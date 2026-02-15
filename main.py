@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from scada.dashboard import open_dashboard
-from physics.phase_transition import open_phase_transition
+from physics.launcher import open_physics_launcher
 
 
 # 기능 함수 정의 (나중에 구현)
@@ -29,7 +29,7 @@ class App(tk.Tk):
         # 버튼 목록: (이름, 실행할 함수) — 여기에 추가하면 자동으로 버튼 생성
         self._buttons = [
             ("1. 임베디드 제어 및 모니터링 (SCADA)", lambda: open_dashboard(self)),
-            ("2. 초전도 물리 엔진 (Phase Transition)", lambda: open_phase_transition(self)),
+            ("2. 초전도 물리 엔진 (Physics)", lambda: open_physics_launcher(self)),
             ("3. 기능 3", function_3),
             ("4. 기능 4", function_4),
             ("5. 기능 5", function_5),
