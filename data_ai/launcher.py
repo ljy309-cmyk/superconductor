@@ -3,6 +3,7 @@
 import tkinter as tk
 
 from data_ai.tc_predictor import open_tc_predictor
+from data_ai.qrng_logger import open_qrng_logger
 
 BG = "#1e1e2e"
 FG = "#cdd6f4"
@@ -26,6 +27,7 @@ class DataAILauncher(tk.Toplevel):
 
         buttons = [
             ("5-1. AI 신소재 Tc 예측 (RandomForest)", self._launch_tc_predictor),
+            ("5-2. QRNG 양자 난수 생성 로그", self._launch_qrng),
         ]
 
         for text, cmd in buttons:
@@ -36,6 +38,9 @@ class DataAILauncher(tk.Toplevel):
 
     def _launch_tc_predictor(self):
         open_tc_predictor(self)
+
+    def _launch_qrng(self):
+        open_qrng_logger(self)
 
 
 def open_data_ai_launcher(master=None):
