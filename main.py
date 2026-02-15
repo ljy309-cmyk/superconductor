@@ -2,11 +2,10 @@ import tkinter as tk
 from tkinter import messagebox
 
 from scada.dashboard import open_dashboard
+from physics.phase_transition import open_phase_transition
 
 
 # 기능 함수 정의 (나중에 구현)
-def function_2():
-    messagebox.showinfo("기능 2", "기능 2은 아직 구현되지 않았습니다.")
 
 
 def function_3():
@@ -30,7 +29,7 @@ class App(tk.Tk):
         # 버튼 목록: (이름, 실행할 함수) — 여기에 추가하면 자동으로 버튼 생성
         self._buttons = [
             ("1. 임베디드 제어 및 모니터링 (SCADA)", lambda: open_dashboard(self)),
-            ("2. 기능 2", function_2),
+            ("2. 초전도 물리 엔진 (Phase Transition)", lambda: open_phase_transition(self)),
             ("3. 기능 3", function_3),
             ("4. 기능 4", function_4),
             ("5. 기능 5", function_5),
