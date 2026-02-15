@@ -3,6 +3,7 @@
 from superconductor import check_superconductivity
 from meissner import run_meissner_simulation
 from tc_prediction import run_tc_analysis
+from tc_ml_prediction import run_ml_prediction
 
 def show_menu():
     print("=" * 50)
@@ -11,7 +12,7 @@ def show_menu():
     print("  1. 초전도 상태 변화 판독기 (조건문 활용)")
     print("  2. 마이스너 효과 시뮬레이션 (반복문 & 리스트)")
     print("  3. 임계 온도 예측 데이터 분석 (데이터 라이브러리)")
-    print("  4. (준비 중)")
+    print("  4. 머신러닝 Tc 예측 (scikit-learn)")
     print("  0. 종료")
     print("=" * 50)
 
@@ -30,7 +31,8 @@ def main():
             print()
             run_tc_analysis()
         elif choice == "4":
-            print("아직 준비 중인 프로그램입니다.")
+            print()
+            run_ml_prediction()
         elif choice == "0":
             print("프로그램을 종료합니다.")
             break

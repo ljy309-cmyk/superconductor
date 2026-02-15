@@ -59,13 +59,15 @@ class TestMainMenu:
         assert "총 물질 수" in output
         assert "프로그램을 종료합니다" in output
 
-    def test_select_4_shows_not_ready(self, monkeypatch, capsys):
-        """4 선택 → 준비 중 메시지."""
-        inputs = iter(["4", "0"])
+    def test_select_4_runs_ml_prediction(self, monkeypatch, capsys):
+        """4 선택 → 머신러닝 Tc 예측 실행."""
+        # 4 선택 → 데이터소스 2(내장) → 모델 1(랜덤포레스트) → 0(돌아가기) → 0(종료)
+        inputs = iter(["4", "2", "1", "0", "0"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
         main()
         output = capsys.readouterr().out
-        assert "준비 중" in output
+        assert "머신러닝" in output
+        assert "프로그램을 종료합니다" in output
 
     def test_select_0_exits(self, monkeypatch, capsys):
         """0 선택 → 즉시 종료."""
