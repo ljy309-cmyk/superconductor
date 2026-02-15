@@ -4,13 +4,10 @@ from tkinter import messagebox
 from scada.dashboard import open_dashboard
 from physics.launcher import open_physics_launcher
 from quantum.launcher import open_quantum_launcher
+from security.launcher import open_security_launcher
 
 
 # 기능 함수 정의 (나중에 구현)
-
-
-def function_4():
-    messagebox.showinfo("기능 4", "기능 4은 아직 구현되지 않았습니다.")
 
 
 def function_5():
@@ -28,7 +25,7 @@ class App(tk.Tk):
             ("1. 임베디드 제어 및 모니터링 (SCADA)", lambda: open_dashboard(self)),
             ("2. 초전도 물리 엔진 (Physics)", lambda: open_physics_launcher(self)),
             ("3. 양자 역학 시뮬레이터 (Quantum)", lambda: open_quantum_launcher(self)),
-            ("4. 기능 4", function_4),
+            ("4. 첨단 센서 및 암호 보안 (Security)", lambda: open_security_launcher(self)),
             ("5. 기능 5", function_5),
         ]
 
