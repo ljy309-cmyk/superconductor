@@ -3,6 +3,7 @@
 import tkinter as tk
 
 from quantum.qubit_chain import open_qubit_chain
+from quantum.tunneling import open_tunneling
 
 BG = "#1e1e2e"
 FG = "#cdd6f4"
@@ -26,6 +27,7 @@ class QuantumLauncher(tk.Toplevel):
 
         buttons = [
             ("3-1. 큐비트 연쇄 붕괴 (Entanglement Cascade)", self._launch_qubit_chain),
+            ("3-2. 양자 중첩 및 터널링 (Tunneling)", self._launch_tunneling),
         ]
 
         for text, cmd in buttons:
@@ -37,6 +39,11 @@ class QuantumLauncher(tk.Toplevel):
     def _launch_qubit_chain(self):
         self.withdraw()
         open_qubit_chain()
+        self.deiconify()
+
+    def _launch_tunneling(self):
+        self.withdraw()
+        open_tunneling()
         self.deiconify()
 
 
