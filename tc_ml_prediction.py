@@ -139,6 +139,183 @@ def predict_tc(model, features):
     return float(model.predict(X)[0])
 
 
+# ── 가상 물질 설계 ───────────────────────────────────────
+
+
+def get_feature_ranges(df, feature_names, le):
+    """학습 데이터에서 각 특성의 범위(최솟값, 최댓값, 평균)를 반환한다.
+
+    Returns:
+        {특성이름: {"min": float, "max": float, "mean": float}} 딕셔너리
+    """
+    numeric_cols = get_numeric_columns(df)
+    ranges = {}
+    for fname in feature_names:
+        if fname == "유형_코드":
+            ranges[fname] = {"유형목록": list(le.classes_)}
+        elif fname in df.columns:
+            col = df[fname]
+            ranges[fname] = {
+                "min": float(col.min()),
+                "max": float(col.max()),
+                "mean": float(col.mean()),
+            }
+    return ranges
+
+
+# 유형별 프리셋 — 각 유형의 대표적 물성 (내장 데이터 기반 참고값)
+MATERIAL_PRESETS = {
+    "원소": {
+        "설명": "단일 원소 초전도체 (Al, Nb, Pb 등)",
+        "평균원자질량": 100.0, "가전자수": 4.0, "밀도": 8.0,
+        "원소수": 1, "평균가전자수": 4.0, "열전도도": 50.0, "전자비열계수": 3.5,
+    },
+    "합금": {
+        "설명": "2~3종 원소 합금 (NbTi 등)",
+        "평균원자질량": 70.0, "가전자수": 5.0, "밀도": 7.0,
+        "원소수": 2, "평균가전자수": 4.5, "열전도도": 30.0, "전자비열계수": 5.0,
+    },
+    "화합물": {
+        "설명": "화학적 화합물 (Nb3Sn, MgB2 등)",
+        "평균원자질량": 50.0, "가전자수": 4.0, "밀도": 6.0,
+        "원소수": 2, "평균가전자수": 4.0, "열전도도": 20.0, "전자비열계수": 5.0,
+    },
+    "고온": {
+        "설명": "고온 초전도체 (YBCO, BSCCO 등)",
+        "평균원자질량": 100.0, "가전자수": 3.0, "밀도": 6.5,
+        "원소수": 5, "평균가전자수": 3.0, "열전도도": 4.0, "전자비열계수": 8.0,
+    },
+    "수소화물": {
+        "설명": "고압 수소화물 (LaH10, YH6 등)",
+        "평균원자질량": 15.0, "가전자수": 3.0, "밀도": 5.0,
+        "원소수": 2, "평균가전자수": 3.0, "열전도도": 35.0, "전자비열계수": 4.0,
+    },
+}
+
+
+def find_similar_materials(df, features, feature_names, le, n=5):
+    """입력 특성과 가장 유사한 기존 물질 n개를 찾는다.
+
+    유클리드 거리 기반 (특성값 정규화 후 비교).
+
+    Returns:
+        [(물질명, 유형, Tc, 거리)] 리스트 (거리 오름차순)
+    """
+    numeric_cols = get_numeric_columns(df)
+
+    # 비교용 특성 행렬 구성 (유형 인코딩 포함)
+    X_db = df[numeric_cols].copy()
+    X_db["유형_코드"] = le.transform(df["유형"])
+    X_db = X_db[feature_names].values
+
+    # 정규화 (0~1 범위)
+    col_min = X_db.min(axis=0)
+    col_max = X_db.max(axis=0)
+    col_range = col_max - col_min
+    col_range[col_range == 0] = 1  # 0 나누기 방지
+
+    X_norm = (X_db - col_min) / col_range
+    feat_norm = (np.array(features) - col_min) / col_range
+
+    # 유클리드 거리
+    distances = np.sqrt(np.sum((X_norm - feat_norm) ** 2, axis=1))
+
+    # 상위 n개
+    top_idx = np.argsort(distances)[:n]
+    results = []
+    for idx in top_idx:
+        results.append((
+            df.iloc[idx]["물질명"],
+            df.iloc[idx]["유형"],
+            float(df.iloc[idx]["Tc"]),
+            float(distances[idx]),
+        ))
+    return results
+
+
+def build_features_from_input(feature_names, ranges, le, preset=None):
+    """대화형으로 특성값을 입력받아 특성 벡터를 구성한다.
+
+    Args:
+        feature_names: 특성 이름 리스트
+        ranges: get_feature_ranges() 결과
+        le: LabelEncoder
+        preset: 프리셋 딕셔너리 (기본값 제공용, None이면 기본값 없음)
+
+    Returns:
+        (features_list, valid) 튜플. valid=False면 입력 오류.
+    """
+    features = []
+    for fname in feature_names:
+        if fname == "유형_코드":
+            type_list = ranges[fname]["유형목록"]
+            print(f"\n  유형 선택: {type_list}")
+            if preset:
+                # 프리셋에서 유형 이름 추출 (프리셋 키가 유형명)
+                default_type = None
+                for t in type_list:
+                    if preset.get("_유형") == t:
+                        default_type = t
+                        break
+                if default_type:
+                    type_input = input(f"  유형 (기본값: {default_type}): ").strip()
+                    type_input = type_input or default_type
+                else:
+                    type_input = input(f"  유형: ").strip()
+            else:
+                type_input = input(f"  유형: ").strip()
+            try:
+                code = le.transform([type_input])[0]
+                features.append(code)
+            except ValueError:
+                print(f"  오류: 알 수 없는 유형 '{type_input}'")
+                return features, False
+        else:
+            r = ranges.get(fname, {})
+            hint = ""
+            default_val = ""
+            if "min" in r:
+                hint = f" (범위: {r['min']:.1f} ~ {r['max']:.1f}, 평균: {r['mean']:.1f})"
+            if preset and fname in preset:
+                default_val = str(preset[fname])
+                prompt = f"  {fname}{hint}\n    값 (기본값: {default_val}): "
+            else:
+                prompt = f"  {fname}{hint}: "
+            val_str = input(prompt).strip()
+            val_str = val_str or default_val
+            try:
+                features.append(float(val_str))
+            except ValueError:
+                print(f"  오류: 숫자를 입력해 주세요.")
+                return features, False
+    return features, True
+
+
+def show_prediction_result(name, pred_tc, similar):
+    """예측 결과와 유사 물질을 출력한다."""
+    print(f"\n{'=' * 55}")
+    print(f"  가상 물질: {name}")
+    print(f"  ★ 예측된 Tc: {pred_tc:.2f} K")
+
+    if pred_tc > 77:
+        print("  → 고온 초전도체 가능성! (액체 질소 온도 77K 이상)")
+    elif pred_tc > 20:
+        print("  → 중간 수준의 Tc입니다.")
+    elif pred_tc > 4.2:
+        print("  → 저온 초전도체 (액체 헬륨 온도 4.2K 이상)")
+    else:
+        print("  → 극저온 영역입니다.")
+    print(f"{'=' * 55}")
+
+    if similar:
+        print(f"\n[ 가장 유사한 기존 물질 (상위 {len(similar)}개) ]")
+        print(f"  {'물질명':16s} {'유형':8s} {'Tc(K)':>8s} {'유사도':>8s}")
+        print(f"  {'-' * 44}")
+        for mat_name, mat_type, mat_tc, dist in similar:
+            similarity = max(0, (1 - dist) * 100)
+            print(f"  {mat_name:16s} {mat_type:8s} {mat_tc:8.2f} {similarity:7.1f}%")
+
+
 # ── 출력 함수 ────────────────────────────────────────────
 
 
@@ -229,19 +406,58 @@ def run_ml_prediction():
     metrics = evaluate_model(model, X_test, y_test)
     show_evaluation(metrics)
 
+    # 특성 범위 계산 (가상 물질 설계 시 참고용)
+    ranges = get_feature_ranges(df, feature_names, le)
+
     while True:
         print("\n[ ML 분석 메뉴 ]")
-        print("  1. 새로운 물질의 Tc 예측")
-        print("  2. 특성 중요도 보기")
-        print("  3. 교차 검증 수행")
-        print("  4. 다른 모델로 재학습")
+        print("  1. 가상 물질 설계 및 Tc 예측")
+        print("  2. 특성 직접 입력으로 Tc 예측")
+        print("  3. 특성 중요도 보기")
+        print("  4. 교차 검증 수행")
+        print("  5. 다른 모델로 재학습")
         print("  0. 메인 메뉴로 돌아가기")
 
         choice = input("번호를 선택하세요: ").strip()
 
         if choice == "1":
-            # 새 물질 예측
-            print(f"\n[ 새로운 물질의 특성 입력 ]")
+            # 가상 물질 설계
+            print(f"\n[ 가상 물질 설계 ]")
+            mat_name = input("  물질 이름 (예: MyAlloy-1): ").strip() or "가상물질"
+
+            print("\n  프리셋을 선택하면 기본값이 제공됩니다.")
+            print("  0. 프리셋 없이 직접 입력")
+            preset_types = list(MATERIAL_PRESETS.keys())
+            for i, ptype in enumerate(preset_types, 1):
+                desc = MATERIAL_PRESETS[ptype]["설명"]
+                print(f"  {i}. {ptype} — {desc}")
+
+            preset_choice = input("  프리셋 번호 (기본값 0): ").strip() or "0"
+
+            preset = None
+            if preset_choice != "0":
+                idx = int(preset_choice) - 1 if preset_choice.isdigit() else -1
+                if 0 <= idx < len(preset_types):
+                    selected_type = preset_types[idx]
+                    preset = dict(MATERIAL_PRESETS[selected_type])
+                    preset["_유형"] = selected_type
+                    print(f"  → {selected_type} 프리셋 로드 완료")
+
+            print(f"\n  특성값을 입력하세요 (프리셋이 있으면 Enter로 기본값 사용):")
+            new_features, valid = build_features_from_input(
+                feature_names, ranges, le, preset
+            )
+
+            if valid:
+                pred_tc = predict_tc(model, new_features)
+                similar = find_similar_materials(
+                    df, new_features, feature_names, le, n=5
+                )
+                show_prediction_result(mat_name, pred_tc, similar)
+
+        elif choice == "2":
+            # 직접 입력 예측
+            print(f"\n[ 특성 직접 입력 ]")
             print(f"  특성 순서: {', '.join(feature_names)}")
 
             new_features = []
@@ -276,11 +492,11 @@ def run_ml_prediction():
                 else:
                     print("  → 저온 초전도체 영역입니다.")
 
-        elif choice == "2":
+        elif choice == "3":
             importances = get_feature_importance(model, feature_names)
             show_feature_importance(importances)
 
-        elif choice == "3":
+        elif choice == "4":
             print("\n  교차 검증 수행 중...")
             model_class = MODELS[model_name]
             params = DEFAULT_MODEL_PARAMS[model_name]
@@ -288,7 +504,7 @@ def run_ml_prediction():
             cv_result = cross_validate_model(cv_model, X, y)
             show_cross_validation(cv_result)
 
-        elif choice == "4":
+        elif choice == "5":
             print("\n[ 모델 선택 ]")
             print("  1. 랜덤포레스트")
             print("  2. 그래디언트부스팅")
@@ -303,4 +519,4 @@ def run_ml_prediction():
         elif choice == "0":
             break
         else:
-            print("올바른 번호를 입력해 주세요. (0~4)")
+            print("올바른 번호를 입력해 주세요. (0~5)")
