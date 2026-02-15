@@ -3,6 +3,7 @@
 import tkinter as tk
 
 from security.squid_mines import open_squid_mines
+from security.bb84_defense import open_bb84_defense
 
 BG = "#1e1e2e"
 FG = "#cdd6f4"
@@ -26,6 +27,7 @@ class SecurityLauncher(tk.Toplevel):
 
         buttons = [
             ("4-1. SQUID 지뢰찾기 (Magnetic Flux Sensor)", self._launch_squid),
+            ("4-2. BB84 양자 암호 통신 방어전", self._launch_bb84),
         ]
 
         for text, cmd in buttons:
@@ -37,6 +39,11 @@ class SecurityLauncher(tk.Toplevel):
     def _launch_squid(self):
         self.withdraw()
         open_squid_mines()
+        self.deiconify()
+
+    def _launch_bb84(self):
+        self.withdraw()
+        open_bb84_defense()
         self.deiconify()
 
 
