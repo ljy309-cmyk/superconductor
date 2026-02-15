@@ -10,13 +10,14 @@ class TestShowMenu:
     """메뉴 출력 확인."""
 
     def test_displays_all_options(self, capsys):
-        """4개 프로그램 항목과 종료 옵션이 모두 표시된다."""
+        """5개 프로그램 항목과 종료 옵션이 모두 표시된다."""
         show_menu()
         output = capsys.readouterr().out
         assert "1." in output
         assert "2." in output
         assert "3." in output
         assert "4." in output
+        assert "5." in output
         assert "0. 종료" in output
 
     def test_displays_title(self, capsys):
@@ -67,6 +68,16 @@ class TestMainMenu:
         main()
         output = capsys.readouterr().out
         assert "머신러닝" in output
+        assert "프로그램을 종료합니다" in output
+
+    def test_select_5_runs_critical_field(self, monkeypatch, capsys):
+        """5 선택 → 임계 자기장 시뮬레이션 실행."""
+        # 5 선택 → 물질 기본값(Nb) → 보드 크기 기본값 → 0(돌아가기) → 0(종료)
+        inputs = iter(["5", "3", "5", "0", "0"])
+        monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+        main()
+        output = capsys.readouterr().out
+        assert "체스 전략" in output
         assert "프로그램을 종료합니다" in output
 
     def test_select_0_exits(self, monkeypatch, capsys):
