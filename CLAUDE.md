@@ -21,7 +21,9 @@ superconductor/
 ├── README.md                # Project title and description
 ├── main.py                  # 메인 메뉴 (4개 프로그램 선택)
 ├── superconductor.py        # 프로그램 1 — 초전도 상태 판독기
+├── meissner.py              # 프로그램 2 — 마이스너 효과 시뮬레이션
 ├── test_main.py             # 메뉴 시스템 테스트 (8 tests)
+├── test_meissner.py         # 마이스너 시뮬레이션 테스트 (16 tests)
 └── test_superconductor.py   # 초전도 판독기 테스트 (15 tests)
 ```
 
@@ -30,13 +32,14 @@ superconductor/
 ### Prerequisites
 
 - Python 3.11+
+- numpy, matplotlib (프로그램 2: 마이스너 시뮬레이션)
 - pytest (for running tests)
 
 ### Getting Started
 
 ```bash
-# Install test dependencies
-pip install pytest
+# Install dependencies
+pip install numpy matplotlib pytest
 
 # Run the program (menu)
 python main.py
@@ -66,7 +69,7 @@ python -m pytest test_superconductor.py::TestSuperconductingState -v
 
 ## Testing
 
-Tests use **pytest**. Total **23 tests** across two files.
+Tests use **pytest**. Total **39 tests** across three files.
 Tests use `monkeypatch` to simulate `input()` and `capsys` to capture printed output.
 
 ### `test_main.py` (8 tests)
@@ -74,7 +77,16 @@ Tests use `monkeypatch` to simulate `input()` and `capsys` to capture printed ou
 | Test Class | What it covers |
 |---|---|
 | `TestShowMenu` | 메뉴 출력 (4개 항목 + 종료 옵션, 제목) |
-| `TestMainMenu` | 메뉴 선택 동작 (1→초전도 실행, 2~4→준비 중, 0→종료, 잘못된 입력) |
+| `TestMainMenu` | 메뉴 선택 동작 (1→초전도, 2→마이스너, 3~4→준비 중, 0→종료) |
+
+### `test_meissner.py` (16 tests)
+
+| Test Class | What it covers |
+|---|---|
+| `TestCreateGrid` | 격자 생성 (크기, 범위, 대칭성) |
+| `TestComputeField` | 자기장 계산 (내부=0, 외부 수렴, 표면 편향, 마스크) |
+| `TestPlotMeissner` | 시각화 (fig/ax 반환, 파일 저장) |
+| `TestRunSimulation` | 대화형 실행 (기본값, 빈 입력, 오류 처리) |
 
 ### `test_superconductor.py` (15 tests)
 
@@ -103,7 +115,7 @@ while 루프로 반복 실행되며, "0" 입력 시 종료.
 | 번호 | 프로그램 | 모듈 |
 |------|---------|------|
 | 1 | 초전도 상태 변화 판독기 | `superconductor.py` |
-| 2 | (준비 중) | — |
+| 2 | 마이스너 효과 시뮬레이션 | `meissner.py` |
 | 3 | (준비 중) | — |
 | 4 | (준비 중) | — |
 
@@ -115,6 +127,17 @@ while 루프로 반복 실행되며, "0" 입력 시 종료.
 2. **사용자 입력** — `input()`으로 현재 온도(K)와 자기장(T) 입력
 3. **조건 판별** — if-else 조건문으로 상태 결정
 4. **결과 출력** — 초전도/일반 상태와 판별 근거 출력
+
+### 프로그램 2: `meissner.py`
+
+마이스너 효과(자기장 배척) 시뮬레이션. 학습 포인트: 반복문(for), 리스트(list), matplotlib.
+
+- **`create_grid()`** — numpy meshgrid로 2D 격자 좌표 생성
+- **`compute_field_with_meissner()`** — 자기 쌍극자 모델로 초전도체 주변 자기장 계산
+  - 내부: B = 0 (마이스너 효과)
+  - 외부: 외부 자기장 + 쌍극자 보정 (자기장이 휘어지는 효과)
+- **`plot_meissner()`** — matplotlib quiver plot으로 시각화, PNG 저장
+- **`run_meissner_simulation()`** — 대화형 실행 (반지름, 격자 밀도, 자기장 세기 입력)
 
 ### State Determination Logic (조건문 흐름)
 
@@ -174,7 +197,9 @@ _No CI/CD pipeline configured yet._
 |------|---------|
 | `main.py` | 메인 메뉴 — 4개 프로그램 선택 진입점 |
 | `superconductor.py` | 프로그램 1 — 수은 기준 초전도 상태 판별 |
+| `meissner.py` | 프로그램 2 — 마이스너 효과 자기장 시뮬레이션 |
 | `test_main.py` | 메뉴 시스템 테스트 (8 tests) |
+| `test_meissner.py` | 마이스너 시뮬레이션 테스트 (16 tests) |
 | `test_superconductor.py` | 초전도 판독기 테스트 (15 tests) |
 | `README.md` | Project description |
 | `CLAUDE.md` | This guide — keep it updated as the project evolves |

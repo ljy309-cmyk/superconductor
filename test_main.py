@@ -1,5 +1,7 @@
 """메인 메뉴 시스템 테스트."""
 
+import matplotlib
+matplotlib.use("Agg")
 import pytest
 from main import show_menu, main
 
@@ -37,13 +39,15 @@ class TestMainMenu:
         assert "초전도 상태" in output
         assert "프로그램을 종료합니다" in output
 
-    def test_select_2_shows_not_ready(self, monkeypatch, capsys):
-        """2 선택 → 준비 중 메시지."""
-        inputs = iter(["2", "0"])
+    def test_select_2_runs_meissner(self, monkeypatch, capsys, tmp_path):
+        """2 선택 → 마이스너 시뮬레이션 실행."""
+        monkeypatch.chdir(tmp_path)
+        inputs = iter(["2", "1.0", "10", "1.0", "0"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
         main()
         output = capsys.readouterr().out
-        assert "준비 중" in output
+        assert "마이스너" in output
+        assert "프로그램을 종료합니다" in output
 
     def test_select_3_shows_not_ready(self, monkeypatch, capsys):
         """3 선택 → 준비 중 메시지."""
