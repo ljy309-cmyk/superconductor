@@ -49,13 +49,15 @@ class TestMainMenu:
         assert "마이스너" in output
         assert "프로그램을 종료합니다" in output
 
-    def test_select_3_shows_not_ready(self, monkeypatch, capsys):
-        """3 선택 → 준비 중 메시지."""
-        inputs = iter(["3", "0"])
+    def test_select_3_runs_tc_analysis(self, monkeypatch, capsys):
+        """3 선택 → 임계 온도 데이터 분석 실행."""
+        # 3 선택 → 분석 메뉴에서 2(통계) → 0(돌아가기) → 0(종료)
+        inputs = iter(["3", "2", "0", "0"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
         main()
         output = capsys.readouterr().out
-        assert "준비 중" in output
+        assert "총 물질 수" in output
+        assert "프로그램을 종료합니다" in output
 
     def test_select_4_shows_not_ready(self, monkeypatch, capsys):
         """4 선택 → 준비 중 메시지."""

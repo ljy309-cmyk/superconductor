@@ -22,9 +22,11 @@ superconductor/
 ├── main.py                  # 메인 메뉴 (4개 프로그램 선택)
 ├── superconductor.py        # 프로그램 1 — 초전도 상태 판독기
 ├── meissner.py              # 프로그램 2 — 마이스너 효과 시뮬레이션
+├── tc_prediction.py         # 프로그램 3 — 임계 온도 데이터 분석
 ├── test_main.py             # 메뉴 시스템 테스트 (8 tests)
-├── test_meissner.py         # 마이스너 시뮬레이션 테스트 (16 tests)
-└── test_superconductor.py   # 초전도 판독기 테스트 (15 tests)
+├── test_meissner.py         # 마이스너 시뮬레이션 테스트 (20 tests)
+├── test_superconductor.py   # 초전도 판독기 테스트 (15 tests)
+└── test_tc_prediction.py    # 데이터 분석 테스트 (25 tests)
 ```
 
 ## Development Setup
@@ -33,13 +35,14 @@ superconductor/
 
 - Python 3.11+
 - numpy, matplotlib (프로그램 2: 마이스너 시뮬레이션)
+- pandas, scipy (프로그램 3: 임계 온도 데이터 분석)
 - pytest (for running tests)
 
 ### Getting Started
 
 ```bash
 # Install dependencies
-pip install numpy matplotlib pytest
+pip install numpy matplotlib pandas scipy pytest
 
 # Run the program (menu)
 python main.py
@@ -69,7 +72,7 @@ python -m pytest test_superconductor.py::TestSuperconductingState -v
 
 ## Testing
 
-Tests use **pytest**. Total **39 tests** across three files.
+Tests use **pytest**. Total **68 tests** across four files.
 Tests use `monkeypatch` to simulate `input()` and `capsys` to capture printed output.
 
 ### `test_main.py` (8 tests)
@@ -77,16 +80,28 @@ Tests use `monkeypatch` to simulate `input()` and `capsys` to capture printed ou
 | Test Class | What it covers |
 |---|---|
 | `TestShowMenu` | 메뉴 출력 (4개 항목 + 종료 옵션, 제목) |
-| `TestMainMenu` | 메뉴 선택 동작 (1→초전도, 2→마이스너, 3~4→준비 중, 0→종료) |
+| `TestMainMenu` | 메뉴 선택 동작 (1→초전도, 2→마이스너, 3→데이터분석, 4→준비 중, 0→종료) |
 
-### `test_meissner.py` (16 tests)
+### `test_meissner.py` (20 tests)
 
 | Test Class | What it covers |
 |---|---|
 | `TestCreateGrid` | 격자 생성 (크기, 범위, 대칭성) |
 | `TestComputeField` | 자기장 계산 (내부=0, 외부 수렴, 표면 편향, 마스크) |
 | `TestPlotMeissner` | 시각화 (fig/ax 반환, 파일 저장) |
-| `TestRunSimulation` | 대화형 실행 (기본값, 빈 입력, 오류 처리) |
+| `TestRunSimulation` | 대화형 실행 (기본값, 빈 입력, 컬러맵 선택, 오류 처리) |
+
+### `test_tc_prediction.py` (25 tests)
+
+| Test Class | What it covers |
+|---|---|
+| `TestLoadDataset` | 데이터셋 로드 (DataFrame 형식, 열 이름, 행 수, 유효성) |
+| `TestBasicStats` | 기본 통계 출력 (물질 수, 최솟/최댓값, 평균) |
+| `TestDataTable` | 데이터 테이블 출력 (모든 물질 포함 확인) |
+| `TestCorrelation` | 상관 분석 (3개 변수, 상관계수 범위) |
+| `TestRegression` | 회귀 분석 (선형 모델, R², 완벽 피팅) |
+| `TestPlotAnalysis` | 시각화 (4종 차트 반환, 파일 저장) |
+| `TestRunAnalysis` | 대화형 실행 (테이블, 통계, 상관, 회귀, 그래프) |
 
 ### `test_superconductor.py` (15 tests)
 
@@ -116,7 +131,7 @@ while 루프로 반복 실행되며, "0" 입력 시 종료.
 |------|---------|------|
 | 1 | 초전도 상태 변화 판독기 | `superconductor.py` |
 | 2 | 마이스너 효과 시뮬레이션 | `meissner.py` |
-| 3 | (준비 중) | — |
+| 3 | 임계 온도 예측 데이터 분석 | `tc_prediction.py` |
 | 4 | (준비 중) | — |
 
 ### 프로그램 1: `superconductor.py`
@@ -137,7 +152,19 @@ while 루프로 반복 실행되며, "0" 입력 시 종료.
   - 내부: B = 0 (마이스너 효과)
   - 외부: 외부 자기장 + 쌍극자 보정 (자기장이 휘어지는 효과)
 - **`plot_meissner()`** — matplotlib quiver plot으로 시각화, PNG 저장
-- **`run_meissner_simulation()`** — 대화형 실행 (반지름, 격자 밀도, 자기장 세기 입력)
+- **`run_meissner_simulation()`** — 대화형 실행 (반지름, 격자 밀도, 자기장 세기, 컬러맵 입력)
+
+### 프로그램 3: `tc_prediction.py`
+
+임계 온도 예측 데이터 분석. 학습 포인트: pandas, scipy, 데이터 시각화.
+
+- **`SUPERCONDUCTOR_DATA`** — 20종 초전도체의 물리적 성질 (질량, 가전자수, 밀도, Tc)
+- **`load_dataset()`** — pandas DataFrame으로 데이터 로드
+- **`show_basic_stats()`** / **`show_data_table()`** — 통계 및 테이블 출력
+- **`compute_correlation()`** — scipy.stats.pearsonr로 각 변수와 Tc의 상관계수 계산
+- **`fit_regression()`** — scipy.optimize.curve_fit으로 선형 회귀 (기울기, 절편, R²)
+- **`plot_analysis()`** — 4종 서브플롯 (히스토그램, 산점도+회귀선, 박스플롯, 밀도 산점도)
+- **`run_tc_analysis()`** — 하위 메뉴 방식 대화형 실행 (1~5 분석 선택)
 
 ### State Determination Logic (조건문 흐름)
 
@@ -198,9 +225,11 @@ _No CI/CD pipeline configured yet._
 | `main.py` | 메인 메뉴 — 4개 프로그램 선택 진입점 |
 | `superconductor.py` | 프로그램 1 — 수은 기준 초전도 상태 판별 |
 | `meissner.py` | 프로그램 2 — 마이스너 효과 자기장 시뮬레이션 |
+| `tc_prediction.py` | 프로그램 3 — 임계 온도 데이터 분석 |
 | `test_main.py` | 메뉴 시스템 테스트 (8 tests) |
-| `test_meissner.py` | 마이스너 시뮬레이션 테스트 (16 tests) |
 | `test_superconductor.py` | 초전도 판독기 테스트 (15 tests) |
+| `test_meissner.py` | 마이스너 시뮬레이션 테스트 (20 tests) |
+| `test_tc_prediction.py` | 데이터 분석 테스트 (25 tests) |
 | `README.md` | Project description |
 | `CLAUDE.md` | This guide — keep it updated as the project evolves |
 
@@ -212,4 +241,4 @@ Keep this document current as the project grows. Update it when:
 - Linting or formatting tools are set up
 - CI/CD pipelines are created
 - New materials or physics models are introduced
-- 새로운 프로그램(2~4번)이 추가되면 메뉴와 이 문서를 함께 업데이트
+- 새로운 프로그램(4번)이 추가되면 메뉴와 이 문서를 함께 업데이트
