@@ -23,10 +23,13 @@ superconductor/
 ├── superconductor.py        # 프로그램 1 — 초전도 상태 판독기
 ├── meissner.py              # 프로그램 2 — 마이스너 효과 시뮬레이션
 ├── tc_prediction.py         # 프로그램 3 — 임계 온도 데이터 분석
+├── superconductor_data.csv  # 대규모 실험 데이터 (21,263행)
+├── generate_dataset.py      # CSV 데이터셋 생성 스크립트
 ├── test_main.py             # 메뉴 시스템 테스트 (8 tests)
 ├── test_meissner.py         # 마이스너 시뮬레이션 테스트 (20 tests)
 ├── test_superconductor.py   # 초전도 판독기 테스트 (15 tests)
-└── test_tc_prediction.py    # 데이터 분석 테스트 (25 tests)
+├── test_tc_prediction.py    # 데이터 분석 테스트 (46 tests)
+└── test_superconductor_data.csv  # 테스트용 CSV (20행)
 ```
 
 ## Development Setup
@@ -72,7 +75,7 @@ python -m pytest test_superconductor.py::TestSuperconductingState -v
 
 ## Testing
 
-Tests use **pytest**. Total **68 tests** across four files.
+Tests use **pytest**. Total **89 tests** across four files.
 Tests use `monkeypatch` to simulate `input()` and `capsys` to capture printed output.
 
 ### `test_main.py` (8 tests)
@@ -91,17 +94,20 @@ Tests use `monkeypatch` to simulate `input()` and `capsys` to capture printed ou
 | `TestPlotMeissner` | 시각화 (fig/ax 반환, 파일 저장) |
 | `TestRunSimulation` | 대화형 실행 (기본값, 빈 입력, 컬러맵 선택, 오류 처리) |
 
-### `test_tc_prediction.py` (25 tests)
+### `test_tc_prediction.py` (46 tests)
 
 | Test Class | What it covers |
 |---|---|
-| `TestLoadDataset` | 데이터셋 로드 (DataFrame 형식, 열 이름, 행 수, 유효성) |
-| `TestBasicStats` | 기본 통계 출력 (물질 수, 최솟/최댓값, 평균) |
-| `TestDataTable` | 데이터 테이블 출력 (모든 물질 포함 확인) |
-| `TestCorrelation` | 상관 분석 (3개 변수, 상관계수 범위) |
-| `TestRegression` | 회귀 분석 (선형 모델, R², 완벽 피팅) |
-| `TestPlotAnalysis` | 시각화 (4종 차트 반환, 파일 저장) |
-| `TestRunAnalysis` | 대화형 실행 (테이블, 통계, 상관, 회귀, 그래프) |
+| `TestLoadDataset` | 내장 데이터셋 로드 (DataFrame 형식, 열 이름, 행 수, 유효성) |
+| `TestLoadCsv` | CSV 파일 로드 (정상/오류/필수열 검증) |
+| `TestGetNumericColumns` | 수치 열 자동 감지 (내장 3개, CSV 6개) |
+| `TestBasicStats` | 기본 통계 출력 (소규모 + 대규모 분위수) |
+| `TestDataTable` | 데이터 테이블 출력 (소규모 전체 / 대규모 앞뒤 생략) |
+| `TestTypeSummary` | 유형별 Tc 요약 통계 |
+| `TestCorrelation` | 상관 분석 (내장 3개 / CSV 6개 변수, 범위 확인) |
+| `TestRegression` | 회귀 분석 (선형 모델, R², CSV 확장 열) |
+| `TestPlotAnalysis` | 시각화 (내장 + CSV 데이터 차트, 파일 저장) |
+| `TestRunAnalysis` | 대화형 실행 (내장/CSV 로드, 유형별 요약, 오류 처리) |
 
 ### `test_superconductor.py` (15 tests)
 
@@ -156,15 +162,23 @@ while 루프로 반복 실행되며, "0" 입력 시 종료.
 
 ### 프로그램 3: `tc_prediction.py`
 
-임계 온도 예측 데이터 분석. 학습 포인트: pandas, scipy, 데이터 시각화.
+임계 온도 예측 데이터 분석. 학습 포인트: pandas, scipy, CSV 파일 I/O, 데이터 시각화.
 
-- **`SUPERCONDUCTOR_DATA`** — 20종 초전도체의 물리적 성질 (질량, 가전자수, 밀도, Tc)
-- **`load_dataset()`** — pandas DataFrame으로 데이터 로드
-- **`show_basic_stats()`** / **`show_data_table()`** — 통계 및 테이블 출력
-- **`compute_correlation()`** — scipy.stats.pearsonr로 각 변수와 Tc의 상관계수 계산
-- **`fit_regression()`** — scipy.optimize.curve_fit으로 선형 회귀 (기울기, 절편, R²)
-- **`plot_analysis()`** — 4종 서브플롯 (히스토그램, 산점도+회귀선, 박스플롯, 밀도 산점도)
-- **`run_tc_analysis()`** — 하위 메뉴 방식 대화형 실행 (1~5 분석 선택)
+**데이터 소스** (실행 시 선택):
+- CSV 파일 — `superconductor_data.csv` (21,263행, 9열: 물질명, 유형, 원소수, 평균원자질량, 평균가전자수, 밀도, 열전도도, 전자비열계수, Tc)
+- 내장 데이터 — `SUPERCONDUCTOR_DATA` (20종, 폴백용)
+
+**핵심 함수:**
+- **`load_csv()`** — CSV 파일 로드 + 필수 열(물질명, 유형, Tc) 검증
+- **`load_dataset()`** — 내장 데이터 20종 DataFrame 반환
+- **`get_numeric_columns()`** — Tc 제외 수치형 열 자동 감지
+- **`show_basic_stats()`** — 기본 통계 (대규모 데이터는 분위수 추가)
+- **`show_data_table()`** — 표 출력 (대규모 데이터는 앞뒤 15행씩 생략 표시)
+- **`show_type_summary()`** — 유형별 Tc 요약 (개수, 평균, 중앙값, 최솟/최댓값)
+- **`compute_correlation()`** — pearsonr 상관계수 + 유의수준 표시 (***/**/* )
+- **`fit_regression()`** — curve_fit 선형 회귀 (기울기, 절편, R²)
+- **`plot_analysis()`** — 4종 서브플롯 (대규모 데이터용 점 크기/투명도 자동 조정)
+- **`run_tc_analysis()`** — 하위 메뉴 대화형 실행 (1~6 분석 + 데이터 소스 선택)
 
 ### State Determination Logic (조건문 흐름)
 
@@ -225,11 +239,14 @@ _No CI/CD pipeline configured yet._
 | `main.py` | 메인 메뉴 — 4개 프로그램 선택 진입점 |
 | `superconductor.py` | 프로그램 1 — 수은 기준 초전도 상태 판별 |
 | `meissner.py` | 프로그램 2 — 마이스너 효과 자기장 시뮬레이션 |
-| `tc_prediction.py` | 프로그램 3 — 임계 온도 데이터 분석 |
+| `tc_prediction.py` | 프로그램 3 — 임계 온도 데이터 분석 (CSV + 내장) |
+| `superconductor_data.csv` | 대규모 실험 데이터 (21,263행, 9열) |
+| `generate_dataset.py` | CSV 데이터셋 생성 스크립트 |
 | `test_main.py` | 메뉴 시스템 테스트 (8 tests) |
 | `test_superconductor.py` | 초전도 판독기 테스트 (15 tests) |
 | `test_meissner.py` | 마이스너 시뮬레이션 테스트 (20 tests) |
-| `test_tc_prediction.py` | 데이터 분석 테스트 (25 tests) |
+| `test_tc_prediction.py` | 데이터 분석 테스트 (46 tests) |
+| `test_superconductor_data.csv` | 테스트용 CSV (20행) |
 | `README.md` | Project description |
 | `CLAUDE.md` | This guide — keep it updated as the project evolves |
 

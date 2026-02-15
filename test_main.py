@@ -51,8 +51,8 @@ class TestMainMenu:
 
     def test_select_3_runs_tc_analysis(self, monkeypatch, capsys):
         """3 선택 → 임계 온도 데이터 분석 실행."""
-        # 3 선택 → 분석 메뉴에서 2(통계) → 0(돌아가기) → 0(종료)
-        inputs = iter(["3", "2", "0", "0"])
+        # 3 선택 → 데이터소스 2(내장) → 분석 메뉴 2(통계) → 0(돌아가기) → 0(종료)
+        inputs = iter(["3", "2", "2", "0", "0"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
         main()
         output = capsys.readouterr().out

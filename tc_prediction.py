@@ -1,6 +1,8 @@
 # 임계 온도 예측 데이터 분석
 # 학습 포인트: 외부 라이브러리 활용 (pandas, scipy, matplotlib)
+# CSV 파일(2만 개 이상 실험 데이터) 또는 내장 데이터셋으로 분석 가능
 
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,8 +10,8 @@ from scipy import stats
 from scipy.optimize import curve_fit
 
 
-# ── 초전도체 데이터셋 ────────────────────────────────────
-# 실제 초전도체 물질의 물리적 성질과 임계 온도(T_c)
+# ── 내장 초전도체 데이터셋 (소규모 기본 데이터) ──────────
+# CSV 파일이 없을 때 사용되는 폴백 데이터
 # 출처: 물리학 핸드북, 실험 논문 데이터 종합
 
 SUPERCONDUCTOR_DATA = [
@@ -38,11 +40,53 @@ SUPERCONDUCTOR_DATA = [
 
 COLUMNS = ["물질명", "유형", "평균원자질량", "가전자수", "밀도", "Tc"]
 
+# CSV 파일의 열 이름 (확장된 데이터)
+CSV_COLUMNS = ["물질명", "유형", "원소수", "평균원자질량", "평균가전자수",
+               "밀도", "열전도도", "전자비열계수", "Tc"]
+
+# CSV에서 분석 가능한 수치 열 목록
+CSV_NUMERIC_COLS = ["평균원자질량", "평균가전자수", "밀도", "열전도도", "전자비열계수", "원소수"]
+
+DEFAULT_CSV_PATH = "superconductor_data.csv"
+
 
 def load_dataset():
-    """초전도체 데이터를 pandas DataFrame으로 반환한다."""
+    """내장 초전도체 데이터를 pandas DataFrame으로 반환한다."""
     df = pd.DataFrame(SUPERCONDUCTOR_DATA, columns=COLUMNS)
     return df
+
+
+def load_csv(csv_path):
+    """CSV 파일에서 초전도체 데이터를 로드한다.
+
+    Args:
+        csv_path: CSV 파일 경로
+
+    Returns:
+        pandas DataFrame
+
+    Raises:
+        FileNotFoundError: 파일이 존재하지 않을 때
+        ValueError: 필수 열(물질명, 유형, Tc)이 없을 때
+    """
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"파일을 찾을 수 없습니다: {csv_path}")
+
+    df = pd.read_csv(csv_path)
+
+    # 필수 열 검증
+    required = {"물질명", "유형", "Tc"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"필수 열이 없습니다: {missing}")
+
+    return df
+
+
+def get_numeric_columns(df):
+    """DataFrame에서 Tc를 제외한 수치형 열 목록을 반환한다."""
+    numeric = df.select_dtypes(include=[np.number]).columns.tolist()
+    return [c for c in numeric if c != "Tc"]
 
 
 def show_basic_stats(df):
@@ -60,34 +104,67 @@ def show_basic_stats(df):
     print(f"  중앙값: {df['Tc'].median():.2f} K")
     print(f"  표준편차: {df['Tc'].std():.2f} K")
 
+    # CSV 데이터(대규모)인 경우 추가 분위수 정보
+    if len(df) > 100:
+        print(f"\n[ 분위수 ]")
+        for q in [0.25, 0.50, 0.75, 0.90, 0.95, 0.99]:
+            print(f"  {q*100:5.1f}%: {df['Tc'].quantile(q):8.2f} K")
 
-def show_data_table(df):
-    """전체 데이터를 표 형태로 출력한다."""
-    print("\n[ 초전도체 데이터 테이블 ]")
+
+def show_data_table(df, max_rows=30):
+    """데이터를 표 형태로 출력한다. 대규모 데이터는 앞뒤만 보여준다."""
+    num_cols = get_numeric_columns(df)
+    print(f"\n[ 초전도체 데이터 테이블 ] (총 {len(df)}개)")
     print("-" * 75)
-    print(f"{'물질명':16s} {'유형':8s} {'질량(amu)':>10s} {'가전자':>6s} "
-          f"{'밀도':>8s} {'Tc(K)':>8s}")
+
+    # 열 헤더 결정 (데이터에 있는 열 기준)
+    header_cols = ["물질명", "유형"]
+    display_cols = []
+    for col in ["평균원자질량", "평균가전자수", "가전자수", "밀도", "Tc"]:
+        if col in df.columns:
+            header_cols.append(col)
+            display_cols.append(col)
+
+    print(f"{'물질명':16s} {'유형':8s}", end="")
+    for col in display_cols:
+        print(f" {col:>10s}", end="")
+    print()
     print("-" * 75)
-    for _, row in df.iterrows():
-        print(f"{row['물질명']:16s} {row['유형']:8s} {row['평균원자질량']:10.2f} "
-              f"{row['가전자수']:6d} {row['밀도']:8.2f} {row['Tc']:8.2f}")
+
+    if len(df) <= max_rows:
+        rows_to_show = df
+    else:
+        # 앞 15개 + 뒤 15개
+        rows_to_show = pd.concat([df.head(15), df.tail(15)])
+        show_ellipsis = True
+
+    for idx, (_, row) in enumerate(rows_to_show.iterrows()):
+        if len(df) > max_rows and idx == 15:
+            print(f"  ... ({len(df) - 30}개 행 생략) ...")
+        print(f"{str(row['물질명']):16s} {str(row['유형']):8s}", end="")
+        for col in display_cols:
+            print(f" {row[col]:10.2f}", end="")
+        print()
     print("-" * 75)
 
 
 def compute_correlation(df):
     """각 수치 변수와 T_c 사이의 상관계수를 계산한다."""
-    numeric_cols = ["평균원자질량", "가전자수", "밀도"]
+    numeric_cols = get_numeric_columns(df)
     results = []
 
-    print("\n[ 상관 분석: 각 변수 vs T_c ]")
-    print("-" * 55)
+    print(f"\n[ 상관 분석: 각 변수 vs T_c ] ({len(numeric_cols)}개 변수)")
+    print("-" * 65)
     for col in numeric_cols:
         r, p_value = stats.pearsonr(df[col], df["Tc"])
         results.append({"변수": col, "상관계수(r)": r, "p-value": p_value})
         strength = "강함" if abs(r) > 0.5 else "약함"
         sign = "양의" if r > 0 else "음의"
-        print(f"  {col:12s} → r = {r:+.4f} (p={p_value:.4f}) [{sign} 상관, {strength}]")
-    print("-" * 55)
+        sig = "***" if p_value < 0.001 else ("**" if p_value < 0.01 else ("*" if p_value < 0.05 else ""))
+        print(f"  {col:12s} → r = {r:+.4f} (p={p_value:.4e}) [{sign} 상관, {strength}] {sig}")
+    print("-" * 65)
+    if len(df) > 100:
+        print("  유의수준: *** p<0.001, ** p<0.01, * p<0.05")
 
     return pd.DataFrame(results)
 
@@ -122,6 +199,25 @@ def fit_regression(df, x_col):
     return a, b, r_squared
 
 
+def show_type_summary(df):
+    """유형별 Tc 요약 통계를 출력한다."""
+    print("\n[ 유형별 Tc 요약 통계 ]")
+    print("-" * 70)
+    print(f"  {'유형':10s} {'개수':>6s} {'평균(K)':>8s} {'중앙값(K)':>9s} "
+          f"{'최솟값(K)':>9s} {'최댓값(K)':>9s} {'표준편차':>8s}")
+    print("-" * 70)
+
+    for type_name in sorted(df["유형"].unique()):
+        subset = df[df["유형"] == type_name]["Tc"]
+        print(f"  {type_name:10s} {len(subset):6d} {subset.mean():8.2f} "
+              f"{subset.median():9.2f} {subset.min():9.2f} "
+              f"{subset.max():9.2f} {subset.std():8.2f}")
+    print("-" * 70)
+    print(f"  {'전체':10s} {len(df):6d} {df['Tc'].mean():8.2f} "
+          f"{df['Tc'].median():9.2f} {df['Tc'].min():9.2f} "
+          f"{df['Tc'].max():9.2f} {df['Tc'].std():8.2f}")
+
+
 def plot_analysis(df, save_path=None):
     """4개 서브플롯으로 데이터 분석 결과를 시각화한다.
 
@@ -141,20 +237,31 @@ def plot_analysis(df, save_path=None):
 
     colors = [type_colors.get(t, "#999999") for t in df["유형"]]
 
+    # 대규모 데이터용 점 크기/투명도 조정
+    n = len(df)
+    point_size = max(5, min(80, 800 / (n ** 0.5)))
+    alpha = max(0.1, min(1.0, 100 / (n ** 0.5)))
+
+    # 히스토그램 빈 수 조정
+    n_bins = min(50, max(10, int(n ** 0.5)))
+
     # 1. T_c 분포 히스토그램
     ax1 = axes[0, 0]
-    ax1.hist(df["Tc"], bins=10, color="#42A5F5", edgecolor="white", alpha=0.8)
+    ax1.hist(df["Tc"], bins=n_bins, color="#42A5F5", edgecolor="white", alpha=0.8)
     ax1.set_xlabel("Tc (K)")
     ax1.set_ylabel("Count")
-    ax1.set_title("Tc Distribution")
-    ax1.axvline(df["Tc"].median(), color="red", linestyle="--", label=f"Median={df['Tc'].median():.1f}K")
+    ax1.set_title(f"Tc Distribution (n={n:,})")
+    ax1.axvline(df["Tc"].median(), color="red", linestyle="--",
+                label=f"Median={df['Tc'].median():.1f}K")
     ax1.legend()
 
     # 2. 평균원자질량 vs T_c
     ax2 = axes[0, 1]
-    ax2.scatter(df["평균원자질량"], df["Tc"], c=colors, s=80, edgecolors="white", zorder=5)
-    a, b, r2 = fit_regression(df, "평균원자질량")
-    x_fit = np.linspace(df["평균원자질량"].min(), df["평균원자질량"].max(), 100)
+    mass_col = "평균원자질량"
+    ax2.scatter(df[mass_col], df["Tc"], c=colors, s=point_size,
+                alpha=alpha, edgecolors="none", zorder=5)
+    a, b, r2 = fit_regression(df, mass_col)
+    x_fit = np.linspace(df[mass_col].min(), df[mass_col].max(), 100)
     ax2.plot(x_fit, linear_model(x_fit, a, b), "r--", alpha=0.7, label=f"R²={r2:.3f}")
     ax2.set_xlabel("Avg Atomic Mass (amu)")
     ax2.set_ylabel("Tc (K)")
@@ -175,7 +282,8 @@ def plot_analysis(df, save_path=None):
 
     # 4. 밀도 vs T_c
     ax4 = axes[1, 1]
-    ax4.scatter(df["밀도"], df["Tc"], c=colors, s=80, edgecolors="white", zorder=5)
+    ax4.scatter(df["밀도"], df["Tc"], c=colors, s=point_size,
+                alpha=alpha, edgecolors="none", zorder=5)
     a, b, r2 = fit_regression(df, "밀도")
     x_fit = np.linspace(df["밀도"].min(), df["밀도"].max(), 100)
     ax4.plot(x_fit, linear_model(x_fit, a, b), "r--", alpha=0.7, label=f"R²={r2:.3f}")
@@ -190,7 +298,7 @@ def plot_analysis(df, save_path=None):
             ax2.scatter([], [], c=c, s=60, label=t)
     ax2.legend(fontsize=8)
 
-    plt.suptitle("Superconductor Tc Data Analysis", fontsize=15, y=1.01)
+    plt.suptitle(f"Superconductor Tc Data Analysis (n={n:,})", fontsize=15, y=1.01)
     plt.tight_layout()
 
     if save_path:
@@ -207,8 +315,29 @@ def run_tc_analysis():
     print("--- 임계 온도 예측 데이터 분석 ---")
     print("초전도체의 물리적 성질과 임계 온도(Tc) 관계를 분석합니다.\n")
 
-    # 1. 데이터 로드
-    df = load_dataset()
+    # 1. 데이터 소스 선택
+    print("[ 데이터 소스 선택 ]")
+    print(f"  1. CSV 파일 불러오기 (기본: {DEFAULT_CSV_PATH})")
+    print("  2. 내장 데이터셋 사용 (20개 물질)")
+
+    source_choice = input("선택 (기본값 1): ").strip() or "1"
+
+    if source_choice == "1":
+        csv_path = input(f"CSV 파일 경로 (기본값: {DEFAULT_CSV_PATH}): ").strip()
+        csv_path = csv_path or DEFAULT_CSV_PATH
+        try:
+            df = load_csv(csv_path)
+            print(f"  ✔ CSV 로드 완료: {len(df):,}개 데이터")
+        except (FileNotFoundError, ValueError) as e:
+            print(f"  오류: {e}")
+            print("  → 내장 데이터셋으로 전환합니다.")
+            df = load_dataset()
+    else:
+        df = load_dataset()
+        print(f"  내장 데이터셋 로드: {len(df)}개 물질")
+
+    # 수치 열 목록 파악
+    numeric_cols = get_numeric_columns(df)
 
     while True:
         print("\n[ 분석 메뉴 ]")
@@ -217,6 +346,7 @@ def run_tc_analysis():
         print("  3. 상관 분석 (변수별 Tc 상관계수)")
         print("  4. 회귀 분석 (변수 선택 → 기울기, R²)")
         print("  5. 그래프 저장 (4종 분석 차트)")
+        print("  6. 유형별 Tc 요약")
         print("  0. 메인 메뉴로 돌아가기")
 
         choice = input("분석 번호를 선택하세요: ").strip()
@@ -229,12 +359,12 @@ def run_tc_analysis():
             compute_correlation(df)
         elif choice == "4":
             print("\n회귀 분석할 변수를 선택하세요:")
-            print("  1. 평균원자질량")
-            print("  2. 가전자수")
-            print("  3. 밀도")
+            var_map = {}
+            for i, col in enumerate(numeric_cols, 1):
+                print(f"  {i}. {col}")
+                var_map[str(i)] = col
             var_choice = input("변수 번호 (기본값 1): ").strip() or "1"
-            var_map = {"1": "평균원자질량", "2": "가전자수", "3": "밀도"}
-            col = var_map.get(var_choice, "평균원자질량")
+            col = var_map.get(var_choice, numeric_cols[0])
             a, b, r2 = fit_regression(df, col)
             print(f"\n[ 회귀 결과: {col} → Tc ]")
             print(f"  Tc = {a:.4f} × {col} + {b:.4f}")
@@ -248,7 +378,9 @@ def run_tc_analysis():
         elif choice == "5":
             plot_analysis(df, save_path="tc_analysis.png")
             print("분석 완료!")
+        elif choice == "6":
+            show_type_summary(df)
         elif choice == "0":
             break
         else:
-            print("올바른 번호를 입력해 주세요. (0~5)")
+            print("올바른 번호를 입력해 주세요. (0~6)")
