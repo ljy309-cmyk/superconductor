@@ -30,7 +30,3 @@ def check_superconductivity():
 
     except ValueError:
         print("오류: 숫자 형태로 입력해 주세요.")
-
-# 프로그램 실행
-if __name__ == "__main__":
-    check_superconductivity()

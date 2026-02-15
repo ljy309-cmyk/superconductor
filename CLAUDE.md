@@ -19,8 +19,10 @@ superconductor/
 ├── .gitignore               # Python-specific ignore patterns
 ├── CLAUDE.md                # This file — AI assistant guide
 ├── README.md                # Project title and description
-├── superconductor.py        # Main module — 수은(Hg) 기준 초전도 상태 판별
-└── test_superconductor.py   # pytest test suite (15 tests)
+├── main.py                  # 메인 메뉴 (4개 프로그램 선택)
+├── superconductor.py        # 프로그램 1 — 초전도 상태 판독기
+├── test_main.py             # 메뉴 시스템 테스트 (8 tests)
+└── test_superconductor.py   # 초전도 판독기 테스트 (15 tests)
 ```
 
 ## Development Setup
@@ -36,33 +38,45 @@ superconductor/
 # Install test dependencies
 pip install pytest
 
-# Run the program interactively
-python superconductor.py
+# Run the program (menu)
+python main.py
 
 # Run the test suite
-python -m pytest test_superconductor.py -v
+python -m pytest -v
 ```
 
 ## Build & Run Commands
 
 ```bash
-# Run the interactive CLI program
-python superconductor.py
+# Run the main menu program
+python main.py
 
-# Run all tests
+# Run all tests (메뉴 + 초전도 판독기)
+python -m pytest -v
+
+# Run only menu tests
+python -m pytest test_main.py -v
+
+# Run only superconductor tests
 python -m pytest test_superconductor.py -v
 
 # Run a specific test class
 python -m pytest test_superconductor.py::TestSuperconductingState -v
-
-# Run a single test
-python -m pytest test_superconductor.py::TestNormalStateHighTemp::test_above_tc -v
 ```
 
 ## Testing
 
-Tests use **pytest** and live in `test_superconductor.py`. There are 15 tests organized into six classes.
+Tests use **pytest**. Total **23 tests** across two files.
 Tests use `monkeypatch` to simulate `input()` and `capsys` to capture printed output.
+
+### `test_main.py` (8 tests)
+
+| Test Class | What it covers |
+|---|---|
+| `TestShowMenu` | 메뉴 출력 (4개 항목 + 종료 옵션, 제목) |
+| `TestMainMenu` | 메뉴 선택 동작 (1→초전도 실행, 2~4→준비 중, 0→종료, 잘못된 입력) |
+
+### `test_superconductor.py` (15 tests)
 
 | Test Class | What it covers |
 |---|---|
@@ -76,12 +90,24 @@ Tests use `monkeypatch` to simulate `input()` and `capsys` to capture printed ou
 Run all tests before committing:
 
 ```bash
-python -m pytest test_superconductor.py -v
+python -m pytest -v
 ```
 
 ## Architecture & Key Concepts
 
-### Core Module: `superconductor.py`
+### 메인 메뉴: `main.py`
+
+`main()` → `show_menu()`로 4개 프로그램 메뉴를 표시하고, 사용자 선택에 따라 해당 모듈을 호출한다.
+while 루프로 반복 실행되며, "0" 입력 시 종료.
+
+| 번호 | 프로그램 | 모듈 |
+|------|---------|------|
+| 1 | 초전도 상태 변화 판독기 | `superconductor.py` |
+| 2 | (준비 중) | — |
+| 3 | (준비 중) | — |
+| 4 | (준비 중) | — |
+
+### 프로그램 1: `superconductor.py`
 
 단일 함수 `check_superconductivity()`로 구성된 교육용 프로그램:
 
@@ -125,7 +151,7 @@ _No CI/CD pipeline configured yet._
 - Keep changes minimal and focused on the task at hand.
 - Do not add unnecessary abstractions, comments, or features beyond what is requested.
 - Follow existing code style and naming conventions.
-- Run `python -m pytest test_superconductor.py -v` after any code changes.
+- Run `python -m pytest -v` after any code changes.
 
 ### Python Conventions
 
@@ -146,8 +172,10 @@ _No CI/CD pipeline configured yet._
 
 | File | Purpose |
 |------|---------|
-| `superconductor.py` | Core logic — 수은 기준 초전도 상태 판별 (check_superconductivity) |
-| `test_superconductor.py` | Test suite — 15 tests (monkeypatch + capsys로 input/output 검증) |
+| `main.py` | 메인 메뉴 — 4개 프로그램 선택 진입점 |
+| `superconductor.py` | 프로그램 1 — 수은 기준 초전도 상태 판별 |
+| `test_main.py` | 메뉴 시스템 테스트 (8 tests) |
+| `test_superconductor.py` | 초전도 판독기 테스트 (15 tests) |
 | `README.md` | Project description |
 | `CLAUDE.md` | This guide — keep it updated as the project evolves |
 
@@ -159,3 +187,4 @@ Keep this document current as the project grows. Update it when:
 - Linting or formatting tools are set up
 - CI/CD pipelines are created
 - New materials or physics models are introduced
+- 새로운 프로그램(2~4번)이 추가되면 메뉴와 이 문서를 함께 업데이트
