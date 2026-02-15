@@ -2,9 +2,13 @@
 
 ## Project Overview
 
-**superconductor** (초전도체) is a Python project. The repository is in its early stages of development.
+**superconductor** (초전도체) is a Python educational project that simulates superconductor physics. It determines whether a material is in a **superconducting state** or **normal state** based on temperature and magnetic field inputs, using the critical magnetic field curve equation:
 
-- **Primary language**: Python
+```
+B_c(T) = B_0 × [1 - (T / T_c)²]
+```
+
+- **Primary language**: Python 3.11+
 - **Repository**: Git-based, hosted on GitHub
 - **Default branch**: `master`
 
@@ -12,59 +16,97 @@
 
 ```
 superconductor/
-├── .gitignore          # Python-specific ignore patterns
-├── README.md           # Project title and description
-└── CLAUDE.md           # This file — AI assistant guide
+├── .gitignore               # Python-specific ignore patterns
+├── CLAUDE.md                # This file — AI assistant guide
+├── README.md                # Project title and description
+├── superconductor.py        # Main module — state determination logic and CLI
+└── test_superconductor.py   # pytest test suite (17 tests)
 ```
 
 ## Development Setup
 
 ### Prerequisites
 
-- Python 3.x (version TBD — no `.python-version` or `pyproject.toml` yet)
+- Python 3.11+
+- pytest (for running tests)
 
 ### Getting Started
 
-No build system or dependency management is configured yet. When one is added, update this section with:
-- How to create a virtual environment
-- How to install dependencies
-- How to run the project
+```bash
+# Install test dependencies
+pip install pytest
+
+# Run the program interactively
+python superconductor.py
+
+# Run the test suite
+python -m pytest test_superconductor.py -v
+```
 
 ## Build & Run Commands
 
-_No build system configured yet._ When tooling is added, document commands here:
-
 ```bash
-# Example placeholders — replace when real tooling is added:
-# python -m venv .venv && source .venv/bin/activate
-# pip install -r requirements.txt
-# python -m superconductor
+# Run the interactive CLI program
+python superconductor.py
+
+# Run all tests
+python -m pytest test_superconductor.py -v
+
+# Run a specific test class
+python -m pytest test_superconductor.py::TestCriticalMagneticField -v
+
+# Run a single test
+python -m pytest test_superconductor.py::TestDetermineState::test_superconducting_state -v
 ```
 
 ## Testing
 
-_No test framework configured yet._ The `.gitignore` includes patterns for pytest, tox, nox, and coverage — suggesting pytest is the likely choice.
+Tests use **pytest** and live in `test_superconductor.py`. There are 17 tests organized into three classes:
 
-When tests are added, document:
-- How to run the full test suite
-- How to run a single test file or test case
-- How to check code coverage
+| Test Class | What it covers |
+|---|---|
+| `TestCriticalMagneticField` | The `critical_magnetic_field()` function — boundary values, mid-range, error handling |
+| `TestDetermineState` | The `determine_state()` function — superconducting/normal classification, boundary conditions |
+| `TestWithRealMaterials` | Integration tests using real material data from the `MATERIALS` dict |
+
+Run all tests before committing:
+
+```bash
+python -m pytest test_superconductor.py -v
+```
+
+## Architecture & Key Concepts
+
+### Core Module: `superconductor.py`
+
+- **`MATERIALS`** dict — Physical constants (T_c, B_0) for real superconductor materials (Pb, Nb, Sn, Al, Hg)
+- **`critical_magnetic_field(T, T_c, B_0)`** — Computes B_c(T) from the critical field curve equation
+- **`determine_state(T, B, T_c, B_0)`** — Returns the material state ("초전도 상태" or "일반 상태") and the critical field value
+- **`main()`** — Interactive CLI that lets users pick a material, enter conditions, and see results
+
+### State Determination Logic
+
+A material is in the **superconducting state** when BOTH conditions are met:
+1. Temperature `T` < critical temperature `T_c`
+2. Magnetic field `B` < critical magnetic field `B_c(T)`
+
+Otherwise it is in the **normal state**. At the boundary (T = T_c or B = B_c), the state is normal.
 
 ## Linting & Code Style
 
 _No linter configured yet._ The `.gitignore` includes patterns for Ruff (`.ruff_cache/`), suggesting Ruff may be adopted.
 
-When linting is configured, document:
-- How to run the linter
-- How to auto-fix lint issues
-- Any project-specific style rules
+### Current Conventions (follow these patterns)
+
+- Docstrings: Korean descriptions with English parameter names
+- Comments: Korean for domain-level explanations
+- Variable names: Physics notation (`T`, `B`, `T_c`, `B_0`, `B_c`) for domain variables
+- Functions: snake_case (PEP 8)
+- All user-facing strings are bilingual (Korean with English in parentheses)
 
 ## CI/CD
 
-_No CI/CD pipeline configured yet._ When one is added (e.g., GitHub Actions), document:
-- What checks run on PRs
-- How to interpret CI failures
-- Required checks before merging
+_No CI/CD pipeline configured yet._
 
 ## Conventions for AI Assistants
 
@@ -73,14 +115,16 @@ _No CI/CD pipeline configured yet._ When one is added (e.g., GitHub Actions), do
 - Read existing code before making changes — understand the patterns in use.
 - Keep changes minimal and focused on the task at hand.
 - Do not add unnecessary abstractions, comments, or features beyond what is requested.
-- Follow existing code style and naming conventions once source code is established.
+- Follow existing code style and naming conventions.
+- Run `python -m pytest test_superconductor.py -v` after any code changes.
 
-### Python Conventions (anticipated)
+### Python Conventions
 
-- Follow PEP 8 style guidelines unless the project adopts specific overrides.
-- Use type hints where the existing codebase uses them.
-- Write docstrings for public functions/classes if the codebase follows that pattern.
-- Prefer standard library solutions over adding new dependencies when practical.
+- Follow PEP 8 style guidelines.
+- Use physics notation for domain variables (T, B, T_c, B_0).
+- Write docstrings in Korean with English parameter names.
+- Keep user-facing output bilingual (Korean + English).
+- Prefer standard library solutions over adding new dependencies.
 
 ### Git Workflow
 
@@ -92,16 +136,16 @@ _No CI/CD pipeline configured yet._ When one is added (e.g., GitHub Actions), do
 
 | File | Purpose |
 |------|---------|
-| `README.md` | Project description and setup instructions |
-| `.gitignore` | Files excluded from version control (Python-focused) |
+| `superconductor.py` | Core logic — state determination, critical field equation, materials data |
+| `test_superconductor.py` | Test suite — 17 tests covering all public functions |
+| `README.md` | Project description |
 | `CLAUDE.md` | This guide — keep it updated as the project evolves |
 
 ## Updating This File
 
 Keep this document current as the project grows. Update it when:
-- A build system or dependency manager is added (e.g., `pyproject.toml`, `requirements.txt`)
-- A test framework is configured
+- New modules or files are added
+- Dependencies change
 - Linting or formatting tools are set up
 - CI/CD pipelines are created
-- Major architectural decisions are made
-- New key directories or modules are introduced
+- New materials or physics models are introduced
