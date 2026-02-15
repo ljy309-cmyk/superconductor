@@ -6,7 +6,10 @@ import matplotlib
 matplotlib.use("Agg")  # GUI 없이 테스트
 import matplotlib.pyplot as plt
 
-from meissner import create_grid, compute_field_with_meissner, plot_meissner, run_meissner_simulation
+from meissner import (
+    create_grid, compute_field_with_meissner, plot_meissner,
+    run_meissner_simulation, COLORMAPS,
+)
 
 
 # ── 격자 생성 테스트 ─────────────────────────────────────
@@ -142,6 +145,27 @@ class TestPlotMeissner:
         assert os.path.exists(save_path)
         plt.close(fig)
 
+    def test_different_colormaps(self):
+        """각 컬러맵으로 정상 렌더링된다."""
+        for key, info in COLORMAPS.items():
+            fig, ax = plot_meissner(
+                sc_radius=1.0, n_grid=8,
+                B_ext_direction=(0.0, 1.0),
+                cmap_name=info["name"],
+            )
+            assert fig is not None
+            plt.close(fig)
+
+    def test_title_contains_colormap_name(self):
+        """제목에 컬러맵 이름이 표시된다."""
+        fig, ax = plot_meissner(
+            sc_radius=1.0, n_grid=8,
+            B_ext_direction=(0.0, 1.0),
+            cmap_name="hot",
+        )
+        assert "hot" in ax.get_title()
+        plt.close(fig)
+
 
 # ── 대화형 실행 테스트 ───────────────────────────────────
 
@@ -152,7 +176,7 @@ class TestRunSimulation:
     def test_default_inputs(self, monkeypatch, capsys, tmp_path):
         """기본값 입력으로 정상 실행된다."""
         monkeypatch.chdir(tmp_path)
-        inputs = iter(["1.0", "10", "1.0"])
+        inputs = iter(["1.0", "10", "1.0", "1"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
         run_meissner_simulation()
         output = capsys.readouterr().out
@@ -161,10 +185,30 @@ class TestRunSimulation:
     def test_empty_inputs_use_defaults(self, monkeypatch, capsys, tmp_path):
         """빈 입력 시 기본값이 사용된다."""
         monkeypatch.chdir(tmp_path)
-        inputs = iter(["", "", ""])
+        inputs = iter(["", "", "", ""])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
         run_meissner_simulation()
         output = capsys.readouterr().out
+        assert "시뮬레이션 완료" in output
+
+    def test_select_colormap_hot(self, monkeypatch, capsys, tmp_path):
+        """컬러맵 2번(hot) 선택 시 정상 실행된다."""
+        monkeypatch.chdir(tmp_path)
+        inputs = iter(["1.0", "10", "1.0", "2"])
+        monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+        run_meissner_simulation()
+        output = capsys.readouterr().out
+        assert "hot" in output
+        assert "시뮬레이션 완료" in output
+
+    def test_invalid_colormap_falls_back(self, monkeypatch, capsys, tmp_path):
+        """잘못된 컬러맵 번호 → 기본값(plasma) 사용."""
+        monkeypatch.chdir(tmp_path)
+        inputs = iter(["1.0", "10", "1.0", "99"])
+        monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+        run_meissner_simulation()
+        output = capsys.readouterr().out
+        assert "plasma" in output
         assert "시뮬레이션 완료" in output
 
     def test_negative_radius_error(self, monkeypatch, capsys):

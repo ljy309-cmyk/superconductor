@@ -42,7 +42,7 @@ class TestMainMenu:
     def test_select_2_runs_meissner(self, monkeypatch, capsys, tmp_path):
         """2 선택 → 마이스너 시뮬레이션 실행."""
         monkeypatch.chdir(tmp_path)
-        inputs = iter(["2", "1.0", "10", "1.0", "0"])
+        inputs = iter(["2", "1.0", "10", "1.0", "1", "0"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
         main()
         output = capsys.readouterr().out
