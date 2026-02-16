@@ -13,6 +13,14 @@ import pygame
 
 from config_loader import cfg
 from ui.slider import SliderPanel, PANEL_W
+from preset_hud import PresetHUD
+from help_overlay import HelpOverlay
+from sound_manager import get_sound_manager
+from achievements import check_achievements
+from replay import ReplayRecorder
+from logger import get_module_logger
+
+_log = get_module_logger("bb84_defense")
 
 # 미션3 (5-2): QRNG 키 통합 — 모듈이 있으면 양자 해시 키 사용
 try:
@@ -491,6 +499,18 @@ def run_simulation():
     sl_decoy = panel.add(0.0, 0.5, DECOY_CHANCE, 0.05, "Decoy Chance", ".2f")
     sl_autoblock = panel.add(0.05, 0.5, AUTO_BLOCK_THRESHOLD, 0.05, "Auto Block", ".2f")
 
+    slider_map = {
+        ("bb84", "send_interval"): sl_interval,
+        ("bb84", "eve_chance"): sl_eve,
+        ("bb84", "decoy_chance"): sl_decoy,
+        ("bb84", "auto_block_threshold"): sl_autoblock,
+    }
+    preset_hud = PresetHUD("bb84_defense", slider_map)
+    help_overlay = HelpOverlay("bb84_defense")
+    snd = get_sound_manager()
+    snd.init()
+    recorder = ReplayRecorder("bb84_defense")
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -499,6 +519,8 @@ def run_simulation():
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
             panel.handle_event(event)
+            preset_hud.handle_event(event)
+            help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -507,6 +529,7 @@ def run_simulation():
                 elif event.key == pygame.K_SPACE:
                     if game.channel_open:
                         game.manual_shutdown()
+                        snd.play("channel_shutdown")
                     else:
                         game.reopen()
                 elif event.key == pygame.K_r:
@@ -519,14 +542,21 @@ def run_simulation():
                     game.auto_block_enabled = not game.auto_block_enabled
 
         # ── 업데이트 ─────────────────────────────────
+        preset_hud.update(dt)
+
         if not paused:
             # 전송 타이머 (슬라이더 값 사용)
             cur_interval = sl_interval.value
             game.send_timer += dt
             if game.send_timer >= cur_interval:
                 game.send_timer = 0.0
+                prev_decoy_trapped = game.decoy_trapped
                 game.new_round(eve_chance=sl_eve.value,
                                decoy_chance=sl_decoy.value)
+                if game.eve_active:
+                    snd.play("eve_detected")
+                if game.decoy_trapped > prev_decoy_trapped:
+                    snd.play("decoy_trap")
 
             # 패킷 이동
             for pkt in game.packets:
@@ -537,6 +567,15 @@ def run_simulation():
 
             # 도착한 패킷 제거
             game.packets = [p for p in game.packets if not p.arrived]
+
+            # 리플레이 기록
+            recorder.record({
+                "round": game.round_id,
+                "error_rate": game.error_rate,
+                "eve_active": game.eve_active,
+                "channel_open": game.channel_open,
+                "score": game.score,
+            })
 
             # 플래시 타이머
             if game.eve_flash > 0:
@@ -595,6 +634,9 @@ def run_simulation():
             surf = font.render(h, True, TEXT_CLR)
             screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 52 + i * 16))
 
+        preset_hud.draw(screen)
+        help_overlay.draw(screen)
+
         pygame.display.flip()
 
     # 최종미션: 플레이 기록 저장 + 보고서 생성
@@ -613,15 +655,22 @@ def run_simulation():
     try:
         from data_ai.play_logger import get_logger
         get_logger().log_session("bb84_defense", session_data)
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error("플레이 기록 저장 실패: %s", e)
+
+    try:
+        check_achievements("bb84_defense", session_data)
+    except Exception as e:
+        _log.error("업적 확인 실패: %s", e)
 
     try:
         from report import generate_report
         generate_report("bb84_defense", session_data)
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error("보고서 생성 실패: %s", e)
 
+    recorder.save()
+    snd.quit()
     pygame.quit()
 
 

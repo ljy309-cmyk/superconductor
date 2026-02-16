@@ -21,6 +21,8 @@ _MODULE_TITLES = {
     "qec_shield": "Quantum Error Correction Shield",
     "squid_mines": "SQUID Magnetic Flux Minesweeper",
     "bb84_defense": "BB84 Quantum Key Distribution Defense",
+    "flux_pinning": "Meissner Levitation & Flux Pinning",
+    "phase_transition": "Superconducting Phase Transition",
 }
 
 

@@ -162,6 +162,118 @@ class RankingApp(tk.Toplevel):
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
+        # ── 하단 도구 버튼 ──────────────────────────────
+        tool_row = tk.Frame(self, bg=BG)
+        tool_row.pack(fill=tk.X, padx=20, pady=(0, 8))
+
+        tk.Button(
+            tool_row, text="Save Profile", command=self._save_profile,
+            font=("Consolas", 9), width=14,
+        ).pack(side=tk.LEFT, padx=4)
+
+        tk.Button(
+            tool_row, text="Load Profile", command=self._load_profile,
+            font=("Consolas", 9), width=14,
+        ).pack(side=tk.LEFT, padx=4)
+
+        tk.Button(
+            tool_row, text="Stats Dashboard", command=self._open_stats,
+            font=("Consolas", 9, "bold"), width=16, fg="#89b4fa",
+        ).pack(side=tk.LEFT, padx=4)
+
+        tk.Button(
+            tool_row, text="Achievements", command=self._open_achievements,
+            font=("Consolas", 9), width=14, fg="#f9e2af",
+        ).pack(side=tk.LEFT, padx=4)
+
+    # ── 프로파일 관리 ─────────────────────────────────
+
+    def _save_profile(self):
+        """현재 플레이어 설정을 프로파일로 저장."""
+        from presets import save_profile
+        name = self.name_entry.get().strip() or "default"
+        data = {
+            "player_name": name,
+            "game_mode": self.mode_var.get(),
+        }
+        save_profile(f"ranking_{name}", data)
+        messagebox.showinfo("Profile", f"Profile '{name}' saved.", parent=self)
+
+    def _load_profile(self):
+        """프로파일 불러오기."""
+        from presets import list_profiles, load_profile
+        profiles = list_profiles()
+        ranking_profiles = [p for p in profiles if p.startswith("ranking_")]
+        if not ranking_profiles:
+            messagebox.showinfo("Profile", "No saved profiles.", parent=self)
+            return
+
+        # 간단한 선택 다이얼로그
+        win = tk.Toplevel(self)
+        win.title("Load Profile")
+        win.configure(bg=BG)
+        win.geometry("300x200")
+
+        tk.Label(win, text="Select Profile:", font=("Consolas", 10, "bold"),
+                 bg=BG, fg=FG).pack(pady=8)
+
+        listbox = tk.Listbox(win, font=("Consolas", 10), height=5)
+        for p in ranking_profiles:
+            listbox.insert(tk.END, p)
+        listbox.pack(fill=tk.X, padx=12)
+
+        def _apply():
+            sel = listbox.curselection()
+            if sel:
+                profile_name = ranking_profiles[sel[0]]
+                data = load_profile(profile_name)
+                if "player_name" in data:
+                    self.name_entry.delete(0, tk.END)
+                    self.name_entry.insert(0, data["player_name"])
+                if "game_mode" in data:
+                    self.mode_var.set(data["game_mode"])
+            win.destroy()
+
+        tk.Button(win, text="Load", command=_apply,
+                  font=("Consolas", 10, "bold"), width=10).pack(pady=8)
+
+    def _open_stats(self):
+        """통계 대시보드 열기."""
+        try:
+            from stats_dashboard import open_stats_dashboard
+            open_stats_dashboard(self)
+        except Exception:
+            messagebox.showerror("Error", "Stats dashboard unavailable.", parent=self)
+
+    def _open_achievements(self):
+        """업적 목록 표시."""
+        try:
+            from achievements import get_all_achievements, get_unlocked_count
+            unlocked, total = get_unlocked_count()
+            achievements = get_all_achievements()
+
+            win = tk.Toplevel(self)
+            win.title(f"Achievements ({unlocked}/{total})")
+            win.configure(bg=BG)
+            win.geometry("500x400")
+
+            tk.Label(win, text=f"Achievements: {unlocked}/{total}",
+                     font=("Consolas", 14, "bold"), bg=BG, fg=GOLD).pack(pady=8)
+
+            text = tk.Text(win, bg="#181825", fg=FG, font=("Consolas", 10),
+                           state="normal", wrap="word", padx=8, pady=8)
+            text.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
+
+            for ach in achievements:
+                status = "[*]" if ach["unlocked"] else "[ ]"
+                color = "#a6e3a1" if ach["unlocked"] else "#585b70"
+                text.insert(tk.END, f" {status} [{ach['icon']}] {ach['title']}\n")
+                text.insert(tk.END, f"      {ach['desc']}\n\n")
+
+            text.configure(state="disabled")
+        except Exception:
+            messagebox.showerror("Error", "Achievement system unavailable.", parent=self)
+
     # ── REST API 호출 ────────────────────────────────
 
     def _submit_score(self):

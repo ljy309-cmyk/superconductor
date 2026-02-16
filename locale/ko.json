@@ -84,5 +84,60 @@
   "preset_easy": "Easy",
   "preset_normal": "Normal",
   "preset_hard": "Hard",
-  "preset_custom": "Custom"
+  "preset_custom": "Custom",
+
+  "hint_noise_info": "노이즈: {rate:.1f}%/s  |  연쇄: +{damage}  |  {shield_state}  |  {pause_state}",
+  "hint_click_correct": "클릭: 오류 정정  |  N: 노이즈  |  S: 방어막  |  H: 힐링",
+  "hint_params": "↑↓/←→: 파라미터 조절  |  우측 패널: 슬라이더  |  SPACE: 일시정지",
+  "hint_reset": "R: 전체 리셋  |  ESC: 종료",
+
+  "hint_speed_info": "속도: x{speed:.1f}  |  벽 두께: {width}px  |  확률: {prob:.1f}%  |  {pause_state}",
+  "hint_click_launch": "클릭: 재발사  |  ↑↓/←→: 파라미터  |  우측 패널: 슬라이더",
+  "hint_pause_reset": "SPACE: 일시정지  |  R: 리셋  |  ESC: 종료",
+
+  "hint_reduction_info": "감쇠: x{red:.1f}  |  {shield_state}  |  {pause_state}",
+  "hint_qec_controls": "S: 방어막  |  H: 힐링  |  ←→: 감쇠  |  우측 패널: 슬라이더",
+
+  "hint_bb84_info": "SCORE: {score}  |  자동차단: {auto_state}  |  {pause_state}",
+  "hint_bb84_controls": "SPACE: 폐쇄/재개  |  A: 자동차단  |  우측 패널: 슬라이더",
+  "hint_bb84_pause": "P: 일시정지  |  R: 리셋  |  ESC: 종료",
+
+  "hint_squid_info": "민감도: x{sens:.1f}  |  사운드: {sound_state}  |  근접: {nearby}개",
+  "hint_squid_controls": "마우스: SQUID 센서  |  클릭: 마킹  |  ↑↓/슬라이더: 민감도",
+  "hint_squid_extra": "M: 사운드  |  R: 리셋  |  ESC: 종료",
+
+  "hint_flux_drag": "마우스 드래그: 자석 이동",
+  "hint_flux_flip": "F 키: 자석 뒤집기 (플럭스 피닝 확인)",
+  "hint_flux_toggle": "SPACE: 초전도 ON/OFF (온도 변화)",
+  "hint_flux_esc": "ESC: 종료",
+  "hint_flux_state": "상태: {state}",
+
+  "ranking_title": "Global Ranking",
+  "ranking_subtitle": "Qubit Survival Time Leaderboard",
+  "ranking_top5": "  TOP 5  ",
+  "ranking_submit": "  Submit Score  ",
+  "ranking_player_name": "Player Name:",
+  "ranking_survival_sec": "Survival (sec):",
+  "ranking_game_mode": "Game Mode:",
+  "ranking_post_score": "POST Score",
+  "ranking_get_refresh": "GET Refresh",
+  "ranking_all_records": "  All Records  ",
+  "ranking_save_profile": "Save Profile",
+  "ranking_load_profile": "Load Profile",
+  "ranking_stats": "Stats Dashboard",
+  "ranking_registered": "Registered! Current rank: #{rank}",
+  "ranking_server_error": "Server error: {code}",
+
+  "shield_on": "SHIELD",
+  "shield_off": "",
+  "auto_on": "ON",
+  "auto_off": "OFF",
+  "sound_on": "ON",
+  "sound_off": "OFF",
+
+  "comparison_title": "Comparison Mode",
+  "comparison_hint": "C: 비교 모드 | 같은 설정으로 QEC ON/OFF 비교",
+
+  "theme_dark": "Dark",
+  "theme_light": "Light"
 }

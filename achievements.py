@@ -1,0 +1,154 @@
+"""업적/뱃지 시스템 — 게임 플레이 목표 달성 추적.
+
+사용법:
+    from achievements import check_achievements, get_all_achievements
+    new = check_achievements("qubit_chain", {"survival_time": 60.0})
+    # new = [{"id": "qc_survivor_60", "title": "1분 생존", ...}]
+"""
+
+import json
+import os
+
+from logger import get_module_logger
+
+_log = get_module_logger("achievements")
+
+_SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "achievements.json")
+
+# ── 업적 정의 ───────────────────────────────────────────────
+ACHIEVEMENTS = [
+    # 큐비트 연쇄 붕괴
+    {"id": "qc_first_play", "module": "qubit_chain", "title": "First Cascade",
+     "desc": "큐비트 연쇄 붕괴를 처음 플레이했습니다.", "icon": "Q",
+     "condition": lambda d: True},
+    {"id": "qc_survivor_30", "module": "qubit_chain", "title": "30s Survivor",
+     "desc": "30초 이상 생존했습니다.", "icon": "T",
+     "condition": lambda d: d.get("survival_time", 0) >= 30},
+    {"id": "qc_survivor_60", "module": "qubit_chain", "title": "1min Survivor",
+     "desc": "1분 이상 생존했습니다!", "icon": "S",
+     "condition": lambda d: d.get("survival_time", 0) >= 60},
+    {"id": "qc_shield_master", "module": "qubit_chain", "title": "Shield Master",
+     "desc": "QEC 방어막을 5회 이상 사용했습니다.", "icon": "D",
+     "condition": lambda d: d.get("shield_uses", 0) >= 5},
+    {"id": "qc_no_collapse", "module": "qubit_chain", "title": "Perfect Defense",
+     "desc": "큐비트 붕괴 없이 30초 생존!", "icon": "P",
+     "condition": lambda d: d.get("collapsed_count", 1) == 0 and d.get("survival_time", 0) >= 30},
+
+    # 터널링
+    {"id": "tn_first_tunnel", "module": "tunneling", "title": "First Tunnel",
+     "desc": "첫 터널링 성공!", "icon": "W",
+     "condition": lambda d: d.get("tunnel_count", 0) >= 1},
+    {"id": "tn_lucky_10", "module": "tunneling", "title": "Lucky Streak",
+     "desc": "터널링 10회 성공!", "icon": "L",
+     "condition": lambda d: d.get("tunnel_count", 0) >= 10},
+    {"id": "tn_rate_50", "module": "tunneling", "title": "Probability Bender",
+     "desc": "터널링 성공률 50% 달성!", "icon": "B",
+     "condition": lambda d: d.get("tunnel_rate", 0) >= 0.5 and d.get("total_attempts", 0) >= 10},
+
+    # QEC 방어막
+    {"id": "qec_survivor_60", "module": "qec_shield", "title": "QEC Master",
+     "desc": "QEC 모드에서 60초 이상 생존!", "icon": "M",
+     "condition": lambda d: d.get("survival_time", 0) >= 60},
+    {"id": "qec_efficient", "module": "qec_shield", "title": "Efficient Shielding",
+     "desc": "QEC 3회 이하로 60초 생존!", "icon": "E",
+     "condition": lambda d: d.get("qec_uses", 99) <= 3 and d.get("survival_time", 0) >= 60},
+
+    # BB84
+    {"id": "bb84_first_play", "module": "bb84_defense", "title": "Protocol Initiator",
+     "desc": "BB84 프로토콜을 처음 실행했습니다.", "icon": "K",
+     "condition": lambda d: True},
+    {"id": "bb84_score_500", "module": "bb84_defense", "title": "Score 500",
+     "desc": "BB84에서 500점 달성!", "icon": "H",
+     "condition": lambda d: d.get("score", 0) >= 500},
+    {"id": "bb84_manual_5", "module": "bb84_defense", "title": "Quick Hands",
+     "desc": "수동 차단을 5회 이상 실행!", "icon": "F",
+     "condition": lambda d: d.get("manual_blocks", 0) >= 5},
+    {"id": "bb84_trap_3", "module": "bb84_defense", "title": "Decoy Expert",
+     "desc": "디코이 트랩 3회 이상 발동!", "icon": "X",
+     "condition": lambda d: d.get("decoy_trapped", 0) >= 3},
+
+    # SQUID 지뢰찾기
+    {"id": "sq_first_win", "module": "squid_mines", "title": "Mine Sweeper",
+     "desc": "모든 지뢰를 찾았습니다!", "icon": "G",
+     "condition": lambda d: d.get("won", False)},
+    {"id": "sq_perfect", "module": "squid_mines", "title": "Perfect Scan",
+     "desc": "오답 없이 모든 지뢰를 찾았습니다!", "icon": "V",
+     "condition": lambda d: d.get("won", False) and d.get("wrong_marks", 1) == 0},
+
+    # 플럭스 피닝
+    {"id": "fp_first_play", "module": "flux_pinning", "title": "Levitation!",
+     "desc": "마이스너 부상 시뮬레이션을 체험했습니다.", "icon": "U",
+     "condition": lambda d: True},
+
+    # 범용
+    {"id": "all_modules", "module": "_global", "title": "Explorer",
+     "desc": "모든 5개 게임 모듈을 플레이했습니다!", "icon": "A",
+     "condition": lambda d: len(d.get("modules_played", [])) >= 5},
+]
+
+
+def _load_unlocked() -> set[str]:
+    """해금된 업적 ID 로드."""
+    if os.path.exists(_SAVE_PATH):
+        try:
+            with open(_SAVE_PATH, "r", encoding="utf-8") as f:
+                return set(json.load(f))
+        except Exception:
+            pass
+    return set()
+
+
+def _save_unlocked(unlocked: set[str]):
+    """해금 상태 저장."""
+    try:
+        with open(_SAVE_PATH, "w", encoding="utf-8") as f:
+            json.dump(sorted(unlocked), f)
+    except OSError as e:
+        _log.error("업적 저장 실패: %s", e)
+
+
+def check_achievements(module_name: str, data: dict) -> list[dict]:
+    """세션 데이터로 업적 달성 여부 확인. 새로 해금된 업적 목록 반환."""
+    unlocked = _load_unlocked()
+    new_achievements = []
+
+    for ach in ACHIEVEMENTS:
+        if ach["id"] in unlocked:
+            continue
+        if ach["module"] != module_name and ach["module"] != "_global":
+            continue
+        try:
+            if ach["condition"](data):
+                unlocked.add(ach["id"])
+                new_achievements.append(ach)
+                _log.info("업적 해금: %s — %s", ach["id"], ach["title"])
+        except Exception:
+            pass
+
+    if new_achievements:
+        _save_unlocked(unlocked)
+
+    return new_achievements
+
+
+def get_all_achievements() -> list[dict]:
+    """전체 업적 목록 (해금 상태 포함)."""
+    unlocked = _load_unlocked()
+    result = []
+    for ach in ACHIEVEMENTS:
+        info = {
+            "id": ach["id"],
+            "module": ach["module"],
+            "title": ach["title"],
+            "desc": ach["desc"],
+            "icon": ach["icon"],
+            "unlocked": ach["id"] in unlocked,
+        }
+        result.append(info)
+    return result
+
+
+def get_unlocked_count() -> tuple[int, int]:
+    """(해금 수, 전체 수) 반환."""
+    unlocked = _load_unlocked()
+    return len(unlocked), len(ACHIEVEMENTS)

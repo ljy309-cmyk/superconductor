@@ -209,4 +209,30 @@ class PhaseTransitionWindow(tk.Toplevel):
 
 def open_phase_transition(master=None):
     """외부에서 호출하는 진입점."""
-    PhaseTransitionWindow(master)
+    from logger import get_module_logger
+    _log = get_module_logger("phase_transition")
+
+    win = PhaseTransitionWindow(master)
+
+    def _on_close():
+        try:
+            from data_ai.play_logger import get_logger
+            get_logger().log_session("phase_transition", {
+                "material": win._material_var.get(),
+                "last_temp": win._current_temp,
+                "noise": win._noise,
+            })
+        except Exception as e:
+            _log.error("플레이 기록 실패: %s", e)
+        try:
+            from report import generate_report
+            generate_report("phase_transition", {
+                "material": win._material_var.get(),
+                "last_temp": win._current_temp,
+                "tc": win._tc,
+            })
+        except Exception as e:
+            _log.error("보고서 생성 실패: %s", e)
+        win.destroy()
+
+    win.protocol("WM_DELETE_WINDOW", _on_close)

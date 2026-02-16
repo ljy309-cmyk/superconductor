@@ -11,6 +11,14 @@ import pygame
 
 from config_loader import cfg
 from ui.slider import SliderPanel, PANEL_W
+from preset_hud import PresetHUD
+from help_overlay import HelpOverlay
+from sound_manager import get_sound_manager
+from achievements import check_achievements
+from replay import ReplayRecorder
+from logger import get_module_logger
+
+_log = get_module_logger("tunneling")
 
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH, HEIGHT = 900, 600
@@ -258,6 +266,22 @@ def run_simulation():
     sl_barrier = panel.add(BARRIER_WIDTH_MIN, BARRIER_WIDTH_MAX, BARRIER_WIDTH_DEFAULT, 2, "Barrier W", ".0f")
     sl_boost = panel.add(1.0, 5.0, TUNNEL_SPEED_BOOST, 0.5, "Tunnel Boost", ".1f")
 
+    # ── 프리셋 HUD ──
+    slider_map = {
+        ("tunneling", "tunnel_prob_base"): sl_speed,
+        ("tunneling", "barrier_width_default"): sl_barrier,
+        ("tunneling", "tunnel_speed_boost"): sl_boost,
+    }
+    preset_hud = PresetHUD("tunneling", slider_map)
+    help_overlay = HelpOverlay("tunneling")
+
+    # ── 사운드 ──
+    snd = get_sound_manager()
+    snd.init()
+
+    # ── 리플레이 ──
+    recorder = ReplayRecorder("tunneling")
+
     barrier_width = BARRIER_WIDTH_DEFAULT
     tunnel_prob = _calc_tunnel_prob(barrier_width)
 
@@ -268,6 +292,8 @@ def run_simulation():
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
             panel.handle_event(event)
+            preset_hud.handle_event(event)
+            help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -302,6 +328,21 @@ def run_simulation():
             particle.update(dt, barrier_width, tunnel_prob, sl_boost.value)
             particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
 
+            # ── 사운드 ──
+            if particle.tunneled is True and particle.flash_timer > 0.5:
+                snd.play("tunnel_success")
+            elif particle.tunneled is False and particle.flash_timer > 0.3:
+                snd.play("tunnel_reflect")
+
+            preset_hud.update(dt)
+
+            recorder.record_frame({
+                "x": round(particle.x, 1),
+                "tunneled": particle.tunneled,
+                "attempts": particle.total_attempts,
+                "tunnels": particle.tunnel_count,
+            })
+
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
 
@@ -334,6 +375,9 @@ def run_simulation():
             surf = font.render(h, True, TEXT_CLR)
             screen.blit(surf, (SIM_LEFT, HEIGHT - 52 + i * 16))
 
+        preset_hud.draw(screen, font)
+        help_overlay.draw(screen, font)
+
         pygame.display.flip()
 
     # 최종미션: 플레이 기록 저장
@@ -348,8 +392,32 @@ def run_simulation():
             "barrier_width": barrier_width,
             "tunnel_prob": round(tunnel_prob, 3),
         })
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error("플레이 기록 실패: %s", e)
+
+    try:
+        from report import generate_report
+        generate_report("tunneling", {
+            "total_attempts": particle.total_attempts,
+            "tunnel_count": particle.tunnel_count,
+            "reflect_count": particle.reflect_count,
+            "tunnel_rate": round(rate, 3),
+            "barrier_width": barrier_width,
+        })
+    except Exception as e:
+        _log.error("보고서 생성 실패: %s", e)
+
+    try:
+        check_achievements("tunneling", {
+            "tunnel_count": particle.tunnel_count,
+            "tunnel_rate": round(rate, 3),
+            "total_attempts": particle.total_attempts,
+        })
+    except Exception as e:
+        _log.error("업적 확인 실패: %s", e)
+
+    recorder.save()
+    snd.quit()
 
     pygame.quit()
 

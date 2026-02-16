@@ -12,6 +12,14 @@ import pygame
 
 from config_loader import cfg
 from ui.slider import SliderPanel, PANEL_W
+from preset_hud import PresetHUD
+from help_overlay import HelpOverlay
+from sound_manager import get_sound_manager
+from achievements import check_achievements
+from replay import ReplayRecorder
+from logger import get_module_logger
+
+_log = get_module_logger("qec_shield")
 
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH, HEIGHT = 900, 600
@@ -275,6 +283,22 @@ def run_simulation():
     sl_noise = spanel.add(1.0, 15.0, NOISE_RATE, 0.5, "Noise Rate", ".1f")
     sl_cascade = spanel.add(5.0, 40.0, CASCADE_DAMAGE, 5.0, "Cascade Dmg", ".0f")
 
+    # ── 프리셋 HUD ──
+    slider_map = {
+        ("qec_shield", "qec_reduction_default"): sl_reduction,
+        ("qec_shield", "noise_rate"): sl_noise,
+        ("qec_shield", "cascade_damage"): sl_cascade,
+    }
+    preset_hud = PresetHUD("qec_shield", slider_map)
+    help_overlay = HelpOverlay("qec_shield")
+
+    # ── 사운드 ──
+    snd = get_sound_manager()
+    snd.init()
+
+    # ── 리플레이 ──
+    recorder = ReplayRecorder("qec_shield")
+
     shield_active = False
     shield_timer = 0.0
     cooldown_timer = 0.0
@@ -294,6 +318,8 @@ def run_simulation():
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
             spanel.handle_event(event)
+            preset_hud.handle_event(event)
+            help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -305,6 +331,7 @@ def run_simulation():
                         shield_active = True
                         shield_timer = QEC_DURATION
                         qec_uses += 1
+                        snd.play("shield_on")
                 elif event.key == pygame.K_h:
                     # 미션2: 힐링 — 모든 생존 큐비트 stress -20
                     if heal_cooldown <= 0:
@@ -313,6 +340,7 @@ def run_simulation():
                                 n.stress = max(n.stress - HEAL_AMOUNT, 0.0)
                         heal_uses += 1
                         heal_cooldown = HEAL_COOLDOWN_SEC
+                        snd.play("heal")
                 elif event.key == pygame.K_LEFT:
                     sl_reduction.value = sl_reduction.value - QEC_REDUCTION_STEP
                 elif event.key == pygame.K_RIGHT:
@@ -376,6 +404,18 @@ def run_simulation():
                 for n in nodes:
                     if n.check_collapse(cascade_mult, cur_cascade):
                         changed = True
+                        snd.play("collapse")
+
+            # ── 프리셋 HUD 업데이트 ──
+            preset_hud.update(dt)
+
+            # ── 리플레이 기록 ──
+            recorder.record({
+                "elapsed": round(elapsed, 2),
+                "shield_active": shield_active,
+                "alive": sum(1 for n in nodes if not n.collapsed),
+                "stresses": [round(n.stress, 1) for n in nodes],
+            })
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -431,6 +471,9 @@ def run_simulation():
             surf = font.render(h, True, TEXT_CLR)
             screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 40 + i * 16))
 
+        preset_hud.draw(screen, font, 10, 50)
+        help_overlay.draw(screen, font)
+
         pygame.display.flip()
 
     # 최종미션: 플레이 기록 저장 + 보고서 생성 + 랭킹 자동 등록
@@ -445,15 +488,23 @@ def run_simulation():
     try:
         from data_ai.play_logger import get_logger
         get_logger().log_session("qec_shield", session_data)
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error("플레이 기록 실패: %s", e)
+
+    try:
+        check_achievements("qec_shield", {
+            "survival_time": round(elapsed, 1),
+            "qec_uses": qec_uses,
+        })
+    except Exception as e:
+        _log.error("업적 확인 실패: %s", e)
 
     # 보고서 자동 생성
     try:
         from report import generate_report
         generate_report("qec_shield", session_data)
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error("보고서 생성 실패: %s", e)
 
     # 랭킹 자동 등록 (생존 시간 기반)
     try:
@@ -465,8 +516,11 @@ def run_simulation():
             "score": round(elapsed, 2),
             "mode": "QEC Shield",
         }, timeout=2)
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error("랭킹 등록 실패: %s", e)
+
+    recorder.save({"survival_time": round(elapsed, 1)})
+    snd.quit()
 
     pygame.quit()
 

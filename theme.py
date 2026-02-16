@@ -100,3 +100,92 @@ class FONTS:
     MONO_12 = (FAMILY, 12)
     MONO_11 = (FAMILY, 11)
     BUTTON  = (FAMILY, 10)
+
+
+# ── 라이트 테마 (Catppuccin Latte 기반) ───────────────
+class TK_LIGHT:
+    """Tkinter 용 라이트 테마."""
+    BG          = "#eff1f5"
+    PANEL_BG    = "#e6e9ef"
+    SURFACE     = "#dce0e8"
+    OVERLAY     = "#ccd0da"
+    TEXT        = "#4c4f69"
+    SUBTEXT     = "#6c6f85"
+    ACCENT_BLUE = "#1e66f5"
+    ACCENT_PURPLE = "#8839ef"
+    ACCENT_GREEN  = "#40a02b"
+    ACCENT_YELLOW = "#df8e1d"
+    ACCENT_PEACH  = "#fe640b"
+    RED         = "#d20f39"
+    GREEN       = "#40a02b"
+    YELLOW      = "#df8e1d"
+    GOLD        = "#df8e1d"
+    SILVER      = "#9ca0b0"
+    BRONZE      = "#fe640b"
+    GAUGE_BG    = "#ccd0da"
+
+
+class PG_LIGHT:
+    """Pygame 용 라이트 테마 RGB 튜플."""
+    BG          = (239, 241, 245)
+    PANEL_BG    = (230, 233, 239)
+    SURFACE     = (220, 224, 232)
+    OVERLAY     = (204, 208, 218)
+    TEXT        = (76, 79, 105)
+    SUBTEXT     = (108, 111, 133)
+    ACCENT_BLUE = (30, 102, 245)
+    ACCENT_PURPLE = (136, 57, 239)
+    ACCENT_GREEN  = (64, 160, 43)
+    ACCENT_YELLOW = (223, 142, 29)
+    ACCENT_PEACH  = (254, 100, 11)
+    RED         = (210, 15, 57)
+    GREEN       = (64, 160, 43)
+    YELLOW      = (223, 142, 29)
+    SHIELD_CLR  = (30, 102, 245)
+    SHIELD_GLOW = (32, 159, 181)
+    SENSOR_CLR  = (32, 159, 181)
+    MAGNET_N    = (210, 15, 57)
+    MAGNET_S    = (30, 102, 245)
+    SC_COLOR    = (64, 160, 43)
+    SC_GLOW     = (30, 102, 245)
+    STABLE      = (64, 160, 43)
+    WARNING     = (223, 142, 29)
+    DANGER      = (254, 100, 11)
+    COLLAPSED   = (210, 15, 57)
+    ALICE       = (30, 102, 245)
+    BOB         = (64, 160, 43)
+    EVE         = (210, 15, 57)
+    QUBIT       = (136, 57, 239)
+    DECOY       = (223, 142, 29)
+
+
+# ── 테마 토글 ────────────────────────────────────────
+_current_theme = "dark"
+
+
+def get_theme() -> str:
+    """현재 테마 반환."""
+    return _current_theme
+
+
+def set_theme(theme: str):
+    """테마 설정 ('dark' 또는 'light')."""
+    global _current_theme
+    _current_theme = theme
+
+
+def toggle_theme() -> str:
+    """다크/라이트 토글. 새 테마 이름 반환."""
+    global _current_theme
+    _current_theme = "light" if _current_theme == "dark" else "dark"
+    return _current_theme
+
+
+def get_tk_theme():
+    """현재 Tkinter 테마 클래스 반환."""
+    return TK_LIGHT if _current_theme == "light" else TK
+
+
+def get_pg_theme():
+    """현재 Pygame 테마 클래스 반환."""
+    return PG_LIGHT if _current_theme == "light" else PG

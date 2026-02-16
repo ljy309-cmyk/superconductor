@@ -84,5 +84,60 @@
   "preset_easy": "Easy",
   "preset_normal": "Normal",
   "preset_hard": "Hard",
-  "preset_custom": "Custom"
+  "preset_custom": "Custom",
+
+  "hint_noise_info": "Noise: {rate:.1f}%/s  |  Chain: +{damage}  |  {shield_state}  |  {pause_state}",
+  "hint_click_correct": "Click: Error Correction  |  N: Noise  |  S: Shield  |  H: Healing",
+  "hint_params": "Up/Down/Left/Right: Adjust Parameters  |  Right Panel: Sliders  |  SPACE: Pause",
+  "hint_reset": "R: Full Reset  |  ESC: Exit",
+
+  "hint_speed_info": "Speed: x{speed:.1f}  |  Wall Thickness: {width}px  |  Probability: {prob:.1f}%  |  {pause_state}",
+  "hint_click_launch": "Click: Relaunch  |  Up/Down/Left/Right: Parameters  |  Right Panel: Sliders",
+  "hint_pause_reset": "SPACE: Pause  |  R: Reset  |  ESC: Exit",
+
+  "hint_reduction_info": "Reduction: x{red:.1f}  |  {shield_state}  |  {pause_state}",
+  "hint_qec_controls": "S: Shield  |  H: Healing  |  Left/Right: Reduction  |  Right Panel: Sliders",
+
+  "hint_bb84_info": "SCORE: {score}  |  Auto-Block: {auto_state}  |  {pause_state}",
+  "hint_bb84_controls": "SPACE: Close/Resume  |  A: Auto-Block  |  Right Panel: Sliders",
+  "hint_bb84_pause": "P: Pause  |  R: Reset  |  ESC: Exit",
+
+  "hint_squid_info": "Sensitivity: x{sens:.1f}  |  Sound: {sound_state}  |  Nearby: {nearby}",
+  "hint_squid_controls": "Mouse: SQUID Sensor  |  Click: Mark  |  Up/Down/Slider: Sensitivity",
+  "hint_squid_extra": "M: Sound  |  R: Reset  |  ESC: Exit",
+
+  "hint_flux_drag": "Mouse Drag: Move Magnet",
+  "hint_flux_flip": "F Key: Flip Magnet (Check Flux Pinning)",
+  "hint_flux_toggle": "SPACE: Superconductor ON/OFF (Temperature Change)",
+  "hint_flux_esc": "ESC: Exit",
+  "hint_flux_state": "State: {state}",
+
+  "ranking_title": "Global Ranking",
+  "ranking_subtitle": "Qubit Survival Time Leaderboard",
+  "ranking_top5": "  TOP 5  ",
+  "ranking_submit": "  Submit Score  ",
+  "ranking_player_name": "Player Name:",
+  "ranking_survival_sec": "Survival (sec):",
+  "ranking_game_mode": "Game Mode:",
+  "ranking_post_score": "POST Score",
+  "ranking_get_refresh": "GET Refresh",
+  "ranking_all_records": "  All Records  ",
+  "ranking_save_profile": "Save Profile",
+  "ranking_load_profile": "Load Profile",
+  "ranking_stats": "Stats Dashboard",
+  "ranking_registered": "Registered! Current rank: #{rank}",
+  "ranking_server_error": "Server error: {code}",
+
+  "shield_on": "SHIELD",
+  "shield_off": "",
+  "auto_on": "ON",
+  "auto_off": "OFF",
+  "sound_on": "ON",
+  "sound_off": "OFF",
+
+  "comparison_title": "Comparison Mode",
+  "comparison_hint": "C: Comparison Mode | Compare QEC ON/OFF with same settings",
+
+  "theme_dark": "Dark",
+  "theme_light": "Light"
 }

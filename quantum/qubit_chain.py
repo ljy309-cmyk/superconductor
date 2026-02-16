@@ -14,6 +14,14 @@ import pygame
 
 from config_loader import cfg
 from ui.slider import SliderPanel, PANEL_W
+from preset_hud import PresetHUD
+from help_overlay import HelpOverlay
+from sound_manager import get_sound_manager
+from achievements import check_achievements
+from replay import ReplayRecorder
+from logger import get_module_logger
+
+_log = get_module_logger("qubit_chain")
 
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH, HEIGHT = 900, 600
@@ -231,6 +239,24 @@ def run_simulation():
     sl_qec_cd = panel.add(1.0, 20.0, QEC_COOLDOWN, 0.5, "QEC Cooldown", ".1f")
     sl_heal = panel.add(5.0, 50.0, HEAL_AMOUNT, 5.0, "Heal Amount", ".0f")
 
+    # ── 프리셋 HUD ──
+    slider_map = {
+        ("qubit_chain", "noise_rate_base"): sl_noise,
+        ("qubit_chain", "cascade_damage"): sl_cascade,
+        ("qubit_chain", "qec_duration"): sl_qec_dur,
+        ("qubit_chain", "qec_cooldown"): sl_qec_cd,
+        ("qubit_chain", "heal_amount"): sl_heal,
+    }
+    preset_hud = PresetHUD("qubit_chain", slider_map)
+    help_overlay = HelpOverlay("qubit_chain")
+
+    # ── 사운드 ──
+    snd = get_sound_manager()
+    snd.init()
+
+    # ── 리플레이 ──
+    recorder = ReplayRecorder("qubit_chain")
+
     # ── QEC 방어막 + 힐링 (미션3: 3-3 통합) ──
     shield_active = False
     shield_timer = 0.0
@@ -252,6 +278,8 @@ def run_simulation():
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
             panel.handle_event(event)
+            preset_hud.handle_event(event)
+            help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -287,6 +315,7 @@ def run_simulation():
                         shield_active = True
                         shield_timer = sl_qec_dur.value
                         qec_uses += 1
+                        snd.play("shield_on")
                         cascade_log.append("QEC SHIELD ON!")
                 elif event.key == pygame.K_h:
                     # 힐링 (미션3)
@@ -296,6 +325,7 @@ def run_simulation():
                             if not n.collapsed:
                                 n.stress = max(n.stress - heal_amt, 0.0)
                         heal_cooldown = HEAL_COOLDOWN_SEC
+                        snd.play("heal")
                         cascade_log.append(f"HEAL! All -{int(heal_amt)} stress")
                 elif event.key == pygame.K_n:
                     # 랜덤 큐비트에 즉시 큰 노이즈 주입
@@ -311,12 +341,15 @@ def run_simulation():
                         # 클릭: 오류 정정 — stress를 0으로 치료
                         if not n.collapsed:
                             n.stress = 0.0
+                            snd.play("error_correct")
                             cascade_log.append(f"Q{n.qid} 오류 정정! (stress → 0)")
                         break
 
         # ── 슬라이더 값 읽기 ─────────────────────────
         noise_rate = sl_noise.value
         cascade_damage = sl_cascade.value
+
+        preset_hud.update(dt)
 
         # ── 물리 업데이트 ────────────────────────────
         if not paused:
@@ -361,12 +394,20 @@ def run_simulation():
                 for n in nodes:
                     if n.check_collapse(effective_cascade):
                         changed = True
+                        snd.play("collapse")
                         if shield_active:
                             cascade_log.append(
                                 f"Q{n.qid} COLLAPSED → +{int(effective_cascade)} (shielded from +{int(cascade_damage)})")
                         else:
                             cascade_log.append(
                                 f"Q{n.qid} COLLAPSED → cascade +{int(cascade_damage)} to neighbors")
+
+            recorder.record_frame({
+                "stresses": [n.stress for n in nodes],
+                "collapsed": [n.collapsed for n in nodes],
+                "shield": shield_active,
+                "t": round(survival_time, 2),
+            })
 
         # 로그 길이 제한
         if len(cascade_log) > 8:
@@ -470,6 +511,9 @@ def run_simulation():
                 True, (243, 139, 168))
             screen.blit(over_surf, (WIDTH // 2 - over_surf.get_width() // 2, HEIGHT // 2 - 80))
 
+        preset_hud.draw(screen, info_font, hud_x, hud_y + 72)
+        help_overlay.draw(screen, info_font)
+
         pygame.display.flip()
 
     # 최종미션: 플레이 기록 저장
@@ -485,8 +529,34 @@ def run_simulation():
             "max_stress": max((n.stress for n in nodes), default=0),
             "survival_time": round(survival_time, 2),
         })
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error("플레이 기록 실패: %s", e)
+
+    # 보고서 생성
+    try:
+        from report import generate_report
+        generate_report("qubit_chain", {
+            "total_qubits": len(nodes),
+            "collapsed_count": sum(1 for n in nodes if n.collapsed),
+            "survival_time": round(survival_time, 2),
+            "shield_uses": qec_uses,
+            "noise_rate": noise_rate,
+            "cascade_damage": cascade_damage,
+        })
+    except Exception as e:
+        _log.error("보고서 생성 실패: %s", e)
+
+    # 업적 확인
+    try:
+        new_ach = check_achievements("qubit_chain", {
+            "survival_time": survival_time,
+            "collapsed_count": sum(1 for n in nodes if n.collapsed),
+            "shield_uses": qec_uses,
+        })
+        for ach in new_ach:
+            _log.info("Achievement unlocked: %s", ach["title"])
+    except Exception as e:
+        _log.error("업적 확인 실패: %s", e)
 
     # 최종보스미션 (5-3): 랭킹 서버에 생존 시간 POST
     if survival_time > 0:
@@ -500,9 +570,11 @@ def run_simulation():
                 "mode": "Entanglement Cascade",
             }
             requests.post(f"{get_base_url()}/ranking", json=payload, timeout=3)
-        except Exception:
-            pass  # 미션1: 오프라인이면 조용히 넘어감 (방어적 프로그래밍)
+        except Exception as e:
+            _log.error("랭킹 등록 실패: %s", e)
 
+    recorder.save({"survival_time": round(survival_time, 2)})
+    snd.quit()
     pygame.quit()
 
 

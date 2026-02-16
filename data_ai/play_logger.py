@@ -54,6 +54,12 @@ class PlayLogger:
             "eve_intercepts", "auto_blocks", "manual_blocks",
             "decoy_sent", "decoy_trapped",
         ],
+        "flux_pinning": [
+            "play_time", "superconducting", "flipped",
+        ],
+        "phase_transition": [
+            "material", "last_temp", "noise", "tc",
+        ],
     }
 
     def __init__(self):

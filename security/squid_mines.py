@@ -16,6 +16,14 @@ import pygame
 
 from config_loader import cfg
 from ui.slider import SliderPanel, PANEL_W
+from preset_hud import PresetHUD
+from help_overlay import HelpOverlay
+from sound_manager import get_sound_manager
+from achievements import check_achievements
+from replay import ReplayRecorder
+from logger import get_module_logger
+
+_log = get_module_logger("squid_mines")
 
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH, HEIGHT = 900, 650
@@ -310,6 +318,15 @@ def run_simulation():
     panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
     sl_sens = panel.add(SENSITIVITY_MIN, SENSITIVITY_MAX, SENSITIVITY_DEFAULT, 0.5, "Sensitivity", ".1f")
 
+    slider_map = {
+        ("squid_mines", "sensitivity_default"): sl_sens,
+    }
+    preset_hud = PresetHUD("squid_mines", slider_map)
+    help_overlay = HelpOverlay("squid_mines")
+    snd = get_sound_manager()
+    snd.init()
+    recorder = ReplayRecorder("squid_mines")
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -319,6 +336,8 @@ def run_simulation():
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
             panel.handle_event(event)
+            preset_hud.handle_event(event)
+            help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -338,9 +357,18 @@ def run_simulation():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 cell = game.get_hover_cell(mx, my)
                 if cell:
+                    prev_marked = len(game.marked)
+                    prev_wrong = len(game.wrong)
                     game.mark_cell(*cell)
+                    if len(game.marked) > prev_marked:
+                        snd.play("mine_found")
+                        if game.won:
+                            snd.play("victory")
+                    elif len(game.wrong) > prev_wrong:
+                        snd.play("wrong_mark")
 
         # ── 슬라이더 값 읽기 ─────────────────────────
+        preset_hud.update(dt)
         sensitivity = sl_sens.value
 
         # ── 그래프 업데이트 ──────────────────────────
@@ -393,6 +421,9 @@ def run_simulation():
             surf = font.render(h, True, TEXT_CLR)
             screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 52 + i * 16))
 
+        preset_hud.draw(screen)
+        help_overlay.draw(screen)
+
         pygame.display.flip()
 
     # 최종미션: 플레이 기록 저장 + 보고서 생성
@@ -406,15 +437,22 @@ def run_simulation():
     try:
         from data_ai.play_logger import get_logger
         get_logger().log_session("squid_mines", session_data)
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error("플레이 기록 저장 실패: %s", e)
+
+    try:
+        check_achievements("squid_mines", session_data)
+    except Exception as e:
+        _log.error("업적 확인 실패: %s", e)
 
     try:
         from report import generate_report
         generate_report("squid_mines", session_data)
-    except Exception:
-        pass
+    except Exception as e:
+        _log.error("보고서 생성 실패: %s", e)
 
+    recorder.save()
+    snd.quit()
     pygame.mixer.quit()
     pygame.quit()
 
