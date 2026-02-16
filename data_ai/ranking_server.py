@@ -14,9 +14,12 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
+from config_loader import cfg
+
 DATA_PATH = os.path.join(os.path.dirname(__file__), "ranking_data.json")
-HOST, PORT = "127.0.0.1", 18084
-TOP_N = 5
+HOST = cfg("server", "host", "127.0.0.1")
+PORT = cfg("server", "port", 18084)
+TOP_N = cfg("server", "top_n", 5)
 
 
 def _load_data() -> list[dict]:

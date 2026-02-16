@@ -12,9 +12,12 @@ import time
 
 import pygame
 
+from config_loader import cfg
+from ui.slider import SliderPanel, PANEL_W
+
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH, HEIGHT = 900, 600
-FPS = 60
+FPS = cfg("display", "fps", 60)
 
 # ── 색상 ─────────────────────────────────────────────
 BG = (30, 30, 46)
@@ -31,19 +34,19 @@ STATE_COLORS = {
     "collapsed": (243, 139, 168),  # 빨강 — 붕괴
 }
 
-# ── 물리 파라미터 ────────────────────────────────────
-STRESS_THRESHOLD = 100.0    # 하중 임계값 (%)
-CASCADE_DAMAGE = 20.0       # 붕괴 시 인접 노드에 전파되는 추가 하중
-NOISE_RATE_BASE = 3.0       # 기본 노이즈 증가율 (%/s)
-RECOVERY_RATE = 5.0         # 안정화 회복율 (%/s, 마우스 클릭 시)
-COLLAPSE_ANIM_DURATION = 0.5  # 붕괴 애니메이션 시간 (초)
+# ── 물리 파라미터 (config.json에서 로드, 없으면 기본값) ──
+STRESS_THRESHOLD = cfg("qubit_chain", "stress_threshold", 100.0)
+CASCADE_DAMAGE = cfg("qubit_chain", "cascade_damage", 20.0)
+NOISE_RATE_BASE = cfg("qubit_chain", "noise_rate_base", 3.0)
+RECOVERY_RATE = cfg("qubit_chain", "recovery_rate", 5.0)
+COLLAPSE_ANIM_DURATION = 0.5
 
-# ── QEC 방어막 (미션3: 3-3 모듈 통합) ─────────────────
-QEC_REDUCTION_DEFAULT = 0.2   # 방어막 기본 감쇠 (연쇄 데미지 20% → +30 → +6)
-QEC_DURATION = 5.0            # 방어막 지속 시간 (초)
-QEC_COOLDOWN = 8.0            # 방어막 재사용 대기 시간 (초)
-HEAL_AMOUNT = 20.0            # 힐링량
-HEAL_COOLDOWN_SEC = 3.0       # 힐링 재사용 대기
+# ── QEC 방어막 ──────────────────────────────────────
+QEC_REDUCTION_DEFAULT = cfg("qubit_chain", "qec_reduction", 0.2)
+QEC_DURATION = cfg("qubit_chain", "qec_duration", 5.0)
+QEC_COOLDOWN = cfg("qubit_chain", "qec_cooldown", 8.0)
+HEAL_AMOUNT = cfg("qubit_chain", "heal_amount", 20.0)
+HEAL_COOLDOWN_SEC = cfg("qubit_chain", "heal_cooldown", 3.0)
 SHIELD_CLR = (137, 180, 250)
 SHIELD_GLOW = (116, 199, 236)
 
@@ -208,7 +211,7 @@ def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y:
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption("Qubit Entanglement Cascade")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
@@ -216,11 +219,17 @@ def run_simulation():
     info_font = pygame.font.SysFont("Consolas", 11)
 
     nodes = _build_network()
-    noise_rate = NOISE_RATE_BASE
-    cascade_damage = CASCADE_DAMAGE  # 런타임 조절 가능한 연쇄 데미지
     t = 0.0
     paused = False
     cascade_log: list[str] = []  # 최근 이벤트 로그
+
+    # ── 슬라이더 패널 ─────────────────────────────────
+    panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
+    sl_noise = panel.add(0.0, 20.0, NOISE_RATE_BASE, 0.5, "Noise Rate", ".1f")
+    sl_cascade = panel.add(0.0, 80.0, CASCADE_DAMAGE, 5.0, "Cascade Dmg", ".0f")
+    sl_qec_dur = panel.add(1.0, 15.0, QEC_DURATION, 0.5, "QEC Duration", ".1f")
+    sl_qec_cd = panel.add(1.0, 20.0, QEC_COOLDOWN, 0.5, "QEC Cooldown", ".1f")
+    sl_heal = panel.add(5.0, 50.0, HEAL_AMOUNT, 5.0, "Heal Amount", ".0f")
 
     # ── QEC 방어막 + 힐링 (미션3: 3-3 통합) ──
     shield_active = False
@@ -242,6 +251,7 @@ def run_simulation():
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
+            panel.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -252,8 +262,7 @@ def run_simulation():
                     for n in nodes:
                         n.reset()
                     cascade_log.clear()
-                    noise_rate = NOISE_RATE_BASE
-                    cascade_damage = CASCADE_DAMAGE
+                    panel.reset_all()
                     shield_active = False
                     shield_timer = 0.0
                     cooldown_timer = 0.0
@@ -265,28 +274,29 @@ def run_simulation():
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
                 elif event.key == pygame.K_UP:
-                    noise_rate = min(noise_rate + 1.0, 20.0)
+                    sl_noise.value = sl_noise.value + 1.0
                 elif event.key == pygame.K_DOWN:
-                    noise_rate = max(noise_rate - 1.0, 0.0)
+                    sl_noise.value = sl_noise.value - 1.0
                 elif event.key == pygame.K_RIGHT:
-                    cascade_damage = min(cascade_damage + 5.0, 80.0)
+                    sl_cascade.value = sl_cascade.value + 5.0
                 elif event.key == pygame.K_LEFT:
-                    cascade_damage = max(cascade_damage - 5.0, 0.0)
+                    sl_cascade.value = sl_cascade.value - 5.0
                 elif event.key == pygame.K_s:
                     # QEC 방어막 활성화 (미션3)
                     if not shield_active and cooldown_timer <= 0:
                         shield_active = True
-                        shield_timer = QEC_DURATION
+                        shield_timer = sl_qec_dur.value
                         qec_uses += 1
                         cascade_log.append("QEC SHIELD ON!")
                 elif event.key == pygame.K_h:
                     # 힐링 (미션3)
                     if heal_cooldown <= 0:
+                        heal_amt = sl_heal.value
                         for n in nodes:
                             if not n.collapsed:
-                                n.stress = max(n.stress - HEAL_AMOUNT, 0.0)
+                                n.stress = max(n.stress - heal_amt, 0.0)
                         heal_cooldown = HEAL_COOLDOWN_SEC
-                        cascade_log.append(f"HEAL! All -{int(HEAL_AMOUNT)} stress")
+                        cascade_log.append(f"HEAL! All -{int(heal_amt)} stress")
                 elif event.key == pygame.K_n:
                     # 랜덤 큐비트에 즉시 큰 노이즈 주입
                     alive = [n for n in nodes if not n.collapsed]
@@ -304,6 +314,10 @@ def run_simulation():
                             cascade_log.append(f"Q{n.qid} 오류 정정! (stress → 0)")
                         break
 
+        # ── 슬라이더 값 읽기 ─────────────────────────
+        noise_rate = sl_noise.value
+        cascade_damage = sl_cascade.value
+
         # ── 물리 업데이트 ────────────────────────────
         if not paused:
             # QEC 방어막 타이머 (미션3)
@@ -312,7 +326,7 @@ def run_simulation():
                 if shield_timer <= 0:
                     shield_active = False
                     shield_timer = 0.0
-                    cooldown_timer = QEC_COOLDOWN
+                    cooldown_timer = sl_qec_cd.value
                     cascade_log.append("QEC SHIELD OFF")
 
             if cooldown_timer > 0:
@@ -427,11 +441,14 @@ def run_simulation():
         time_txt = info_font.render(f"Survival: {survival_time:.1f}s", True, time_clr)
         screen.blit(time_txt, (hud_x, hud_y + 52))
 
+        # 슬라이더 패널 그리기
+        panel.draw(screen, info_font, info_font)
+
         # 조작 안내
         hints = [
             f"노이즈: {noise_rate:.1f}%/s  |  연쇄: +{int(cascade_damage)}  |  {'SHIELD' if shield_active else ''}  |  {'일시정지' if paused else '실행 중'}",
-            "클릭: 오류 정정  |  N: 노이즈  |  S: 방어막  |  H: 힐링(-20)",
-            "↑↓: 노이즈 속도  |  ←→: 연쇄 데미지  |  SPACE: 일시정지",
+            "클릭: 오류 정정  |  N: 노이즈  |  S: 방어막  |  H: 힐링",
+            "↑↓/←→: 파라미터 조절  |  우측 패널: 슬라이더  |  SPACE: 일시정지",
             "R: 전체 리셋  |  ESC: 종료",
         ]
         for i, hint in enumerate(hints):

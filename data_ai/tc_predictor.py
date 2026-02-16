@@ -20,6 +20,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error
 
+from config_loader import cfg
 from data_ai.generate_sample_data import generate as generate_data
 
 BG = "#1e1e2e"
@@ -64,9 +65,12 @@ class TcPredictorApp(tk.Toplevel):
         X = self.df[FEATURES].values
         y = self.df[TARGET].values
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        _test_size = cfg("ml", "test_size", 0.2)
+        _seed = cfg("ml", "random_state", 42)
+        _n_est = cfg("ml", "n_estimators", 100)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=_test_size, random_state=_seed)
 
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model = RandomForestRegressor(n_estimators=_n_est, random_state=_seed)
         model.fit(X_train, y_train)
 
         y_pred = model.predict(X_test)

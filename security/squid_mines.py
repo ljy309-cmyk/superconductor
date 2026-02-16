@@ -14,9 +14,12 @@ import random
 
 import pygame
 
+from config_loader import cfg
+from ui.slider import SliderPanel, PANEL_W
+
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH, HEIGHT = 900, 650
-FPS = 60
+FPS = cfg("display", "fps", 60)
 
 # ── 색상 ─────────────────────────────────────────────
 BG = (30, 30, 46)
@@ -33,12 +36,13 @@ GRAPH_LINE = (203, 166, 247)    # 자기 선속 그래프 (보라)
 GRAPH_PEAK = (243, 139, 168)    # 피크 (빨강)
 SENSOR_CLR = (116, 199, 236)    # 센서 커서 글로우
 
-# ── 그리드 설정 ──────────────────────────────────────
-GRID_COLS, GRID_ROWS = 10, 8
+# ── 그리드 설정 (config.json에서 로드) ────────────────
+GRID_COLS = cfg("squid_mines", "grid_cols", 10)
+GRID_ROWS = cfg("squid_mines", "grid_rows", 8)
 CELL_SIZE = 52
 GRID_OX = (WIDTH - GRID_COLS * CELL_SIZE) // 2
 GRID_OY = 60
-NUM_MINES = 8
+NUM_MINES = cfg("squid_mines", "num_mines", 8)
 
 # ── 그래프 설정 ──────────────────────────────────────
 GRAPH_X = 50
@@ -47,15 +51,15 @@ GRAPH_W = WIDTH - 100
 GRAPH_H = 120
 GRAPH_HISTORY = 200  # 샘플 수
 
-# ── 센서 민감도 (미션3) ─────────────────────────────
-SENSITIVITY_DEFAULT = 3.0     # 기본 민감도 배율
-SENSITIVITY_MIN = 1.0
-SENSITIVITY_MAX = 8.0
+# ── 센서 민감도 (config.json에서 로드) ────────────────
+SENSITIVITY_DEFAULT = cfg("squid_mines", "sensitivity_default", 3.0)
+SENSITIVITY_MIN = cfg("squid_mines", "sensitivity_min", 1.0)
+SENSITIVITY_MAX = cfg("squid_mines", "sensitivity_max", 8.0)
 SENSITIVITY_STEP = 0.5
 
-# ── 사운드 (미션1) ──────────────────────────────────
-BEEP_FREQ = 880               # 경고음 주파수 (Hz)
-BEEP_DURATION_MS = 60         # 경고음 길이 (ms)
+# ── 사운드 (config.json에서 로드) ────────────────────
+BEEP_FREQ = cfg("squid_mines", "beep_freq", 880)
+BEEP_DURATION_MS = cfg("squid_mines", "beep_duration_ms", 60)
 BEEP_INTERVAL_MAX = 1.0       # 최대 간격 (초, intensity=0)
 BEEP_INTERVAL_MIN = 0.08      # 최소 간격 (초, intensity=1)
 
@@ -290,7 +294,7 @@ def run_simulation():
     pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
     beep_sound = _make_beep_sound()
 
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption("SQUID Minesweeper — Magnetic Flux Sensor")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
@@ -299,9 +303,12 @@ def run_simulation():
 
     game = SQUIDGame()
     t = 0.0
-    sensitivity = SENSITIVITY_DEFAULT       # 미션3: 런타임 민감도
     beep_timer = 0.0                        # 미션1: 비프 간격 타이머
     sound_enabled = True                    # 미션1: 사운드 ON/OFF
+
+    # ── 슬라이더 패널 ─────────────────────────────────
+    panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
+    sl_sens = panel.add(SENSITIVITY_MIN, SENSITIVITY_MAX, SENSITIVITY_DEFAULT, 0.5, "Sensitivity", ".1f")
 
     running = True
     while running:
@@ -311,6 +318,7 @@ def run_simulation():
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
+            panel.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -318,13 +326,12 @@ def run_simulation():
                     running = False
                 elif event.key == pygame.K_r:
                     game.reset()
+                    panel.reset_all()
                     beep_timer = 0.0
                 elif event.key == pygame.K_UP:
-                    # 미션3: 민감도 증가
-                    sensitivity = min(sensitivity + SENSITIVITY_STEP, SENSITIVITY_MAX)
+                    sl_sens.value = sl_sens.value + SENSITIVITY_STEP
                 elif event.key == pygame.K_DOWN:
-                    # 미션3: 민감도 감소
-                    sensitivity = max(sensitivity - SENSITIVITY_STEP, SENSITIVITY_MIN)
+                    sl_sens.value = sl_sens.value - SENSITIVITY_STEP
                 elif event.key == pygame.K_m:
                     # 미션1: 사운드 토글
                     sound_enabled = not sound_enabled
@@ -332,6 +339,9 @@ def run_simulation():
                 cell = game.get_hover_cell(mx, my)
                 if cell:
                     game.mark_cell(*cell)
+
+        # ── 슬라이더 값 읽기 ─────────────────────────
+        sensitivity = sl_sens.value
 
         # ── 그래프 업데이트 ──────────────────────────
         intensity, nearest_dist, nearby_count = game.flux_intensity(mx, my, sensitivity)
@@ -370,11 +380,14 @@ def run_simulation():
         # 자기 선속 그래프
         _draw_flux_graph(screen, game, intensity, nearest_dist, nearby_count, sensitivity, font)
 
+        # 슬라이더 패널 그리기
+        panel.draw(screen, font)
+
         # 안내
         hints = [
             f"민감도: x{sensitivity:.1f}  |  사운드: {'ON' if sound_enabled else 'OFF'}  |  근접: {nearby_count}개",
-            "마우스: SQUID 센서  |  클릭: 마킹  |  ↑↓: 민감도  |  M: 사운드 토글",
-            "R: 리셋  |  ESC: 종료",
+            "마우스: SQUID 센서  |  클릭: 마킹  |  ↑↓/슬라이더: 민감도",
+            "M: 사운드  |  R: 리셋  |  ESC: 종료",
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)

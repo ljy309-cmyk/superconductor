@@ -11,6 +11,9 @@ import random
 
 import pygame
 
+from config_loader import cfg
+from ui.slider import SliderPanel, PANEL_W
+
 # 미션3 (5-2): QRNG 키 통합 — 모듈이 있으면 양자 해시 키 사용
 try:
     from data_ai.qrng_logger import pop_key_bit, shared_key_available
@@ -20,7 +23,7 @@ except ImportError:
 
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH, HEIGHT = 900, 600
-FPS = 60
+FPS = cfg("display", "fps", 60)
 
 # ── 색상 ─────────────────────────────────────────────
 BG = (30, 30, 46)
@@ -44,26 +47,26 @@ BOB_X, BOB_Y = 800, 250
 CHANNEL_Y = 250
 EVE_X, EVE_Y = 450, 100
 
-# ── 프로토콜 파라미터 ────────────────────────────────
-BASES = ["+", "×"]           # 직선 / 대각선 기저
+# ── 프로토콜 파라미터 (config.json에서 로드) ─────────
+BASES = ["+", "×"]
 BITS = ["0", "1"]
-SEND_INTERVAL = 1.2          # 큐비트 전송 간격 (초)
-EVE_CHANCE = 0.25            # 도청 이벤트 발생 확률 (라운드당)
-EVE_ERROR_INJECT = 0.50      # Eve 도청 시 에러 주입 확률
-ERROR_THRESHOLD = 0.25       # 에러율 임계값 → 자동 폐쇄
-HISTORY_WINDOW = 20          # 에러율 계산 최근 N 라운드
+SEND_INTERVAL = cfg("bb84", "send_interval", 1.2)
+EVE_CHANCE = cfg("bb84", "eve_chance", 0.25)
+EVE_ERROR_INJECT = cfg("bb84", "eve_error_inject", 0.50)
+ERROR_THRESHOLD = cfg("bb84", "error_threshold", 0.25)
+HISTORY_WINDOW = cfg("bb84", "history_window", 20)
 
-# ── 미션1: 자동 차단 시스템 ────────────────────────
-AUTO_BLOCK_THRESHOLD = 0.15  # 에러율 15% 초과 시 자동 차단
-AUTO_BLOCK_SCORE = 50        # 자동 차단 성공 시 획득 점수
-MANUAL_BLOCK_SCORE = 100     # 수동 차단 보너스 (사람 판단)
+# ── 자동 차단 시스템 ────────────────────────────────
+AUTO_BLOCK_THRESHOLD = cfg("bb84", "auto_block_threshold", 0.15)
+AUTO_BLOCK_SCORE = 50
+MANUAL_BLOCK_SCORE = 100
 
-# ── 미션2: 경고 알람 ──────────────────────────────
-WARNING_THRESHOLD = 0.10     # 에러율 10% 초과 시 배경 경고
+# ── 경고 알람 ───────────────────────────────────────
+WARNING_THRESHOLD = cfg("bb84", "warning_threshold", 0.10)
 
-# ── 미션3: 디코이 상태 ─────────────────────────────
-DECOY_CHANCE = 0.15          # 디코이 패킷 발생 확률 (15%)
-DECOY_ERROR_MULT = 2.0       # 디코이 도청 시 에러 기여 2배
+# ── 디코이 상태 ─────────────────────────────────────
+DECOY_CHANCE = cfg("bb84", "decoy_chance", 0.15)
+DECOY_ERROR_MULT = cfg("bb84", "decoy_error_mult", 2.0)
 
 
 # ── 큐비트 패킷 ──────────────────────────────────────
@@ -147,7 +150,8 @@ class BB84Game:
         self.total_errors = 0
         self.total_safe = 0
 
-    def new_round(self):
+    def new_round(self, eve_chance: float = EVE_CHANCE,
+                  decoy_chance: float = DECOY_CHANCE):
         """새 큐비트 전송 라운드."""
         if not self.channel_open:
             return
@@ -167,13 +171,13 @@ class BB84Game:
         alice_basis = random.choice(BASES)
 
         # 미션3: 디코이 패킷 — Alice가 가끔 가짜 데이터 삽입
-        is_decoy = random.random() < DECOY_CHANCE
+        is_decoy = random.random() < decoy_chance
         pkt = QubitPacket(alice_bit, alice_basis, self.round_id, is_decoy=is_decoy)
         if is_decoy:
             self.decoy_sent += 1
 
         # Eve 도청 여부
-        eve_present = random.random() < EVE_CHANCE
+        eve_present = random.random() < eve_chance
         if eve_present:
             self.eve_active = True
             self.eve_flash = 0.8
@@ -195,7 +199,8 @@ class BB84Game:
         self.packets.append(pkt)
         self.total_sent += 1
 
-    def process_arrival(self, pkt: QubitPacket):
+    def process_arrival(self, pkt: QubitPacket,
+                        auto_block_thresh: float = AUTO_BLOCK_THRESHOLD):
         """Bob이 큐비트 수신 처리."""
         bob_basis = random.choice(BASES)
         basis_match = (bob_basis == pkt.basis)
@@ -222,9 +227,9 @@ class BB84Game:
         if self.error_history:
             self.error_rate = sum(self.error_history) / len(self.error_history)
 
-        # 미션1: 자동 차단 시스템 (15% 초과)
+        # 미션1: 자동 차단 시스템
         if (self.auto_block_enabled
-                and self.error_rate > AUTO_BLOCK_THRESHOLD
+                and self.error_rate > auto_block_thresh
                 and len(self.error_history) >= 5
                 and self.channel_open):
             self.channel_open = False
@@ -468,7 +473,7 @@ def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
 
 def run_simulation():
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption("BB84 Quantum Key Distribution Defense")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 11)
@@ -479,6 +484,13 @@ def run_simulation():
     t = 0.0
     paused = False
 
+    # ── 슬라이더 패널 ─────────────────────────────────
+    panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
+    sl_interval = panel.add(0.3, 3.0, SEND_INTERVAL, 0.1, "Send Interval", ".1f")
+    sl_eve = panel.add(0.0, 1.0, EVE_CHANCE, 0.05, "Eve Chance", ".2f")
+    sl_decoy = panel.add(0.0, 0.5, DECOY_CHANCE, 0.05, "Decoy Chance", ".2f")
+    sl_autoblock = panel.add(0.05, 0.5, AUTO_BLOCK_THRESHOLD, 0.05, "Auto Block", ".2f")
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -486,6 +498,7 @@ def run_simulation():
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
+            panel.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -498,6 +511,7 @@ def run_simulation():
                         game.reopen()
                 elif event.key == pygame.K_r:
                     game.reset()
+                    panel.reset_all()
                 elif event.key == pygame.K_p:
                     paused = not paused
                 elif event.key == pygame.K_a:
@@ -506,17 +520,20 @@ def run_simulation():
 
         # ── 업데이트 ─────────────────────────────────
         if not paused:
-            # 전송 타이머
+            # 전송 타이머 (슬라이더 값 사용)
+            cur_interval = sl_interval.value
             game.send_timer += dt
-            if game.send_timer >= SEND_INTERVAL:
+            if game.send_timer >= cur_interval:
                 game.send_timer = 0.0
-                game.new_round()
+                game.new_round(eve_chance=sl_eve.value,
+                               decoy_chance=sl_decoy.value)
 
             # 패킷 이동
             for pkt in game.packets:
                 pkt.update(dt)
                 if pkt.arrived:
-                    game.process_arrival(pkt)
+                    game.process_arrival(pkt,
+                                         auto_block_thresh=sl_autoblock.value)
 
             # 도착한 패킷 제거
             game.packets = [p for p in game.packets if not p.arrived]
@@ -565,11 +582,14 @@ def run_simulation():
         # 폐쇄 배너
         _draw_shutdown_banner(screen, game, big_font, t)
 
+        # 슬라이더 패널 그리기
+        panel.draw(screen, font)
+
         # 안내
         hints = [
             f"SCORE: {game.score}  |  자동차단: {'ON' if game.auto_block_enabled else 'OFF'}  |  {'일시정지' if paused else '실행 중'}",
-            "SPACE: 폐쇄/재개  |  A: 자동차단 토글  |  P: 일시정지",
-            "R: 리셋  |  ESC: 종료",
+            "SPACE: 폐쇄/재개  |  A: 자동차단  |  우측 패널: 슬라이더",
+            "P: 일시정지  |  R: 리셋  |  ESC: 종료",
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)

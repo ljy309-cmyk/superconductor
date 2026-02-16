@@ -13,7 +13,9 @@ import os
 import pandas as pd
 import numpy as np
 
-SAMPLE_SIZE = 200
+from config_loader import cfg
+
+SAMPLE_SIZE = cfg("data_gen", "sample_size", 200)
 OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.xlsx")
 CSV_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.csv")
 

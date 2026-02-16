@@ -43,9 +43,11 @@ def shared_key_available() -> int:
     return len(_shared_key_bits)
 
 
+from config_loader import cfg
+
 OUTPUT_DIR = os.path.dirname(__file__)
-BITS_PER_KEY = 256          # 한 키당 비트 수
-NOISE_SOURCES = 7           # 시뮬레이션 큐비트 수
+BITS_PER_KEY = cfg("qrng", "bits_per_key", 256)
+NOISE_SOURCES = cfg("qrng", "noise_sources", 7)
 
 
 class QuantumNoiseSource:
