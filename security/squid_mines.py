@@ -3,8 +3,12 @@
 - 그리드에 숨겨진 이상 물질(지뢰)
 - 마우스(SQUID 센서)가 지뢰에 가까울수록 하단 자기 선속 그래프가 크게 요동
 - 클릭으로 지뢰 위치를 마킹, 모두 찾으면 승리
+- 미션1: 거리 기반 경고음 (삐-삐-삐, 가까울수록 빨라짐)
+- 미션2: 가장 가까운 타겟 기반 신호 + 근접 타겟 수 표시
+- 미션3: 센서 민감도 ↑↓ 키 런타임 튜닝
 """
 
+import array
 import math
 import random
 
@@ -43,6 +47,34 @@ GRAPH_W = WIDTH - 100
 GRAPH_H = 120
 GRAPH_HISTORY = 200  # 샘플 수
 
+# ── 센서 민감도 (미션3) ─────────────────────────────
+SENSITIVITY_DEFAULT = 3.0     # 기본 민감도 배율
+SENSITIVITY_MIN = 1.0
+SENSITIVITY_MAX = 8.0
+SENSITIVITY_STEP = 0.5
+
+# ── 사운드 (미션1) ──────────────────────────────────
+BEEP_FREQ = 880               # 경고음 주파수 (Hz)
+BEEP_DURATION_MS = 60         # 경고음 길이 (ms)
+BEEP_INTERVAL_MAX = 1.0       # 최대 간격 (초, intensity=0)
+BEEP_INTERVAL_MIN = 0.08      # 최소 간격 (초, intensity=1)
+
+
+# ── 사운드 생성 헬퍼 (미션1) ────────────────────────
+
+def _make_beep_sound(freq: int = BEEP_FREQ, duration_ms: int = BEEP_DURATION_MS,
+                     sample_rate: int = 22050, volume: float = 0.3) -> pygame.mixer.Sound:
+    """사인파 기반 경고 비프음 생성."""
+    n_samples = int(sample_rate * duration_ms / 1000)
+    buf = array.array("h", [0] * n_samples)
+    max_amp = int(32767 * volume)
+    for i in range(n_samples):
+        t = i / sample_rate
+        # 부드러운 엔벨로프 (페이드 인/아웃)
+        env = min(i / (n_samples * 0.1 + 1), 1.0, (n_samples - i) / (n_samples * 0.1 + 1))
+        buf[i] = int(max_amp * env * math.sin(2 * math.pi * freq * t))
+    return pygame.mixer.Sound(buffer=buf)
+
 
 # ── 게임 로직 ────────────────────────────────────────
 
@@ -72,20 +104,39 @@ class SQUIDGame:
         cy = GRID_OY + row * CELL_SIZE + CELL_SIZE / 2
         return cx, cy
 
-    def flux_intensity(self, mx: float, my: float) -> float:
-        """마우스 위치에서의 자기 선속 강도 (0~1).
+    def flux_intensity(self, mx: float, my: float,
+                       sensitivity: float = SENSITIVITY_DEFAULT) -> tuple[float, float, int]:
+        """마우스 위치에서의 자기 선속 강도.
 
-        모든 지뢰까지의 거리 역수 합 기반.
+        미션2: 가장 가까운 타겟 기반 신호 + 근접 타겟 수
+        미션3: sensitivity로 감지 범위/강도 조절
+
+        Returns:
+            (intensity 0~1, nearest_dist, nearby_count)
         """
-        total = 0.0
-        for (c, r) in self.mines:
-            if (c, r) in self.marked:
-                continue  # 이미 찾은 지뢰는 제외
+        unfound = [(c, r) for (c, r) in self.mines if (c, r) not in self.marked]
+        if not unfound:
+            return (0.0, 9999.0, 0)
+
+        # 미션2: 각 타겟까지 거리 계산 → 최근접 기반
+        distances: list[float] = []
+        for (c, r) in unfound:
             cx, cy = self.cell_center(c, r)
-            dist = max(math.hypot(mx - cx, my - cy), 1.0)
-            # 가까울수록 기여도 ↑ (역제곱)
-            total += (CELL_SIZE * 3) ** 2 / dist ** 2
-        return min(total, 1.0)
+            distances.append(math.hypot(mx - cx, my - cy))
+
+        nearest_dist = min(distances)
+        # 근접 타겟 수 (감지 반경 내)
+        detect_radius = CELL_SIZE * sensitivity
+        nearby_count = sum(1 for d in distances if d < detect_radius)
+
+        # 미션3: 민감도에 따른 강도 — 가까울수록 + 민감도 높을수록 강한 신호
+        ref = CELL_SIZE * sensitivity
+        intensity = (ref / max(nearest_dist, 1.0)) ** 2
+        # 근접 타겟이 여러 개면 보너스 (+10% per extra)
+        intensity *= 1.0 + 0.1 * max(nearby_count - 1, 0)
+        intensity = min(intensity, 1.0)
+
+        return (intensity, nearest_dist, nearby_count)
 
     def update_graph(self, intensity: float, dt: float):
         """자기 선속 그래프에 새 샘플 추가."""
@@ -169,7 +220,9 @@ def _draw_sensor_glow(screen, mx: int, my: int, intensity: float, t: float):
     screen.blit(glow, (mx - radius, my - radius))
 
 
-def _draw_flux_graph(screen, game: SQUIDGame, intensity: float, font):
+def _draw_flux_graph(screen, game: SQUIDGame, intensity: float,
+                     nearest_dist: float, nearby_count: int,
+                     sensitivity: float, font):
     """하단 자기 선속 그래프."""
     # 배경
     pygame.draw.rect(screen, GRAPH_BG, (GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H))
@@ -197,11 +250,20 @@ def _draw_flux_graph(screen, game: SQUIDGame, intensity: float, font):
     pygame.draw.lines(screen, line_color, False, points, 2)
 
     # 라벨
-    label = font.render("Magnetic Flux (Φ)", True, ACCENT)
+    label = font.render("Magnetic Flux (\u03a6)", True, ACCENT)
     screen.blit(label, (GRAPH_X + 4, GRAPH_Y - 16))
 
-    intensity_txt = font.render(f"Intensity: {intensity:.2f}", True, GRAPH_PEAK if intensity > 0.4 else TEXT_CLR)
-    screen.blit(intensity_txt, (GRAPH_X + GRAPH_W - intensity_txt.get_width() - 4, GRAPH_Y - 16))
+    # 미션2: 근접 타겟 수 + 거리 표시
+    info_parts = [
+        f"Intensity: {intensity:.2f}",
+        f"Nearest: {nearest_dist:.0f}px",
+        f"Nearby: {nearby_count}",
+        f"Sens: x{sensitivity:.1f}",
+    ]
+    info_str = "  |  ".join(info_parts)
+    info_clr = GRAPH_PEAK if intensity > 0.4 else TEXT_CLR
+    info_surf = font.render(info_str, True, info_clr)
+    screen.blit(info_surf, (GRAPH_X + GRAPH_W - info_surf.get_width() - 4, GRAPH_Y - 16))
 
 
 def _draw_status(screen, game: SQUIDGame, font, big_font):
@@ -224,6 +286,10 @@ def _draw_status(screen, game: SQUIDGame, font, big_font):
 
 def run_simulation():
     pygame.init()
+    # 미션1: 사운드 초기화
+    pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
+    beep_sound = _make_beep_sound()
+
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("SQUID Minesweeper — Magnetic Flux Sensor")
     clock = pygame.time.Clock()
@@ -233,6 +299,9 @@ def run_simulation():
 
     game = SQUIDGame()
     t = 0.0
+    sensitivity = SENSITIVITY_DEFAULT       # 미션3: 런타임 민감도
+    beep_timer = 0.0                        # 미션1: 비프 간격 타이머
+    sound_enabled = True                    # 미션1: 사운드 ON/OFF
 
     running = True
     while running:
@@ -249,14 +318,35 @@ def run_simulation():
                     running = False
                 elif event.key == pygame.K_r:
                     game.reset()
+                    beep_timer = 0.0
+                elif event.key == pygame.K_UP:
+                    # 미션3: 민감도 증가
+                    sensitivity = min(sensitivity + SENSITIVITY_STEP, SENSITIVITY_MAX)
+                elif event.key == pygame.K_DOWN:
+                    # 미션3: 민감도 감소
+                    sensitivity = max(sensitivity - SENSITIVITY_STEP, SENSITIVITY_MIN)
+                elif event.key == pygame.K_m:
+                    # 미션1: 사운드 토글
+                    sound_enabled = not sound_enabled
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 cell = game.get_hover_cell(mx, my)
                 if cell:
                     game.mark_cell(*cell)
 
         # ── 그래프 업데이트 ──────────────────────────
-        intensity = game.flux_intensity(mx, my)
+        intensity, nearest_dist, nearby_count = game.flux_intensity(mx, my, sensitivity)
         game.update_graph(intensity, dt)
+
+        # ── 미션1: 거리 기반 경고음 ──────────────────
+        if sound_enabled and intensity > 0.05 and not game.won:
+            # 가까울수록 간격 짧아짐 (선형 보간)
+            interval = BEEP_INTERVAL_MAX - (BEEP_INTERVAL_MAX - BEEP_INTERVAL_MIN) * intensity
+            beep_timer -= dt
+            if beep_timer <= 0:
+                beep_sound.play()
+                beep_timer = interval
+        else:
+            beep_timer = 0.0
 
         hover_cell = game.get_hover_cell(mx, my)
 
@@ -278,18 +368,21 @@ def run_simulation():
             _draw_sensor_glow(screen, mx, my, intensity, t)
 
         # 자기 선속 그래프
-        _draw_flux_graph(screen, game, intensity, font)
+        _draw_flux_graph(screen, game, intensity, nearest_dist, nearby_count, sensitivity, font)
 
         # 안내
         hints = [
-            "마우스: SQUID 센서 이동  |  클릭: 지뢰 마킹  |  R: 리셋  |  ESC: 종료",
+            f"민감도: x{sensitivity:.1f}  |  사운드: {'ON' if sound_enabled else 'OFF'}  |  근접: {nearby_count}개",
+            "마우스: SQUID 센서  |  클릭: 마킹  |  ↑↓: 민감도  |  M: 사운드 토글",
+            "R: 리셋  |  ESC: 종료",
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
-            screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 22 + i * 16))
+            screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 52 + i * 16))
 
         pygame.display.flip()
 
+    pygame.mixer.quit()
     pygame.quit()
 
 
