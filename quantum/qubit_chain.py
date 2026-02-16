@@ -8,6 +8,7 @@
 import math
 import random
 import sys
+import time
 
 import pygame
 
@@ -229,6 +230,11 @@ def run_simulation():
     heal_cooldown = 0.0
     qec_uses = 0
 
+    # 최종보스미션 (5-3): 생존 시간 측정 → 랭킹 서버 전송
+    start_time = time.time()
+    survival_time = 0.0
+    game_over = False
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -253,6 +259,9 @@ def run_simulation():
                     cooldown_timer = 0.0
                     heal_cooldown = 0.0
                     qec_uses = 0
+                    start_time = time.time()
+                    survival_time = 0.0
+                    game_over = False
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
                 elif event.key == pygame.K_UP:
@@ -413,6 +422,11 @@ def run_simulation():
             heal_txt = info_font.render("Heal: READY (H)", True, (166, 227, 161))
         screen.blit(heal_txt, (hud_x, hud_y + 32))
 
+        # 최종보스미션: 생존 시간 표시
+        time_clr = (243, 139, 168) if game_over else ACCENT
+        time_txt = info_font.render(f"Survival: {survival_time:.1f}s", True, time_clr)
+        screen.blit(time_txt, (hud_x, hud_y + 52))
+
         # 조작 안내
         hints = [
             f"노이즈: {noise_rate:.1f}%/s  |  연쇄: +{int(cascade_damage)}  |  {'SHIELD' if shield_active else ''}  |  {'일시정지' if paused else '실행 중'}",
@@ -424,10 +438,19 @@ def run_simulation():
             surf = info_font.render(hint, True, TEXT_CLR)
             screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 70 + i * 16))
 
-        # 전체 붕괴 판정
+        # 최종보스미션: 생존 시간 갱신
         all_collapsed = all(n.collapsed for n in nodes)
+        if not game_over and not paused:
+            if all_collapsed:
+                game_over = True
+                survival_time = time.time() - start_time
+            else:
+                survival_time = time.time() - start_time
+
         if all_collapsed:
-            over_surf = title_font.render("ALL QUBITS COLLAPSED — Press R to reset", True, (243, 139, 168))
+            over_surf = title_font.render(
+                f"ALL QUBITS COLLAPSED  |  Survival: {survival_time:.2f}s  |  Press R to reset",
+                True, (243, 139, 168))
             screen.blit(over_surf, (WIDTH // 2 - over_surf.get_width() // 2, HEIGHT // 2 - 80))
 
         pygame.display.flip()
@@ -443,9 +466,25 @@ def run_simulation():
             "cascade_damage": cascade_damage,
             "shield_uses": qec_uses,
             "max_stress": max((n.stress for n in nodes), default=0),
+            "survival_time": round(survival_time, 2),
         })
     except Exception:
         pass
+
+    # 최종보스미션 (5-3): 랭킹 서버에 생존 시간 POST
+    if survival_time > 0:
+        try:
+            import requests
+            from data_ai.ranking_server import get_base_url, start_server
+            start_server()
+            payload = {
+                "name": "Player",
+                "score": round(survival_time, 2),
+                "mode": "Entanglement Cascade",
+            }
+            requests.post(f"{get_base_url()}/ranking", json=payload, timeout=3)
+        except Exception:
+            pass  # 미션1: 오프라인이면 조용히 넘어감 (방어적 프로그래밍)
 
     pygame.quit()
 

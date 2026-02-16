@@ -36,6 +36,11 @@ class RankingApp(tk.Toplevel):
         start_server()
         self.base_url = get_base_url()
 
+        # 미션1: 연결 상태 관리
+        self.online = False
+        # 미션2: 1등 점수 기록
+        self.top1_score = 0.0
+
         self._build_ui()
         self._refresh_ranking()
 
@@ -48,7 +53,15 @@ class RankingApp(tk.Toplevel):
         tk.Label(
             self, text="Qubit Survival Time Leaderboard", font=("Consolas", 10),
             bg=BG, fg=FG,
-        ).pack(pady=(0, 10))
+        ).pack(pady=(0, 4))
+
+        # 미션1: 서버 연결 상태 표시
+        self.conn_var = tk.StringVar(value="Connecting...")
+        self.conn_label = tk.Label(
+            self, textvariable=self.conn_var, font=("Consolas", 10, "bold"),
+            bg=BG, fg=FG,
+        )
+        self.conn_label.pack(pady=(0, 6))
 
         # ── 랭킹 보드 (상위 5위) ────────────────────
         board_frame = tk.LabelFrame(
@@ -117,6 +130,13 @@ class RankingApp(tk.Toplevel):
             bg=BG, fg=ACCENT,
         ).pack(side=tk.LEFT, padx=8)
 
+        # 미션2: 점수 비교 결과 표시
+        self.compare_var = tk.StringVar(value="")
+        tk.Label(
+            submit_frame, textvariable=self.compare_var, font=("Consolas", 11, "bold"),
+            bg=BG, fg=GOLD, wraplength=620,
+        ).pack(fill=tk.X, pady=(6, 0))
+
         # ── 전체 기록 테이블 ─────────────────────────
         log_frame = tk.LabelFrame(
             self, text="  All Records  ", font=("Consolas", 11, "bold"),
@@ -145,7 +165,7 @@ class RankingApp(tk.Toplevel):
     # ── REST API 호출 ────────────────────────────────
 
     def _submit_score(self):
-        """POST /ranking — 점수 등록."""
+        """POST /ranking — 미션1: 에러 핸들링 + 미션2: 점수 비교."""
         name = self.name_entry.get().strip()
         if not name:
             messagebox.showwarning("입력 오류", "플레이어 이름을 입력하세요.", parent=self)
@@ -163,26 +183,42 @@ class RankingApp(tk.Toplevel):
             "mode": self.mode_var.get(),
         }
 
+        # 미션1: try-except로 방어적 프로그래밍 (Defensive Programming)
         try:
             resp = requests.post(f"{self.base_url}/ranking", json=payload, timeout=5)
             if resp.status_code == 201:
                 data = resp.json()
                 rank = data.get("rank", "?")
                 self.submit_status.set(f"Registered! Current rank: #{rank}")
+                self.online = True
+                # 미션2: 점수 비교 로직
+                self._compare_score(score)
             else:
                 self.submit_status.set(f"Server error: {resp.status_code}")
-        except requests.RequestException as e:
-            self.submit_status.set(f"Connection failed: {e}")
+        except requests.RequestException:
+            # 미션1: 인터넷 끊김 → 프로그램이 죽지 않고 안내 메시지 표시
+            self.online = False
+            self.conn_var.set("[OFFLINE] 인터넷 연결 실패! 오프라인 모드 가동")
+            self.conn_label.configure(fg="#f38ba8")
+            self.submit_status.set("전송 실패 -- 오프라인 모드 (점수 미등록)")
 
         self._refresh_ranking()
 
     def _refresh_ranking(self):
-        """GET /ranking — 상위 5위 + 전체 기록 갱신."""
-        # 상위 5위
+        """GET /ranking — 미션1: 오프라인 대비 방어적 프로그래밍."""
+        # 상위 5위 (GET 요청)
         try:
             resp = requests.get(f"{self.base_url}/ranking", timeout=5)
             if resp.status_code == 200:
+                self.online = True
+                self.conn_var.set("[ONLINE] 서버 연결 성공")
+                self.conn_label.configure(fg="#a6e3a1")
+
                 top5 = resp.json()
+                # 미션2: 1등 점수 저장 (비교용)
+                if top5:
+                    self.top1_score = top5[0].get("score", 0)
+
                 for i, lbl in enumerate(self.rank_labels):
                     if i < len(top5):
                         r = top5[i]
@@ -192,9 +228,12 @@ class RankingApp(tk.Toplevel):
                         medal = {0: "1st", 1: "2nd", 2: "3rd"}.get(i, f"{i+1}th")
                         lbl.configure(text=f"  {medal}   ---")
         except requests.RequestException:
-            pass
+            # 미션1: except 문이 작동하여 프로그램을 보호
+            self.online = False
+            self.conn_var.set("[OFFLINE] 인터넷 연결 실패! 오프라인 모드 가동")
+            self.conn_label.configure(fg="#f38ba8")
 
-        # 전체 기록
+        # 전체 기록 (GET 요청)
         try:
             resp = requests.get(f"{self.base_url}/ranking/all", timeout=5)
             if resp.status_code == 200:
@@ -210,7 +249,27 @@ class RankingApp(tk.Toplevel):
                         r.get("timestamp", ""),
                     ))
         except requests.RequestException:
-            pass
+            pass  # 미션1: 오프라인이면 조용히 넘어감
+
+    # ── 미션2: 점수 비교 로직 ─────────────────────────
+
+    def _compare_score(self, my_score: float):
+        """미션2: 내 점수(my_score)와 1등 점수 비교 — if/else 조건문."""
+        if self.top1_score > 0 and my_score > self.top1_score:
+            # 내 점수가 1등보다 높으면 → 신기록!
+            self.compare_var.set(
+                f"*** 신기록 달성!! *** "
+                f"({my_score:.2f}s > 기존 1등 {self.top1_score:.2f}s)"
+            )
+        elif self.top1_score > 0:
+            # 낮으면 → 아쉽습니다
+            diff = self.top1_score - my_score
+            self.compare_var.set(
+                f"아쉽습니다. 다음 기회에! (1등까지 {diff:.2f}초 부족)"
+            )
+        else:
+            # 첫 기록
+            self.compare_var.set("첫 기록 등록! 당신이 1등!")
 
 
 def open_ranking(master=None):
