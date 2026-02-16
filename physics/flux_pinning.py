@@ -24,6 +24,8 @@ SPRING_K = 4.0           # 스프링 상수 k
 DAMPING = 0.88           # 감쇠 계수
 LEVITATION_AMP = 4.0     # sin 부상 진폭 (px)
 LEVITATION_FREQ = 2.0    # sin 부상 주파수 (Hz)
+GRAVITY = 480.0          # 중력 가속도 (px/s²)
+FLOOR_Y = 460.0          # 바닥 Y 좌표 (px)
 
 # ── 오브젝트 크기 ────────────────────────────────────
 MAGNET_W, MAGNET_H = 160, 50
@@ -50,7 +52,8 @@ def run_simulation():
     sc_vy = 0.0
 
     dragging = False
-    flipped = False  # 자석 뒤집힘 여부
+    flipped = False        # 자석 뒤집힘 여부
+    superconducting = True  # 초전도 상태
     t = 0.0
 
     running = True
@@ -67,6 +70,12 @@ def run_simulation():
                     running = False
                 elif event.key == pygame.K_f:
                     flipped = not flipped
+                elif event.key == pygame.K_SPACE:
+                    superconducting = not superconducting
+                    if superconducting:
+                        # 재냉각: 속도 초기화, 자석 위 평형 위치로 복귀
+                        sc_vy = 0.0
+                        sc_vx = 0.0
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 if abs(mx - magnet_x) < MAGNET_W / 2 and abs(my - magnet_y) < MAGNET_H / 2:
@@ -78,26 +87,37 @@ def run_simulation():
             magnet_x, magnet_y = pygame.mouse.get_pos()
 
         # ── 물리 연산 ────────────────────────────────
-        # 평형 위치: 자석 위(또는 아래) EQUILIBRIUM_GAP 만큼 떨어진 지점
-        direction = 1 if flipped else -1  # -1: 위에 부상, +1: 아래에 부상
-        target_x = magnet_x
-        target_y = magnet_y + direction * EQUILIBRIUM_GAP
+        if superconducting:
+            # 평형 위치: 자석 위(또는 아래) EQUILIBRIUM_GAP 만큼 떨어진 지점
+            direction = 1 if flipped else -1  # -1: 위에 부상, +1: 아래에 부상
+            target_x = magnet_x
+            target_y = magnet_y + direction * EQUILIBRIUM_GAP
 
-        # 스프링 힘: F = -k * (현재 - 목표)
-        dx = sc_x - target_x
-        dy = sc_y - target_y
-        ax = -SPRING_K * dx
-        ay = -SPRING_K * dy
+            # 스프링 힘: F = -k * (현재 - 목표)
+            dx = sc_x - target_x
+            dy = sc_y - target_y
+            ax = -SPRING_K * dx
+            ay = -SPRING_K * dy
 
-        sc_vx = (sc_vx + ax * dt) * DAMPING
-        sc_vy = (sc_vy + ay * dt) * DAMPING
-        sc_x += sc_vx
-        sc_y += sc_vy
+            sc_vx = (sc_vx + ax * dt) * DAMPING
+            sc_vy = (sc_vy + ay * dt) * DAMPING
+            sc_x += sc_vx
+            sc_y += sc_vy
 
-        # sin 부상 미세 진동
-        levitation_offset = LEVITATION_AMP * math.sin(LEVITATION_FREQ * 2 * math.pi * t)
+            # sin 부상 미세 진동
+            levitation_offset = LEVITATION_AMP * math.sin(LEVITATION_FREQ * 2 * math.pi * t)
+            draw_sc_y = sc_y + levitation_offset
+        else:
+            # 초전도 파괴 → 중력 낙하: v = v₀ + g·t
+            sc_vy += GRAVITY * dt
+            sc_y += sc_vy * dt
 
-        draw_sc_y = sc_y + levitation_offset
+            # 바닥 충돌
+            if sc_y >= FLOOR_Y:
+                sc_y = FLOOR_Y
+                sc_vy = 0.0
+
+            draw_sc_y = sc_y
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -113,22 +133,26 @@ def run_simulation():
         _draw_magnet(screen, magnet_x, magnet_y, flipped, font)
 
         # 초전도체 그리기
-        _draw_superconductor(screen, sc_x, draw_sc_y, t)
+        _draw_superconductor(screen, sc_x, draw_sc_y, t, superconducting)
 
-        # 연결선 (스프링 시각화)
-        pygame.draw.line(
-            screen, (88, 91, 112),
-            (int(magnet_x), int(magnet_y)),
-            (int(sc_x), int(draw_sc_y)),
-            1,
-        )
+        # 연결선 (스프링 시각화) — 초전도 상태에서만 표시
+        if superconducting:
+            pygame.draw.line(
+                screen, (88, 91, 112),
+                (int(magnet_x), int(magnet_y)),
+                (int(sc_x), int(draw_sc_y)),
+                1,
+            )
 
         # 안내 텍스트
+        state_label = "FALLEN (추락)" if not superconducting else (
+            "FLIPPED (뒤집힘)" if flipped else "LEVITATING (부상)")
         hints = [
             "마우스 드래그: 자석 이동",
             "F 키: 자석 뒤집기 (플럭스 피닝 확인)",
+            "SPACE: 초전도 ON/OFF (온도 변화)",
             "ESC: 종료",
-            f"상태: {'FLIPPED (뒤집힘)' if flipped else 'NORMAL'}",
+            f"상태: {state_label}",
         ]
         for i, hint in enumerate(hints):
             surf = font.render(hint, True, TEXT_CLR)
@@ -164,18 +188,20 @@ def _draw_magnet(screen, cx, cy, flipped, font):
     screen.blit(s_surf, (left + 3 * MAGNET_W / 4 - s_surf.get_width() / 2, cy - s_surf.get_height() / 2))
 
 
-def _draw_superconductor(screen, cx, cy, t):
+def _draw_superconductor(screen, cx, cy, t, superconducting=True):
     """초전도체 (글로우 효과 포함)."""
     rect = pygame.Rect(cx - SC_W / 2, cy - SC_H / 2, SC_W, SC_H)
 
-    # 글로우 (반투명 사각형 확장)
-    glow_alpha = int(80 + 40 * math.sin(t * 3))
-    glow_surf = pygame.Surface((SC_W + 16, SC_H + 16), pygame.SRCALPHA)
-    glow_surf.fill((*SC_GLOW, glow_alpha))
-    screen.blit(glow_surf, (rect.x - 8, rect.y - 8))
+    if superconducting:
+        # 글로우 (반투명 사각형 확장) — 초전도 상태에서만
+        glow_alpha = int(80 + 40 * math.sin(t * 3))
+        glow_surf = pygame.Surface((SC_W + 16, SC_H + 16), pygame.SRCALPHA)
+        glow_surf.fill((*SC_GLOW, glow_alpha))
+        screen.blit(glow_surf, (rect.x - 8, rect.y - 8))
 
-    # 본체
-    pygame.draw.rect(screen, SC_COLOR, rect, border_radius=6)
+    # 본체 — 초전도 파괴 시 색상 어둡게
+    body_color = SC_COLOR if superconducting else (100, 100, 100)
+    pygame.draw.rect(screen, body_color, rect, border_radius=6)
     pygame.draw.rect(screen, (255, 255, 255), rect, 1, border_radius=6)
 
 
