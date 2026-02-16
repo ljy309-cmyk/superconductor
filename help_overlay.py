@@ -14,7 +14,10 @@
     overlay.draw(screen, font)
 """
 
-import pygame
+try:
+    import pygame
+except ImportError:
+    pygame = None  # type: ignore[assignment]
 
 # 모듈별 도움말 텍스트 (한국어)
 _HELP_TEXTS: dict[str, list[str]] = {

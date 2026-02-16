@@ -13,19 +13,25 @@
     hud.draw(screen, font)
 """
 
-import pygame
+try:
+    import pygame
+except ImportError:
+    pygame = None  # type: ignore[assignment]
 
 from presets import get_preset, save_profile, load_profile, list_profiles
 from logger import get_module_logger
 
 _log = get_module_logger("preset_hud")
 
-# 프리셋 키 매핑
-_PRESET_KEYS = {
-    pygame.K_1: "easy",
-    pygame.K_2: "normal",
-    pygame.K_3: "hard",
-}
+# 프리셋 키 매핑 (pygame이 없으면 빈 dict)
+if pygame:
+    _PRESET_KEYS = {
+        pygame.K_1: "easy",
+        pygame.K_2: "normal",
+        pygame.K_3: "hard",
+    }
+else:
+    _PRESET_KEYS = {}
 
 # 프리셋별 표시 색상
 _PRESET_COLORS = {
