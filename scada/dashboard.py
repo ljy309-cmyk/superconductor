@@ -76,6 +76,18 @@ class Dashboard(tk.Toplevel):
         scrollbar.pack(side="right", fill="y")
         self._log.pack(side="left", fill="both", expand=True)
 
+        # 목표 온도 표시
+        self._target_var = tk.StringVar(value="목표 온도: -196.00 °C")
+        tk.Label(
+            left,
+            textvariable=self._target_var,
+            font=("Consolas", 10, "bold"),
+            bg=PANEL_BG,
+            fg=YELLOW,
+            anchor="w",
+            padx=8,
+        ).pack(side="bottom", fill="x", pady=(4, 6))
+
         # ── 우측: 시스템 상태 게이지 패널 ──
         right = tk.LabelFrame(
             body,
@@ -218,6 +230,7 @@ class Dashboard(tk.Toplevel):
         else:
             self._status_var.set("STANDBY")
 
+        self._target_var.set(f"목표 온도: {state.target:.2f} °C")
         self._cooling_var.set(f"냉각기: {'ON' if state.cooling_on else 'OFF'}")
         self._emergency_var.set(f"긴급 냉각: {'ON' if state.emergency else 'OFF'}")
 
