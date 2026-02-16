@@ -24,11 +24,14 @@ REFLECT_CLR = (243, 139, 168)   # 반사 빨강
 BLOCH_RING = (88, 91, 112)
 
 # ── 물리 파라미터 ────────────────────────────────────
-TUNNEL_PROB = 0.10          # 터널링 확률 10 %
+TUNNEL_PROB_BASE = 0.10     # 기본 터널링 확률 10 %
 PARTICLE_SPEED = 200.0      # 기본 속도 (px/s)
 PARTICLE_RADIUS = 10
-BARRIER_WIDTH = 12
+BARRIER_WIDTH_DEFAULT = 12  # 기본 장벽 두께 (px)
+BARRIER_WIDTH_MIN = 4
+BARRIER_WIDTH_MAX = 200
 SUPERPOSITION_HZ = 6.0      # |0⟩↔|1⟩ 점멸 주파수
+TUNNEL_SPEED_BOOST = 2.0    # 터널링 성공 시 속도 배율
 
 # ── 영역 레이아웃 ────────────────────────────────────
 # 왼쪽: 터널링 시뮬레이션 | 오른쪽: 블로흐 구
@@ -39,6 +42,14 @@ BLOCH_R = 110
 
 # 장벽 위치 (시뮬레이션 영역 중앙)
 BARRIER_X = SIM_LEFT + SIM_W // 2
+
+
+def _calc_tunnel_prob(barrier_width: int) -> float:
+    """벽 두께에 따른 터널링 확률 — 두꺼울수록 확률 감소.
+
+    기본 두께(12px)에서 10 %, 두께 200px이면 ~0.5 % 수준으로 지수 감쇠.
+    """
+    return TUNNEL_PROB_BASE * math.exp(-0.02 * (barrier_width - BARRIER_WIDTH_DEFAULT))
 
 
 # ── 입자 클래스 ──────────────────────────────────────
@@ -75,7 +86,8 @@ class QuantumParticle:
         phase = math.sin(pygame.time.get_ticks() / 1000.0 * SUPERPOSITION_HZ * 2 * math.pi)
         return math.pi * (1 - phase) / 2  # 0→π 매핑
 
-    def update(self, dt: float):
+    def update(self, dt: float, barrier_width: int = BARRIER_WIDTH_DEFAULT,
+               tunnel_prob: float = TUNNEL_PROB_BASE):
         if not self.alive:
             return
 
@@ -93,18 +105,19 @@ class QuantumParticle:
         # 장벽 충돌 판정
         if self.tunneled is None and self.vx > 0:
             # 오른쪽으로 진행 중, 장벽에 도달
-            if self.x + PARTICLE_RADIUS >= BARRIER_X - BARRIER_WIDTH / 2:
+            if self.x + PARTICLE_RADIUS >= BARRIER_X - barrier_width / 2:
                 self.total_attempts += 1
-                if random.random() < TUNNEL_PROB:
-                    # 터널링 성공! 장벽 반대편으로 좌표 이동
-                    self.x = BARRIER_X + BARRIER_WIDTH / 2 + PARTICLE_RADIUS + 5
+                if random.random() < tunnel_prob:
+                    # 터널링 성공! 장벽 반대편으로 좌표 이동 + 속도 2배
+                    self.x = BARRIER_X + barrier_width / 2 + PARTICLE_RADIUS + 5
+                    self.vx = abs(self.vx) * TUNNEL_SPEED_BOOST
                     self.tunneled = True
                     self.tunnel_count += 1
                     self.flash_timer = 0.6
                 else:
                     # 반사
                     self.vx = -abs(self.vx) * 0.8
-                    self.x = BARRIER_X - BARRIER_WIDTH / 2 - PARTICLE_RADIUS - 2
+                    self.x = BARRIER_X - barrier_width / 2 - PARTICLE_RADIUS - 2
                     self.tunneled = False
                     self.reflect_count += 1
                     self.flash_timer = 0.4
@@ -119,14 +132,14 @@ class QuantumParticle:
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
-def _draw_sim_area(screen, font):
+def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     """시뮬레이션 영역 배경."""
     pygame.draw.rect(screen, (24, 24, 37), (SIM_LEFT, SIM_TOP, SIM_W, SIM_H))
     pygame.draw.rect(screen, (69, 71, 90), (SIM_LEFT, SIM_TOP, SIM_W, SIM_H), 1)
 
     # 장벽
-    bx = BARRIER_X - BARRIER_WIDTH // 2
-    pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, BARRIER_WIDTH, SIM_H))
+    bx = BARRIER_X - barrier_width // 2
+    pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, barrier_width, SIM_H))
 
     # 장벽 라벨
     label = font.render("BARRIER", True, BG)
@@ -153,8 +166,8 @@ def _draw_particle(screen, p: QuantumParticle, font):
         pygame.draw.circle(glow, (*flash_clr, alpha), (flash_r, flash_r), flash_r)
         screen.blit(glow, (cx - flash_r, cy - flash_r))
 
-    # 입자 본체
-    color = TUNNEL_FLASH if (p.tunneled is True and p.flash_timer > 0) else PARTICLE_CLR
+    # 입자 본체 — 터널링 성공 시 흰색, 평상시 파랑
+    color = (255, 255, 255) if (p.tunneled is True and p.flash_timer > 0) else PARTICLE_CLR
     pygame.draw.circle(screen, color, (cx, cy), PARTICLE_RADIUS)
     pygame.draw.circle(screen, TEXT_CLR, (cx, cy), PARTICLE_RADIUS, 1)
 
@@ -203,7 +216,7 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     screen.blit(sl, (BLOCH_CX - sl.get_width() // 2, BLOCH_CY + BLOCH_R + 26))
 
 
-def _draw_stats(screen, p: QuantumParticle, font):
+def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PROB_BASE):
     """통계 패널."""
     stats_x = BLOCH_CX - BLOCH_R
     stats_y = BLOCH_CY + BLOCH_R + 60
@@ -212,7 +225,7 @@ def _draw_stats(screen, p: QuantumParticle, font):
         f"총 시도: {p.total_attempts}",
         f"터널링: {p.tunnel_count}  ({(p.tunnel_count / max(p.total_attempts, 1) * 100):.1f}%)",
         f"반사:   {p.reflect_count}  ({(p.reflect_count / max(p.total_attempts, 1) * 100):.1f}%)",
-        f"이론 확률: {TUNNEL_PROB * 100:.0f}%",
+        f"현재 확률: {tunnel_prob * 100:.1f}%",
     ]
     for i, line in enumerate(lines):
         color = TUNNEL_FLASH if "터널링" in line else REFLECT_CLR if "반사" in line else TEXT_CLR
@@ -234,6 +247,8 @@ def run_simulation():
 
     particle = QuantumParticle()
     speed_mult = 1.0
+    barrier_width = BARRIER_WIDTH_DEFAULT
+    tunnel_prob = _calc_tunnel_prob(barrier_width)
     paused = False
 
     running = True
@@ -252,10 +267,18 @@ def run_simulation():
                 elif event.key == pygame.K_r:
                     particle = QuantumParticle()
                     speed_mult = 1.0
+                    barrier_width = BARRIER_WIDTH_DEFAULT
+                    tunnel_prob = _calc_tunnel_prob(barrier_width)
                 elif event.key == pygame.K_UP:
                     speed_mult = min(speed_mult + 0.5, 5.0)
                 elif event.key == pygame.K_DOWN:
                     speed_mult = max(speed_mult - 0.5, 0.5)
+                elif event.key == pygame.K_RIGHT:
+                    barrier_width = min(barrier_width + 10, BARRIER_WIDTH_MAX)
+                    tunnel_prob = _calc_tunnel_prob(barrier_width)
+                elif event.key == pygame.K_LEFT:
+                    barrier_width = max(barrier_width - 10, BARRIER_WIDTH_MIN)
+                    tunnel_prob = _calc_tunnel_prob(barrier_width)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 # 클릭으로 입자 재발사
                 particle.reset()
@@ -264,7 +287,7 @@ def run_simulation():
         if not paused:
             orig_vx = particle.vx
             particle.vx = orig_vx * speed_mult if orig_vx > 0 else orig_vx
-            particle.update(dt)
+            particle.update(dt, barrier_width, tunnel_prob)
             particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
 
         # ── 렌더링 ───────────────────────────────────
@@ -275,7 +298,7 @@ def run_simulation():
         screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
 
         # 시뮬레이션 영역
-        _draw_sim_area(screen, font)
+        _draw_sim_area(screen, font, barrier_width)
 
         # 입자
         _draw_particle(screen, particle, font)
@@ -284,13 +307,13 @@ def run_simulation():
         _draw_bloch_sphere(screen, particle, font, title_font)
 
         # 통계
-        _draw_stats(screen, particle, font)
+        _draw_stats(screen, particle, font, tunnel_prob)
 
         # 안내
         hints = [
-            f"속도: x{speed_mult:.1f}  |  {'일시정지' if paused else '실행 중'}",
-            "클릭: 재발사  |  ↑↓: 속도 조절  |  SPACE: 일시정지",
-            "R: 리셋  |  ESC: 종료",
+            f"속도: x{speed_mult:.1f}  |  벽 두께: {barrier_width}px  |  확률: {tunnel_prob*100:.1f}%  |  {'일시정지' if paused else '실행 중'}",
+            "클릭: 재발사  |  ↑↓: 속도  |  ←→: 벽 두께 (확률 자동 연동)",
+            "SPACE: 일시정지  |  R: 리셋  |  ESC: 종료",
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
