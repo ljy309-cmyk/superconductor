@@ -11,10 +11,10 @@ from matplotlib.figure import Figure
 
 # ── 물질별 임계 온도 (°C) ────────────────────────────────
 MATERIALS = {
-    "YBCO (Tc=93K)": -180.15,          # 93 K
+    "YBCO (Tc=77K)": -196.0,            # 77 K
     "Mercury / Hg (Tc=4.2K)": -268.95, # 4.2 K
 }
-DEFAULT_MATERIAL = "YBCO (Tc=93K)"
+DEFAULT_MATERIAL = "YBCO (Tc=77K)"
 
 R_NORMAL = 1.0        # 정규화된 상온 저항 (임의 단위)
 T_RANGE = (-275, 50)  # 그래프 온도 범위 (°C)
