@@ -416,6 +416,21 @@ def run_simulation():
 
         pygame.display.flip()
 
+    # 최종미션: 플레이 기록 저장
+    try:
+        from data_ai.play_logger import get_logger
+        alive = sum(1 for n in nodes if not n.collapsed)
+        get_logger().log_session("qec_shield", {
+            "survival_time": round(elapsed, 1),
+            "alive_count": alive,
+            "total_qubits": total,
+            "qec_uses": qec_uses,
+            "heal_uses": heal_uses,
+            "qec_reduction": qec_reduction,
+        })
+    except Exception:
+        pass
+
     pygame.quit()
 
 

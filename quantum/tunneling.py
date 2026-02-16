@@ -321,6 +321,21 @@ def run_simulation():
 
         pygame.display.flip()
 
+    # 최종미션: 플레이 기록 저장
+    try:
+        from data_ai.play_logger import get_logger
+        rate = particle.tunnel_count / max(particle.total_attempts, 1)
+        get_logger().log_session("tunneling", {
+            "total_attempts": particle.total_attempts,
+            "tunnel_count": particle.tunnel_count,
+            "reflect_count": particle.reflect_count,
+            "tunnel_rate": round(rate, 3),
+            "barrier_width": barrier_width,
+            "tunnel_prob": round(tunnel_prob, 3),
+        })
+    except Exception:
+        pass
+
     pygame.quit()
 
 

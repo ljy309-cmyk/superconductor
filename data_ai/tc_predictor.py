@@ -27,7 +27,9 @@ FG = "#cdd6f4"
 ACCENT = "#a6e3a1"
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.xlsx")
-FEATURES = ["density", "atomic_mass", "electron_affinity", "thermal_conductivity", "valence"]
+CSV_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.csv")
+FEATURES = ["density", "atomic_mass", "electron_affinity", "thermal_conductivity",
+            "valence", "electronegativity"]
 TARGET = "critical_temp"
 
 
@@ -41,8 +43,13 @@ class TcPredictorApp(tk.Toplevel):
         self.geometry("1050x720")
         self.resizable(False, False)
 
-        # 데이터 로드 (없으면 생성)
-        if not os.path.exists(DATA_PATH):
+        # 데이터 로드 (없거나 컬럼 부족하면 재생성)
+        need_regen = not os.path.exists(DATA_PATH)
+        if not need_regen:
+            tmp = pd.read_excel(DATA_PATH)
+            if "electronegativity" not in tmp.columns:
+                need_regen = True
+        if need_regen:
             generate_data()
         self.df = pd.read_excel(DATA_PATH)
 
@@ -90,11 +97,11 @@ class TcPredictorApp(tk.Toplevel):
         """멀티 서브플롯 산점도."""
         self.fig.clear()
 
-        colors = ["#89b4fa", "#cba6f7", "#f9e2af", "#a6e3a1", "#f38ba8"]
-        titles = ["Density", "Atomic Mass", "Electron Affinity", "Thermal Cond.", "Valence"]
+        colors = ["#89b4fa", "#cba6f7", "#f9e2af", "#a6e3a1", "#f38ba8", "#74c7ec"]
+        titles = ["Density", "Atomic Mass", "e- Affinity", "Thermal K", "Valence", "Electroneg."]
 
         for i, (feat, color, title) in enumerate(zip(FEATURES, colors, titles)):
-            ax = self.fig.add_subplot(1, 5, i + 1)
+            ax = self.fig.add_subplot(1, 6, i + 1)
             ax.set_facecolor("#181825")
             ax.scatter(
                 self.df[feat], self.df[TARGET],
@@ -121,7 +128,7 @@ class TcPredictorApp(tk.Toplevel):
 
         self.entries: dict[str, tk.Entry] = {}
         defaults = {"density": "6.5", "atomic_mass": "90.0", "electron_affinity": "80.0",
-                     "thermal_conductivity": "50.0", "valence": "3"}
+                     "thermal_conductivity": "50.0", "valence": "3", "electronegativity": "1.8"}
 
         for feat in FEATURES:
             row = tk.Frame(input_frame, bg=BG)

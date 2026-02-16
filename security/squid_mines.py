@@ -382,6 +382,19 @@ def run_simulation():
 
         pygame.display.flip()
 
+    # 최종미션: 플레이 기록 저장
+    try:
+        from data_ai.play_logger import get_logger
+        get_logger().log_session("squid_mines", {
+            "mines_found": len(game.marked),
+            "wrong_marks": len(game.wrong),
+            "total_mines": len(game.mines),
+            "sensitivity": sensitivity,
+            "won": game.won,
+        })
+    except Exception:
+        pass
+
     pygame.mixer.quit()
     pygame.quit()
 

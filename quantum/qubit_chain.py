@@ -432,6 +432,21 @@ def run_simulation():
 
         pygame.display.flip()
 
+    # 최종미션: 플레이 기록 저장
+    try:
+        from data_ai.play_logger import get_logger
+        get_logger().log_session("qubit_chain", {
+            "total_qubits": len(nodes),
+            "collapsed_count": sum(1 for n in nodes if n.collapsed),
+            "alive_count": sum(1 for n in nodes if not n.collapsed),
+            "noise_rate": noise_rate,
+            "cascade_damage": cascade_damage,
+            "shield_uses": qec_uses,
+            "max_stress": max((n.stress for n in nodes), default=0),
+        })
+    except Exception:
+        pass
+
     pygame.quit()
 
 
