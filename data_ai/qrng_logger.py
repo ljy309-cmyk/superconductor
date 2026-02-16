@@ -22,6 +22,27 @@ BIT_0_CLR = "#a6e3a1"
 BIT_1_CLR = "#f38ba8"
 KEY_CLR = "#f9e2af"
 
+# ── 미션3: QRNG 키 공유 저장소 (BB84 통합) ──────────
+_shared_key_bits: list[int] = []
+
+
+def push_key_bits(bits: list[int]):
+    """생성된 키 비트를 공유 저장소에 추가."""
+    _shared_key_bits.extend(bits)
+
+
+def pop_key_bit():
+    """공유 저장소에서 비트 1개 소비. 없으면 None."""
+    if _shared_key_bits:
+        return _shared_key_bits.pop(0)
+    return None
+
+
+def shared_key_available() -> int:
+    """공유 저장소에 남아 있는 비트 수."""
+    return len(_shared_key_bits)
+
+
 OUTPUT_DIR = os.path.dirname(__file__)
 BITS_PER_KEY = 256          # 한 키당 비트 수
 NOISE_SOURCES = 7           # 시뮬레이션 큐비트 수
@@ -50,13 +71,20 @@ class QuantumNoiseSource:
         return noise
 
     def extract_bit(self) -> int:
-        """노이즈의 소수점 자리를 추출하여 0 또는 1로 치환."""
+        """노이즈에 ×1,000,000 → 일의 자리 % 2로 비트 추출 (미션1 업그레이드)."""
         noise = self.sample_noise()
-        # 소수점 이하 4번째 자리 추출
-        fractional = abs(noise) - int(abs(noise))
-        digit = int(fractional * 10000) % 10
-        # 짝수 → 0, 홀수 → 1
-        return digit % 2
+        # ×1,000,000으로 소수점 끌어올림 → 일의 자리 추출 → 짝홀 판정
+        amplified = int(abs(noise) * 1_000_000)
+        digit = amplified % 10          # 일의 자리
+        return digit % 2                # 짝수→0, 홀수→1
+
+    def extract_bit_detail(self) -> tuple:
+        """비트 추출 + 상세 정보 (bit, noise, amplified_ones_digit)."""
+        noise = self.sample_noise()
+        amplified = int(abs(noise) * 1_000_000)
+        digit = amplified % 10
+        bit = digit % 2
+        return bit, noise, digit
 
 
 class QRNGLoggerApp(tk.Toplevel):
@@ -93,7 +121,7 @@ class QRNGLoggerApp(tk.Toplevel):
         row.pack()
         for i in range(NOISE_SOURCES):
             lbl = tk.Label(
-                row, text=f"Q{i}: —", font=("Consolas", 9), bg=BG, fg=FG, width=14,
+                row, text=f"Q{i}: —", font=("Consolas", 9), bg=BG, fg=FG, width=18,
             )
             lbl.pack(side=tk.LEFT, padx=4)
             self.source_labels.append(lbl)
@@ -161,16 +189,18 @@ class QRNGLoggerApp(tk.Toplevel):
         )
         log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(4, 10))
 
-        columns = ("id", "timestamp", "hex_key", "entropy")
+        columns = ("id", "timestamp", "hex_short", "hex_key", "entropy")
         self.tree = ttk.Treeview(log_frame, columns=columns, show="headings", height=8)
         self.tree.heading("id", text="ID")
         self.tree.heading("timestamp", text="Timestamp")
-        self.tree.heading("hex_key", text="Hex Key (first 32 chars)")
+        self.tree.heading("hex_short", text="Hash Fingerprint")
+        self.tree.heading("hex_key", text="Full Hex Key")
         self.tree.heading("entropy", text="Entropy")
         self.tree.column("id", width=40)
-        self.tree.column("timestamp", width=160)
-        self.tree.column("hex_key", width=440)
-        self.tree.column("entropy", width=80)
+        self.tree.column("timestamp", width=150)
+        self.tree.column("hex_short", width=160)
+        self.tree.column("hex_key", width=300)
+        self.tree.column("entropy", width=70)
 
         scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -205,12 +235,11 @@ class QRNGLoggerApp(tk.Toplevel):
             bit = src.extract_bit()
             self.bit_buffer.append(bit)
 
-        # 소스 라벨 업데이트
+        # 소스 라벨 업데이트 (미션1: ×1M 추출 과정 표시)
         for i, src in enumerate(self.sources):
-            noise_val = src.sample_noise()
-            bit_val = src.extract_bit()
+            bit_val, noise_val, digit_val = src.extract_bit_detail()
             self.source_labels[i].configure(
-                text=f"Q{i}: {noise_val:+.4f} → {bit_val}",
+                text=f"Q{i}: ×1M→d{digit_val}%2={bit_val}",
                 fg=BIT_0_CLR if bit_val == 0 else BIT_1_CLR,
             )
 
@@ -255,20 +284,31 @@ class QRNGLoggerApp(tk.Toplevel):
         key_id = len(self.keys) + 1
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        # 미션2: 16진수 해시 지문 (0x + 앞 16자)
+        hex_short = "0x" + hex_key[:16]
+
         key_record = {
             "id": key_id,
             "timestamp": timestamp,
             "hex_key": hex_key,
+            "hex_short": hex_short,
             "bits": bit_str,
             "entropy": round(entropy, 4),
         }
         self.keys.append(key_record)
 
+        # 미션3: QRNG 키 비트를 공유 저장소에 추가 (BB84 통합)
+        push_key_bits(bits)
+
         # 테이블에 추가
         display_hex = hex_key[:32] + ("..." if len(hex_key) > 32 else "")
-        self.tree.insert("", tk.END, values=(key_id, timestamp, display_hex, f"{entropy:.4f}"))
+        self.tree.insert("", tk.END, values=(
+            key_id, timestamp, hex_short, display_hex, f"{entropy:.4f}",
+        ))
 
-        self.status_var.set(f"Key #{key_id} generated! ({BITS_PER_KEY} bits, entropy={entropy:.4f})")
+        self.status_var.set(
+            f"Key #{key_id} — {hex_short}… ({BITS_PER_KEY} bits, H={entropy:.4f})"
+        )
 
     # ── Excel 저장 ───────────────────────────────────
 

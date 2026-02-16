@@ -11,6 +11,13 @@ import random
 
 import pygame
 
+# 미션3 (5-2): QRNG 키 통합 — 모듈이 있으면 양자 해시 키 사용
+try:
+    from data_ai.qrng_logger import pop_key_bit, shared_key_available
+    _QRNG_AVAILABLE = True
+except ImportError:
+    _QRNG_AVAILABLE = False
+
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH, HEIGHT = 900, 600
 FPS = 60
@@ -132,6 +139,9 @@ class BB84Game:
         self.decoy_sent = 0
         self.decoy_trapped = 0         # Eve가 디코이를 건드린 횟수
 
+        # 미션3 (5-2): QRNG 키 사용 추적
+        self.qrng_bits_used = 0
+
         # 통계
         self.total_sent = 0
         self.total_errors = 0
@@ -143,7 +153,17 @@ class BB84Game:
             return
 
         self.round_id += 1
-        alice_bit = random.choice(BITS)
+
+        # 미션3 (5-2): QRNG 키가 있으면 양자 해시 비트를 Alice가 전송
+        qrng_bit = None
+        if _QRNG_AVAILABLE:
+            qrng_bit = pop_key_bit()
+        if qrng_bit is not None:
+            alice_bit = str(qrng_bit)
+            self.qrng_bits_used += 1
+        else:
+            alice_bit = random.choice(BITS)
+
         alice_basis = random.choice(BASES)
 
         # 미션3: 디코이 패킷 — Alice가 가끔 가짜 데이터 삽입
@@ -381,6 +401,10 @@ def _draw_stats(screen, game: BB84Game, font, big_font):
     score_surf = big_font.render(f"SCORE: {game.score}", True, ACCENT)
     screen.blit(score_surf, (sx, sy - 20))
 
+    # 미션3 (5-2): QRNG 키 잔량 표시
+    qrng_remain = shared_key_available() if _QRNG_AVAILABLE else 0
+    qrng_tag = f"QRNG: {game.qrng_bits_used}bit 사용 (잔여 {qrng_remain})"
+
     lines = [
         (f"전송: {game.total_sent}", TEXT_CLR),
         (f"안전 수신: {game.total_safe}", SAFE_CLR),
@@ -388,6 +412,7 @@ def _draw_stats(screen, game: BB84Game, font, big_font):
         (f"Eve 도청: {game.eve_intercept_count}", EVE_CLR),
         (f"디코이 발사: {game.decoy_sent}  트랩: {game.decoy_trapped}", DECOY_CLR),
         (f"자동차단: {game.auto_blocks}회  수동: {game.manual_blocks}회", ALICE_CLR),
+        (qrng_tag, ACCENT if qrng_remain > 0 else (88, 91, 112)),
         (f"채널: {'OPEN' if game.channel_open else 'SHUTDOWN'}  |  자동: {'ON' if game.auto_block_enabled else 'OFF'}", SAFE_CLR if game.channel_open else DANGER_CLR),
     ]
     for i, (text, color) in enumerate(lines):
@@ -565,6 +590,7 @@ def run_simulation():
             "manual_blocks": game.manual_blocks,
             "decoy_sent": game.decoy_sent,
             "decoy_trapped": game.decoy_trapped,
+            "qrng_bits_used": game.qrng_bits_used,
         })
     except Exception:
         pass
