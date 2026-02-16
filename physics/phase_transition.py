@@ -16,8 +16,10 @@ MATERIALS = {
 }
 DEFAULT_MATERIAL = "YBCO (Tc=77K)"
 
-R_NORMAL = 1.0        # 정규화된 상온 저항 (임의 단위)
-T_RANGE = (-275, 50)  # 그래프 온도 범위 (°C)
+from config_loader import cfg
+
+R_NORMAL = cfg("phase_transition", "r_normal", 1.0)
+T_RANGE = (cfg("phase_transition", "t_range_min", -275), cfg("phase_transition", "t_range_max", 50))
 
 
 def _celsius_to_kelvin(t):

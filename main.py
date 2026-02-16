@@ -1,3 +1,5 @@
+"""Superconductor — 메인 메뉴 애플리케이션."""
+
 import tkinter as tk
 
 from scada.dashboard import open_dashboard
@@ -5,6 +7,8 @@ from physics.launcher import open_physics_launcher
 from quantum.launcher import open_quantum_launcher
 from security.launcher import open_security_launcher
 from data_ai.launcher import open_data_ai_launcher
+from i18n import t, set_locale
+from theme import TK, FONTS
 
 
 class App(tk.Tk):
@@ -13,13 +17,12 @@ class App(tk.Tk):
         self.title("Superconductor")
         self.resizable(False, False)
 
-        # 버튼 목록: (이름, 실행할 함수) — 여기에 추가하면 자동으로 버튼 생성
         self._buttons = [
-            ("1. 임베디드 제어 및 모니터링 (SCADA)", lambda: open_dashboard(self)),
-            ("2. 초전도 물리 엔진 (Physics)", lambda: open_physics_launcher(self)),
-            ("3. 양자 역학 시뮬레이터 (Quantum)", lambda: open_quantum_launcher(self)),
-            ("4. 첨단 센서 및 암호 보안 (Security)", lambda: open_security_launcher(self)),
-            ("5. 데이터 사이언스 & AI (Data)", lambda: open_data_ai_launcher(self)),
+            ("menu_scada",    lambda: open_dashboard(self)),
+            ("menu_physics",  lambda: open_physics_launcher(self)),
+            ("menu_quantum",  lambda: open_quantum_launcher(self)),
+            ("menu_security", lambda: open_security_launcher(self)),
+            ("menu_data_ai",  lambda: open_data_ai_launcher(self)),
         ]
 
         self._create_widgets()
@@ -29,14 +32,34 @@ class App(tk.Tk):
         frame = tk.Frame(self, padx=20, pady=20)
         frame.pack()
 
-        tk.Label(frame, text="메뉴를 선택하세요", font=("Arial", 14, "bold")).pack(
-            pady=(0, 15)
-        )
+        tk.Label(
+            frame, text=t("menu_title"), font=FONTS.HEADING,
+        ).pack(pady=(0, 15))
 
-        for name, command in self._buttons:
+        for key, command in self._buttons:
             tk.Button(
-                frame, text=name, command=command, width=35, height=2
+                frame, text=t(key), command=command,
+                width=35, height=2,
             ).pack(pady=4)
+
+        # 언어 전환 버튼
+        lang_frame = tk.Frame(frame)
+        lang_frame.pack(pady=(10, 0))
+        tk.Button(
+            lang_frame, text="한국어", font=FONTS.SMALL,
+            command=lambda: self._switch_locale("ko"), width=8,
+        ).pack(side="left", padx=2)
+        tk.Button(
+            lang_frame, text="English", font=FONTS.SMALL,
+            command=lambda: self._switch_locale("en"), width=8,
+        ).pack(side="left", padx=2)
+
+    def _switch_locale(self, locale: str):
+        """언어 전환 후 UI 재구성."""
+        set_locale(locale)
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._create_widgets()
 
     def _center_window(self):
         self.update_idletasks()

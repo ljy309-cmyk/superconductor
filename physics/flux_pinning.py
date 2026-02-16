@@ -5,26 +5,29 @@ import sys
 
 import pygame
 
+from config_loader import cfg
+from theme import PG
+
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH, HEIGHT = 800, 500
-FPS = 60
+FPS = cfg("display", "fps", 60)
 
-# ── 색상 ─────────────────────────────────────────────
-BG = (30, 30, 46)
-TEXT_CLR = (205, 214, 244)
-MAGNET_N = (235, 90, 90)   # 빨강 (N극)
-MAGNET_S = (100, 130, 235)  # 파랑 (S극)
-SC_COLOR = (166, 227, 161)  # 초전도체 (초록)
-SC_GLOW = (137, 180, 250)   # 부상 글로우
+# ── 색상 (theme에서 가져옴) ──────────────────────────
+BG = PG.BG
+TEXT_CLR = PG.TEXT
+MAGNET_N = PG.MAGNET_N
+MAGNET_S = PG.MAGNET_S
+SC_COLOR = PG.SC_COLOR
+SC_GLOW = PG.SC_GLOW
 FIELD_CLR = (88, 91, 112, 60)
 
-# ── 물리 파라미터 ────────────────────────────────────
-EQUILIBRIUM_GAP = 65.0   # 자석-초전도체 평형 거리 (px)
-SPRING_K = 4.0           # 스프링 상수 k
-DAMPING = 0.88           # 감쇠 계수
-LEVITATION_AMP = 4.0     # sin 부상 진폭 (px)
-LEVITATION_FREQ = 2.0    # sin 부상 주파수 (Hz)
-GRAVITY = 480.0          # 중력 가속도 (px/s²)
+# ── 물리 파라미터 (config.json에서 로드) ──────────────
+EQUILIBRIUM_GAP = cfg("flux_pinning", "equilibrium_gap", 65.0)
+SPRING_K = cfg("flux_pinning", "spring_k", 4.0)
+DAMPING = cfg("flux_pinning", "damping", 0.88)
+LEVITATION_AMP = cfg("flux_pinning", "levitation_amp", 4.0)
+LEVITATION_FREQ = cfg("flux_pinning", "levitation_freq", 2.0)
+GRAVITY = cfg("flux_pinning", "gravity", 480.0)
 FLOOR_Y = 460.0          # 바닥 Y 좌표 (px)
 
 # ── 오브젝트 크기 ────────────────────────────────────

@@ -597,21 +597,28 @@ def run_simulation():
 
         pygame.display.flip()
 
-    # 최종미션: 플레이 기록 저장
+    # 최종미션: 플레이 기록 저장 + 보고서 생성
+    session_data = {
+        "score": game.score,
+        "total_sent": game.total_sent,
+        "total_errors": game.total_errors,
+        "total_safe": game.total_safe,
+        "eve_intercepts": game.eve_intercept_count,
+        "auto_blocks": game.auto_blocks,
+        "manual_blocks": game.manual_blocks,
+        "decoy_sent": game.decoy_sent,
+        "decoy_trapped": game.decoy_trapped,
+        "qrng_bits_used": game.qrng_bits_used,
+    }
     try:
         from data_ai.play_logger import get_logger
-        get_logger().log_session("bb84_defense", {
-            "score": game.score,
-            "total_sent": game.total_sent,
-            "total_errors": game.total_errors,
-            "total_safe": game.total_safe,
-            "eve_intercepts": game.eve_intercept_count,
-            "auto_blocks": game.auto_blocks,
-            "manual_blocks": game.manual_blocks,
-            "decoy_sent": game.decoy_sent,
-            "decoy_trapped": game.decoy_trapped,
-            "qrng_bits_used": game.qrng_bits_used,
-        })
+        get_logger().log_session("bb84_defense", session_data)
+    except Exception:
+        pass
+
+    try:
+        from report import generate_report
+        generate_report("bb84_defense", session_data)
     except Exception:
         pass
 

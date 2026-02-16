@@ -22,25 +22,29 @@ BIT_0_CLR = "#a6e3a1"
 BIT_1_CLR = "#f38ba8"
 KEY_CLR = "#f9e2af"
 
-# ── 미션3: QRNG 키 공유 저장소 (BB84 통합) ──────────
-_shared_key_bits: list[int] = []
+# ── 미션3: QRNG 키 공유 저장소 (BB84 통합, 스레드 안전) ──
+import queue as _queue
+
+_shared_key_queue: _queue.Queue = _queue.Queue()
 
 
 def push_key_bits(bits: list[int]):
-    """생성된 키 비트를 공유 저장소에 추가."""
-    _shared_key_bits.extend(bits)
+    """생성된 키 비트를 공유 저장소에 추가 (스레드 안전)."""
+    for b in bits:
+        _shared_key_queue.put(b)
 
 
 def pop_key_bit():
-    """공유 저장소에서 비트 1개 소비. 없으면 None."""
-    if _shared_key_bits:
-        return _shared_key_bits.pop(0)
-    return None
+    """공유 저장소에서 비트 1개 소비. 없으면 None (스레드 안전)."""
+    try:
+        return _shared_key_queue.get_nowait()
+    except _queue.Empty:
+        return None
 
 
 def shared_key_available() -> int:
-    """공유 저장소에 남아 있는 비트 수."""
-    return len(_shared_key_bits)
+    """공유 저장소에 남아 있는 비트 수 (근사치)."""
+    return _shared_key_queue.qsize()
 
 
 from config_loader import cfg

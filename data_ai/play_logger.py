@@ -10,10 +10,16 @@
     logger.export()
 """
 
+import csv
 import os
+import threading
 from datetime import datetime
 
 import pandas as pd
+
+from logger import get_module_logger
+
+_log = get_module_logger("play_logger")
 
 LOG_DIR = os.path.dirname(__file__)
 PLAY_LOG_XLSX = os.path.join(LOG_DIR, "play_history.xlsx")
@@ -21,33 +27,28 @@ PLAY_LOG_CSV = os.path.join(LOG_DIR, "play_history.csv")
 
 
 class PlayLogger:
-    """게임 플레이 데이터 누적 기록 및 엑셀 추출."""
+    """게임 플레이 데이터 누적 기록 및 엑셀 추출 (스레드 안전)."""
 
     # 기록 가능한 필드 정의 (모듈별)
     FIELDS = {
-        # 모듈 3-1: 큐비트 연쇄 붕괴
         "qubit_chain": [
             "total_qubits", "collapsed_count", "alive_count",
             "noise_rate", "cascade_damage",
             "shield_uses", "heal_uses",
-            "max_stress",
+            "max_stress", "survival_time",
         ],
-        # 모듈 3-2: 양자 터널링
         "tunneling": [
             "total_attempts", "tunnel_count", "reflect_count",
             "tunnel_rate", "barrier_width", "tunnel_prob",
         ],
-        # 모듈 3-3: QEC 방어막
         "qec_shield": [
             "survival_time", "alive_count", "total_qubits",
             "qec_uses", "heal_uses", "qec_reduction",
         ],
-        # 모듈 4-1: SQUID 지뢰찾기
         "squid_mines": [
             "mines_found", "wrong_marks", "total_mines",
             "sensitivity", "won",
         ],
-        # 모듈 4-2: BB84 방어전
         "bb84_defense": [
             "score", "total_sent", "total_errors", "total_safe",
             "eve_intercepts", "auto_blocks", "manual_blocks",
@@ -56,6 +57,7 @@ class PlayLogger:
     }
 
     def __init__(self):
+        self._lock = threading.Lock()
         self.records: list[dict] = []
         self._load_existing()
 
@@ -65,11 +67,13 @@ class PlayLogger:
             try:
                 df = pd.read_csv(PLAY_LOG_CSV)
                 self.records = df.to_dict("records")
-            except Exception:
+                _log.info("기존 기록 %d건 로드", len(self.records))
+            except Exception as e:
+                _log.error("기록 로드 실패: %s", e)
                 self.records = []
 
     def log_session(self, module_name: str, data: dict):
-        """게임 세션 데이터 기록.
+        """게임 세션 데이터 기록 (스레드 안전).
 
         Args:
             module_name: 모듈 이름 (예: "qubit_chain", "bb84_defense")
@@ -90,46 +94,77 @@ class PlayLogger:
             if key not in record:
                 record[key] = val
 
-        self.records.append(record)
-        self._auto_save()
+        with self._lock:
+            self.records.append(record)
+            self._append_csv(record)
+
+        _log.info("세션 기록: %s (%d건)", module_name, len(self.records))
         return record
 
-    def _auto_save(self):
-        """기록 변경 시 자동 저장."""
+    def _append_csv(self, record: dict):
+        """단일 레코드를 CSV에 증분 추가 (O(1) 성능)."""
         try:
-            self.export()
-        except Exception:
-            pass  # UI 없는 환경에서도 안전
+            file_exists = os.path.exists(PLAY_LOG_CSV)
+            # 전체 필드 셋 결정
+            all_fields = ["timestamp", "module"]
+            for fields in self.FIELDS.values():
+                for f in fields:
+                    if f not in all_fields:
+                        all_fields.append(f)
+            for k in record:
+                if k not in all_fields:
+                    all_fields.append(k)
+
+            if not file_exists or os.path.getsize(PLAY_LOG_CSV) == 0:
+                # 새 파일: 헤더 + 레코드
+                with open(PLAY_LOG_CSV, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=all_fields, extrasaction="ignore")
+                    writer.writeheader()
+                    writer.writerow(record)
+            else:
+                # 기존 파일: 레코드만 추가
+                with open(PLAY_LOG_CSV, "a", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=all_fields, extrasaction="ignore")
+                    writer.writerow(record)
+        except OSError as e:
+            _log.error("CSV 증분 저장 실패: %s", e)
 
     def export(self) -> str:
-        """누적 기록을 Excel + CSV로 저장."""
-        if not self.records:
-            return ""
+        """누적 기록을 Excel + CSV로 전체 저장."""
+        with self._lock:
+            if not self.records:
+                return ""
 
-        df = pd.DataFrame(self.records)
+            df = pd.DataFrame(self.records)
 
-        # 컬럼 정렬: timestamp, module을 앞으로
-        priority = ["timestamp", "module"]
-        other_cols = [c for c in df.columns if c not in priority]
-        df = df[priority + other_cols]
+            # 컬럼 정렬: timestamp, module을 앞으로
+            priority = ["timestamp", "module"]
+            other_cols = [c for c in df.columns if c not in priority]
+            df = df[priority + other_cols]
 
-        df.to_excel(PLAY_LOG_XLSX, index=False)
-        df.to_csv(PLAY_LOG_CSV, index=False)
+            try:
+                df.to_excel(PLAY_LOG_XLSX, index=False)
+                df.to_csv(PLAY_LOG_CSV, index=False)
+                _log.info("기록 내보내기 완료: %d건", len(df))
+            except OSError as e:
+                _log.error("내보내기 실패: %s", e)
+
         return PLAY_LOG_XLSX
 
     def get_summary(self) -> dict:
         """모듈별 플레이 통계 요약."""
-        if not self.records:
-            return {"total_sessions": 0}
+        with self._lock:
+            if not self.records:
+                return {"total_sessions": 0}
 
-        df = pd.DataFrame(self.records)
+            df = pd.DataFrame(self.records)
+
         summary = {
             "total_sessions": len(df),
             "modules_played": df["module"].nunique(),
             "sessions_per_module": df["module"].value_counts().to_dict(),
         }
 
-        # 모듈별 주요 지표 평균
         for module in df["module"].unique():
             mod_df = df[df["module"] == module]
             fields = self.FIELDS.get(module, [])
@@ -149,19 +184,24 @@ class PlayLogger:
 
     def clear(self):
         """기록 초기화."""
-        self.records.clear()
-        for path in (PLAY_LOG_XLSX, PLAY_LOG_CSV):
-            if os.path.exists(path):
-                os.remove(path)
+        with self._lock:
+            self.records.clear()
+            for path in (PLAY_LOG_XLSX, PLAY_LOG_CSV):
+                if os.path.exists(path):
+                    os.remove(path)
+        _log.info("기록 초기화 완료")
 
 
-# 싱글턴 인스턴스 (모든 모듈에서 공유)
+# 싱글턴 인스턴스 (스레드 안전 — 더블 체크 락킹)
+_logger_lock = threading.Lock()
 _logger_instance: PlayLogger | None = None
 
 
 def get_logger() -> PlayLogger:
-    """전역 PlayLogger 인스턴스 반환."""
+    """전역 PlayLogger 인스턴스 반환 (스레드 안전)."""
     global _logger_instance
     if _logger_instance is None:
-        _logger_instance = PlayLogger()
+        with _logger_lock:
+            if _logger_instance is None:
+                _logger_instance = PlayLogger()
     return _logger_instance

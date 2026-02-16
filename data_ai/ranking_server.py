@@ -109,27 +109,33 @@ class RankingHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
+_server_lock = threading.Lock()
 _server_instance: HTTPServer | None = None
 _server_thread: threading.Thread | None = None
 
 
 def start_server():
-    """백그라운드 스레드에서 랭킹 서버 시작."""
+    """백그라운드 스레드에서 랭킹 서버 시작 (스레드 안전)."""
     global _server_instance, _server_thread
-    if _server_instance is not None:
-        return  # 이미 실행 중
+    with _server_lock:
+        if _server_instance is not None:
+            return  # 이미 실행 중
 
-    _server_instance = HTTPServer((HOST, PORT), RankingHandler)
-    _server_thread = threading.Thread(target=_server_instance.serve_forever, daemon=True)
-    _server_thread.start()
+        try:
+            _server_instance = HTTPServer((HOST, PORT), RankingHandler)
+            _server_thread = threading.Thread(target=_server_instance.serve_forever, daemon=True)
+            _server_thread.start()
+        except OSError:
+            pass  # 포트 이미 사용 중
 
 
 def stop_server():
-    """서버 종료."""
+    """서버 종료 (스레드 안전)."""
     global _server_instance
-    if _server_instance:
-        _server_instance.shutdown()
-        _server_instance = None
+    with _server_lock:
+        if _server_instance:
+            _server_instance.shutdown()
+            _server_instance = None
 
 
 def get_base_url() -> str:

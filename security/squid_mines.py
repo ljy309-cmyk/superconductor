@@ -395,16 +395,23 @@ def run_simulation():
 
         pygame.display.flip()
 
-    # 최종미션: 플레이 기록 저장
+    # 최종미션: 플레이 기록 저장 + 보고서 생성
+    session_data = {
+        "mines_found": len(game.marked),
+        "wrong_marks": len(game.wrong),
+        "total_mines": len(game.mines),
+        "sensitivity": sensitivity,
+        "won": game.won,
+    }
     try:
         from data_ai.play_logger import get_logger
-        get_logger().log_session("squid_mines", {
-            "mines_found": len(game.marked),
-            "wrong_marks": len(game.wrong),
-            "total_mines": len(game.mines),
-            "sensitivity": sensitivity,
-            "won": game.won,
-        })
+        get_logger().log_session("squid_mines", session_data)
+    except Exception:
+        pass
+
+    try:
+        from report import generate_report
+        generate_report("squid_mines", session_data)
     except Exception:
         pass
 

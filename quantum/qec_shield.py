@@ -433,18 +433,38 @@ def run_simulation():
 
         pygame.display.flip()
 
-    # 최종미션: 플레이 기록 저장
+    # 최종미션: 플레이 기록 저장 + 보고서 생성 + 랭킹 자동 등록
+    session_data = {
+        "survival_time": round(elapsed, 1),
+        "alive_count": sum(1 for n in nodes if not n.collapsed),
+        "total_qubits": total,
+        "qec_uses": qec_uses,
+        "heal_uses": heal_uses,
+        "qec_reduction": qec_reduction,
+    }
     try:
         from data_ai.play_logger import get_logger
-        alive = sum(1 for n in nodes if not n.collapsed)
-        get_logger().log_session("qec_shield", {
-            "survival_time": round(elapsed, 1),
-            "alive_count": alive,
-            "total_qubits": total,
-            "qec_uses": qec_uses,
-            "heal_uses": heal_uses,
-            "qec_reduction": qec_reduction,
-        })
+        get_logger().log_session("qec_shield", session_data)
+    except Exception:
+        pass
+
+    # 보고서 자동 생성
+    try:
+        from report import generate_report
+        generate_report("qec_shield", session_data)
+    except Exception:
+        pass
+
+    # 랭킹 자동 등록 (생존 시간 기반)
+    try:
+        import requests
+        from data_ai.ranking_server import start_server, get_base_url
+        start_server()
+        requests.post(f"{get_base_url()}/ranking", json={
+            "name": "QEC Player",
+            "score": round(elapsed, 2),
+            "mode": "QEC Shield",
+        }, timeout=2)
     except Exception:
         pass
 
