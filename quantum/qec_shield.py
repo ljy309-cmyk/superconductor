@@ -27,9 +27,13 @@ PANEL_BG = (24, 24, 37)
 
 # ── 물리 파라미터 ────────────────────────────────────
 NOISE_RATE = 5.0              # 기본 노이즈 증가율 (%/s)
-QEC_REDUCTION = 0.5           # QEC 활성 시 노이즈 배율 (절반)
+QEC_REDUCTION_DEFAULT = 0.5   # QEC 기본 감쇠 계수 (0.5 = 절반)
+QEC_REDUCTION_MIN = 0.0       # 무적 방어막
+QEC_REDUCTION_MAX = 1.0       # 방어막 무효 (감쇠 없음)
+QEC_REDUCTION_STEP = 0.1      # 조절 단위
 QEC_DURATION = 5.0            # QEC 방어막 지속 시간 (초)
 QEC_COOLDOWN = 8.0            # QEC 재사용 대기 시간 (초)
+HEAL_AMOUNT = 20.0            # H키 힐링량
 STRESS_THRESHOLD = 100.0
 CASCADE_DAMAGE = 15.0
 
@@ -67,14 +71,14 @@ class QECQubit:
         if not self.collapsed:
             self.stress = min(self.stress + amount, 150.0)
 
-    def check_collapse(self) -> bool:
+    def check_collapse(self, damage_mult: float = 1.0) -> bool:
         if self.collapsed:
             return False
         if self.stress >= STRESS_THRESHOLD:
             self.collapsed = True
             for nb in self.neighbors:
                 if not nb.collapsed:
-                    nb.apply_noise(CASCADE_DAMAGE)
+                    nb.apply_noise(CASCADE_DAMAGE * damage_mult)
             return True
         return False
 
@@ -147,10 +151,12 @@ def _draw_node(screen, node: QECQubit, font, shield_active: bool, t: float):
     screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
 
 
-def _draw_shield_hud(screen, shield_active: bool, shield_timer: float, cooldown_timer: float, font, big_font):
+def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
+                     cooldown_timer: float, qec_reduction: float,
+                     heal_cooldown: float, font, big_font):
     """QEC 방어막 상태 HUD."""
-    hud_x, hud_y = 660, 140
-    hud_w, hud_h = 210, 180
+    hud_x, hud_y = 660, 120
+    hud_w, hud_h = 210, 260
 
     pygame.draw.rect(screen, PANEL_BG, (hud_x, hud_y, hud_w, hud_h), border_radius=8)
     pygame.draw.rect(screen, ACCENT, (hud_x, hud_y, hud_w, hud_h), 2, border_radius=8)
@@ -173,7 +179,20 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float, cooldown_
         time_txt = font.render(f"{shield_timer:.1f}s remaining", True, TEXT_CLR)
         screen.blit(time_txt, (bar_x, bar_y + 20))
 
-        effect = font.render(f"Noise x{QEC_REDUCTION} (절반)", True, STABLE_CLR)
+        # 감쇠 계수 표시 — 0.0이면 무적, 1.0이면 무효
+        if qec_reduction == 0.0:
+            label = "INVINCIBLE"
+            clr = SHIELD_GLOW
+        elif qec_reduction < 0.5:
+            label = f"Noise x{qec_reduction:.1f} (강력)"
+            clr = STABLE_CLR
+        elif qec_reduction == 0.5:
+            label = f"Noise x{qec_reduction:.1f} (기본)"
+            clr = STABLE_CLR
+        else:
+            label = f"Noise x{qec_reduction:.1f} (약함)"
+            clr = WARNING_CLR
+        effect = font.render(label, True, clr)
         screen.blit(effect, (bar_x, bar_y + 38))
     elif cooldown_timer > 0:
         status = big_font.render("COOLDOWN", True, WARNING_CLR)
@@ -192,17 +211,37 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float, cooldown_
         status = big_font.render("READY", True, STABLE_CLR)
         screen.blit(status, (hud_x + hud_w // 2 - status.get_width() // 2, hud_y + 40))
 
-        prompt = font.render("Q 키를 눌러 활성화", True, TEXT_CLR)
+        prompt = font.render("S 키를 눌러 활성화", True, TEXT_CLR)
         screen.blit(prompt, (hud_x + hud_w // 2 - prompt.get_width() // 2, hud_y + 70))
 
+    # ── 감쇠 계수 조절 표시 ──
+    adj_y = hud_y + 140
+    adj_label = font.render(f"감쇠 계수: x{qec_reduction:.1f}", True, TEXT_CLR)
+    screen.blit(adj_label, (hud_x + 20, adj_y))
+    adj_hint = font.render("←→ 키로 조절", True, (88, 91, 112))
+    screen.blit(adj_hint, (hud_x + 20, adj_y + 16))
 
-def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int, qec_uses: int, font):
-    """경과 시간 · 생존 큐비트 수 · QEC 사용 횟수."""
-    sx, sy = 660, 350
+    # ── 힐링 상태 ──
+    heal_y = adj_y + 40
+    if heal_cooldown > 0:
+        heal_txt = font.render(f"Heal: {heal_cooldown:.1f}s 대기", True, WARNING_CLR)
+    else:
+        heal_txt = font.render("Heal: READY (H키)", True, STABLE_CLR)
+    screen.blit(heal_txt, (hud_x + 20, heal_y))
+
+    heal_desc = font.render(f"회복량: -{int(HEAL_AMOUNT)} stress", True, (88, 91, 112))
+    screen.blit(heal_desc, (hud_x + 20, heal_y + 16))
+
+
+def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int,
+                     qec_uses: int, heal_uses: int, font):
+    """경과 시간 · 생존 큐비트 수 · QEC/Heal 사용 횟수."""
+    sx, sy = 660, 400
     lines = [
         ("경과 시간", f"{elapsed:.1f}s"),
         ("생존 큐비트", f"{alive_count} / {total}"),
         ("QEC 사용", f"{qec_uses}회"),
+        ("Heal 사용", f"{heal_uses}회"),
     ]
     for i, (label, value) in enumerate(lines):
         lbl = font.render(f"{label}:", True, (88, 91, 112))
@@ -228,7 +267,11 @@ def run_simulation():
     shield_active = False
     shield_timer = 0.0
     cooldown_timer = 0.0
+    qec_reduction = QEC_REDUCTION_DEFAULT   # 미션1: 런타임 조절 가능
+    heal_cooldown = 0.0                     # 미션2: 힐링 쿨다운
+    HEAL_COOLDOWN_SEC = 3.0                 # 힐링 재사용 대기
     qec_uses = 0
+    heal_uses = 0
     elapsed = 0.0
     paused = False
     t = 0.0
@@ -245,19 +288,36 @@ def run_simulation():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif event.key == pygame.K_q:
-                    # QEC 방어막 활성화
+                elif event.key == pygame.K_s:
+                    # QEC 방어막 활성화 (S = Shield)
                     if not shield_active and cooldown_timer <= 0:
                         shield_active = True
                         shield_timer = QEC_DURATION
                         qec_uses += 1
+                elif event.key == pygame.K_h:
+                    # 미션2: 힐링 — 모든 생존 큐비트 stress -20
+                    if heal_cooldown <= 0:
+                        for n in nodes:
+                            if not n.collapsed:
+                                n.stress = max(n.stress - HEAL_AMOUNT, 0.0)
+                        heal_uses += 1
+                        heal_cooldown = HEAL_COOLDOWN_SEC
+                elif event.key == pygame.K_LEFT:
+                    # 미션1: 감쇠 계수 감소 (방어막 강화)
+                    qec_reduction = round(max(qec_reduction - QEC_REDUCTION_STEP, QEC_REDUCTION_MIN), 1)
+                elif event.key == pygame.K_RIGHT:
+                    # 미션1: 감쇠 계수 증가 (방어막 약화)
+                    qec_reduction = round(min(qec_reduction + QEC_REDUCTION_STEP, QEC_REDUCTION_MAX), 1)
                 elif event.key == pygame.K_r:
                     for n in nodes:
                         n.reset()
                     shield_active = False
                     shield_timer = 0.0
                     cooldown_timer = 0.0
+                    qec_reduction = QEC_REDUCTION_DEFAULT
+                    heal_cooldown = 0.0
                     qec_uses = 0
+                    heal_uses = 0
                     elapsed = 0.0
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
@@ -281,19 +341,26 @@ def run_simulation():
                 if cooldown_timer < 0:
                     cooldown_timer = 0.0
 
-            # 노이즈 적용
-            noise_mult = QEC_REDUCTION if shield_active else 1.0
+            # 힐링 쿨다운
+            if heal_cooldown > 0:
+                heal_cooldown -= dt
+                if heal_cooldown < 0:
+                    heal_cooldown = 0.0
+
+            # 노이즈 적용 — 미션1: qec_reduction은 런타임 변수
+            noise_mult = qec_reduction if shield_active else 1.0
             for n in nodes:
                 if not n.collapsed:
                     noise = NOISE_RATE * dt * (0.5 + random.random()) * noise_mult
                     n.apply_noise(noise)
 
-            # 붕괴 체크 (연쇄)
+            # 붕괴 체크 (연쇄) — 방어막 시 연쇄 데미지도 감쇠
+            cascade_mult = qec_reduction if shield_active else 1.0
             changed = True
             while changed:
                 changed = False
                 for n in nodes:
-                    if n.check_collapse():
+                    if n.check_collapse(cascade_mult):
                         changed = True
 
         # ── 렌더링 ───────────────────────────────────
@@ -324,10 +391,11 @@ def run_simulation():
             _draw_node(screen, n, font, shield_active, t)
 
         # HUD
-        _draw_shield_hud(screen, shield_active, shield_timer, cooldown_timer, font, big_font)
+        _draw_shield_hud(screen, shield_active, shield_timer, cooldown_timer,
+                         qec_reduction, heal_cooldown, font, big_font)
 
         alive_count = sum(1 for n in nodes if not n.collapsed)
-        _draw_scoreboard(screen, elapsed, alive_count, total, qec_uses, font)
+        _draw_scoreboard(screen, elapsed, alive_count, total, qec_uses, heal_uses, font)
 
         # 전체 붕괴
         if alive_count == 0:
@@ -338,8 +406,9 @@ def run_simulation():
 
         # 안내
         hints = [
-            "Q: QEC 방어막 활성화 (노이즈 절반)  |  SPACE: 일시정지",
-            "R: 전체 리셋  |  ESC: 종료",
+            f"감쇠: x{qec_reduction:.1f}  |  {'SHIELD ON' if shield_active else 'SHIELD OFF'}  |  {'일시정지' if paused else '실행 중'}",
+            "S: 방어막  |  H: 힐링(-20)  |  ←→: 감쇠 계수 조절",
+            "SPACE: 일시정지  |  R: 전체 리셋  |  ESC: 종료",
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
