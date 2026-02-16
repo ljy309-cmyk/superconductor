@@ -24,8 +24,9 @@ LINK_ENTANGLED = (203, 166, 247)  # 얽힘 연결선
 
 # 큐비트 상태별 색상
 STATE_COLORS = {
-    "stable": (166, 227, 161),   # 녹색 — 안정
-    "warning": (249, 226, 175),  # 노랑 — 위험
+    "stable": (166, 227, 161),     # 녹색 — 안정
+    "warning": (249, 226, 175),    # 노랑 — 경고
+    "danger": (250, 179, 135),     # 주황 — 위험
     "collapsed": (243, 139, 168),  # 빨강 — 붕괴
 }
 
@@ -58,7 +59,9 @@ class QubitNode:
     def state(self) -> str:
         if self.collapsed:
             return "collapsed"
-        if self.stress >= 70:
+        if self.stress >= 85:
+            return "danger"
+        if self.stress >= 50:
             return "warning"
         return "stable"
 
@@ -77,17 +80,17 @@ class QubitNode:
         if not self.collapsed:
             self.stress = max(self.stress - amount, 0.0)
 
-    def check_collapse(self) -> bool:
-        """하중이 임계값을 넘으면 붕괴 → 인접 노드에 +20 전파."""
+    def check_collapse(self, cascade_damage: float = CASCADE_DAMAGE) -> bool:
+        """하중이 임계값을 넘으면 붕괴 → 인접 노드에 데미지 전파."""
         if self.collapsed:
             return False
         if self.stress >= STRESS_THRESHOLD:
             self.collapsed = True
             self.collapse_timer = COLLAPSE_ANIM_DURATION
-            # 얽힘 연쇄: neighbors에 CASCADE_DAMAGE 부여
+            # 얽힘 연쇄: neighbors에 cascade_damage 부여
             for nb in self.neighbors:
                 if not nb.collapsed:
-                    nb.apply_noise(CASCADE_DAMAGE)
+                    nb.apply_noise(cascade_damage)
             return True
         return False
 
@@ -195,6 +198,7 @@ def run_simulation():
 
     nodes = _build_network()
     noise_rate = NOISE_RATE_BASE
+    cascade_damage = CASCADE_DAMAGE  # 런타임 조절 가능한 연쇄 데미지
     t = 0.0
     paused = False
     cascade_log: list[str] = []  # 최근 이벤트 로그
@@ -217,12 +221,17 @@ def run_simulation():
                         n.reset()
                     cascade_log.clear()
                     noise_rate = NOISE_RATE_BASE
+                    cascade_damage = CASCADE_DAMAGE
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
                 elif event.key == pygame.K_UP:
                     noise_rate = min(noise_rate + 1.0, 20.0)
                 elif event.key == pygame.K_DOWN:
                     noise_rate = max(noise_rate - 1.0, 0.0)
+                elif event.key == pygame.K_RIGHT:
+                    cascade_damage = min(cascade_damage + 5.0, 80.0)
+                elif event.key == pygame.K_LEFT:
+                    cascade_damage = max(cascade_damage - 5.0, 0.0)
                 elif event.key == pygame.K_n:
                     # 랜덤 큐비트에 즉시 큰 노이즈 주입
                     alive = [n for n in nodes if not n.collapsed]
@@ -234,8 +243,10 @@ def run_simulation():
                 mx, my = event.pos
                 for n in nodes:
                     if math.hypot(mx - n.x, my - n.y) <= NODE_RADIUS:
-                        # 클릭: 안정화 (하중 감소)
-                        n.stabilize(RECOVERY_RATE * 3)
+                        # 클릭: 오류 정정 — stress를 0으로 치료
+                        if not n.collapsed:
+                            n.stress = 0.0
+                            cascade_log.append(f"Q{n.qid} 오류 정정! (stress → 0)")
                         break
 
         # ── 물리 업데이트 ────────────────────────────
@@ -255,9 +266,9 @@ def run_simulation():
             while changed:
                 changed = False
                 for n in nodes:
-                    if n.check_collapse():
+                    if n.check_collapse(cascade_damage):
                         changed = True
-                        cascade_log.append(f"Q{n.qid} COLLAPSED → cascade +{int(CASCADE_DAMAGE)} to neighbors")
+                        cascade_log.append(f"Q{n.qid} COLLAPSED → cascade +{int(cascade_damage)} to neighbors")
 
         # 로그 길이 제한
         if len(cascade_log) > 8:
@@ -302,9 +313,9 @@ def run_simulation():
 
         # 조작 안내
         hints = [
-            f"노이즈 속도: {noise_rate:.1f}%/s  |  {'일시정지' if paused else '실행 중'}",
-            "클릭: 큐비트 안정화  |  N: 랜덤 노이즈 주입",
-            "↑↓: 노이즈 속도 조절  |  SPACE: 일시정지",
+            f"노이즈: {noise_rate:.1f}%/s  |  연쇄 데미지: +{int(cascade_damage)}  |  {'일시정지' if paused else '실행 중'}",
+            "클릭: 오류 정정 (stress→0)  |  N: 랜덤 노이즈 주입",
+            "↑↓: 노이즈 속도  |  ←→: 연쇄 데미지 조절  |  SPACE: 일시정지",
             "R: 전체 리셋  |  ESC: 종료",
         ]
         for i, hint in enumerate(hints):
