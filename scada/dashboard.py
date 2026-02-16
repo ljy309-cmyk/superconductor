@@ -159,9 +159,14 @@ class Dashboard(tk.Toplevel):
         ax.set_ylabel("Temperature (°C)", color="#cdd6f4", fontsize=8)
         ax.set_title("Live Temperature", color="#89b4fa", fontsize=10, fontweight="bold")
         ax.axhline(y=-196.0, color="#f38ba8", linestyle="--", linewidth=1, alpha=0.7, label="Target Tc")
+
+        # 라인 객체를 미리 생성 (blitting용)
+        self._temp_line, = ax.plot([], [], color="#89b4fa", linewidth=1.5, label="Temperature")
         ax.legend(loc="upper right", fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
         self._fig.tight_layout()
         self._canvas.draw()
+        self._graph_bg = self._canvas.copy_from_bbox(ax.bbox)
+        self._full_redraw_counter = 0
 
     def _update_graph(self, temperature: float):
         self._tick_count += 1
@@ -173,32 +178,45 @@ class Dashboard(tk.Toplevel):
             self._time_history.pop(0)
 
         ax = self._ax
-        ax.clear()
-        ax.set_facecolor("#181825")
-        for spine in ax.spines.values():
-            spine.set_color("#585b70")
-        ax.tick_params(colors="#cdd6f4", labelsize=7)
-        ax.set_xlabel("Time (ticks)", color="#cdd6f4", fontsize=8)
-        ax.set_ylabel("Temperature (°C)", color="#cdd6f4", fontsize=8)
-        ax.set_title("Live Temperature", color="#89b4fa", fontsize=10, fontweight="bold")
+        self._full_redraw_counter += 1
 
-        ax.axhline(y=-196.0, color="#f38ba8", linestyle="--", linewidth=1, alpha=0.7, label="Target Tc")
-        ax.plot(self._time_history, self._temp_history, color="#89b4fa", linewidth=1.5, label="Temperature")
+        # 매 20틱마다 full redraw (축 범위, fill_between 업데이트)
+        if self._full_redraw_counter >= 20:
+            self._full_redraw_counter = 0
+            ax.set_xlim(self._time_history[0], self._time_history[-1])
+            y_min = min(min(self._temp_history), -210.0)
+            y_max = max(max(self._temp_history), 30.0)
+            ax.set_ylim(y_min - 10, y_max + 10)
 
-        ax.fill_between(
-            self._time_history, self._temp_history, -196.0,
-            where=[tmp > -196.0 for tmp in self._temp_history],
-            alpha=0.1, color="#f38ba8",
-        )
-        ax.fill_between(
-            self._time_history, self._temp_history, -196.0,
-            where=[tmp <= -196.0 for tmp in self._temp_history],
-            alpha=0.1, color="#a6e3a1",
-        )
+            # fill_between 갱신 (기존 컬렉션 제거 후 재생성)
+            while ax.collections:
+                ax.collections[0].remove()
+            ax.fill_between(
+                self._time_history, self._temp_history, -196.0,
+                where=[tmp > -196.0 for tmp in self._temp_history],
+                alpha=0.1, color="#f38ba8",
+            )
+            ax.fill_between(
+                self._time_history, self._temp_history, -196.0,
+                where=[tmp <= -196.0 for tmp in self._temp_history],
+                alpha=0.1, color="#a6e3a1",
+            )
+            self._fig.tight_layout()
+            self._canvas.draw()
+            self._graph_bg = self._canvas.copy_from_bbox(ax.bbox)
+        else:
+            # 빠른 업데이트: 라인 데이터만 갱신 + blit
+            self._temp_line.set_data(self._time_history, self._temp_history)
 
-        ax.legend(loc="upper right", fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
-        self._fig.tight_layout()
-        self._canvas.draw()
+            # 축 범위 초과 시에만 조정
+            if self._time_history[-1] > ax.get_xlim()[1]:
+                ax.set_xlim(self._time_history[0], self._time_history[-1])
+                self._canvas.draw()
+                self._graph_bg = self._canvas.copy_from_bbox(ax.bbox)
+
+            self._canvas.restore_region(self._graph_bg)
+            ax.draw_artist(self._temp_line)
+            self._canvas.blit(ax.bbox)
 
     # ── 게이지 바 ────────────────────────────────────────
 

@@ -19,6 +19,8 @@ from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
 from replay import ReplayRecorder
+from achievement_toast import AchievementToast
+from tutorial import TutorialOverlay
 from logger import get_module_logger
 
 _log = get_module_logger("qubit_chain")
@@ -257,6 +259,12 @@ def run_simulation():
     # ── 리플레이 ──
     recorder = ReplayRecorder("qubit_chain")
 
+    # ── 업적 토스트 ──
+    toast = AchievementToast()
+
+    # ── 튜토리얼 ──
+    tutorial = TutorialOverlay("qubit_chain")
+
     # ── QEC 방어막 + 힐링 (미션3: 3-3 통합) ──
     shield_active = False
     shield_timer = 0.0
@@ -269,6 +277,7 @@ def run_simulation():
     start_time = time.time()
     survival_time = 0.0
     game_over = False
+    _ach_checked_milestones: set[int] = set()  # 실시간 업적 체크용 (30, 60초 등)
 
     running = True
     while running:
@@ -277,6 +286,8 @@ def run_simulation():
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
+            if tutorial.handle_event(event):
+                continue
             panel.handle_event(event)
             preset_hud.handle_event(event)
             help_overlay.handle_event(event)
@@ -505,6 +516,21 @@ def run_simulation():
             else:
                 survival_time = time.time() - start_time
 
+        # 실시간 업적 체크 (생존 마일스톤)
+        if not game_over and not paused:
+            for milestone in [30, 60]:
+                if survival_time >= milestone and milestone not in _ach_checked_milestones:
+                    _ach_checked_milestones.add(milestone)
+                    try:
+                        new_ach = check_achievements("qubit_chain", {
+                            "survival_time": survival_time,
+                            "collapsed_count": sum(1 for n in nodes if n.collapsed),
+                            "shield_uses": qec_uses,
+                        })
+                        toast.show_many(new_ach)
+                    except Exception:
+                        pass
+
         if all_collapsed:
             over_surf = title_font.render(
                 f"ALL QUBITS COLLAPSED  |  Survival: {survival_time:.2f}s  |  Press R to reset",
@@ -512,7 +538,13 @@ def run_simulation():
             screen.blit(over_surf, (WIDTH // 2 - over_surf.get_width() // 2, HEIGHT // 2 - 80))
 
         preset_hud.draw(screen, info_font, hud_x, hud_y + 72)
+
+        # 업적 토스트 업데이트/렌더링
+        toast.update(dt)
+        toast.draw(screen, info_font)
+
         help_overlay.draw(screen, info_font)
+        tutorial.draw(screen, info_font)
 
         pygame.display.flip()
 
@@ -554,7 +586,7 @@ def run_simulation():
             "shield_uses": qec_uses,
         })
         for ach in new_ach:
-            _log.info("Achievement unlocked: %s", ach["title"])
+            _log.info("Achievement unlocked: %s — %s", ach["title"], ach["desc"])
     except Exception as e:
         _log.error("업적 확인 실패: %s", e)
 

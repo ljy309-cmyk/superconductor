@@ -17,6 +17,7 @@
 
 import json
 import os
+from collections import deque
 from datetime import datetime
 
 from logger import get_module_logger
@@ -32,18 +33,14 @@ class ReplayRecorder:
     def __init__(self, module_name: str, max_frames: int = 3600):
         self.module_name = module_name
         self.max_frames = max_frames
-        self._frames: list[dict] = []
+        self._frames: deque[dict] = deque(maxlen=max_frames)
         self._metadata: dict = {
             "module": module_name,
             "start_time": datetime.now().isoformat(),
         }
 
     def record_frame(self, state: dict):
-        """한 프레임의 상태 기록."""
-        if len(self._frames) >= self.max_frames:
-            # 링 버퍼: 오래된 프레임 제거 (매 2프레임당 1프레임)
-            self._frames = self._frames[::2]
-
+        """한 프레임의 상태 기록. deque maxlen으로 자동 관리."""
         self._frames.append(state)
 
     def save(self, extra_metadata: dict | None = None) -> str:
@@ -63,7 +60,7 @@ class ReplayRecorder:
 
         data = {
             "metadata": self._metadata,
-            "frames": self._frames,
+            "frames": list(self._frames),
         }
 
         try:

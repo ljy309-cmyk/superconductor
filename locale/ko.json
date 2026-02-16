@@ -16,6 +16,7 @@
   "launcher_data_ai_heading": "Data Science & AI",
 
   "btn_phase_transition": "2-1. 상전이 시각화 (Phase Transition)",
+  "btn_phase_transition_sim": "2-1b. 상전이 Pygame 시각화 (격자 진동 & 쿠퍼쌍)",
   "btn_flux_pinning": "2-2. 마이스너 부상 & 플럭스 피닝",
   "btn_qubit_chain": "3-1. 큐비트 연쇄 붕괴 (Entanglement Cascade)",
   "btn_tunneling": "3-2. 양자 중첩 및 터널링 (Tunneling)",
@@ -25,6 +26,8 @@
   "btn_tc_predictor": "5-1. AI 신소재 Tc 예측 (RandomForest)",
   "btn_qrng": "5-2. QRNG 양자 난수 생성 로그",
   "btn_ranking": "5-3. 글로벌 멀티플레이어 랭킹",
+  "btn_stats": "5-4. 플레이 통계 대시보드 (Stats)",
+  "btn_replay_viewer": "5-5. 리플레이 뷰어 (Replay Viewer)",
 
   "dashboard_title": "SCADA — 액체 질소 냉각 모니터링",
   "dashboard_heading": "Liquid Nitrogen Cooling — Digital Twin",

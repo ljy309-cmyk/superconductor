@@ -8,7 +8,7 @@ from quantum.launcher import open_quantum_launcher
 from security.launcher import open_security_launcher
 from data_ai.launcher import open_data_ai_launcher
 from i18n import t, set_locale
-from theme import TK, FONTS
+from theme import TK, FONTS, get_theme, toggle_theme, get_tk_theme
 
 
 class App(tk.Tk):
@@ -42,21 +42,34 @@ class App(tk.Tk):
                 width=35, height=2,
             ).pack(pady=4)
 
-        # 언어 전환 버튼
-        lang_frame = tk.Frame(frame)
-        lang_frame.pack(pady=(10, 0))
+        # 언어 전환 + 테마 전환 버튼
+        option_frame = tk.Frame(frame, bg=get_tk_theme().BG)
+        option_frame.pack(pady=(10, 0))
         tk.Button(
-            lang_frame, text="한국어", font=FONTS.SMALL,
+            option_frame, text="한국어", font=FONTS.SMALL,
             command=lambda: self._switch_locale("ko"), width=8,
         ).pack(side="left", padx=2)
         tk.Button(
-            lang_frame, text="English", font=FONTS.SMALL,
+            option_frame, text="English", font=FONTS.SMALL,
             command=lambda: self._switch_locale("en"), width=8,
         ).pack(side="left", padx=2)
+
+        theme_icon = "Light" if get_theme() == "dark" else "Dark"
+        tk.Button(
+            option_frame, text=f"Theme: {theme_icon}", font=FONTS.SMALL,
+            command=self._switch_theme, width=12,
+        ).pack(side="left", padx=(10, 2))
 
     def _switch_locale(self, locale: str):
         """언어 전환 후 UI 재구성."""
         set_locale(locale)
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._create_widgets()
+
+    def _switch_theme(self):
+        """다크/라이트 테마 전환 후 UI 재구성."""
+        toggle_theme()
         for widget in self.winfo_children():
             widget.destroy()
         self._create_widgets()

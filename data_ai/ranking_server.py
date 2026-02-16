@@ -68,6 +68,11 @@ class RankingHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/ranking":
             length = int(self.headers.get("Content-Length", 0))
+            if length > 10_000:  # 최대 10KB
+                self._set_json_headers(413)
+                self.wfile.write(json.dumps({"error": "Payload too large"}).encode())
+                return
+
             body = self.rfile.read(length)
             try:
                 data = json.loads(body)
@@ -76,9 +81,16 @@ class RankingHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
                 return
 
-            name = data.get("name", "Anonymous")
+            name = str(data.get("name", "Anonymous"))[:50]  # 최대 50자
             score = data.get("score", 0)
-            mode = data.get("mode", "unknown")
+            mode = str(data.get("mode", "unknown"))[:30]
+
+            # 점수 타입/범위 검증
+            if not isinstance(score, (int, float)):
+                self._set_json_headers(400)
+                self.wfile.write(json.dumps({"error": "score must be a number"}).encode())
+                return
+            score = max(0.0, min(float(score), 999999.0))  # 0 ~ 999999
 
             record = {
                 "name": name,
