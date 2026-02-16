@@ -1,0 +1,44 @@
+name: Superconductor CI
+
+on:
+  push:
+    branches: [main, develop, "claude/*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy matplotlib requests flask
+          pip install pytest pytest-cov
+
+      - name: Run unit tests
+        run: |
+          cd ${{ github.workspace }}
+          python -m pytest tests/ -v --tb=short --co -q 2>/dev/null || true
+          python -m pytest tests/ -v --tb=short -x
+
+      - name: Check imports
+        run: |
+          python -c "from config_loader import cfg; print('config_loader OK')"
+          python -c "from logger import get_module_logger; print('logger OK')"
+          python -c "from i18n import t, set_locale; print('i18n OK')"
+          python -c "from presets import get_preset, list_presets; print('presets OK')"
+          python -c "from report import generate_report; print('report OK')"
+          python -c "from achievements import get_all_achievements; print('achievements OK')"
+          python -c "from replay import ReplayRecorder; print('replay OK')"

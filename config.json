@@ -1,0 +1,113 @@
+{
+  "display": {
+    "fps": 60
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 18084,
+    "top_n": 5
+  },
+  "qrng": {
+    "bits_per_key": 256,
+    "noise_sources": 7
+  },
+  "ml": {
+    "n_estimators": 100,
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "data_gen": {
+    "sample_size": 200
+  },
+  "qubit_chain": {
+    "stress_threshold": 100.0,
+    "cascade_damage": 20.0,
+    "noise_rate_base": 3.0,
+    "recovery_rate": 5.0,
+    "qec_reduction": 0.2,
+    "qec_duration": 5.0,
+    "qec_cooldown": 8.0,
+    "heal_amount": 20.0,
+    "heal_cooldown": 3.0,
+    "outer_nodes": 6
+  },
+  "tunneling": {
+    "tunnel_prob_base": 0.10,
+    "particle_speed": 200.0,
+    "barrier_width_default": 12,
+    "barrier_width_min": 4,
+    "barrier_width_max": 200,
+    "tunnel_speed_boost": 2.0
+  },
+  "qec_shield": {
+    "noise_rate": 5.0,
+    "qec_reduction_default": 0.5,
+    "qec_reduction_min": 0.0,
+    "qec_reduction_max": 1.0,
+    "qec_duration": 5.0,
+    "qec_cooldown": 8.0,
+    "heal_amount": 20.0,
+    "heal_cooldown": 3.0,
+    "stress_threshold": 100.0,
+    "cascade_damage": 15.0,
+    "grid_cols": 5,
+    "grid_rows": 3
+  },
+  "squid_mines": {
+    "grid_cols": 10,
+    "grid_rows": 8,
+    "num_mines": 8,
+    "sensitivity_default": 3.0,
+    "sensitivity_min": 1.0,
+    "sensitivity_max": 8.0,
+    "beep_freq": 880,
+    "beep_duration_ms": 60
+  },
+  "flux_pinning": {
+    "equilibrium_gap": 65.0,
+    "spring_k": 4.0,
+    "damping": 0.88,
+    "levitation_amp": 4.0,
+    "levitation_freq": 2.0,
+    "gravity": 480.0
+  },
+  "phase_transition": {
+    "t_range_min": -275,
+    "t_range_max": 50,
+    "r_normal": 1.0
+  },
+  "presets": {
+    "easy": {
+      "qubit_chain": {"noise_rate_base": 1.5, "cascade_damage": 10.0, "qec_reduction": 0.1, "heal_amount": 30.0},
+      "tunneling": {"tunnel_prob_base": 0.25, "barrier_width_default": 8},
+      "bb84": {"eve_chance": 0.10, "send_interval": 2.0, "decoy_chance": 0.25},
+      "qec_shield": {"noise_rate": 2.5, "cascade_damage": 8.0, "qec_reduction_default": 0.3},
+      "squid_mines": {"num_mines": 5, "sensitivity_default": 5.0}
+    },
+    "normal": {
+      "qubit_chain": {"noise_rate_base": 3.0, "cascade_damage": 20.0, "qec_reduction": 0.2, "heal_amount": 20.0},
+      "tunneling": {"tunnel_prob_base": 0.10, "barrier_width_default": 12},
+      "bb84": {"eve_chance": 0.25, "send_interval": 1.2, "decoy_chance": 0.15},
+      "qec_shield": {"noise_rate": 5.0, "cascade_damage": 15.0, "qec_reduction_default": 0.5},
+      "squid_mines": {"num_mines": 8, "sensitivity_default": 3.0}
+    },
+    "hard": {
+      "qubit_chain": {"noise_rate_base": 6.0, "cascade_damage": 35.0, "qec_reduction": 0.5, "heal_amount": 10.0},
+      "tunneling": {"tunnel_prob_base": 0.03, "barrier_width_default": 40},
+      "bb84": {"eve_chance": 0.50, "send_interval": 0.6, "decoy_chance": 0.05},
+      "qec_shield": {"noise_rate": 10.0, "cascade_damage": 25.0, "qec_reduction_default": 0.8},
+      "squid_mines": {"num_mines": 14, "sensitivity_default": 1.5}
+    }
+  },
+  "bb84": {
+    "send_interval": 1.2,
+    "eve_chance": 0.25,
+    "eve_error_inject": 0.50,
+    "error_threshold": 0.25,
+    "history_window": 20,
+    "auto_block_threshold": 0.15,
+    "warning_threshold": 0.10,
+    "decoy_chance": 0.15,
+    "decoy_error_mult": 2.0
+  }
+}

@@ -1,0 +1,462 @@
+"""SQUID 지뢰찾기 — 정밀 자기장 센서 미니 게임 (Pygame).
+
+- 그리드에 숨겨진 이상 물질(지뢰)
+- 마우스(SQUID 센서)가 지뢰에 가까울수록 하단 자기 선속 그래프가 크게 요동
+- 클릭으로 지뢰 위치를 마킹, 모두 찾으면 승리
+- 미션1: 거리 기반 경고음 (삐-삐-삐, 가까울수록 빨라짐)
+- 미션2: 가장 가까운 타겟 기반 신호 + 근접 타겟 수 표시
+- 미션3: 센서 민감도 ↑↓ 키 런타임 튜닝
+"""
+
+import array
+import math
+import random
+
+import pygame
+
+from config_loader import cfg
+from ui.slider import SliderPanel, PANEL_W
+from preset_hud import PresetHUD
+from help_overlay import HelpOverlay
+from sound_manager import get_sound_manager
+from achievements import check_achievements
+from replay import ReplayRecorder
+from logger import get_module_logger
+
+_log = get_module_logger("squid_mines")
+
+# ── 화면 설정 ────────────────────────────────────────
+WIDTH, HEIGHT = 900, 650
+FPS = cfg("display", "fps", 60)
+
+# ── 색상 ─────────────────────────────────────────────
+BG = (30, 30, 46)
+TEXT_CLR = (205, 214, 244)
+ACCENT = (137, 180, 250)
+GRID_CLR = (69, 71, 90)
+CELL_SAFE = (49, 50, 68)
+CELL_HOVER = (59, 60, 82)
+CELL_MARKED = (166, 227, 161)   # 마킹한 셀 (초록)
+CELL_WRONG = (243, 139, 168)    # 오답 마킹 (빨강)
+MINE_CLR = (249, 226, 175)      # 지뢰 (노랑)
+GRAPH_BG = (24, 24, 37)
+GRAPH_LINE = (203, 166, 247)    # 자기 선속 그래프 (보라)
+GRAPH_PEAK = (243, 139, 168)    # 피크 (빨강)
+SENSOR_CLR = (116, 199, 236)    # 센서 커서 글로우
+
+# ── 그리드 설정 (config.json에서 로드) ────────────────
+GRID_COLS = cfg("squid_mines", "grid_cols", 10)
+GRID_ROWS = cfg("squid_mines", "grid_rows", 8)
+CELL_SIZE = 52
+GRID_OX = (WIDTH - GRID_COLS * CELL_SIZE) // 2
+GRID_OY = 60
+NUM_MINES = cfg("squid_mines", "num_mines", 8)
+
+# ── 그래프 설정 ──────────────────────────────────────
+GRAPH_X = 50
+GRAPH_Y = GRID_OY + GRID_ROWS * CELL_SIZE + 30
+GRAPH_W = WIDTH - 100
+GRAPH_H = 120
+GRAPH_HISTORY = 200  # 샘플 수
+
+# ── 센서 민감도 (config.json에서 로드) ────────────────
+SENSITIVITY_DEFAULT = cfg("squid_mines", "sensitivity_default", 3.0)
+SENSITIVITY_MIN = cfg("squid_mines", "sensitivity_min", 1.0)
+SENSITIVITY_MAX = cfg("squid_mines", "sensitivity_max", 8.0)
+SENSITIVITY_STEP = 0.5
+
+# ── 사운드 (config.json에서 로드) ────────────────────
+BEEP_FREQ = cfg("squid_mines", "beep_freq", 880)
+BEEP_DURATION_MS = cfg("squid_mines", "beep_duration_ms", 60)
+BEEP_INTERVAL_MAX = 1.0       # 최대 간격 (초, intensity=0)
+BEEP_INTERVAL_MIN = 0.08      # 최소 간격 (초, intensity=1)
+
+
+# ── 사운드 생성 헬퍼 (미션1) ────────────────────────
+
+def _make_beep_sound(freq: int = BEEP_FREQ, duration_ms: int = BEEP_DURATION_MS,
+                     sample_rate: int = 22050, volume: float = 0.3) -> pygame.mixer.Sound:
+    """사인파 기반 경고 비프음 생성."""
+    n_samples = int(sample_rate * duration_ms / 1000)
+    buf = array.array("h", [0] * n_samples)
+    max_amp = int(32767 * volume)
+    for i in range(n_samples):
+        t = i / sample_rate
+        # 부드러운 엔벨로프 (페이드 인/아웃)
+        env = min(i / (n_samples * 0.1 + 1), 1.0, (n_samples - i) / (n_samples * 0.1 + 1))
+        buf[i] = int(max_amp * env * math.sin(2 * math.pi * freq * t))
+    return pygame.mixer.Sound(buffer=buf)
+
+
+# ── 게임 로직 ────────────────────────────────────────
+
+class SQUIDGame:
+    """SQUID 지뢰찾기 게임 상태."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.mines: set[tuple[int, int]] = set()
+        while len(self.mines) < NUM_MINES:
+            c = random.randint(0, GRID_COLS - 1)
+            r = random.randint(0, GRID_ROWS - 1)
+            self.mines.add((c, r))
+
+        self.marked: set[tuple[int, int]] = set()
+        self.wrong: set[tuple[int, int]] = set()
+        self.revealed = False  # 게임 종료 시 전체 공개
+        self.graph_history: list[float] = [0.0] * GRAPH_HISTORY
+        self.won = False
+        self.t = 0.0
+
+    def cell_center(self, col: int, row: int) -> tuple[float, float]:
+        """셀 중심 화면 좌표."""
+        cx = GRID_OX + col * CELL_SIZE + CELL_SIZE / 2
+        cy = GRID_OY + row * CELL_SIZE + CELL_SIZE / 2
+        return cx, cy
+
+    def flux_intensity(self, mx: float, my: float,
+                       sensitivity: float = SENSITIVITY_DEFAULT) -> tuple[float, float, int]:
+        """마우스 위치에서의 자기 선속 강도.
+
+        미션2: 가장 가까운 타겟 기반 신호 + 근접 타겟 수
+        미션3: sensitivity로 감지 범위/강도 조절
+
+        Returns:
+            (intensity 0~1, nearest_dist, nearby_count)
+        """
+        unfound = [(c, r) for (c, r) in self.mines if (c, r) not in self.marked]
+        if not unfound:
+            return (0.0, 9999.0, 0)
+
+        # 미션2: 각 타겟까지 거리 계산 → 최근접 기반
+        distances: list[float] = []
+        for (c, r) in unfound:
+            cx, cy = self.cell_center(c, r)
+            distances.append(math.hypot(mx - cx, my - cy))
+
+        nearest_dist = min(distances)
+        # 근접 타겟 수 (감지 반경 내)
+        detect_radius = CELL_SIZE * sensitivity
+        nearby_count = sum(1 for d in distances if d < detect_radius)
+
+        # 미션3: 민감도에 따른 강도 — 가까울수록 + 민감도 높을수록 강한 신호
+        ref = CELL_SIZE * sensitivity
+        intensity = (ref / max(nearest_dist, 1.0)) ** 2
+        # 근접 타겟이 여러 개면 보너스 (+10% per extra)
+        intensity *= 1.0 + 0.1 * max(nearby_count - 1, 0)
+        intensity = min(intensity, 1.0)
+
+        return (intensity, nearest_dist, nearby_count)
+
+    def update_graph(self, intensity: float, dt: float):
+        """자기 선속 그래프에 새 샘플 추가."""
+        self.t += dt
+        # 노이즈 + 강도 비례 요동
+        noise = random.gauss(0, 0.03 + intensity * 0.15)
+        value = intensity * 0.7 + noise + 0.05 * math.sin(self.t * 8)
+        value = max(-0.3, min(value, 1.2))
+        self.graph_history.append(value)
+        if len(self.graph_history) > GRAPH_HISTORY:
+            self.graph_history.pop(0)
+
+    def mark_cell(self, col: int, row: int):
+        """셀 마킹 (지뢰 예상 위치)."""
+        if self.revealed:
+            return
+        pos = (col, row)
+        if pos in self.marked or pos in self.wrong:
+            return
+        if pos in self.mines:
+            self.marked.add(pos)
+            # 승리 체크
+            if self.marked == self.mines:
+                self.won = True
+                self.revealed = True
+        else:
+            self.wrong.add(pos)
+
+    def get_hover_cell(self, mx: int, my: int) -> tuple[int, int] | None:
+        """마우스 위치의 그리드 셀 반환."""
+        col = (mx - GRID_OX) // CELL_SIZE
+        row = (my - GRID_OY) // CELL_SIZE
+        if 0 <= col < GRID_COLS and 0 <= row < GRID_ROWS:
+            return (col, row)
+        return None
+
+
+# ── 그리기 헬퍼 ──────────────────────────────────────
+
+def _draw_grid(screen, game: SQUIDGame, hover_cell, font):
+    """그리드 렌더링."""
+    for r in range(GRID_ROWS):
+        for c in range(GRID_COLS):
+            x = GRID_OX + c * CELL_SIZE
+            y = GRID_OY + r * CELL_SIZE
+            rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
+
+            # 셀 배경
+            pos = (c, r)
+            if pos in game.marked:
+                color = CELL_MARKED
+            elif pos in game.wrong:
+                color = CELL_WRONG
+            elif hover_cell == pos:
+                color = CELL_HOVER
+            else:
+                color = CELL_SAFE
+
+            pygame.draw.rect(screen, color, rect)
+            pygame.draw.rect(screen, GRID_CLR, rect, 1)
+
+            # 게임 종료 시 지뢰 공개
+            if game.revealed and pos in game.mines and pos not in game.marked:
+                pygame.draw.circle(screen, MINE_CLR, rect.center, CELL_SIZE // 4)
+
+            # 마킹 표시
+            if pos in game.marked:
+                flag = font.render("M", True, (30, 30, 46))
+                screen.blit(flag, (rect.centerx - flag.get_width() // 2, rect.centery - flag.get_height() // 2))
+            elif pos in game.wrong:
+                x_mark = font.render("X", True, (255, 255, 255))
+                screen.blit(x_mark, (rect.centerx - x_mark.get_width() // 2, rect.centery - x_mark.get_height() // 2))
+
+
+def _draw_sensor_glow(screen, mx: int, my: int, intensity: float, t: float):
+    """마우스 주위 센서 글로우."""
+    radius = int(20 + 30 * intensity + 5 * math.sin(t * 6))
+    alpha = int(30 + 80 * intensity)
+    glow = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+    pygame.draw.circle(glow, (*SENSOR_CLR, alpha), (radius, radius), radius)
+    screen.blit(glow, (mx - radius, my - radius))
+
+
+def _draw_flux_graph(screen, game: SQUIDGame, intensity: float,
+                     nearest_dist: float, nearby_count: int,
+                     sensitivity: float, font):
+    """하단 자기 선속 그래프."""
+    # 배경
+    pygame.draw.rect(screen, GRAPH_BG, (GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H))
+    pygame.draw.rect(screen, GRID_CLR, (GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H), 1)
+
+    # 제로 라인
+    zero_y = GRAPH_Y + GRAPH_H // 2
+    pygame.draw.line(screen, GRID_CLR, (GRAPH_X, zero_y), (GRAPH_X + GRAPH_W, zero_y), 1)
+
+    # 그래프 선
+    history = game.graph_history
+    if len(history) < 2:
+        return
+
+    step = GRAPH_W / (GRAPH_HISTORY - 1)
+    points = []
+    for i, val in enumerate(history):
+        px = GRAPH_X + i * step
+        py = zero_y - val * (GRAPH_H * 0.45)
+        py = max(GRAPH_Y + 2, min(GRAPH_Y + GRAPH_H - 2, py))
+        points.append((px, py))
+
+    # 선 색상: 강도에 따라 보라→빨강
+    line_color = GRAPH_PEAK if intensity > 0.4 else GRAPH_LINE
+    pygame.draw.lines(screen, line_color, False, points, 2)
+
+    # 라벨
+    label = font.render("Magnetic Flux (\u03a6)", True, ACCENT)
+    screen.blit(label, (GRAPH_X + 4, GRAPH_Y - 16))
+
+    # 미션2: 근접 타겟 수 + 거리 표시
+    info_parts = [
+        f"Intensity: {intensity:.2f}",
+        f"Nearest: {nearest_dist:.0f}px",
+        f"Nearby: {nearby_count}",
+        f"Sens: x{sensitivity:.1f}",
+    ]
+    info_str = "  |  ".join(info_parts)
+    info_clr = GRAPH_PEAK if intensity > 0.4 else TEXT_CLR
+    info_surf = font.render(info_str, True, info_clr)
+    screen.blit(info_surf, (GRAPH_X + GRAPH_W - info_surf.get_width() - 4, GRAPH_Y - 16))
+
+
+def _draw_status(screen, game: SQUIDGame, font, big_font):
+    """상태 표시."""
+    remaining = len(game.mines) - len(game.marked)
+    wrong_count = len(game.wrong)
+
+    info = f"남은 지뢰: {remaining}  |  오답: {wrong_count}"
+    surf = font.render(info, True, TEXT_CLR)
+    screen.blit(surf, (GRID_OX, GRID_OY - 20))
+
+    if game.won:
+        win_surf = big_font.render("ALL MINES FOUND — SQUID Scan Complete!", True, CELL_MARKED)
+        screen.blit(win_surf, (WIDTH // 2 - win_surf.get_width() // 2, GRAPH_Y + GRAPH_H + 10))
+    elif game.revealed and not game.won:
+        pass  # 미래 확장: 실패 조건
+
+
+# ── 메인 시뮬레이션 ──────────────────────────────────
+
+def run_simulation():
+    pygame.init()
+    # 미션1: 사운드 초기화
+    pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
+    beep_sound = _make_beep_sound()
+
+    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
+    pygame.display.set_caption("SQUID Minesweeper — Magnetic Flux Sensor")
+    clock = pygame.time.Clock()
+    font = pygame.font.SysFont("Consolas", 12)
+    big_font = pygame.font.SysFont("Consolas", 16, bold=True)
+    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
+
+    game = SQUIDGame()
+    t = 0.0
+    beep_timer = 0.0                        # 미션1: 비프 간격 타이머
+    sound_enabled = True                    # 미션1: 사운드 ON/OFF
+
+    # ── 슬라이더 패널 ─────────────────────────────────
+    panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
+    sl_sens = panel.add(SENSITIVITY_MIN, SENSITIVITY_MAX, SENSITIVITY_DEFAULT, 0.5, "Sensitivity", ".1f")
+
+    slider_map = {
+        ("squid_mines", "sensitivity_default"): sl_sens,
+    }
+    preset_hud = PresetHUD("squid_mines", slider_map)
+    help_overlay = HelpOverlay("squid_mines")
+    snd = get_sound_manager()
+    snd.init()
+    recorder = ReplayRecorder("squid_mines")
+
+    running = True
+    while running:
+        dt = clock.tick(FPS) / 1000.0
+        t += dt
+        mx, my = pygame.mouse.get_pos()
+
+        # ── 이벤트 ───────────────────────────────────
+        for event in pygame.event.get():
+            panel.handle_event(event)
+            preset_hud.handle_event(event)
+            help_overlay.handle_event(event)
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                elif event.key == pygame.K_r:
+                    game.reset()
+                    panel.reset_all()
+                    beep_timer = 0.0
+                elif event.key == pygame.K_UP:
+                    sl_sens.value = sl_sens.value + SENSITIVITY_STEP
+                elif event.key == pygame.K_DOWN:
+                    sl_sens.value = sl_sens.value - SENSITIVITY_STEP
+                elif event.key == pygame.K_m:
+                    # 미션1: 사운드 토글
+                    sound_enabled = not sound_enabled
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                cell = game.get_hover_cell(mx, my)
+                if cell:
+                    prev_marked = len(game.marked)
+                    prev_wrong = len(game.wrong)
+                    game.mark_cell(*cell)
+                    if len(game.marked) > prev_marked:
+                        snd.play("mine_found")
+                        if game.won:
+                            snd.play("victory")
+                    elif len(game.wrong) > prev_wrong:
+                        snd.play("wrong_mark")
+
+        # ── 슬라이더 값 읽기 ─────────────────────────
+        preset_hud.update(dt)
+        sensitivity = sl_sens.value
+
+        # ── 그래프 업데이트 ──────────────────────────
+        intensity, nearest_dist, nearby_count = game.flux_intensity(mx, my, sensitivity)
+        game.update_graph(intensity, dt)
+
+        # ── 미션1: 거리 기반 경고음 ──────────────────
+        if sound_enabled and intensity > 0.05 and not game.won:
+            # 가까울수록 간격 짧아짐 (선형 보간)
+            interval = BEEP_INTERVAL_MAX - (BEEP_INTERVAL_MAX - BEEP_INTERVAL_MIN) * intensity
+            beep_timer -= dt
+            if beep_timer <= 0:
+                beep_sound.play()
+                beep_timer = interval
+        else:
+            beep_timer = 0.0
+
+        hover_cell = game.get_hover_cell(mx, my)
+
+        # ── 렌더링 ───────────────────────────────────
+        screen.fill(BG)
+
+        # 타이틀
+        title = title_font.render("SQUID Minesweeper — Magnetic Flux Sensor", True, ACCENT)
+        screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 12))
+
+        # 상태
+        _draw_status(screen, game, font, big_font)
+
+        # 그리드
+        _draw_grid(screen, game, hover_cell, font)
+
+        # 센서 글로우 (그리드 영역 위에서만)
+        if GRID_OY <= my <= GRID_OY + GRID_ROWS * CELL_SIZE:
+            _draw_sensor_glow(screen, mx, my, intensity, t)
+
+        # 자기 선속 그래프
+        _draw_flux_graph(screen, game, intensity, nearest_dist, nearby_count, sensitivity, font)
+
+        # 슬라이더 패널 그리기
+        panel.draw(screen, font)
+
+        # 안내
+        hints = [
+            f"민감도: x{sensitivity:.1f}  |  사운드: {'ON' if sound_enabled else 'OFF'}  |  근접: {nearby_count}개",
+            "마우스: SQUID 센서  |  클릭: 마킹  |  ↑↓/슬라이더: 민감도",
+            "M: 사운드  |  R: 리셋  |  ESC: 종료",
+        ]
+        for i, h in enumerate(hints):
+            surf = font.render(h, True, TEXT_CLR)
+            screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 52 + i * 16))
+
+        preset_hud.draw(screen)
+        help_overlay.draw(screen)
+
+        pygame.display.flip()
+
+    # 최종미션: 플레이 기록 저장 + 보고서 생성
+    session_data = {
+        "mines_found": len(game.marked),
+        "wrong_marks": len(game.wrong),
+        "total_mines": len(game.mines),
+        "sensitivity": sensitivity,
+        "won": game.won,
+    }
+    try:
+        from data_ai.play_logger import get_logger
+        get_logger().log_session("squid_mines", session_data)
+    except Exception as e:
+        _log.error("플레이 기록 저장 실패: %s", e)
+
+    try:
+        check_achievements("squid_mines", session_data)
+    except Exception as e:
+        _log.error("업적 확인 실패: %s", e)
+
+    try:
+        from report import generate_report
+        generate_report("squid_mines", session_data)
+    except Exception as e:
+        _log.error("보고서 생성 실패: %s", e)
+
+    recorder.save()
+    snd.quit()
+    pygame.mixer.quit()
+    pygame.quit()
+
+
+def open_squid_mines():
+    """외부에서 호출하는 진입점."""
+    run_simulation()
