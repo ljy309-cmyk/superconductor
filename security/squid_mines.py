@@ -144,6 +144,7 @@ class SQUIDGame:
         self.graph_history: list[float] = [0.0] * GRAPH_HISTORY
         self.won = False
         self.t = 0.0
+        self._undo_stack: list[tuple[tuple[int, int], str]] = []
 
     def cell_center(self, col: int, row: int) -> tuple[float, float]:
         """셀 중심 화면 좌표."""
@@ -205,12 +206,25 @@ class SQUIDGame:
             return
         if pos in self.mines:
             self.marked.add(pos)
+            self._undo_stack.append((pos, "marked"))
             # 승리 체크
             if self.marked == self.mines:
                 self.won = True
                 self.revealed = True
         else:
             self.wrong.add(pos)
+            self._undo_stack.append((pos, "wrong"))
+
+    def undo_mark(self) -> tuple[tuple[int, int], str] | None:
+        """마지막 마킹을 실행취소. 되돌린 (pos, kind)를 반환, 없으면 None."""
+        if self.revealed or not self._undo_stack:
+            return None
+        pos, kind = self._undo_stack.pop()
+        if kind == "marked":
+            self.marked.discard(pos)
+        else:
+            self.wrong.discard(pos)
+        return (pos, kind)
 
     def get_hover_cell(self, mx: int, my: int) -> tuple[int, int] | None:
         """마우스 위치의 그리드 셀 반환."""
@@ -386,6 +400,12 @@ def run_simulation():
                 if event.key == pygame.K_ESCAPE:
                     if confirm_quit(screen, font):
                         running = False
+                elif event.key == pygame.K_z and (event.mod & pygame.KMOD_CTRL):
+                    if game.undo_mark():
+                        snd.play("undo")
+                elif event.key == pygame.K_u:
+                    if game.undo_mark():
+                        snd.play("undo")
                 elif event.key == pygame.K_r:
                     game.reset()
                     panel.reset_all()
@@ -487,7 +507,7 @@ def run_simulation():
         # 안내
         hints = [
             f"민감도: x{sensitivity:.1f}  |  사운드: {'ON' if gs.sound_enabled else 'OFF'}  |  근접: {nearby_count}개",
-            "마우스: SQUID 센서  |  클릭/Enter: 마킹  |  WASD: 커서 이동",
+            "마우스: SQUID 센서  |  클릭/Enter: 마킹  |  U/Ctrl+Z: 실행취소  |  WASD: 커서 이동",
             f"↑↓: 민감도  |  M: 사운드  |  [/]: 속도 ({speed_label()})  |  R: 리셋  |  ESC: 종료",
         ]
         for i, h in enumerate(hints):
