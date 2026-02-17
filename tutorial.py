@@ -23,6 +23,9 @@ except ImportError:
 import json
 import os
 
+from logger import get_module_logger
+
+_log = get_module_logger("tutorial")
 _SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tutorial_state.json")
 
 # 모듈별 튜토리얼 스텝
@@ -80,8 +83,8 @@ def _load_seen() -> set[str]:
         try:
             with open(_SAVE_PATH, "r") as f:
                 return set(json.load(f))
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError, TypeError) as e:
+            _log.warning("튜토리얼 상태 로드 실패: %s", e)
     return set()
 
 
@@ -89,8 +92,8 @@ def _save_seen(seen: set[str]):
     try:
         with open(_SAVE_PATH, "w") as f:
             json.dump(sorted(seen), f)
-    except OSError:
-        pass
+    except OSError as e:
+        _log.warning("튜토리얼 상태 저장 실패: %s", e)
 
 
 class TutorialOverlay:

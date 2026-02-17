@@ -555,8 +555,8 @@ def run_simulation():
                             "shield_uses": qec_uses,
                         })
                         toast.show_many(new_ach)
-                    except Exception:
-                        pass
+                    except (ImportError, KeyError, TypeError) as e:
+                        _log.warning("실시간 업적 확인 실패: %s", e)
 
         if all_collapsed:
             over_surf = title_font.render(

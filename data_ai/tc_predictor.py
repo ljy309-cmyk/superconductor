@@ -9,6 +9,10 @@ import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from logger import get_module_logger
+
+_log = get_module_logger("tc_predictor")
+
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -64,7 +68,8 @@ class TcPredictorApp(tk.Toplevel):
             if need_regen:
                 generate_data()
             self.df = pd.read_excel(DATA_PATH)
-        except Exception:
+        except (OSError, ValueError, KeyError) as e:
+            _log.warning("데이터 로드 실패, 재생성: %s", e)
             generate_data()
             self.df = pd.read_excel(DATA_PATH)
 
