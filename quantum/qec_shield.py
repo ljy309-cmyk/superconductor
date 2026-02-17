@@ -340,6 +340,15 @@ def run_simulation():
     best_with_qec = 0.0       # QEC ON 최고 생존 시간
     best_without_qec = 0.0    # QEC OFF 최고 생존 시간
 
+    # ── 시작 시 난이도 선택 ──
+    from difficulty_dialog import choose_difficulty
+    chosen = choose_difficulty(screen, font)
+    if chosen is None:
+        off_theme_change(_load_theme_colors)
+        pygame.quit()
+        return
+    preset_hud._apply_preset(chosen)
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0

@@ -381,6 +381,17 @@ def run_simulation():
     snd.init()
     recorder = ReplayRecorder("squid_mines")
 
+    # ── 시작 시 난이도 선택 ──
+    from difficulty_dialog import choose_difficulty
+    chosen = choose_difficulty(screen, font)
+    if chosen is None:
+        off_theme_change(_load_theme_colors)
+        snd.quit()
+        pygame.mixer.quit()
+        pygame.quit()
+        return
+    preset_hud._apply_preset(chosen)
+
     running = True
     while running:
         raw_dt = clock.tick(FPS) / 1000.0

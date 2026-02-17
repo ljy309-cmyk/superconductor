@@ -141,6 +141,9 @@
   "comparison_title": "Comparison Mode",
   "comparison_hint": "C: Comparison Mode | Compare QEC ON/OFF with same settings",
 
+  "difficulty_title": "Select Difficulty",
+  "difficulty_hint": "1/2/3 or Up/Down+Enter  |  ESC: Cancel",
+
   "theme_dark": "Dark",
   "theme_light": "Light",
 

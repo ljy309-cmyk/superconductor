@@ -141,6 +141,9 @@
   "comparison_title": "Comparison Mode",
   "comparison_hint": "C: 비교 모드 | 같은 설정으로 QEC ON/OFF 비교",
 
+  "difficulty_title": "난이도 선택",
+  "difficulty_hint": "1/2/3 또는 ↑↓+Enter  |  ESC: 취소",
+
   "theme_dark": "Dark",
   "theme_light": "Light",
 

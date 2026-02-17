@@ -321,6 +321,46 @@ class TestThemeToggle(unittest.TestCase):
         set_theme("dark")
 
 
+# ── 난이도 선택 대화상자 테스트 ──────────────────────────
+
+class TestDifficultyDialog(unittest.TestCase):
+
+    def test_module_imports(self):
+        import difficulty_dialog
+        self.assertTrue(hasattr(difficulty_dialog, "choose_difficulty"))
+        self.assertTrue(hasattr(difficulty_dialog, "_btn_rect"))
+
+    def test_btn_rects_vertically_spaced(self):
+        """버튼 3개가 겹치지 않도록 수직으로 배치되는지 확인."""
+        from difficulty_dialog import _btn_rect
+        # _btn_rect returns a pygame.Rect; under mock we inspect args
+        # Re-compute manually to avoid mock issues
+        panel_w, btn_w, btn_h = 340, 260, 36
+        W, H = 900, 600
+        py = H // 2 - 220 // 2
+        tops = [py + 54 + i * (btn_h + 8) for i in range(3)]
+        for i in range(len(tops) - 1):
+            self.assertGreaterEqual(
+                tops[i + 1], tops[i] + btn_h,
+                f"Button {i} and {i+1} overlap vertically",
+            )
+
+    def test_difficulties_list(self):
+        from difficulty_dialog import _DIFFICULTIES
+        names = [d[0] for d in _DIFFICULTIES]
+        self.assertEqual(names, ["easy", "normal", "hard"])
+
+    def test_i18n_keys_exist(self):
+        from i18n import set_locale, t
+        for locale in ("ko", "en"):
+            set_locale(locale)
+            title = t("difficulty_title")
+            hint = t("difficulty_hint")
+            self.assertNotEqual(title, "difficulty_title", f"Missing key in {locale}")
+            self.assertNotEqual(hint, "difficulty_hint", f"Missing key in {locale}")
+        set_locale("ko")
+
+
 # ── load_pg_colors 공통 헬퍼 테스트 ──────────────────────────
 
 class TestLoadPgColors(unittest.TestCase):

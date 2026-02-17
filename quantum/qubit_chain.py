@@ -336,6 +336,15 @@ def run_simulation():
     # ── 성능 모니터 ──
     perf = PerfMonitor(target_fps=FPS)
 
+    # ── 시작 시 난이도 선택 ──
+    from difficulty_dialog import choose_difficulty
+    chosen = choose_difficulty(screen, font)
+    if chosen is None:
+        off_theme_change(_load_theme_colors)
+        pygame.quit()
+        return
+    preset_hud._apply_preset(chosen)
+
     running = True
     while running:
         raw_dt = clock.tick(FPS) / 1000.0

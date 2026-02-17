@@ -308,6 +308,15 @@ def run_simulation():
     barrier_width = BARRIER_WIDTH_DEFAULT
     tunnel_prob = _calc_tunnel_prob(barrier_width)
 
+    # ── 시작 시 난이도 선택 ──
+    from difficulty_dialog import choose_difficulty
+    chosen = choose_difficulty(screen, font)
+    if chosen is None:
+        off_theme_change(_load_theme_colors)
+        pygame.quit()
+        return
+    preset_hud._apply_preset(chosen)
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
