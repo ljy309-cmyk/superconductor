@@ -9,6 +9,10 @@ import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from logger import get_module_logger
+
+_log = get_module_logger("tc_predictor")
+
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -22,10 +26,20 @@ from sklearn.metrics import r2_score, mean_absolute_error
 
 from config_loader import cfg
 from data_ai.generate_sample_data import generate as generate_data
+from theme import get_tk_theme
 
 BG = "#1e1e2e"
 FG = "#cdd6f4"
 ACCENT = "#a6e3a1"
+
+
+def _load_tc_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, FG, ACCENT
+    _tk = get_tk_theme()
+    BG = _tk.BG
+    FG = _tk.TEXT
+    ACCENT = _tk.ACCENT_GREEN
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.xlsx")
 CSV_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.csv")
@@ -44,15 +58,20 @@ class TcPredictorApp(tk.Toplevel):
         self.geometry("1050x720")
         self.resizable(False, False)
 
-        # 데이터 로드 (없거나 컬럼 부족하면 재생성)
-        need_regen = not os.path.exists(DATA_PATH)
-        if not need_regen:
-            tmp = pd.read_excel(DATA_PATH)
-            if "electronegativity" not in tmp.columns:
-                need_regen = True
-        if need_regen:
+        # 데이터 로드 (없거나 컬럼 부족·손상 시 재생성)
+        try:
+            need_regen = not os.path.exists(DATA_PATH)
+            if not need_regen:
+                tmp = pd.read_excel(DATA_PATH)
+                if "electronegativity" not in tmp.columns:
+                    need_regen = True
+            if need_regen:
+                generate_data()
+            self.df = pd.read_excel(DATA_PATH)
+        except (OSError, ValueError, KeyError) as e:
+            _log.warning("데이터 로드 실패, 재생성: %s", e)
             generate_data()
-        self.df = pd.read_excel(DATA_PATH)
+            self.df = pd.read_excel(DATA_PATH)
 
         # 모델 학습
         self.model, self.r2, self.mae = self._train_model()
@@ -196,9 +215,18 @@ class TcPredictorApp(tk.Toplevel):
     def _predict(self):
         try:
             values = [float(self.entries[f].get()) for f in FEATURES]
-        except ValueError:
+        except (ValueError, TypeError):
             messagebox.showerror("입력 오류", "모든 필드에 숫자를 입력하세요.", parent=self)
             return
+
+        # 범위 검증: 음수·극단값 경고
+        for val, feat in zip(values, FEATURES):
+            if not np.isfinite(val):
+                messagebox.showerror("입력 오류", f"{feat}에 유효한 숫자를 입력하세요.", parent=self)
+                return
+            if val < 0:
+                messagebox.showwarning("범위 경고", f"{feat} 값이 음수입니다. 결과가 부정확할 수 있습니다.", parent=self)
+                break
 
         X_new = np.array([values])
         tc_pred = self.model.predict(X_new)[0]
@@ -208,11 +236,13 @@ class TcPredictorApp(tk.Toplevel):
         self._draw_scatter_plots()
         axes = self.fig.get_axes()
         for i, ax in enumerate(axes):
-            ax.axhline(y=tc_pred, color="#f38ba8", linewidth=0.8, linestyle="--", alpha=0.6)
-            ax.scatter([values[i]], [tc_pred], c="#f38ba8", s=60, marker="*", zorder=5)
+            _tk = get_tk_theme()
+            ax.axhline(y=tc_pred, color=_tk.RED, linewidth=0.8, linestyle="--", alpha=0.6)
+            ax.scatter([values[i]], [tc_pred], c=_tk.RED, s=60, marker="*", zorder=5)
         self.canvas.draw()
 
 
 def open_tc_predictor(master=None):
     """외부에서 호출하는 진입점."""
+    _load_tc_colors()
     TcPredictorApp(master)

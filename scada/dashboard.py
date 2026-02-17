@@ -9,7 +9,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from scada.cooler import CoolerState, CoolingSystem
-from theme import TK, FONTS
+from theme import TK, FONTS, get_tk_theme
 from i18n import t
 
 # 최대 기록 유지할 온도 데이터 포인트 수
@@ -77,7 +77,7 @@ class Dashboard(tk.Toplevel):
 
         # ── 중앙: 실시간 온도 그래프 ──
         mid = tk.LabelFrame(
-            body, text=" Temperature Graph ",
+            body, text=f" {t('graph_title_temp')} ",
             font=FONTS.BODY_BOLD, bg=TK.PANEL_BG, fg=TK.TEXT, bd=1,
         )
         mid.pack(side="left", fill="both", expand=True, padx=6)
@@ -133,16 +133,17 @@ class Dashboard(tk.Toplevel):
         btn_frame = tk.Frame(self, bg=TK.BG)
         btn_frame.pack(pady=(0, 12))
 
+        _tk = get_tk_theme()
         self._start_btn = tk.Button(
             btn_frame, text=t("start"), width=12,
-            font=FONTS.BODY_BOLD, bg=TK.GREEN, fg=TK.BG,
+            font=FONTS.BODY_BOLD, bg=_tk.GREEN, fg=_tk.BG,
             command=self._start,
         )
         self._start_btn.pack(side="left", padx=6)
 
         self._stop_btn = tk.Button(
             btn_frame, text=t("stop"), width=12,
-            font=FONTS.BODY_BOLD, bg=TK.RED, fg=TK.BG,
+            font=FONTS.BODY_BOLD, bg=_tk.RED, fg=_tk.BG,
             command=self._stop, state="disabled",
         )
         self._stop_btn.pack(side="left", padx=6)
@@ -155,13 +156,19 @@ class Dashboard(tk.Toplevel):
         for spine in ax.spines.values():
             spine.set_color("#585b70")
         ax.tick_params(colors="#cdd6f4", labelsize=7)
-        ax.set_xlabel("Time (ticks)", color="#cdd6f4", fontsize=8)
-        ax.set_ylabel("Temperature (°C)", color="#cdd6f4", fontsize=8)
-        ax.set_title("Live Temperature", color="#89b4fa", fontsize=10, fontweight="bold")
-        ax.axhline(y=-196.0, color="#f38ba8", linestyle="--", linewidth=1, alpha=0.7, label="Target Tc")
+        ax.set_xlabel(t("graph_time_ticks"), color="#cdd6f4", fontsize=8)
+        ax.set_ylabel(t("graph_temp_celsius"), color="#cdd6f4", fontsize=8)
+        ax.set_title(t("graph_live_temp"), color="#89b4fa", fontsize=10, fontweight="bold")
+        _tk = get_tk_theme()
+        ax.axhline(y=-196.0, color=_tk.RED, linestyle="--", linewidth=1, alpha=0.7, label=t("graph_target_tc"))
+
+        # 라인 객체를 미리 생성 (blitting용)
+        self._temp_line, = ax.plot([], [], color="#89b4fa", linewidth=1.5, label=t("graph_temperature"))
         ax.legend(loc="upper right", fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
         self._fig.tight_layout()
         self._canvas.draw()
+        self._graph_bg = self._canvas.copy_from_bbox(ax.bbox)
+        self._full_redraw_counter = 0
 
     def _update_graph(self, temperature: float):
         self._tick_count += 1
@@ -173,32 +180,46 @@ class Dashboard(tk.Toplevel):
             self._time_history.pop(0)
 
         ax = self._ax
-        ax.clear()
-        ax.set_facecolor("#181825")
-        for spine in ax.spines.values():
-            spine.set_color("#585b70")
-        ax.tick_params(colors="#cdd6f4", labelsize=7)
-        ax.set_xlabel("Time (ticks)", color="#cdd6f4", fontsize=8)
-        ax.set_ylabel("Temperature (°C)", color="#cdd6f4", fontsize=8)
-        ax.set_title("Live Temperature", color="#89b4fa", fontsize=10, fontweight="bold")
+        self._full_redraw_counter += 1
 
-        ax.axhline(y=-196.0, color="#f38ba8", linestyle="--", linewidth=1, alpha=0.7, label="Target Tc")
-        ax.plot(self._time_history, self._temp_history, color="#89b4fa", linewidth=1.5, label="Temperature")
+        # 매 20틱마다 full redraw (축 범위, fill_between 업데이트)
+        if self._full_redraw_counter >= 20:
+            self._full_redraw_counter = 0
+            ax.set_xlim(self._time_history[0], self._time_history[-1])
+            y_min = min(min(self._temp_history), -210.0)
+            y_max = max(max(self._temp_history), 30.0)
+            ax.set_ylim(y_min - 10, y_max + 10)
 
-        ax.fill_between(
-            self._time_history, self._temp_history, -196.0,
-            where=[tmp > -196.0 for tmp in self._temp_history],
-            alpha=0.1, color="#f38ba8",
-        )
-        ax.fill_between(
-            self._time_history, self._temp_history, -196.0,
-            where=[tmp <= -196.0 for tmp in self._temp_history],
-            alpha=0.1, color="#a6e3a1",
-        )
+            # fill_between 갱신 (기존 컬렉션 제거 후 재생성)
+            while ax.collections:
+                ax.collections[0].remove()
+            _tk = get_tk_theme()
+            ax.fill_between(
+                self._time_history, self._temp_history, -196.0,
+                where=[tmp > -196.0 for tmp in self._temp_history],
+                alpha=0.1, color=_tk.RED,
+            )
+            ax.fill_between(
+                self._time_history, self._temp_history, -196.0,
+                where=[tmp <= -196.0 for tmp in self._temp_history],
+                alpha=0.1, color=_tk.GREEN,
+            )
+            self._fig.tight_layout()
+            self._canvas.draw()
+            self._graph_bg = self._canvas.copy_from_bbox(ax.bbox)
+        else:
+            # 빠른 업데이트: 라인 데이터만 갱신 + blit
+            self._temp_line.set_data(self._time_history, self._temp_history)
 
-        ax.legend(loc="upper right", fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
-        self._fig.tight_layout()
-        self._canvas.draw()
+            # 축 범위 초과 시에만 조정
+            if self._time_history[-1] > ax.get_xlim()[1]:
+                ax.set_xlim(self._time_history[0], self._time_history[-1])
+                self._canvas.draw()
+                self._graph_bg = self._canvas.copy_from_bbox(ax.bbox)
+
+            self._canvas.restore_region(self._graph_bg)
+            ax.draw_artist(self._temp_line)
+            self._canvas.blit(ax.bbox)
 
     # ── 게이지 바 ────────────────────────────────────────
 
@@ -219,12 +240,13 @@ class Dashboard(tk.Toplevel):
         ratio = max(0.0, min(1.0, ratio))
         bar_top = y_top + ratio * (y_bot - y_top)
 
+        _tk = get_tk_theme()
         if temperature <= -196:
-            color = TK.GREEN
+            color = _tk.GREEN
         elif temperature <= -190:
-            color = TK.YELLOW
+            color = _tk.YELLOW
         else:
-            color = TK.RED
+            color = _tk.RED
 
         c.delete("bar")
         c.create_rectangle(17, bar_top, 43, y_bot, fill=color, outline="", tags="bar")
@@ -240,12 +262,13 @@ class Dashboard(tk.Toplevel):
 
         self._temp_var.set(f"{state.temperature:.2f} °C")
 
+        _tk = get_tk_theme()
         if state.temperature <= state.target:
-            self._temp_label.config(fg=TK.GREEN)
+            self._temp_label.config(fg=_tk.GREEN)
         elif state.emergency:
-            self._temp_label.config(fg=TK.RED)
+            self._temp_label.config(fg=_tk.RED)
         else:
-            self._temp_label.config(fg=TK.ACCENT_BLUE)
+            self._temp_label.config(fg=_tk.ACCENT_BLUE)
 
         self._update_gauge(state.temperature)
         self._update_graph(state.temperature)

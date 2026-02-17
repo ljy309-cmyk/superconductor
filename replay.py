@@ -17,6 +17,7 @@
 
 import json
 import os
+from collections import deque
 from datetime import datetime
 
 from logger import get_module_logger
@@ -25,6 +26,20 @@ _log = get_module_logger("replay")
 
 REPLAY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "replays")
 
+# ── 리플레이 포맷 버전 관리 ──────────────────────────
+REPLAY_FORMAT_VERSION = 1  # 현재 포맷 버전
+_MIN_SUPPORTED_VERSION = 1  # 읽기 가능한 최소 버전
+
+
+def _migrate_replay(data: dict, from_version: int) -> dict:
+    """이전 포맷의 리플레이를 현재 포맷으로 마이그레이션.
+
+    새 버전 추가 시 여기에 마이그레이션 로직을 추가합니다.
+    예) if from_version < 2: ... 필드 변환 ...
+    """
+    # 현재 v1만 존재하므로 마이그레이션 불필요
+    return data
+
 
 class ReplayRecorder:
     """프레임 단위 상태 기록."""
@@ -32,18 +47,14 @@ class ReplayRecorder:
     def __init__(self, module_name: str, max_frames: int = 3600):
         self.module_name = module_name
         self.max_frames = max_frames
-        self._frames: list[dict] = []
+        self._frames: deque[dict] = deque(maxlen=max_frames)
         self._metadata: dict = {
             "module": module_name,
             "start_time": datetime.now().isoformat(),
         }
 
     def record_frame(self, state: dict):
-        """한 프레임의 상태 기록."""
-        if len(self._frames) >= self.max_frames:
-            # 링 버퍼: 오래된 프레임 제거 (매 2프레임당 1프레임)
-            self._frames = self._frames[::2]
-
+        """한 프레임의 상태 기록. deque maxlen으로 자동 관리."""
         self._frames.append(state)
 
     def save(self, extra_metadata: dict | None = None) -> str:
@@ -62,8 +73,9 @@ class ReplayRecorder:
             self._metadata.update(extra_metadata)
 
         data = {
+            "format_version": REPLAY_FORMAT_VERSION,
             "metadata": self._metadata,
-            "frames": self._frames,
+            "frames": list(self._frames),
         }
 
         try:
@@ -88,16 +100,37 @@ class ReplayPlayer:
         self._index = 0
 
     def load(self, filepath: str) -> bool:
-        """리플레이 파일 로드."""
+        """리플레이 파일 로드 (버전 호환성 검사 포함)."""
         try:
             with open(filepath, "r", encoding="utf-8") as f:
-                self._data = json.load(f)
-            self._index = 0
-            _log.info("리플레이 로드: %s", filepath)
-            return True
+                data = json.load(f)
         except (OSError, json.JSONDecodeError) as e:
             _log.error("리플레이 로드 실패: %s", e)
             return False
+
+        # 버전 검사 (format_version 없으면 v0으로 간주 = 레거시)
+        file_ver = data.get("format_version", 0)
+        if file_ver > REPLAY_FORMAT_VERSION:
+            _log.warning(
+                "리플레이 버전 %d > 현재 %d — 일부 데이터가 손실될 수 있습니다",
+                file_ver, REPLAY_FORMAT_VERSION,
+            )
+        if file_ver < _MIN_SUPPORTED_VERSION:
+            _log.warning(
+                "레거시 리플레이 (v%d) — 자동 마이그레이션 적용", file_ver,
+            )
+            data = _migrate_replay(data, file_ver)
+            data["format_version"] = REPLAY_FORMAT_VERSION
+
+        self._data = data
+        self._index = 0
+        _log.info("리플레이 로드: %s (v%d)", filepath, file_ver)
+        return True
+
+    @property
+    def format_version(self) -> int:
+        """로드된 리플레이의 포맷 버전."""
+        return self._data.get("format_version", 0)
 
     @property
     def metadata(self) -> dict:

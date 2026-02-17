@@ -18,8 +18,23 @@ import math
 
 import pygame
 
+from theme import get_pg_theme
+
 # 슬라이더 패널 기본 폭 (window 확장용)
 PANEL_W = 220
+
+
+def _colors():
+    """현재 테마에서 슬라이더 색상을 가져온다."""
+    pg = get_pg_theme()
+    return {
+        "text": pg.TEXT,
+        "green": pg.GREEN,
+        "surface": pg.SURFACE,
+        "accent": pg.ACCENT_BLUE,
+        "subtext": pg.SUBTEXT,
+        "panel_bg": pg.PANEL_BG,
+    }
 
 
 class Slider:
@@ -92,31 +107,32 @@ class Slider:
     # ── 렌더링 ───────────────────────────────────────
 
     def draw(self, screen: pygame.Surface, font: pygame.font.Font):
+        c = _colors()
         # 라벨 + 현재 값
         val_str = f"{self._val:{self.fmt}}"
-        label_surf = font.render(f"{self.label}", True, (205, 214, 244))
-        val_surf = font.render(val_str, True, (166, 227, 161))
+        label_surf = font.render(f"{self.label}", True, c["text"])
+        val_surf = font.render(val_str, True, c["green"])
         screen.blit(label_surf, (self.x, self.y))
         screen.blit(val_surf, (self.x + self.w - val_surf.get_width(), self.y))
 
         # 바 배경
-        pygame.draw.rect(screen, (49, 50, 68), self.bar_rect, border_radius=4)
+        pygame.draw.rect(screen, c["surface"], self.bar_rect, border_radius=4)
 
         # 채움
         ratio = self._ratio()
         fill_w = int(self.w * ratio)
         if fill_w > 0:
             fill_rect = pygame.Rect(self.x, self.bar_y, fill_w, self.BAR_H)
-            pygame.draw.rect(screen, (137, 180, 250), fill_rect, border_radius=4)
+            pygame.draw.rect(screen, c["accent"], fill_rect, border_radius=4)
 
         # 핸들 (원형)
         handle_x = self.x + fill_w
         handle_y = self.bar_y + self.BAR_H // 2
-        pygame.draw.circle(screen, (205, 214, 244), (handle_x, handle_y), 7)
-        pygame.draw.circle(screen, (88, 91, 112), (handle_x, handle_y), 7, 1)
+        pygame.draw.circle(screen, c["text"], (handle_x, handle_y), 7)
+        pygame.draw.circle(screen, c["subtext"], (handle_x, handle_y), 7, 1)
 
         # 바 테두리
-        pygame.draw.rect(screen, (88, 91, 112), self.bar_rect, 1, border_radius=4)
+        pygame.draw.rect(screen, c["subtext"], self.bar_rect, 1, border_radius=4)
 
     def _ratio(self) -> float:
         if self.max_val <= self.min_val:
@@ -159,13 +175,14 @@ class SliderPanel:
         h = self.panel_height()
         panel_rect = pygame.Rect(self.x, self.y, self.w, h)
 
+        c = _colors()
         # 배경
-        pygame.draw.rect(screen, (24, 24, 37), panel_rect, border_radius=6)
-        pygame.draw.rect(screen, (88, 91, 112), panel_rect, 1, border_radius=6)
+        pygame.draw.rect(screen, c["panel_bg"], panel_rect, border_radius=6)
+        pygame.draw.rect(screen, c["subtext"], panel_rect, 1, border_radius=6)
 
         # 타이틀
         tf = title_font or font
-        title_surf = tf.render(self.title, True, (137, 180, 250))
+        title_surf = tf.render(self.title, True, c["accent"])
         screen.blit(title_surf, (self.x + self.w // 2 - title_surf.get_width() // 2, self.y + 6))
 
         # 슬라이더들

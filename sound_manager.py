@@ -10,7 +10,10 @@
 import array
 import math
 
-import pygame
+try:
+    import pygame
+except ImportError:
+    pygame = None  # type: ignore[assignment]
 
 from logger import get_module_logger
 
@@ -18,7 +21,7 @@ _log = get_module_logger("sound")
 
 
 def _sine_wave(freq: float, duration_ms: int, volume: float = 0.3,
-               sample_rate: int = 22050) -> pygame.mixer.Sound:
+               sample_rate: int = 22050):
     """사인파 사운드 생성."""
     n = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n)
@@ -31,7 +34,7 @@ def _sine_wave(freq: float, duration_ms: int, volume: float = 0.3,
 
 
 def _dual_tone(f1: float, f2: float, duration_ms: int, volume: float = 0.25,
-               sample_rate: int = 22050) -> pygame.mixer.Sound:
+               sample_rate: int = 22050):
     """두 주파수 혼합 사운드."""
     n = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n)
@@ -45,7 +48,7 @@ def _dual_tone(f1: float, f2: float, duration_ms: int, volume: float = 0.25,
 
 
 def _descending(start_freq: float, end_freq: float, duration_ms: int,
-                volume: float = 0.25, sample_rate: int = 22050) -> pygame.mixer.Sound:
+                volume: float = 0.25, sample_rate: int = 22050):
     """하강 톤 (경고/붕괴)."""
     n = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n)
@@ -64,12 +67,15 @@ class SoundManager:
 
     def __init__(self):
         self.enabled = True
-        self._sounds: dict[str, pygame.mixer.Sound] = {}
+        self._sounds: dict = {}
         self._initialized = False
 
     def init(self):
         """사운드 시스템 초기화. pygame.mixer.init() 이후 호출."""
         if self._initialized:
+            return
+        if pygame is None:
+            self.enabled = False
             return
         try:
             if not pygame.mixer.get_init():

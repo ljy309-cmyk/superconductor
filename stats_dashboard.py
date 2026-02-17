@@ -6,8 +6,10 @@
 """
 
 import tkinter as tk
+from tkinter import messagebox
 
-from theme import TK, FONTS
+from theme import TK, FONTS, get_tk_theme
+from i18n import t
 from logger import get_module_logger
 
 _log = get_module_logger("stats_dashboard")
@@ -18,7 +20,7 @@ class StatsDashboard(tk.Toplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
-        self.title("Play Statistics Dashboard")
+        self.title(t("stats_title"))
         self.configure(bg=TK.BG)
         self.geometry("900x650")
         self.resizable(False, False)
@@ -29,7 +31,7 @@ class StatsDashboard(tk.Toplevel):
     def _build_ui(self):
         # 타이틀
         tk.Label(
-            self, text="Play Statistics Dashboard",
+            self, text=t("stats_title"),
             font=FONTS.HEADING, bg=TK.BG, fg=TK.ACCENT_BLUE,
         ).pack(pady=(12, 4))
 
@@ -39,7 +41,7 @@ class StatsDashboard(tk.Toplevel):
 
         # 좌측: 요약 통계
         left = tk.LabelFrame(
-            body, text=" Summary ", font=FONTS.BODY_BOLD,
+            body, text=f" {t('stats_summary')} ", font=FONTS.BODY_BOLD,
             bg=TK.PANEL_BG, fg=TK.TEXT, bd=1,
         )
         left.pack(side="left", fill="both", expand=True, padx=(0, 6))
@@ -52,7 +54,7 @@ class StatsDashboard(tk.Toplevel):
 
         # 우측: 그래프
         right = tk.LabelFrame(
-            body, text=" Charts ", font=FONTS.BODY_BOLD,
+            body, text=f" {t('stats_charts')} ", font=FONTS.BODY_BOLD,
             bg=TK.PANEL_BG, fg=TK.TEXT, bd=1,
         )
         right.pack(side="right", fill="both", expand=True, padx=(6, 0))
@@ -69,14 +71,14 @@ class StatsDashboard(tk.Toplevel):
             self._has_matplotlib = True
         except ImportError:
             tk.Label(
-                right, text="matplotlib 미설치\n차트를 표시할 수 없습니다.",
+                right, text=t("stats_matplotlib_missing"),
                 font=FONTS.BODY, bg=TK.PANEL_BG, fg=TK.RED,
             ).pack(expand=True)
             self._has_matplotlib = False
 
         # 하단: 업적
         ach_frame = tk.LabelFrame(
-            self, text=" Achievements ", font=FONTS.BODY_BOLD,
+            self, text=f" {t('stats_achievements')} ", font=FONTS.BODY_BOLD,
             bg=TK.PANEL_BG, fg=TK.ACCENT_YELLOW, bd=1,
         )
         ach_frame.pack(fill="x", padx=14, pady=(0, 12))
@@ -87,11 +89,34 @@ class StatsDashboard(tk.Toplevel):
         )
         self._ach_text.pack(fill="x")
 
-        # 새로고침 버튼
+        # 하단 컨트롤 바
+        ctrl_frame = tk.Frame(self, bg=TK.BG)
+        ctrl_frame.pack(pady=(0, 8))
+
         tk.Button(
-            self, text="Refresh", command=self._load_data,
+            ctrl_frame, text=t("stats_refresh"), command=self._load_data,
             font=FONTS.BUTTON, width=12,
-        ).pack(pady=(0, 8))
+        ).pack(side="left", padx=4)
+
+        tk.Button(
+            ctrl_frame, text=t("stats_export_csv"), command=self._export_csv,
+            font=FONTS.BUTTON, width=12,
+        ).pack(side="left", padx=4)
+
+        tk.Button(
+            ctrl_frame, text=t("stats_export_json"), command=self._export_json,
+            font=FONTS.BUTTON, width=12,
+        ).pack(side="left", padx=4)
+
+        # 자동 새로고침 토글
+        self._auto_refresh = tk.BooleanVar(value=False)
+        tk.Checkbutton(
+            ctrl_frame, text=t("stats_auto_refresh"), variable=self._auto_refresh,
+            font=FONTS.SMALL, bg=TK.BG, fg=TK.TEXT, selectcolor=TK.SURFACE,
+            command=self._toggle_auto_refresh,
+        ).pack(side="left", padx=4)
+
+        self._auto_refresh_id: str | None = None
 
     def _load_data(self):
         """데이터 로드 및 표시."""
@@ -111,16 +136,16 @@ class StatsDashboard(tk.Toplevel):
         per_module = summary.get("sessions_per_module", {})
 
         lines = [
-            f"Total Sessions: {total}",
-            f"Modules Played: {modules}",
+            t("stats_total_sessions", count=total),
+            t("stats_modules_played", count=modules),
             "",
-            "=== Sessions per Module ===",
+            f"=== {t('stats_sessions_per_module')} ===",
         ]
         for mod, count in per_module.items():
-            lines.append(f"  {mod}: {count} sessions")
+            lines.append(t("stats_sessions_count", mod=mod, count=count))
 
         lines.append("")
-        lines.append("=== Module Statistics ===")
+        lines.append(f"=== {t('stats_module_statistics')} ===")
 
         module_names = {
             "qubit_chain": "Qubit Chain",
@@ -169,7 +194,7 @@ class StatsDashboard(tk.Toplevel):
         colors = ["#89b4fa", "#a6e3a1", "#f9e2af", "#cba6f7", "#f38ba8", "#fab387", "#74c7ec"]
 
         ax1.barh(modules, counts, color=colors[:len(modules)])
-        ax1.set_title("Sessions per Module", color="#89b4fa", fontsize=10, fontweight="bold")
+        ax1.set_title(t("stats_sessions_per_module"), color="#89b4fa", fontsize=10, fontweight="bold")
 
         for i, v in enumerate(counts):
             ax1.text(v + 0.1, i, str(v), va="center", color="#cdd6f4", fontsize=8)
@@ -180,7 +205,7 @@ class StatsDashboard(tk.Toplevel):
         for spine in ax2.spines.values():
             spine.set_color("#585b70")
         ax2.tick_params(colors="#cdd6f4", labelsize=7)
-        ax2.set_title("Survival Time Trend", color="#a6e3a1", fontsize=10, fontweight="bold")
+        ax2.set_title(t("stats_survival_trend"), color=get_tk_theme().GREEN, fontsize=10, fontweight="bold")
 
         try:
             from data_ai.play_logger import get_logger
@@ -195,10 +220,11 @@ class StatsDashboard(tk.Toplevel):
                         ax2.plot(range(len(times)), times, color=color, linewidth=1.5,
                                  label=mod_name, marker="o", markersize=3)
             ax2.legend(fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
-            ax2.set_xlabel("Session #", color="#cdd6f4", fontsize=8)
-            ax2.set_ylabel("Time (s)", color="#cdd6f4", fontsize=8)
-        except Exception:
-            ax2.text(0.5, 0.5, "No survival data", transform=ax2.transAxes,
+            ax2.set_xlabel(t("stats_session_num"), color="#cdd6f4", fontsize=8)
+            ax2.set_ylabel(t("stats_time_sec"), color="#cdd6f4", fontsize=8)
+        except Exception as e:
+            _log.warning("생존 시간 차트 렌더링 실패: %s", e)
+            ax2.text(0.5, 0.5, t("stats_no_survival_data"), transform=ax2.transAxes,
                      ha="center", va="center", color="#585b70", fontsize=11)
 
         self._fig.tight_layout()
@@ -214,16 +240,75 @@ class StatsDashboard(tk.Toplevel):
             unlocked, total = get_unlocked_count()
             achievements = get_all_achievements()
 
-            lines = [f"Achievements: {unlocked}/{total}\n"]
+            lines = [t("stats_ach_count", unlocked=unlocked, total=total) + "\n"]
             for ach in achievements:
                 status = "[*]" if ach["unlocked"] else "[ ]"
                 lines.append(f"  {status} [{ach['icon']}] {ach['title']} — {ach['desc']}")
 
             self._ach_text.insert("1.0", "\n".join(lines))
-        except Exception:
-            self._ach_text.insert("1.0", "Achievement system not available.")
+        except Exception as e:
+            _log.warning("업적 로드 실패: %s", e)
+            self._ach_text.insert("1.0", t("stats_ach_unavailable"))
 
         self._ach_text.configure(state="disabled")
+
+
+    def _export_csv(self):
+        """CSV 내보내기."""
+        try:
+            from data_ai.play_logger import get_logger
+            path = get_logger().export()
+            if path:
+                messagebox.showinfo(
+                    t("stats_export_csv"),
+                    t("stats_export_done", path=path),
+                    parent=self,
+                )
+            else:
+                messagebox.showwarning(
+                    t("stats_export_csv"),
+                    t("stats_export_empty"),
+                    parent=self,
+                )
+        except Exception as e:
+            _log.error("CSV 내보내기 실패: %s", e)
+
+    def _export_json(self):
+        """JSON 내보내기."""
+        try:
+            from data_ai.play_logger import get_logger
+            path = get_logger().export_json()
+            if path:
+                messagebox.showinfo(
+                    t("stats_export_json"),
+                    t("stats_export_done", path=path),
+                    parent=self,
+                )
+            else:
+                messagebox.showwarning(
+                    t("stats_export_json"),
+                    t("stats_export_empty"),
+                    parent=self,
+                )
+        except Exception as e:
+            _log.error("JSON 내보내기 실패: %s", e)
+
+    def _toggle_auto_refresh(self):
+        """자동 새로고침 ON/OFF."""
+        if self._auto_refresh.get():
+            self._schedule_auto_refresh()
+        else:
+            if self._auto_refresh_id:
+                self.after_cancel(self._auto_refresh_id)
+                self._auto_refresh_id = None
+
+    def _schedule_auto_refresh(self):
+        """10초마다 자동 새로고침."""
+        if not self.winfo_exists():
+            return
+        self._load_data()
+        if self._auto_refresh.get():
+            self._auto_refresh_id = self.after(10000, self._schedule_auto_refresh)
 
 
 def open_stats_dashboard(master=None):

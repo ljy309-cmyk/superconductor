@@ -11,6 +11,20 @@ from tkinter import ttk, messagebox
 import requests
 
 from data_ai.ranking_server import start_server, get_base_url
+from theme import get_tk_theme
+from logger import get_module_logger
+
+_log = get_module_logger("ranking")
+
+
+def _load_tk_colors():
+    _tk = get_tk_theme()
+    return {
+        "bg": _tk.BG, "fg": _tk.TEXT, "accent": _tk.ACCENT_GREEN,
+        "gold": _tk.GOLD, "silver": _tk.SILVER, "bronze": _tk.BRONZE,
+        "red": _tk.RED, "green": _tk.GREEN,
+    }
+
 
 BG = "#1e1e2e"
 FG = "#cdd6f4"
@@ -28,7 +42,9 @@ class RankingApp(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master)
         self.title("Global Qubit Survival Ranking")
-        self.configure(bg=BG)
+        # 테마 색상 로드
+        self._tc = _load_tk_colors()
+        self.configure(bg=self._tc["bg"])
         self.geometry("700x560")
         self.resizable(False, False)
 
@@ -242,8 +258,9 @@ class RankingApp(tk.Toplevel):
         try:
             from stats_dashboard import open_stats_dashboard
             open_stats_dashboard(self)
-        except Exception:
-            messagebox.showerror("Error", "Stats dashboard unavailable.", parent=self)
+        except Exception as e:
+            _log.error("통계 대시보드 열기 실패: %s", e)
+            messagebox.showerror("Error", f"Stats dashboard unavailable: {e}", parent=self)
 
     def _open_achievements(self):
         """업적 목록 표시."""
@@ -266,13 +283,14 @@ class RankingApp(tk.Toplevel):
 
             for ach in achievements:
                 status = "[*]" if ach["unlocked"] else "[ ]"
-                color = "#a6e3a1" if ach["unlocked"] else "#585b70"
+                color = self._tc["green"] if ach["unlocked"] else get_tk_theme().SUBTEXT
                 text.insert(tk.END, f" {status} [{ach['icon']}] {ach['title']}\n")
                 text.insert(tk.END, f"      {ach['desc']}\n\n")
 
             text.configure(state="disabled")
-        except Exception:
-            messagebox.showerror("Error", "Achievement system unavailable.", parent=self)
+        except Exception as e:
+            _log.error("업적 표시 실패: %s", e)
+            messagebox.showerror("Error", f"Achievement system unavailable: {e}", parent=self)
 
     # ── REST API 호출 ────────────────────────────────
 
@@ -311,7 +329,7 @@ class RankingApp(tk.Toplevel):
             # 미션1: 인터넷 끊김 → 프로그램이 죽지 않고 안내 메시지 표시
             self.online = False
             self.conn_var.set("[OFFLINE] 인터넷 연결 실패! 오프라인 모드 가동")
-            self.conn_label.configure(fg="#f38ba8")
+            self.conn_label.configure(fg=self._tc["red"])
             self.submit_status.set("전송 실패 -- 오프라인 모드 (점수 미등록)")
 
         self._refresh_ranking()
@@ -324,7 +342,7 @@ class RankingApp(tk.Toplevel):
             if resp.status_code == 200:
                 self.online = True
                 self.conn_var.set("[ONLINE] 서버 연결 성공")
-                self.conn_label.configure(fg="#a6e3a1")
+                self.conn_label.configure(fg=self._tc["green"])
 
                 top5 = resp.json()
                 # 미션2: 1등 점수 저장 (비교용)
@@ -343,7 +361,7 @@ class RankingApp(tk.Toplevel):
             # 미션1: except 문이 작동하여 프로그램을 보호
             self.online = False
             self.conn_var.set("[OFFLINE] 인터넷 연결 실패! 오프라인 모드 가동")
-            self.conn_label.configure(fg="#f38ba8")
+            self.conn_label.configure(fg=self._tc["red"])
 
         # 전체 기록 (GET 요청)
         try:
@@ -360,8 +378,8 @@ class RankingApp(tk.Toplevel):
                         r.get("mode", ""),
                         r.get("timestamp", ""),
                     ))
-        except requests.RequestException:
-            pass  # 미션1: 오프라인이면 조용히 넘어감
+        except requests.RequestException as e:
+            _log.warning("랭킹 조회 실패 (오프라인): %s", e)
 
     # ── 미션2: 점수 비교 로직 ─────────────────────────
 

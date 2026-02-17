@@ -1,0 +1,41 @@
+[project]
+name = "superconductor"
+version = "1.0.0"
+requires-python = ">=3.10"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "UP",    # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "E741",  # ambiguous variable name (physics uses l, I, etc.)
+    "B905",  # zip without strict (Python 3.10+ strict param)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "config_loader",
+    "theme",
+    "i18n",
+    "logger",
+    "achievements",
+    "replay",
+    "stats_dashboard",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

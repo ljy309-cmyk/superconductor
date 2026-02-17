@@ -12,6 +12,7 @@ import random
 import pygame
 
 from config_loader import cfg
+from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -30,24 +31,48 @@ except ImportError:
     _QRNG_AVAILABLE = False
 
 # ── 화면 설정 ────────────────────────────────────────
-WIDTH, HEIGHT = 900, 600
+WIDTH = cfg("display", "width", 900)
+HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
 
-# ── 색상 ─────────────────────────────────────────────
+# ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
 TEXT_CLR = (205, 214, 244)
 ACCENT = (249, 226, 175)
-ALICE_CLR = (137, 180, 250)    # Alice 파랑
-BOB_CLR = (166, 227, 161)      # Bob 초록
-EVE_CLR = (243, 139, 168)      # Eve 빨강
-QUBIT_CLR = (203, 166, 247)    # 큐비트 보라
-DECOY_CLR = (249, 226, 175)    # 미션3: 디코이 노랑
+ALICE_CLR = (137, 180, 250)
+BOB_CLR = (166, 227, 161)
+EVE_CLR = (243, 139, 168)
+QUBIT_CLR = (203, 166, 247)
+DECOY_CLR = (249, 226, 175)
 SAFE_CLR = (166, 227, 161)
 DANGER_CLR = (243, 139, 168)
-WARNING_BG = (80, 30, 30)      # 미션2: 경고 배경 (짙은 빨강)
+WARNING_BG = (80, 30, 30)
 SHUTDOWN_CLR = (249, 226, 175)
 CHANNEL_CLR = (69, 71, 90)
 PANEL_BG = (24, 24, 37)
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, ALICE_CLR, BOB_CLR, EVE_CLR, QUBIT_CLR
+    global DECOY_CLR, SAFE_CLR, DANGER_CLR, CHANNEL_CLR, PANEL_BG
+    global SUBTEXT_CLR, WARN_CLR, WHITE, ACCENT
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    ALICE_CLR = pg.ALICE
+    BOB_CLR = pg.BOB
+    EVE_CLR = pg.EVE
+    QUBIT_CLR = pg.QUBIT
+    DECOY_CLR = pg.DECOY
+    SAFE_CLR = pg.GREEN
+    DANGER_CLR = pg.RED
+    CHANNEL_CLR = pg.OVERLAY
+    PANEL_BG = pg.PANEL_BG
+    SUBTEXT_CLR = pg.SUBTEXT
+    WARN_CLR = pg.ACCENT_YELLOW
+    WHITE = pg.WHITE
+    ACCENT = pg.ACCENT_YELLOW
 
 # ── 레이아웃 ─────────────────────────────────────────
 ALICE_X, ALICE_Y = 100, 250
@@ -66,8 +91,8 @@ HISTORY_WINDOW = cfg("bb84", "history_window", 20)
 
 # ── 자동 차단 시스템 ────────────────────────────────
 AUTO_BLOCK_THRESHOLD = cfg("bb84", "auto_block_threshold", 0.15)
-AUTO_BLOCK_SCORE = 50
-MANUAL_BLOCK_SCORE = 100
+AUTO_BLOCK_SCORE = cfg("bb84", "auto_block_score", 50)
+MANUAL_BLOCK_SCORE = cfg("bb84", "manual_block_score", 100)
 
 # ── 경고 알람 ───────────────────────────────────────
 WARNING_THRESHOLD = cfg("bb84", "warning_threshold", 0.10)
@@ -294,7 +319,7 @@ def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     pygame.draw.circle(screen, TEXT_CLR, (ALICE_X, ALICE_Y), 30, 2)
     label = big_font.render("Alice", True, ALICE_CLR)
     screen.blit(label, (ALICE_X - label.get_width() // 2, ALICE_Y + 38))
-    role = font.render("Sender", True, (88, 91, 112))
+    role = font.render("Sender", True, SUBTEXT_CLR)
     screen.blit(role, (ALICE_X - role.get_width() // 2, ALICE_Y + 56))
 
     # Bob
@@ -302,7 +327,7 @@ def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     pygame.draw.circle(screen, TEXT_CLR, (BOB_X, BOB_Y), 30, 2)
     label = big_font.render("Bob", True, BOB_CLR)
     screen.blit(label, (BOB_X - label.get_width() // 2, BOB_Y + 38))
-    role = font.render("Receiver", True, (88, 91, 112))
+    role = font.render("Receiver", True, SUBTEXT_CLR)
     screen.blit(role, (BOB_X - role.get_width() // 2, BOB_Y + 56))
 
     # Eve (항상 표시, 도청 시 강조)
@@ -318,7 +343,7 @@ def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     pygame.draw.circle(screen, TEXT_CLR, (EVE_X, EVE_Y), 24, 2)
     label = big_font.render("Eve", True, EVE_CLR)
     screen.blit(label, (EVE_X - label.get_width() // 2, EVE_Y - 42))
-    role = font.render("Eavesdropper", True, (88, 91, 112))
+    role = font.render("Eavesdropper", True, SUBTEXT_CLR)
     screen.blit(role, (EVE_X - role.get_width() // 2, EVE_Y - 28))
 
 
@@ -357,7 +382,7 @@ def _draw_packets(screen, game: BB84Game, font):
         pygame.draw.circle(screen, TEXT_CLR, (cx, cy), 12, 1)
         # 디코이 표시: D, 일반: 편광 화살표
         label = "D" if pkt.is_decoy and not pkt.corrupted else pkt.display
-        sym = font.render(label, True, (255, 255, 255))
+        sym = font.render(label, True, WHITE)
         screen.blit(sym, (cx - sym.get_width() // 2, cy - sym.get_height() // 2))
 
 
@@ -374,8 +399,8 @@ def _draw_error_meter(screen, game: BB84Game, font, big_font):
 
     # 미션2: 10% 경고선
     warn_x = mx + int(mw * WARNING_THRESHOLD)
-    pygame.draw.line(screen, (249, 226, 175), (warn_x, my - 2), (warn_x, my + mh + 2), 1)
-    warn_label = font.render(f"{WARNING_THRESHOLD * 100:.0f}%", True, (249, 226, 175))
+    pygame.draw.line(screen, WARN_CLR, (warn_x, my - 2), (warn_x, my + mh + 2), 1)
+    warn_label = font.render(f"{WARNING_THRESHOLD * 100:.0f}%", True, WARN_CLR)
     screen.blit(warn_label, (warn_x - 12, my + mh + 6))
 
     # 미션1: 15% 자동 차단선
@@ -395,7 +420,7 @@ def _draw_error_meter(screen, game: BB84Game, font, big_font):
     if game.error_rate >= AUTO_BLOCK_THRESHOLD:
         fill_clr = DANGER_CLR
     elif game.error_rate >= WARNING_THRESHOLD:
-        fill_clr = (249, 226, 175)  # 경고색
+        fill_clr = WARN_CLR
     else:
         fill_clr = SAFE_CLR
     pygame.draw.rect(screen, fill_clr, (mx, my, fill_w, mh))
@@ -425,7 +450,7 @@ def _draw_stats(screen, game: BB84Game, font, big_font):
         (f"Eve 도청: {game.eve_intercept_count}", EVE_CLR),
         (f"디코이 발사: {game.decoy_sent}  트랩: {game.decoy_trapped}", DECOY_CLR),
         (f"자동차단: {game.auto_blocks}회  수동: {game.manual_blocks}회", ALICE_CLR),
-        (qrng_tag, ACCENT if qrng_remain > 0 else (88, 91, 112)),
+        (qrng_tag, ACCENT if qrng_remain > 0 else SUBTEXT_CLR),
         (f"채널: {'OPEN' if game.channel_open else 'SHUTDOWN'}  |  자동: {'ON' if game.auto_block_enabled else 'OFF'}", SAFE_CLR if game.channel_open else DANGER_CLR),
     ]
     for i, (text, color) in enumerate(lines):
@@ -480,6 +505,7 @@ def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 def run_simulation():
+    _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption("BB84 Quantum Key Distribution Defense")

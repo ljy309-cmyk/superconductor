@@ -13,27 +13,43 @@
     hud.draw(screen, font)
 """
 
-import pygame
+try:
+    import pygame
+except ImportError:
+    pygame = None  # type: ignore[assignment]
 
 from presets import get_preset, save_profile, load_profile, list_profiles
+from theme import get_pg_theme
 from logger import get_module_logger
 
 _log = get_module_logger("preset_hud")
 
-# 프리셋 키 매핑
-_PRESET_KEYS = {
-    pygame.K_1: "easy",
-    pygame.K_2: "normal",
-    pygame.K_3: "hard",
+# 프리셋 키 매핑 (pygame이 없으면 빈 dict)
+if pygame:
+    _PRESET_KEYS = {
+        pygame.K_1: "easy",
+        pygame.K_2: "normal",
+        pygame.K_3: "hard",
+    }
+else:
+    _PRESET_KEYS = {}
+
+# 프리셋별 표시 색상 (기본값, _get_preset_colors로 동적 로드)
+_PRESET_COLORS = {
+    "easy": (166, 227, 161),
+    "normal": (249, 226, 175),
+    "hard": (243, 139, 168),
+    "custom": (137, 180, 250),
 }
 
-# 프리셋별 표시 색상
-_PRESET_COLORS = {
-    "easy": (166, 227, 161),     # 초록
-    "normal": (249, 226, 175),   # 노랑
-    "hard": (243, 139, 168),     # 빨강
-    "custom": (137, 180, 250),   # 파랑
-}
+
+def _load_preset_colors():
+    """현재 테마(색맹 모드 포함)에서 프리셋 색상을 로드."""
+    pg = get_pg_theme()
+    _PRESET_COLORS["easy"] = pg.GREEN
+    _PRESET_COLORS["normal"] = pg.YELLOW
+    _PRESET_COLORS["hard"] = pg.RED
+    _PRESET_COLORS["custom"] = pg.ACCENT_BLUE
 
 
 class PresetHUD:
@@ -45,6 +61,7 @@ class PresetHUD:
     """
 
     def __init__(self, module_name: str, slider_map: dict):
+        _load_preset_colors()
         self.module_name = module_name
         self.slider_map = slider_map
         self.current = "normal"

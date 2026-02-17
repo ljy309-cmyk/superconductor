@@ -14,7 +14,10 @@
     overlay.draw(screen, font)
 """
 
-import pygame
+try:
+    import pygame
+except ImportError:
+    pygame = None  # type: ignore[assignment]
 
 # 모듈별 도움말 텍스트 (한국어)
 _HELP_TEXTS: dict[str, list[str]] = {
@@ -32,7 +35,8 @@ _HELP_TEXTS: dict[str, list[str]] = {
         "  현실에서는 여분의 큐비트를 사용해 에러를 탐지/복구합니다.",
         "",
         "[조작법]",
-        "  클릭: 큐비트 오류 정정 (stress -> 0)",
+        "  클릭/Enter: 큐비트 오류 정정 (stress -> 0)",
+        "  Tab: 큐비트 포커스 순환 (키보드 선택)",
         "  S: QEC 방어막 활성화",
         "  H: 전체 힐링 (-stress)",
         "  N: 랜덤 노이즈 주입",
@@ -118,7 +122,8 @@ _HELP_TEXTS: dict[str, list[str]] = {
         "  민감도를 높이면 감지 범위가 넓어집니다.",
         "",
         "[조작법]",
-        "  클릭: 지뢰 마킹",
+        "  클릭/Enter: 지뢰 마킹",
+        "  WASD: 그리드 커서 이동 (키보드 탐색)",
         "  Up/Down: 민감도 조절",
         "  M: 사운드 ON/OFF",
         "  1/2/3: 난이도 프리셋",
@@ -137,7 +142,7 @@ _HELP_TEXTS: dict[str, list[str]] = {
         "  공간상에 안정적으로 잠깁니다 (Quantum Locking).",
         "",
         "[조작법]",
-        "  마우스 드래그: 자석 이동",
+        "  마우스 드래그/화살표키: 자석 이동",
         "  F: 자석 N/S 뒤집기",
         "  SPACE: 초전도 ON/OFF (온도 변화)",
     ],

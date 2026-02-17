@@ -18,6 +18,11 @@ _cache: dict | None = None
 _SCHEMA: dict[str, dict[str, tuple]] = {
     "display": {
         "fps": (int, 1, 240),
+        "width": (int, 640, 3840),
+        "height": (int, 480, 2160),
+    },
+    "accessibility": {
+        "colorblind_mode": (bool, None, None),
     },
     "server": {
         "host": (str, None, None),
@@ -35,15 +40,20 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
     },
     "qubit_chain": {
         "stress_threshold": (float, 10.0, 500.0),
+        "stress_danger": (float, 1.0, 500.0),
+        "stress_warning": (float, 1.0, 500.0),
         "cascade_damage": (float, 0.0, 200.0),
         "noise_rate_base": (float, 0.0, 50.0),
         "recovery_rate": (float, 0.0, 50.0),
+        "collapse_anim_duration": (float, 0.1, 5.0),
         "qec_reduction": (float, 0.0, 1.0),
         "qec_duration": (float, 0.5, 60.0),
         "qec_cooldown": (float, 0.5, 60.0),
         "heal_amount": (float, 1.0, 100.0),
         "heal_cooldown": (float, 0.0, 30.0),
         "outer_nodes": (int, 3, 12),
+        "node_radius": (int, 5, 100),
+        "ring_radius": (int, 50, 500),
     },
     "tunneling": {
         "tunnel_prob_base": (float, 0.0, 1.0),
@@ -52,6 +62,11 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
         "barrier_width_min": (int, 1, 500),
         "barrier_width_max": (int, 1, 500),
         "tunnel_speed_boost": (float, 1.0, 10.0),
+        "superposition_hz": (float, 0.1, 60.0),
+        "tunnel_decay_rate": (float, 0.001, 1.0),
+        "particle_vy_range": (float, 0.0, 500.0),
+        "tunnel_flash_sec": (float, 0.05, 5.0),
+        "reflect_flash_sec": (float, 0.05, 5.0),
     },
     "qec_shield": {
         "noise_rate": (float, 0.0, 50.0),
@@ -66,6 +81,8 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
         "cascade_damage": (float, 0.0, 200.0),
         "grid_cols": (int, 1, 20),
         "grid_rows": (int, 1, 20),
+        "node_radius": (int, 5, 100),
+        "stress_warning": (float, 1.0, 500.0),
     },
     "squid_mines": {
         "grid_cols": (int, 3, 30),
@@ -84,6 +101,8 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
         "error_threshold": (float, 0.0, 1.0),
         "history_window": (int, 5, 200),
         "auto_block_threshold": (float, 0.0, 1.0),
+        "auto_block_score": (int, 0, 10000),
+        "manual_block_score": (int, 0, 10000),
         "warning_threshold": (float, 0.0, 1.0),
         "decoy_chance": (float, 0.0, 1.0),
         "decoy_error_mult": (float, 1.0, 10.0),
@@ -113,6 +132,11 @@ def _validate(section: str, key: str, value):
     expected_type, min_val, max_val = schema
 
     # 타입 검증
+    if expected_type is bool:
+        if not isinstance(value, bool):
+            _log.warning("설정 타입 오류: [%s].%s = %r (bool 필요)", section, key, value)
+            return None
+        return value
     if expected_type in (int, float) and isinstance(value, (int, float)):
         if expected_type is int:
             value = int(value)

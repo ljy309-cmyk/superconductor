@@ -5,8 +5,22 @@ import sys
 import unittest
 import tempfile
 import shutil
+from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# pandas가 없는 환경용 모킹
+if "pandas" not in sys.modules:
+    _pd_mock = MagicMock()
+    _pd_mock.DataFrame.return_value = MagicMock(
+        to_dict=MagicMock(return_value=[]),
+        to_csv=MagicMock(),
+        to_excel=MagicMock(),
+        columns=[],
+        __len__=lambda self: 0,
+    )
+    _pd_mock.read_csv.side_effect = FileNotFoundError
+    sys.modules.setdefault("pandas", _pd_mock)
 
 
 class TestPlayLogger(unittest.TestCase):
@@ -105,6 +119,38 @@ class TestPlayLogger(unittest.TestCase):
             "custom_field": "hello",
         })
         self.assertEqual(record["custom_field"], "hello")
+
+    def test_csv_injection_sanitize_function(self):
+        from data_ai.play_logger import _sanitize_csv_value
+        # 위험 접두사가 살균됨
+        self.assertEqual(_sanitize_csv_value("=CMD()"), "'=CMD()")
+        self.assertEqual(_sanitize_csv_value("+1+1"), "'+1+1")
+        self.assertEqual(_sanitize_csv_value("-1-1"), "'-1-1")
+        self.assertEqual(_sanitize_csv_value("@SUM(A1)"), "'@SUM(A1)")
+        self.assertEqual(_sanitize_csv_value("\tdata"), "'\tdata")
+        # 안전한 값은 그대로
+        self.assertEqual(_sanitize_csv_value("hello"), "hello")
+        self.assertEqual(_sanitize_csv_value(""), "")
+        self.assertEqual(_sanitize_csv_value(42), 42)
+        self.assertEqual(_sanitize_csv_value(None), None)
+
+    def test_csv_injection_in_incremental_write(self):
+        """CSV 증분 저장 시 인젝션 위험 문자열이 살균되는지 확인."""
+        import csv
+        import data_ai.play_logger as pl
+        from data_ai.play_logger import PlayLogger
+        logger = PlayLogger()
+        logger.log_session("bb84_defense", {
+            "score": 100,
+            "custom_field": "=HYPERLINK(\"evil\")",
+        })
+        # CSV 파일 파싱하여 셀 값 검증
+        with open(pl.PLAY_LOG_CSV, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            row = next(reader)
+        # 셀 값이 '= 로 시작해야 함 (작은따옴표 접두사로 살균됨)
+        self.assertTrue(row["custom_field"].startswith("'="),
+                        f"Expected sanitized prefix, got: {row['custom_field']!r}")
 
 
 try:

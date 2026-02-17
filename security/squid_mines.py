@@ -11,25 +11,29 @@
 import array
 import math
 import random
+from dataclasses import dataclass
 
 import pygame
 
 from config_loader import cfg
+from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
 from replay import ReplayRecorder
+from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from logger import get_module_logger
 
 _log = get_module_logger("squid_mines")
 
 # ── 화면 설정 ────────────────────────────────────────
-WIDTH, HEIGHT = 900, 650
+WIDTH = cfg("display", "width", 900)
+HEIGHT = cfg("display", "height", 650)
 FPS = cfg("display", "fps", 60)
 
-# ── 색상 ─────────────────────────────────────────────
+# ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
 TEXT_CLR = (205, 214, 244)
 ACCENT = (137, 180, 250)
@@ -43,6 +47,24 @@ GRAPH_BG = (24, 24, 37)
 GRAPH_LINE = (203, 166, 247)    # 자기 선속 그래프 (보라)
 GRAPH_PEAK = (243, 139, 168)    # 피크 (빨강)
 SENSOR_CLR = (116, 199, 236)    # 센서 커서 글로우
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, ACCENT, GRID_CLR, CELL_MARKED, CELL_WRONG
+    global GRAPH_BG, GRAPH_LINE, GRAPH_PEAK, SENSOR_CLR, WHITE
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    ACCENT = pg.ACCENT_BLUE
+    GRID_CLR = pg.OVERLAY
+    CELL_MARKED = pg.GREEN
+    CELL_WRONG = pg.RED
+    GRAPH_BG = pg.PANEL_BG
+    GRAPH_LINE = pg.ACCENT_PURPLE
+    GRAPH_PEAK = pg.RED
+    SENSOR_CLR = pg.SENSOR_CLR
+    WHITE = pg.WHITE
 
 # ── 그리드 설정 (config.json에서 로드) ────────────────
 GRID_COLS = cfg("squid_mines", "grid_cols", 10)
@@ -86,6 +108,23 @@ def _make_beep_sound(freq: int = BEEP_FREQ, duration_ms: int = BEEP_DURATION_MS,
         env = min(i / (n_samples * 0.1 + 1), 1.0, (n_samples - i) / (n_samples * 0.1 + 1))
         buf[i] = int(max_amp * env * math.sin(2 * math.pi * freq * t))
     return pygame.mixer.Sound(buffer=buf)
+
+
+# ── 게임 루프 상태 데이터클래스 ───────────────────────
+
+@dataclass
+class SQUIDMinesState:
+    """SQUID 지뢰찾기 게임 루프 상태."""
+    t: float = 0.0
+    beep_timer: float = 0.0
+    sound_enabled: bool = True
+    kb_col: int = 0
+    kb_row: int = 0
+    kb_active: bool = False
+
+    def reset(self):
+        """게임 루프 상태 리셋."""
+        self.beep_timer = 0.0
 
 
 # ── 게임 로직 ────────────────────────────────────────
@@ -188,7 +227,8 @@ class SQUIDGame:
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
-def _draw_grid(screen, game: SQUIDGame, hover_cell, font):
+def _draw_grid(screen, game: SQUIDGame, hover_cell, font,
+               kb_cell=None):
     """그리드 렌더링."""
     for r in range(GRID_ROWS):
         for c in range(GRID_COLS):
@@ -216,11 +256,15 @@ def _draw_grid(screen, game: SQUIDGame, hover_cell, font):
 
             # 마킹 표시
             if pos in game.marked:
-                flag = font.render("M", True, (30, 30, 46))
+                flag = font.render("M", True, BG)
                 screen.blit(flag, (rect.centerx - flag.get_width() // 2, rect.centery - flag.get_height() // 2))
             elif pos in game.wrong:
-                x_mark = font.render("X", True, (255, 255, 255))
+                x_mark = font.render("X", True, WHITE)
                 screen.blit(x_mark, (rect.centerx - x_mark.get_width() // 2, rect.centery - x_mark.get_height() // 2))
+
+            # 키보드 커서 테두리
+            if kb_cell == pos:
+                pygame.draw.rect(screen, ACCENT, rect, 3)
 
 
 def _draw_sensor_glow(screen, mx: int, my: int, intensity: float, t: float):
@@ -297,6 +341,7 @@ def _draw_status(screen, game: SQUIDGame, font, big_font):
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 def run_simulation():
+    _load_theme_colors()
     pygame.init()
     # 미션1: 사운드 초기화
     pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
@@ -310,9 +355,7 @@ def run_simulation():
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
 
     game = SQUIDGame()
-    t = 0.0
-    beep_timer = 0.0                        # 미션1: 비프 간격 타이머
-    sound_enabled = True                    # 미션1: 사운드 ON/OFF
+    gs = SQUIDMinesState()
 
     # ── 슬라이더 패널 ─────────────────────────────────
     panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
@@ -329,8 +372,9 @@ def run_simulation():
 
     running = True
     while running:
-        dt = clock.tick(FPS) / 1000.0
-        t += dt
+        raw_dt = clock.tick(FPS) / 1000.0
+        dt = apply_speed(raw_dt)
+        gs.t += dt
         mx, my = pygame.mouse.get_pos()
 
         # ── 이벤트 ───────────────────────────────────
@@ -346,14 +390,43 @@ def run_simulation():
                 elif event.key == pygame.K_r:
                     game.reset()
                     panel.reset_all()
-                    beep_timer = 0.0
+                    gs.reset()
                 elif event.key == pygame.K_UP:
                     sl_sens.value = sl_sens.value + SENSITIVITY_STEP
                 elif event.key == pygame.K_DOWN:
                     sl_sens.value = sl_sens.value - SENSITIVITY_STEP
+                elif event.key == pygame.K_LEFTBRACKET:
+                    cycle_sim_speed(-1)
+                elif event.key == pygame.K_RIGHTBRACKET:
+                    cycle_sim_speed(1)
                 elif event.key == pygame.K_m:
                     # 미션1: 사운드 토글
-                    sound_enabled = not sound_enabled
+                    gs.sound_enabled = not gs.sound_enabled
+                # ── 키보드 그리드 탐색 (WASD) ──
+                elif event.key == pygame.K_w:
+                    gs.kb_active = True
+                    gs.kb_row = max(0, gs.kb_row - 1)
+                elif event.key == pygame.K_s:
+                    gs.kb_active = True
+                    gs.kb_row = min(GRID_ROWS - 1, gs.kb_row + 1)
+                elif event.key == pygame.K_a:
+                    gs.kb_active = True
+                    gs.kb_col = max(0, gs.kb_col - 1)
+                elif event.key == pygame.K_d:
+                    gs.kb_active = True
+                    gs.kb_col = min(GRID_COLS - 1, gs.kb_col + 1)
+                elif event.key == pygame.K_RETURN:
+                    # 키보드: 현재 커서 위치 마킹
+                    if gs.kb_active:
+                        prev_marked = len(game.marked)
+                        prev_wrong = len(game.wrong)
+                        game.mark_cell(gs.kb_col, gs.kb_row)
+                        if len(game.marked) > prev_marked:
+                            snd.play("mine_found")
+                            if game.won:
+                                snd.play("victory")
+                        elif len(game.wrong) > prev_wrong:
+                            snd.play("wrong_mark")
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 cell = game.get_hover_cell(mx, my)
                 if cell:
@@ -376,15 +449,15 @@ def run_simulation():
         game.update_graph(intensity, dt)
 
         # ── 미션1: 거리 기반 경고음 ──────────────────
-        if sound_enabled and intensity > 0.05 and not game.won:
+        if gs.sound_enabled and intensity > 0.05 and not game.won:
             # 가까울수록 간격 짧아짐 (선형 보간)
             interval = BEEP_INTERVAL_MAX - (BEEP_INTERVAL_MAX - BEEP_INTERVAL_MIN) * intensity
-            beep_timer -= dt
-            if beep_timer <= 0:
+            gs.beep_timer -= dt
+            if gs.beep_timer <= 0:
                 beep_sound.play()
-                beep_timer = interval
+                gs.beep_timer = interval
         else:
-            beep_timer = 0.0
+            gs.beep_timer = 0.0
 
         hover_cell = game.get_hover_cell(mx, my)
 
@@ -399,11 +472,12 @@ def run_simulation():
         _draw_status(screen, game, font, big_font)
 
         # 그리드
-        _draw_grid(screen, game, hover_cell, font)
+        kb_cell = (gs.kb_col, gs.kb_row) if gs.kb_active else None
+        _draw_grid(screen, game, hover_cell, font, kb_cell=kb_cell)
 
         # 센서 글로우 (그리드 영역 위에서만)
         if GRID_OY <= my <= GRID_OY + GRID_ROWS * CELL_SIZE:
-            _draw_sensor_glow(screen, mx, my, intensity, t)
+            _draw_sensor_glow(screen, mx, my, intensity, gs.t)
 
         # 자기 선속 그래프
         _draw_flux_graph(screen, game, intensity, nearest_dist, nearby_count, sensitivity, font)
@@ -413,9 +487,9 @@ def run_simulation():
 
         # 안내
         hints = [
-            f"민감도: x{sensitivity:.1f}  |  사운드: {'ON' if sound_enabled else 'OFF'}  |  근접: {nearby_count}개",
-            "마우스: SQUID 센서  |  클릭: 마킹  |  ↑↓/슬라이더: 민감도",
-            "M: 사운드  |  R: 리셋  |  ESC: 종료",
+            f"민감도: x{sensitivity:.1f}  |  사운드: {'ON' if gs.sound_enabled else 'OFF'}  |  근접: {nearby_count}개",
+            "마우스: SQUID 센서  |  클릭/Enter: 마킹  |  WASD: 커서 이동",
+            f"↑↓: 민감도  |  M: 사운드  |  [/]: 속도 ({speed_label()})  |  R: 리셋  |  ESC: 종료",
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)

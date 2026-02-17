@@ -10,28 +10,57 @@
 
 import json
 import os
+import shutil
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
 from config_loader import cfg
+from logger import get_module_logger
+
+_log = get_module_logger("ranking_server")
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "ranking_data.json")
+_BACKUP_PATH = DATA_PATH + ".bak"
 HOST = cfg("server", "host", "127.0.0.1")
 PORT = cfg("server", "port", 18084)
 TOP_N = cfg("server", "top_n", 5)
 
+_data_lock = threading.Lock()
+
 
 def _load_data() -> list[dict]:
-    if os.path.exists(DATA_PATH):
-        with open(DATA_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    """랭킹 데이터 로드 (백업 복원 포함)."""
+    with _data_lock:
+        for path in (DATA_PATH, _BACKUP_PATH):
+            if os.path.exists(path):
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    if isinstance(data, list):
+                        return data
+                except (json.JSONDecodeError, OSError) as e:
+                    _log.warning("랭킹 데이터 로드 실패 (%s): %s", path, e)
+        return []
 
 
 def _save_data(records: list[dict]):
-    with open(DATA_PATH, "w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    """랭킹 데이터 저장 (원자적 쓰기 + 백업)."""
+    with _data_lock:
+        # 기존 파일 백업
+        if os.path.exists(DATA_PATH):
+            try:
+                shutil.copy2(DATA_PATH, _BACKUP_PATH)
+            except OSError:
+                pass
+        # 임시 파일에 쓰고 이동 (원자적)
+        tmp_path = DATA_PATH + ".tmp"
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(records, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, DATA_PATH)
+        except OSError as e:
+            _log.error("랭킹 데이터 저장 실패: %s", e)
 
 
 class RankingHandler(BaseHTTPRequestHandler):
@@ -68,6 +97,11 @@ class RankingHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/ranking":
             length = int(self.headers.get("Content-Length", 0))
+            if length > 10_000:  # 최대 10KB
+                self._set_json_headers(413)
+                self.wfile.write(json.dumps({"error": "Payload too large"}).encode())
+                return
+
             body = self.rfile.read(length)
             try:
                 data = json.loads(body)
@@ -76,9 +110,29 @@ class RankingHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
                 return
 
-            name = data.get("name", "Anonymous")
+            name = str(data.get("name", "Anonymous"))[:50]  # 최대 50자
             score = data.get("score", 0)
-            mode = data.get("mode", "unknown")
+            mode = str(data.get("mode", "unknown"))[:30]
+            token = data.get("token", "")
+
+            # 무결성 토큰 검증 (있으면)
+            if token:
+                try:
+                    from score_integrity import verify_score
+                    if not verify_score(name, float(score) if isinstance(score, (int, float)) else 0, mode, token):
+                        _log.warning("점수 무결성 검증 실패: name=%s, score=%s", name, score)
+                        self._set_json_headers(403)
+                        self.wfile.write(json.dumps({"error": "Invalid score token"}).encode())
+                        return
+                except (ImportError, Exception) as e:
+                    _log.warning("무결성 검증 모듈 오류: %s", e)
+
+            # 점수 타입/범위 검증
+            if not isinstance(score, (int, float)):
+                self._set_json_headers(400)
+                self.wfile.write(json.dumps({"error": "score must be a number"}).encode())
+                return
+            score = max(0.0, min(float(score), 999999.0))  # 0 ~ 999999
 
             record = {
                 "name": name,

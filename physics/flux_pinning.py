@@ -3,31 +3,51 @@
 import math
 import sys
 import time
+from dataclasses import dataclass, field
 
 import pygame
 
 from config_loader import cfg
-from theme import PG
+from theme import get_pg_theme
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
 from replay import ReplayRecorder
+from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from logger import get_module_logger
 
 _log = get_module_logger("flux_pinning")
 
 # ── 화면 설정 ────────────────────────────────────────
-WIDTH, HEIGHT = 800, 500
+WIDTH = cfg("display", "width", 900)
+HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
 
-# ── 색상 (theme에서 가져옴) ──────────────────────────
-BG = PG.BG
-TEXT_CLR = PG.TEXT
-MAGNET_N = PG.MAGNET_N
-MAGNET_S = PG.MAGNET_S
-SC_COLOR = PG.SC_COLOR
-SC_GLOW = PG.SC_GLOW
-FIELD_CLR = (88, 91, 112, 60)
+# ── 색상 (테마에서 동적 로드) ─────────────────────────
+_pg = get_pg_theme()
+BG = _pg.BG
+TEXT_CLR = _pg.TEXT
+MAGNET_N = _pg.MAGNET_N
+MAGNET_S = _pg.MAGNET_S
+SC_COLOR = _pg.SC_COLOR
+SC_GLOW = _pg.SC_GLOW
+FIELD_CLR = (*_pg.SUBTEXT, 60)
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, MAGNET_N, MAGNET_S, SC_COLOR, SC_GLOW
+    global SUBTEXT_CLR, WHITE, INACTIVE_CLR
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    MAGNET_N = pg.MAGNET_N
+    MAGNET_S = pg.MAGNET_S
+    SC_COLOR = pg.SC_COLOR
+    SC_GLOW = pg.SC_GLOW
+    SUBTEXT_CLR = pg.SUBTEXT
+    WHITE = pg.WHITE
+    INACTIVE_CLR = pg.INACTIVE
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 EQUILIBRIUM_GAP = cfg("flux_pinning", "equilibrium_gap", 65.0)
@@ -36,15 +56,38 @@ DAMPING = cfg("flux_pinning", "damping", 0.88)
 LEVITATION_AMP = cfg("flux_pinning", "levitation_amp", 4.0)
 LEVITATION_FREQ = cfg("flux_pinning", "levitation_freq", 2.0)
 GRAVITY = cfg("flux_pinning", "gravity", 480.0)
-FLOOR_Y = 460.0          # 바닥 Y 좌표 (px)
+FLOOR_Y = 560.0          # 바닥 Y 좌표 (px)
 
 # ── 오브젝트 크기 ────────────────────────────────────
 MAGNET_W, MAGNET_H = 160, 50
 SC_W, SC_H = 100, 30
 
+# ── 키보드 자석 이동 속도 (px/s) ──
+KB_MAGNET_SPEED = 300
+
+
+# ── 게임 상태 데이터클래스 ────────────────────────────
+
+@dataclass
+class FluxPinningState:
+    """마이스너 부상 & 플럭스 피닝 게임 상태."""
+    magnet_x: float = 0.0
+    magnet_y: float = 0.0
+    sc_x: float = 0.0
+    sc_y: float = 0.0
+    sc_vx: float = 0.0
+    sc_vy: float = 0.0
+    dragging: bool = False
+    flipped: bool = False
+    superconducting: bool = True
+    prev_superconducting: bool = True
+    t: float = 0.0
+    start_time: float = field(default_factory=time.time)
+
 
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
+    _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Meissner Levitation & Flux Pinning")
@@ -58,27 +101,18 @@ def run_simulation():
     snd.init()
     recorder = ReplayRecorder("flux_pinning")
 
-    # 자석 위치 (중심 좌표)
-    magnet_x = WIDTH / 2
-    magnet_y = HEIGHT / 2 + 40
-
-    # 초전도체 위치·속도 (중심 좌표)
-    sc_x = magnet_x
-    sc_y = magnet_y - EQUILIBRIUM_GAP
-    sc_vx = 0.0
-    sc_vy = 0.0
-
-    dragging = False
-    flipped = False        # 자석 뒤집힘 여부
-    superconducting = True  # 초전도 상태
-    prev_superconducting = True  # 상태 변화 감지용
-    t = 0.0
-    start_time = time.time()
+    gs = FluxPinningState(
+        magnet_x=WIDTH / 2,
+        magnet_y=HEIGHT / 2 + 40,
+        sc_x=WIDTH / 2,
+        sc_y=HEIGHT / 2 + 40 - EQUILIBRIUM_GAP,
+    )
 
     running = True
     while running:
-        dt = clock.tick(FPS) / 1000.0
-        t += dt
+        raw_dt = clock.tick(FPS) / 1000.0
+        dt = apply_speed(raw_dt)
+        gs.t += dt
 
         # ── 이벤트 처리 ──────────────────────────────
         for event in pygame.event.get():
@@ -88,63 +122,82 @@ def run_simulation():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE and not help_overlay.visible:
                     running = False
+                elif event.key == pygame.K_LEFTBRACKET:
+                    cycle_sim_speed(-1)
+                elif event.key == pygame.K_RIGHTBRACKET:
+                    cycle_sim_speed(1)
                 elif event.key == pygame.K_f:
-                    flipped = not flipped
+                    gs.flipped = not gs.flipped
                 elif event.key == pygame.K_SPACE:
-                    superconducting = not superconducting
-                    if superconducting:
-                        sc_vy = 0.0
-                        sc_vx = 0.0
+                    gs.superconducting = not gs.superconducting
+                    if gs.superconducting:
+                        gs.sc_vy = 0.0
+                        gs.sc_vx = 0.0
                         snd.play("levitate")
                     else:
                         snd.play("fall")
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
-                if abs(mx - magnet_x) < MAGNET_W / 2 and abs(my - magnet_y) < MAGNET_H / 2:
-                    dragging = True
+                if abs(mx - gs.magnet_x) < MAGNET_W / 2 and abs(my - gs.magnet_y) < MAGNET_H / 2:
+                    gs.dragging = True
             elif event.type == pygame.MOUSEBUTTONUP:
-                dragging = False
+                gs.dragging = False
 
-        if dragging:
-            magnet_x, magnet_y = pygame.mouse.get_pos()
+        if gs.dragging:
+            gs.magnet_x, gs.magnet_y = pygame.mouse.get_pos()
+
+        # ── 키보드 자석 이동 (화살표키) ──
+        keys = pygame.key.get_pressed()
+        if not gs.dragging:
+            if keys[pygame.K_LEFT]:
+                gs.magnet_x -= KB_MAGNET_SPEED * dt
+            if keys[pygame.K_RIGHT]:
+                gs.magnet_x += KB_MAGNET_SPEED * dt
+            if keys[pygame.K_UP]:
+                gs.magnet_y -= KB_MAGNET_SPEED * dt
+            if keys[pygame.K_DOWN]:
+                gs.magnet_y += KB_MAGNET_SPEED * dt
+            # 화면 경계 제한
+            gs.magnet_x = max(MAGNET_W / 2, min(WIDTH - MAGNET_W / 2, gs.magnet_x))
+            gs.magnet_y = max(MAGNET_H / 2, min(HEIGHT - MAGNET_H / 2, gs.magnet_y))
 
         # ── 물리 연산 ────────────────────────────────
-        if superconducting:
-            direction = 1 if flipped else -1
-            target_x = magnet_x
-            target_y = magnet_y + direction * EQUILIBRIUM_GAP
+        if gs.superconducting:
+            direction = 1 if gs.flipped else -1
+            target_x = gs.magnet_x
+            target_y = gs.magnet_y + direction * EQUILIBRIUM_GAP
 
-            dx = sc_x - target_x
-            dy = sc_y - target_y
+            dx = gs.sc_x - target_x
+            dy = gs.sc_y - target_y
             ax = -SPRING_K * dx
             ay = -SPRING_K * dy
 
-            sc_vx = (sc_vx + ax * dt) * DAMPING
-            sc_vy = (sc_vy + ay * dt) * DAMPING
-            sc_x += sc_vx
-            sc_y += sc_vy
+            gs.sc_vx = (gs.sc_vx + ax * dt) * DAMPING
+            gs.sc_vy = (gs.sc_vy + ay * dt) * DAMPING
+            gs.sc_x += gs.sc_vx
+            gs.sc_y += gs.sc_vy
 
-            levitation_offset = LEVITATION_AMP * math.sin(LEVITATION_FREQ * 2 * math.pi * t)
-            draw_sc_y = sc_y + levitation_offset
+            levitation_offset = LEVITATION_AMP * math.sin(LEVITATION_FREQ * 2 * math.pi * gs.t)
+            draw_sc_y = gs.sc_y + levitation_offset
         else:
-            sc_vy += GRAVITY * dt
-            sc_y += sc_vy * dt
+            gs.sc_vy += GRAVITY * dt
+            gs.sc_y += gs.sc_vy * dt
 
-            if sc_y >= FLOOR_Y:
-                sc_y = FLOOR_Y
-                sc_vy = 0.0
+            if gs.sc_y >= FLOOR_Y:
+                gs.sc_y = FLOOR_Y
+                gs.sc_vy = 0.0
 
-            draw_sc_y = sc_y
+            draw_sc_y = gs.sc_y
 
         # 리플레이 기록
         recorder.record_frame({
-            "magnet": [round(magnet_x, 1), round(magnet_y, 1)],
-            "sc": [round(sc_x, 1), round(draw_sc_y, 1)],
-            "flipped": flipped,
-            "superconducting": superconducting,
+            "magnet": [round(gs.magnet_x, 1), round(gs.magnet_y, 1)],
+            "sc": [round(gs.sc_x, 1), round(draw_sc_y, 1)],
+            "flipped": gs.flipped,
+            "superconducting": gs.superconducting,
         })
 
-        prev_superconducting = superconducting
+        gs.prev_superconducting = gs.superconducting
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -154,29 +207,29 @@ def run_simulation():
         screen.blit(title_surf, (WIDTH // 2 - title_surf.get_width() // 2, 15))
 
         # 자기장 라인
-        _draw_field_lines(screen, magnet_x, magnet_y, flipped)
+        _draw_field_lines(screen, gs.magnet_x, gs.magnet_y, gs.flipped)
 
         # 자석 그리기
-        _draw_magnet(screen, magnet_x, magnet_y, flipped, font)
+        _draw_magnet(screen, gs.magnet_x, gs.magnet_y, gs.flipped, font)
 
         # 초전도체 그리기
-        _draw_superconductor(screen, sc_x, draw_sc_y, t, superconducting)
+        _draw_superconductor(screen, gs.sc_x, draw_sc_y, gs.t, gs.superconducting)
 
         # 연결선 (스프링 시각화)
-        if superconducting:
+        if gs.superconducting:
             pygame.draw.line(
-                screen, (88, 91, 112),
-                (int(magnet_x), int(magnet_y)),
-                (int(sc_x), int(draw_sc_y)),
+                screen, SUBTEXT_CLR,
+                (int(gs.magnet_x), int(gs.magnet_y)),
+                (int(gs.sc_x), int(draw_sc_y)),
                 1,
             )
 
         # 안내 텍스트
-        state_label = "FALLEN" if not superconducting else (
-            "FLIPPED" if flipped else "LEVITATING")
+        state_label = "FALLEN" if not gs.superconducting else (
+            "FLIPPED" if gs.flipped else "LEVITATING")
         hints = [
-            "Drag: Move magnet  |  F: Flip  |  SPACE: SC ON/OFF",
-            f"State: {state_label}  |  ESC: Exit",
+            "Drag/Arrow: Move magnet  |  F: Flip  |  SPACE: SC ON/OFF",
+            f"State: {state_label}  |  [/]: Speed ({speed_label()})  |  ESC: Exit",
         ]
         for i, hint in enumerate(hints):
             surf = font.render(hint, True, TEXT_CLR)
@@ -188,11 +241,11 @@ def run_simulation():
         pygame.display.flip()
 
     # ── 종료: 플레이 기록 + 보고서 + 업적 ──
-    play_time = round(time.time() - start_time, 1)
+    play_time = round(time.time() - gs.start_time, 1)
     session_data = {
         "play_time": play_time,
-        "superconducting": superconducting,
-        "flipped": flipped,
+        "superconducting": gs.superconducting,
+        "flipped": gs.flipped,
     }
 
     try:
@@ -232,8 +285,8 @@ def _draw_magnet(screen, cx, cy, flipped, font):
 
     n_label = "S" if flipped else "N"
     s_label = "N" if flipped else "S"
-    n_surf = font.render(n_label, True, (255, 255, 255))
-    s_surf = font.render(s_label, True, (255, 255, 255))
+    n_surf = font.render(n_label, True, WHITE)
+    s_surf = font.render(s_label, True, WHITE)
     screen.blit(n_surf, (left + MAGNET_W / 4 - n_surf.get_width() / 2, cy - n_surf.get_height() / 2))
     screen.blit(s_surf, (left + 3 * MAGNET_W / 4 - s_surf.get_width() / 2, cy - s_surf.get_height() / 2))
 
@@ -248,9 +301,9 @@ def _draw_superconductor(screen, cx, cy, t, superconducting=True):
         glow_surf.fill((*SC_GLOW, glow_alpha))
         screen.blit(glow_surf, (rect.x - 8, rect.y - 8))
 
-    body_color = SC_COLOR if superconducting else (100, 100, 100)
+    body_color = SC_COLOR if superconducting else INACTIVE_CLR
     pygame.draw.rect(screen, body_color, rect, border_radius=6)
-    pygame.draw.rect(screen, (255, 255, 255), rect, 1, border_radius=6)
+    pygame.draw.rect(screen, WHITE, rect, 1, border_radius=6)
 
 
 def _draw_field_lines(screen, cx, cy, flipped):
@@ -264,7 +317,7 @@ def _draw_field_lines(screen, cx, cy, flipped):
             px = int(cx + x_spread)
             py = int(cy + y_off)
             if 0 <= py <= HEIGHT:
-                pygame.draw.circle(screen, (88, 91, 112), (px, py), 1)
+                pygame.draw.circle(screen, SUBTEXT_CLR, (px, py), 1)
 
 
 def open_flux_pinning():
