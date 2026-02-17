@@ -87,11 +87,24 @@ class StatsDashboard(tk.Toplevel):
         )
         self._ach_text.pack(fill="x")
 
-        # 새로고침 버튼
+        # 하단 컨트롤 바
+        ctrl_frame = tk.Frame(self, bg=TK.BG)
+        ctrl_frame.pack(pady=(0, 8))
+
         tk.Button(
-            self, text="Refresh", command=self._load_data,
+            ctrl_frame, text="Refresh", command=self._load_data,
             font=FONTS.BUTTON, width=12,
-        ).pack(pady=(0, 8))
+        ).pack(side="left", padx=4)
+
+        # 자동 새로고침 토글
+        self._auto_refresh = tk.BooleanVar(value=False)
+        tk.Checkbutton(
+            ctrl_frame, text="Auto (10s)", variable=self._auto_refresh,
+            font=FONTS.SMALL, bg=TK.BG, fg=TK.TEXT, selectcolor=TK.SURFACE,
+            command=self._toggle_auto_refresh,
+        ).pack(side="left", padx=4)
+
+        self._auto_refresh_id: str | None = None
 
     def _load_data(self):
         """데이터 로드 및 표시."""
@@ -224,6 +237,24 @@ class StatsDashboard(tk.Toplevel):
             self._ach_text.insert("1.0", "Achievement system not available.")
 
         self._ach_text.configure(state="disabled")
+
+
+    def _toggle_auto_refresh(self):
+        """자동 새로고침 ON/OFF."""
+        if self._auto_refresh.get():
+            self._schedule_auto_refresh()
+        else:
+            if self._auto_refresh_id:
+                self.after_cancel(self._auto_refresh_id)
+                self._auto_refresh_id = None
+
+    def _schedule_auto_refresh(self):
+        """10초마다 자동 새로고침."""
+        if not self.winfo_exists():
+            return
+        self._load_data()
+        if self._auto_refresh.get():
+            self._auto_refresh_id = self.after(10000, self._schedule_auto_refresh)
 
 
 def open_stats_dashboard(master=None):

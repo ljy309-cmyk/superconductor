@@ -2,5 +2,6 @@
 
 __all__ = [
     "open_phase_transition",
+    "open_phase_transition_sim",
     "open_flux_pinning",
 ]

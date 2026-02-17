@@ -44,15 +44,19 @@ class TcPredictorApp(tk.Toplevel):
         self.geometry("1050x720")
         self.resizable(False, False)
 
-        # 데이터 로드 (없거나 컬럼 부족하면 재생성)
-        need_regen = not os.path.exists(DATA_PATH)
-        if not need_regen:
-            tmp = pd.read_excel(DATA_PATH)
-            if "electronegativity" not in tmp.columns:
-                need_regen = True
-        if need_regen:
+        # 데이터 로드 (없거나 컬럼 부족·손상 시 재생성)
+        try:
+            need_regen = not os.path.exists(DATA_PATH)
+            if not need_regen:
+                tmp = pd.read_excel(DATA_PATH)
+                if "electronegativity" not in tmp.columns:
+                    need_regen = True
+            if need_regen:
+                generate_data()
+            self.df = pd.read_excel(DATA_PATH)
+        except Exception:
             generate_data()
-        self.df = pd.read_excel(DATA_PATH)
+            self.df = pd.read_excel(DATA_PATH)
 
         # 모델 학습
         self.model, self.r2, self.mae = self._train_model()
@@ -196,9 +200,18 @@ class TcPredictorApp(tk.Toplevel):
     def _predict(self):
         try:
             values = [float(self.entries[f].get()) for f in FEATURES]
-        except ValueError:
+        except (ValueError, TypeError):
             messagebox.showerror("입력 오류", "모든 필드에 숫자를 입력하세요.", parent=self)
             return
+
+        # 범위 검증: 음수·극단값 경고
+        for val, feat in zip(values, FEATURES):
+            if not np.isfinite(val):
+                messagebox.showerror("입력 오류", f"{feat}에 유효한 숫자를 입력하세요.", parent=self)
+                return
+            if val < 0:
+                messagebox.showwarning("범위 경고", f"{feat} 값이 음수입니다. 결과가 부정확할 수 있습니다.", parent=self)
+                break
 
         X_new = np.array([values])
         tc_pred = self.model.predict(X_new)[0]

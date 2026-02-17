@@ -17,7 +17,7 @@ from logger import get_module_logger
 _log = get_module_logger("flux_pinning")
 
 # ── 화면 설정 ────────────────────────────────────────
-WIDTH, HEIGHT = 800, 500
+WIDTH, HEIGHT = 900, 600
 FPS = cfg("display", "fps", 60)
 
 # ── 색상 (theme에서 가져옴) ──────────────────────────
@@ -36,7 +36,7 @@ DAMPING = cfg("flux_pinning", "damping", 0.88)
 LEVITATION_AMP = cfg("flux_pinning", "levitation_amp", 4.0)
 LEVITATION_FREQ = cfg("flux_pinning", "levitation_freq", 2.0)
 GRAVITY = cfg("flux_pinning", "gravity", 480.0)
-FLOOR_Y = 460.0          # 바닥 Y 좌표 (px)
+FLOOR_Y = 560.0          # 바닥 Y 좌표 (px)
 
 # ── 오브젝트 크기 ────────────────────────────────────
 MAGNET_W, MAGNET_H = 160, 50

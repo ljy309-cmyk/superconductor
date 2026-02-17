@@ -16,6 +16,7 @@
   "launcher_data_ai_heading": "Data Science & AI",
 
   "btn_phase_transition": "2-1. Phase Transition Visualization",
+  "btn_phase_transition_sim": "2-1b. Phase Transition Pygame (Lattice & Cooper Pairs)",
   "btn_flux_pinning": "2-2. Meissner Levitation & Flux Pinning",
   "btn_qubit_chain": "3-1. Qubit Entanglement Cascade",
   "btn_tunneling": "3-2. Quantum Superposition & Tunneling",
@@ -25,6 +26,8 @@
   "btn_tc_predictor": "5-1. AI New Material Tc Prediction (RandomForest)",
   "btn_qrng": "5-2. QRNG Quantum Random Number Generator",
   "btn_ranking": "5-3. Global Multiplayer Ranking",
+  "btn_stats": "5-4. Play Statistics Dashboard",
+  "btn_replay_viewer": "5-5. Replay Viewer",
 
   "dashboard_title": "SCADA — Liquid Nitrogen Cooling Monitor",
   "dashboard_heading": "Liquid Nitrogen Cooling — Digital Twin",
