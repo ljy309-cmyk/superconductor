@@ -10,7 +10,8 @@ from data_ai.launcher import open_data_ai_launcher
 from config_loader import cfg
 from i18n import t, set_locale
 from theme import (TK, FONTS, get_theme, toggle_theme, get_tk_theme,
-                   is_colorblind, set_colorblind, toggle_colorblind)
+                   is_colorblind, set_colorblind, toggle_colorblind,
+                   load_preferences, save_preferences)
 
 
 class App(tk.Tk):
@@ -19,9 +20,8 @@ class App(tk.Tk):
         self.title("Superconductor")
         self.resizable(False, False)
 
-        # config.json에서 색맹 모드 초기 설정 로드
-        if cfg("accessibility", "colorblind_mode", False):
-            set_colorblind(True)
+        # config.json에서 테마/색맹 모드 설정 로드
+        load_preferences()
 
         self._buttons = [
             ("menu_scada",    lambda: open_dashboard(self)),
@@ -82,6 +82,7 @@ class App(tk.Tk):
     def _switch_theme(self):
         """다크/라이트 테마 전환 후 UI 재구성."""
         toggle_theme()
+        save_preferences()
         for widget in self.winfo_children():
             widget.destroy()
         self._create_widgets()
@@ -89,6 +90,7 @@ class App(tk.Tk):
     def _toggle_colorblind(self):
         """색맹 친화 모드 토글 후 UI 재구성."""
         toggle_colorblind()
+        save_preferences()
         for widget in self.winfo_children():
             widget.destroy()
         self._create_widgets()

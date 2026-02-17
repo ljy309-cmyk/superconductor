@@ -236,6 +236,54 @@ class TestThemeToggle(unittest.TestCase):
         self.assertIsInstance(PG_LIGHT.BG, tuple)
         self.assertEqual(len(PG_LIGHT.BG), 3)
 
+    def test_observer_notified_on_toggle(self):
+        from theme import set_theme, toggle_theme, on_theme_change, off_theme_change
+        set_theme("dark")
+        calls = []
+        cb = lambda: calls.append(1)
+        on_theme_change(cb)
+        try:
+            toggle_theme()
+            self.assertEqual(len(calls), 1)
+            toggle_theme()
+            self.assertEqual(len(calls), 2)
+        finally:
+            off_theme_change(cb)
+            set_theme("dark")
+
+    def test_observer_notified_on_set_colorblind(self):
+        from theme import set_colorblind, on_theme_change, off_theme_change
+        set_colorblind(False)
+        calls = []
+        cb = lambda: calls.append(1)
+        on_theme_change(cb)
+        try:
+            set_colorblind(True)
+            self.assertEqual(len(calls), 1)
+            # 같은 값 설정 시 알림 없음
+            set_colorblind(True)
+            self.assertEqual(len(calls), 1)
+        finally:
+            off_theme_change(cb)
+            set_colorblind(False)
+
+    def test_save_and_load_preferences(self):
+        from theme import (set_theme, set_colorblind, save_preferences,
+                           load_preferences, get_theme, is_colorblind)
+        set_theme("light")
+        set_colorblind(True)
+        save_preferences()
+        # 상태 변경 후 로드
+        set_theme("dark")
+        set_colorblind(False)
+        load_preferences()
+        self.assertEqual(get_theme(), "light")
+        self.assertTrue(is_colorblind())
+        # 정리
+        set_theme("dark")
+        set_colorblind(False)
+        save_preferences()
+
 
 # ── Report 추가 테스트 ──────────────────────────────────────
 

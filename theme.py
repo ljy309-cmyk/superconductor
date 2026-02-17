@@ -307,6 +307,7 @@ class PG_CB_LIGHT:
 # ── 테마 & 색맹 모드 토글 ─────────────────────────────
 _current_theme = "dark"
 _colorblind = False
+_listeners: list = []  # 테마 변경 콜백 목록
 
 # 테마 조합 매핑
 _TK_THEMES = {
@@ -324,6 +325,37 @@ _PG_THEMES = {
 }
 
 
+def _notify_listeners():
+    """등록된 모든 콜백에 테마 변경을 알린다."""
+    for cb in _listeners:
+        try:
+            cb()
+        except Exception:
+            pass  # 리스너 오류가 테마 변경을 차단하지 않도록
+
+
+def on_theme_change(callback):
+    """테마 변경 시 호출될 콜백 등록.
+
+    콜백은 인자 없이 호출됩니다. get_pg_theme()/get_tk_theme()으로
+    새 테마를 조회하세요.
+
+    사용법:
+        from theme import on_theme_change
+        on_theme_change(my_module._load_theme_colors)
+    """
+    if callback not in _listeners:
+        _listeners.append(callback)
+
+
+def off_theme_change(callback):
+    """등록된 테마 변경 콜백 제거."""
+    try:
+        _listeners.remove(callback)
+    except ValueError:
+        pass
+
+
 def get_theme() -> str:
     """현재 테마 반환."""
     return _current_theme
@@ -332,13 +364,17 @@ def get_theme() -> str:
 def set_theme(theme: str):
     """테마 설정 ('dark' 또는 'light')."""
     global _current_theme
+    if theme == _current_theme:
+        return
     _current_theme = theme
+    _notify_listeners()
 
 
 def toggle_theme() -> str:
     """다크/라이트 토글. 새 테마 이름 반환."""
     global _current_theme
     _current_theme = "light" if _current_theme == "dark" else "dark"
+    _notify_listeners()
     return _current_theme
 
 
@@ -350,13 +386,17 @@ def is_colorblind() -> bool:
 def set_colorblind(enabled: bool):
     """색맹 친화 모드 설정."""
     global _colorblind
+    if enabled == _colorblind:
+        return
     _colorblind = enabled
+    _notify_listeners()
 
 
 def toggle_colorblind() -> bool:
     """색맹 친화 모드 토글. 새 상태 반환."""
     global _colorblind
     _colorblind = not _colorblind
+    _notify_listeners()
     return _colorblind
 
 
@@ -368,3 +408,39 @@ def get_tk_theme():
 def get_pg_theme():
     """현재 Pygame 테마 클래스 반환 (테마 + 색맹 모드 고려)."""
     return _PG_THEMES[(_current_theme, _colorblind)]
+
+
+def save_preferences():
+    """현재 테마/색맹 설정을 config.json에 저장."""
+    import json
+    import os
+    cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        cfg = {}
+    cfg["theme"] = _current_theme
+    cfg["colorblind_mode"] = _colorblind
+    try:
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except OSError:
+        pass
+
+
+def load_preferences():
+    """config.json에서 테마/색맹 설정을 로드 (알림 없이)."""
+    import json
+    import os
+    global _current_theme, _colorblind
+    cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        if cfg.get("theme") in ("dark", "light"):
+            _current_theme = cfg["theme"]
+        if isinstance(cfg.get("colorblind_mode"), bool):
+            _colorblind = cfg["colorblind_mode"]
+    except (OSError, json.JSONDecodeError):
+        pass
