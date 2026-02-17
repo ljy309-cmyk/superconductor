@@ -27,6 +27,16 @@ PLAY_LOG_XLSX = os.path.join(LOG_DIR, "play_history.xlsx")
 PLAY_LOG_CSV = os.path.join(LOG_DIR, "play_history.csv")
 PLAY_LOG_JSON = os.path.join(LOG_DIR, "play_history.json")
 
+# CSV 인젝션 위험 선행 문자 (스프레드시트 수식으로 해석될 수 있음)
+_CSV_DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r", "\n")
+
+
+def _sanitize_csv_value(value):
+    """CSV 인젝션 방지: 위험한 선행 문자가 있는 문자열 앞에 작은따옴표 추가."""
+    if isinstance(value, str) and value and value[0] in _CSV_DANGEROUS_PREFIXES:
+        return "'" + value
+    return value
+
 
 class PlayLogger:
     """게임 플레이 데이터 누적 기록 및 엑셀 추출 (스레드 안전)."""
@@ -130,17 +140,19 @@ class PlayLogger:
                 if k not in all_fields:
                     all_fields.append(k)
 
+            safe_record = {k: _sanitize_csv_value(v) for k, v in record.items()}
+
             if not file_exists or os.path.getsize(PLAY_LOG_CSV) == 0:
                 # 새 파일: 헤더 + 레코드
                 with open(PLAY_LOG_CSV, "w", newline="", encoding="utf-8") as f:
                     writer = csv.DictWriter(f, fieldnames=all_fields, extrasaction="ignore")
                     writer.writeheader()
-                    writer.writerow(record)
+                    writer.writerow(safe_record)
             else:
                 # 기존 파일: 레코드만 추가
                 with open(PLAY_LOG_CSV, "a", newline="", encoding="utf-8") as f:
                     writer = csv.DictWriter(f, fieldnames=all_fields, extrasaction="ignore")
-                    writer.writerow(record)
+                    writer.writerow(safe_record)
         except OSError as e:
             _log.error("CSV 증분 저장 실패: %s", e)
 
@@ -157,9 +169,16 @@ class PlayLogger:
             other_cols = [c for c in df.columns if c not in priority]
             df = df[priority + other_cols]
 
+            # CSV 인젝션 방지: 문자열 컬럼 살균화
+            safe_df = df.copy()
+            for col in safe_df.select_dtypes(include=["object"]).columns:
+                safe_df[col] = safe_df[col].map(
+                    lambda v: _sanitize_csv_value(v) if isinstance(v, str) else v
+                )
+
             try:
                 df.to_excel(PLAY_LOG_XLSX, index=False)
-                df.to_csv(PLAY_LOG_CSV, index=False)
+                safe_df.to_csv(PLAY_LOG_CSV, index=False)
                 _log.info("기록 내보내기 완료: %d건", len(df))
             except OSError as e:
                 _log.error("내보내기 실패: %s", e)
