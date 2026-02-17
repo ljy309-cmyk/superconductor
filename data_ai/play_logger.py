@@ -60,6 +60,9 @@ class PlayLogger:
         "phase_transition": [
             "material", "last_temp", "noise", "tc",
         ],
+        "phase_transition_sim": [
+            "play_time", "final_temp",
+        ],
     }
 
     def __init__(self):
@@ -85,6 +88,10 @@ class PlayLogger:
             module_name: 모듈 이름 (예: "qubit_chain", "bb84_defense")
             data: 기록할 데이터 딕셔너리
         """
+        if module_name not in self.FIELDS:
+            _log.warning("알 수 없는 모듈명: %r (허용: %s)",
+                         module_name, ", ".join(sorted(self.FIELDS)))
+
         record = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "module": module_name,
