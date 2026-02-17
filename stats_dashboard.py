@@ -6,6 +6,7 @@
 """
 
 import tkinter as tk
+from tkinter import messagebox
 
 from theme import TK, FONTS, get_tk_theme
 from i18n import t
@@ -94,6 +95,16 @@ class StatsDashboard(tk.Toplevel):
 
         tk.Button(
             ctrl_frame, text=t("stats_refresh"), command=self._load_data,
+            font=FONTS.BUTTON, width=12,
+        ).pack(side="left", padx=4)
+
+        tk.Button(
+            ctrl_frame, text=t("stats_export_csv"), command=self._export_csv,
+            font=FONTS.BUTTON, width=12,
+        ).pack(side="left", padx=4)
+
+        tk.Button(
+            ctrl_frame, text=t("stats_export_json"), command=self._export_json,
             font=FONTS.BUTTON, width=12,
         ).pack(side="left", padx=4)
 
@@ -241,6 +252,46 @@ class StatsDashboard(tk.Toplevel):
 
         self._ach_text.configure(state="disabled")
 
+
+    def _export_csv(self):
+        """CSV 내보내기."""
+        try:
+            from data_ai.play_logger import get_logger
+            path = get_logger().export()
+            if path:
+                messagebox.showinfo(
+                    t("stats_export_csv"),
+                    t("stats_export_done", path=path),
+                    parent=self,
+                )
+            else:
+                messagebox.showwarning(
+                    t("stats_export_csv"),
+                    t("stats_export_empty"),
+                    parent=self,
+                )
+        except Exception as e:
+            _log.error("CSV 내보내기 실패: %s", e)
+
+    def _export_json(self):
+        """JSON 내보내기."""
+        try:
+            from data_ai.play_logger import get_logger
+            path = get_logger().export_json()
+            if path:
+                messagebox.showinfo(
+                    t("stats_export_json"),
+                    t("stats_export_done", path=path),
+                    parent=self,
+                )
+            else:
+                messagebox.showwarning(
+                    t("stats_export_json"),
+                    t("stats_export_empty"),
+                    parent=self,
+                )
+        except Exception as e:
+            _log.error("JSON 내보내기 실패: %s", e)
 
     def _toggle_auto_refresh(self):
         """자동 새로고침 ON/OFF."""

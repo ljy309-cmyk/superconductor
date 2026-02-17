@@ -11,6 +11,7 @@
 """
 
 import csv
+import json
 import os
 import threading
 from datetime import datetime
@@ -24,6 +25,7 @@ _log = get_module_logger("play_logger")
 LOG_DIR = os.path.dirname(__file__)
 PLAY_LOG_XLSX = os.path.join(LOG_DIR, "play_history.xlsx")
 PLAY_LOG_CSV = os.path.join(LOG_DIR, "play_history.csv")
+PLAY_LOG_JSON = os.path.join(LOG_DIR, "play_history.json")
 
 
 class PlayLogger:
@@ -164,6 +166,19 @@ class PlayLogger:
 
         return PLAY_LOG_XLSX
 
+    def export_json(self) -> str:
+        """누적 기록을 JSON으로 저장."""
+        with self._lock:
+            if not self.records:
+                return ""
+            try:
+                with open(PLAY_LOG_JSON, "w", encoding="utf-8") as f:
+                    json.dump(self.records, f, ensure_ascii=False, indent=2)
+                _log.info("JSON 내보내기 완료: %d건", len(self.records))
+            except OSError as e:
+                _log.error("JSON 내보내기 실패: %s", e)
+        return PLAY_LOG_JSON
+
     def get_summary(self) -> dict:
         """모듈별 플레이 통계 요약."""
         with self._lock:
@@ -199,7 +214,7 @@ class PlayLogger:
         """기록 초기화."""
         with self._lock:
             self.records.clear()
-            for path in (PLAY_LOG_XLSX, PLAY_LOG_CSV):
+            for path in (PLAY_LOG_XLSX, PLAY_LOG_CSV, PLAY_LOG_JSON):
                 if os.path.exists(path):
                     os.remove(path)
         _log.info("기록 초기화 완료")
