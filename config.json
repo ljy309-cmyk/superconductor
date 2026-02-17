@@ -42,7 +42,7 @@
     "ring_radius": 150
   },
   "tunneling": {
-    "tunnel_prob_base": 0.10,
+    "tunnel_prob_base": 0.1,
     "particle_speed": 200.0,
     "barrier_width_default": 12,
     "barrier_width_min": 4,
@@ -95,38 +95,97 @@
   },
   "presets": {
     "easy": {
-      "qubit_chain": {"noise_rate_base": 1.5, "cascade_damage": 10.0, "qec_reduction": 0.1, "heal_amount": 30.0},
-      "tunneling": {"tunnel_prob_base": 0.25, "barrier_width_default": 8},
-      "bb84": {"eve_chance": 0.10, "send_interval": 2.0, "decoy_chance": 0.25},
-      "qec_shield": {"noise_rate": 2.5, "cascade_damage": 8.0, "qec_reduction_default": 0.3},
-      "squid_mines": {"num_mines": 5, "sensitivity_default": 5.0}
+      "qubit_chain": {
+        "noise_rate_base": 1.5,
+        "cascade_damage": 10.0,
+        "qec_reduction": 0.1,
+        "heal_amount": 30.0
+      },
+      "tunneling": {
+        "tunnel_prob_base": 0.25,
+        "barrier_width_default": 8
+      },
+      "bb84": {
+        "eve_chance": 0.1,
+        "send_interval": 2.0,
+        "decoy_chance": 0.25
+      },
+      "qec_shield": {
+        "noise_rate": 2.5,
+        "cascade_damage": 8.0,
+        "qec_reduction_default": 0.3
+      },
+      "squid_mines": {
+        "num_mines": 5,
+        "sensitivity_default": 5.0
+      }
     },
     "normal": {
-      "qubit_chain": {"noise_rate_base": 3.0, "cascade_damage": 20.0, "qec_reduction": 0.2, "heal_amount": 20.0},
-      "tunneling": {"tunnel_prob_base": 0.10, "barrier_width_default": 12},
-      "bb84": {"eve_chance": 0.25, "send_interval": 1.2, "decoy_chance": 0.15},
-      "qec_shield": {"noise_rate": 5.0, "cascade_damage": 15.0, "qec_reduction_default": 0.5},
-      "squid_mines": {"num_mines": 8, "sensitivity_default": 3.0}
+      "qubit_chain": {
+        "noise_rate_base": 3.0,
+        "cascade_damage": 20.0,
+        "qec_reduction": 0.2,
+        "heal_amount": 20.0
+      },
+      "tunneling": {
+        "tunnel_prob_base": 0.1,
+        "barrier_width_default": 12
+      },
+      "bb84": {
+        "eve_chance": 0.25,
+        "send_interval": 1.2,
+        "decoy_chance": 0.15
+      },
+      "qec_shield": {
+        "noise_rate": 5.0,
+        "cascade_damage": 15.0,
+        "qec_reduction_default": 0.5
+      },
+      "squid_mines": {
+        "num_mines": 8,
+        "sensitivity_default": 3.0
+      }
     },
     "hard": {
-      "qubit_chain": {"noise_rate_base": 6.0, "cascade_damage": 35.0, "qec_reduction": 0.5, "heal_amount": 10.0},
-      "tunneling": {"tunnel_prob_base": 0.03, "barrier_width_default": 40},
-      "bb84": {"eve_chance": 0.50, "send_interval": 0.6, "decoy_chance": 0.05},
-      "qec_shield": {"noise_rate": 10.0, "cascade_damage": 25.0, "qec_reduction_default": 0.8},
-      "squid_mines": {"num_mines": 14, "sensitivity_default": 1.5}
+      "qubit_chain": {
+        "noise_rate_base": 6.0,
+        "cascade_damage": 35.0,
+        "qec_reduction": 0.5,
+        "heal_amount": 10.0
+      },
+      "tunneling": {
+        "tunnel_prob_base": 0.03,
+        "barrier_width_default": 40
+      },
+      "bb84": {
+        "eve_chance": 0.5,
+        "send_interval": 0.6,
+        "decoy_chance": 0.05
+      },
+      "qec_shield": {
+        "noise_rate": 10.0,
+        "cascade_damage": 25.0,
+        "qec_reduction_default": 0.8
+      },
+      "squid_mines": {
+        "num_mines": 14,
+        "sensitivity_default": 1.5
+      }
     }
   },
   "bb84": {
     "send_interval": 1.2,
     "eve_chance": 0.25,
-    "eve_error_inject": 0.50,
+    "eve_error_inject": 0.5,
     "error_threshold": 0.25,
     "history_window": 20,
     "auto_block_threshold": 0.15,
     "auto_block_score": 50,
     "manual_block_score": 100,
-    "warning_threshold": 0.10,
+    "warning_threshold": 0.1,
     "decoy_chance": 0.15,
     "decoy_error_mult": 2.0
-  }
+  },
+  "theme": "dark",
+  "colorblind_mode": false
 }
