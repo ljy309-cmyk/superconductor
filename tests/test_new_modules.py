@@ -159,6 +159,43 @@ class TestReplay(unittest.TestCase):
             rec.record_frame({"i": i})
         self.assertLessEqual(rec.frame_count, 130)
 
+    def test_save_includes_format_version(self):
+        from replay import ReplayRecorder, REPLAY_FORMAT_VERSION
+        rec = ReplayRecorder("test_module")
+        rec.record_frame({"x": 1})
+        path = rec.save()
+
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual(data["format_version"], REPLAY_FORMAT_VERSION)
+
+    def test_load_legacy_no_version(self):
+        """format_version이 없는 레거시 파일도 로드 가능."""
+        from replay import ReplayPlayer
+        legacy = {"metadata": {"module": "test"}, "frames": [{"a": 1}]}
+        path = os.path.join(self._tmpdir, "legacy.json")
+        with open(path, "w") as f:
+            json.dump(legacy, f)
+
+        player = ReplayPlayer()
+        self.assertTrue(player.load(path))
+        self.assertEqual(player.format_version, 1)  # 마이그레이션 후 현재 버전
+        self.assertEqual(player.total_frames, 1)
+
+    def test_load_future_version_still_works(self):
+        """미래 버전 파일도 경고 후 로드 가능."""
+        from replay import ReplayPlayer
+        future = {"format_version": 999, "metadata": {"module": "test"},
+                  "frames": [{"b": 2}]}
+        path = os.path.join(self._tmpdir, "future.json")
+        with open(path, "w") as f:
+            json.dump(future, f)
+
+        player = ReplayPlayer()
+        self.assertTrue(player.load(path))
+        self.assertEqual(player.format_version, 999)
+        self.assertEqual(player.total_frames, 1)
+
 
 # ── Theme Toggle 테스트 ─────────────────────────────────────
 

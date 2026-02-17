@@ -11,7 +11,7 @@ from tkinter import ttk, filedialog
 
 from theme import TK, FONTS
 from i18n import t
-from replay import list_replays, REPLAY_DIR
+from replay import list_replays, REPLAY_DIR, REPLAY_FORMAT_VERSION
 from logger import get_module_logger
 
 _log = get_module_logger("replay_viewer")
@@ -208,19 +208,27 @@ class ReplayViewer(tk.Toplevel):
             self._meta_label.config(text=t("replay_load_error", error=e))
             return
 
+        # 포맷 버전 검사
+        file_ver = self._data.get("format_version", 0)
+        if file_ver > REPLAY_FORMAT_VERSION:
+            from tkinter import messagebox
+            messagebox.showwarning(
+                t("replay_title"),
+                t("replay_version_warning", file_ver=file_ver, cur_ver=REPLAY_FORMAT_VERSION),
+                parent=self,
+            )
+
         self._frames = self._data.get("frames", [])
         meta = self._data.get("metadata", {})
         total = len(self._frames)
 
-        # 메타데이터 표시
+        # 메타데이터 표시 (버전 포함)
+        ver_str = f"v{file_ver}" if file_ver else "legacy"
         meta_lines = [t("replay_module", name=meta.get('module', '?')),
-                      t("replay_start_time", time=meta.get('start_time', '?')),
-                      t("replay_end_time", time=meta.get('end_time', '?')),
-                      t("replay_total_frames", count=total)]
-        for k, v in meta.items():
-            if k not in ("module", "start_time", "end_time", "total_frames"):
-                meta_lines.append(f"{k}: {v}")
-        self._meta_label.config(text="  |  ".join(meta_lines[:4]))
+                      f"Format: {ver_str}",
+                      t("replay_total_frames", count=total),
+                      t("replay_start_time", time=meta.get('start_time', '?'))]
+        self._meta_label.config(text="  |  ".join(meta_lines))
 
         # 슬라이더 범위 업데이트
         self._slider.config(to=max(0, total - 1))
