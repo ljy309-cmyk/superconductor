@@ -208,7 +208,8 @@ class SQUIDGame:
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
-def _draw_grid(screen, game: SQUIDGame, hover_cell, font):
+def _draw_grid(screen, game: SQUIDGame, hover_cell, font,
+               kb_cell=None):
     """그리드 렌더링."""
     for r in range(GRID_ROWS):
         for c in range(GRID_COLS):
@@ -241,6 +242,10 @@ def _draw_grid(screen, game: SQUIDGame, hover_cell, font):
             elif pos in game.wrong:
                 x_mark = font.render("X", True, WHITE)
                 screen.blit(x_mark, (rect.centerx - x_mark.get_width() // 2, rect.centery - x_mark.get_height() // 2))
+
+            # 키보드 커서 테두리
+            if kb_cell == pos:
+                pygame.draw.rect(screen, ACCENT, rect, 3)
 
 
 def _draw_sensor_glow(screen, mx: int, my: int, intensity: float, t: float):
@@ -335,6 +340,10 @@ def run_simulation():
     beep_timer = 0.0                        # 미션1: 비프 간격 타이머
     sound_enabled = True                    # 미션1: 사운드 ON/OFF
 
+    # ── 키보드 커서 (접근성) ──
+    kb_col, kb_row = 0, 0   # 현재 키보드 커서 위치
+    kb_active = False        # 키보드 커서 표시 여부
+
     # ── 슬라이더 패널 ─────────────────────────────────
     panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
     sl_sens = panel.add(SENSITIVITY_MIN, SENSITIVITY_MAX, SENSITIVITY_DEFAULT, 0.5, "Sensitivity", ".1f")
@@ -375,6 +384,31 @@ def run_simulation():
                 elif event.key == pygame.K_m:
                     # 미션1: 사운드 토글
                     sound_enabled = not sound_enabled
+                # ── 키보드 그리드 탐색 (WASD) ──
+                elif event.key == pygame.K_w:
+                    kb_active = True
+                    kb_row = max(0, kb_row - 1)
+                elif event.key == pygame.K_s:
+                    kb_active = True
+                    kb_row = min(GRID_ROWS - 1, kb_row + 1)
+                elif event.key == pygame.K_a:
+                    kb_active = True
+                    kb_col = max(0, kb_col - 1)
+                elif event.key == pygame.K_d:
+                    kb_active = True
+                    kb_col = min(GRID_COLS - 1, kb_col + 1)
+                elif event.key == pygame.K_RETURN:
+                    # 키보드: 현재 커서 위치 마킹
+                    if kb_active:
+                        prev_marked = len(game.marked)
+                        prev_wrong = len(game.wrong)
+                        game.mark_cell(kb_col, kb_row)
+                        if len(game.marked) > prev_marked:
+                            snd.play("mine_found")
+                            if game.won:
+                                snd.play("victory")
+                        elif len(game.wrong) > prev_wrong:
+                            snd.play("wrong_mark")
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 cell = game.get_hover_cell(mx, my)
                 if cell:
@@ -420,7 +454,8 @@ def run_simulation():
         _draw_status(screen, game, font, big_font)
 
         # 그리드
-        _draw_grid(screen, game, hover_cell, font)
+        kb_cell = (kb_col, kb_row) if kb_active else None
+        _draw_grid(screen, game, hover_cell, font, kb_cell=kb_cell)
 
         # 센서 글로우 (그리드 영역 위에서만)
         if GRID_OY <= my <= GRID_OY + GRID_ROWS * CELL_SIZE:
@@ -435,8 +470,8 @@ def run_simulation():
         # 안내
         hints = [
             f"민감도: x{sensitivity:.1f}  |  사운드: {'ON' if sound_enabled else 'OFF'}  |  근접: {nearby_count}개",
-            "마우스: SQUID 센서  |  클릭: 마킹  |  ↑↓/슬라이더: 민감도",
-            "M: 사운드  |  R: 리셋  |  ESC: 종료",
+            "마우스: SQUID 센서  |  클릭/Enter: 마킹  |  WASD: 커서 이동",
+            "↑↓: 민감도  |  M: 사운드  |  R: 리셋  |  ESC: 종료",
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)

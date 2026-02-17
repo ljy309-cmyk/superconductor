@@ -94,6 +94,9 @@ def run_simulation():
     t = 0.0
     start_time = time.time()
 
+    # ── 키보드 자석 이동 속도 (px/s) ──
+    KB_MAGNET_SPEED = 300
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -126,6 +129,21 @@ def run_simulation():
 
         if dragging:
             magnet_x, magnet_y = pygame.mouse.get_pos()
+
+        # ── 키보드 자석 이동 (화살표키) ──
+        keys = pygame.key.get_pressed()
+        if not dragging:
+            if keys[pygame.K_LEFT]:
+                magnet_x -= KB_MAGNET_SPEED * dt
+            if keys[pygame.K_RIGHT]:
+                magnet_x += KB_MAGNET_SPEED * dt
+            if keys[pygame.K_UP]:
+                magnet_y -= KB_MAGNET_SPEED * dt
+            if keys[pygame.K_DOWN]:
+                magnet_y += KB_MAGNET_SPEED * dt
+            # 화면 경계 제한
+            magnet_x = max(MAGNET_W / 2, min(WIDTH - MAGNET_W / 2, magnet_x))
+            magnet_y = max(MAGNET_H / 2, min(HEIGHT - MAGNET_H / 2, magnet_y))
 
         # ── 물리 연산 ────────────────────────────────
         if superconducting:
@@ -194,7 +212,7 @@ def run_simulation():
         state_label = "FALLEN" if not superconducting else (
             "FLIPPED" if flipped else "LEVITATING")
         hints = [
-            "Drag: Move magnet  |  F: Flip  |  SPACE: SC ON/OFF",
+            "Drag/Arrow: Move magnet  |  F: Flip  |  SPACE: SC ON/OFF",
             f"State: {state_label}  |  ESC: Exit",
         ]
         for i, hint in enumerate(hints):

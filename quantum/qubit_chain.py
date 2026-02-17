@@ -188,7 +188,7 @@ def _draw_link(screen, a: QubitNode, b: QubitNode):
 
 
 def _draw_node(screen, node: QubitNode, t: float, font: pygame.font.Font,
-               shield_active: bool = False):
+               shield_active: bool = False, focused: bool = False):
     """큐비트 노드 렌더링."""
     color = STATE_COLORS[node.state]
     cx, cy = int(node.x), int(node.y)
@@ -217,6 +217,11 @@ def _draw_node(screen, node: QubitNode, t: float, font: pygame.font.Font,
     # 본체 원
     pygame.draw.circle(screen, color, (cx, cy), NODE_RADIUS)
     pygame.draw.circle(screen, TEXT_CLR, (cx, cy), NODE_RADIUS, 2)
+
+    # 키보드 포커스 링
+    if focused:
+        ring_r = NODE_RADIUS + 5
+        pygame.draw.circle(screen, ACCENT, (cx, cy), ring_r, 3)
 
     # 하중 텍스트
     pct_text = "X" if node.collapsed else f"{int(node.stress)}%"
@@ -306,6 +311,9 @@ def run_simulation():
     game_over = False
     _ach_checked_milestones: set[int] = set()  # 실시간 업적 체크용 (30, 60초 등)
 
+    # ── 키보드 포커스 (접근성) ──
+    kb_focus = -1  # -1 = 포커스 없음, 0~N = 노드 인덱스
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -372,6 +380,17 @@ def run_simulation():
                         target = random.choice(alive)
                         target.apply_noise(40.0)
                         cascade_log.append(f"Q{target.qid} +40 noise!")
+                elif event.key == pygame.K_TAB:
+                    # 키보드: 큐비트 포커스 순환 (Tab)
+                    kb_focus = (kb_focus + 1) % len(nodes)
+                elif event.key == pygame.K_RETURN:
+                    # 키보드: 포커스된 큐비트 오류 정정 (Enter)
+                    if 0 <= kb_focus < len(nodes):
+                        n = nodes[kb_focus]
+                        if not n.collapsed:
+                            n.stress = 0.0
+                            snd.play("error_correct")
+                            cascade_log.append(f"Q{n.qid} 오류 정정! (stress → 0)")
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 for n in nodes:
@@ -475,8 +494,8 @@ def run_simulation():
                     drawn_pairs.add(pair)
 
         # 큐비트 노드
-        for n in nodes:
-            _draw_node(screen, n, t, font, shield_active)
+        for i, n in enumerate(nodes):
+            _draw_node(screen, n, t, font, shield_active, focused=(i == kb_focus))
 
         # 하중 바 패널
         panel_x, panel_y = 15, 50
@@ -526,7 +545,7 @@ def run_simulation():
         # 조작 안내
         hints = [
             f"노이즈: {noise_rate:.1f}%/s  |  연쇄: +{int(cascade_damage)}  |  {'SHIELD' if shield_active else ''}  |  {'일시정지' if paused else '실행 중'}",
-            "클릭: 오류 정정  |  N: 노이즈  |  S: 방어막  |  H: 힐링",
+            "클릭/Enter: 오류 정정  |  Tab: 큐비트 선택  |  N: 노이즈  |  S: 방어막  |  H: 힐링",
             "↑↓/←→: 파라미터 조절  |  우측 패널: 슬라이더  |  SPACE: 일시정지",
             "R: 전체 리셋  |  ESC: 종료",
         ]
