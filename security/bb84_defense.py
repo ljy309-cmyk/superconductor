@@ -13,7 +13,7 @@ import pygame
 
 from config_loader import cfg
 from i18n import t, toggle_locale
-from theme import get_pg_theme, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -54,27 +54,20 @@ CHANNEL_CLR = (69, 71, 90)
 PANEL_BG = (24, 24, 37)
 
 
+_COLOR_MAP = {
+    "BG": "BG", "TEXT_CLR": "TEXT",
+    "ALICE_CLR": "ALICE", "BOB_CLR": "BOB", "EVE_CLR": "EVE",
+    "QUBIT_CLR": "QUBIT", "DECOY_CLR": "DECOY",
+    "SAFE_CLR": "GREEN", "DANGER_CLR": "RED",
+    "CHANNEL_CLR": "OVERLAY", "PANEL_BG": "PANEL_BG",
+    "SUBTEXT_CLR": "SUBTEXT", "WARN_CLR": "ACCENT_YELLOW",
+    "WHITE": "WHITE", "ACCENT": "ACCENT_YELLOW",
+}
+
+
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, ALICE_CLR, BOB_CLR, EVE_CLR, QUBIT_CLR
-    global DECOY_CLR, SAFE_CLR, DANGER_CLR, CHANNEL_CLR, PANEL_BG
-    global SUBTEXT_CLR, WARN_CLR, WHITE, ACCENT
-    pg = get_pg_theme()
-    BG = pg.BG
-    TEXT_CLR = pg.TEXT
-    ALICE_CLR = pg.ALICE
-    BOB_CLR = pg.BOB
-    EVE_CLR = pg.EVE
-    QUBIT_CLR = pg.QUBIT
-    DECOY_CLR = pg.DECOY
-    SAFE_CLR = pg.GREEN
-    DANGER_CLR = pg.RED
-    CHANNEL_CLR = pg.OVERLAY
-    PANEL_BG = pg.PANEL_BG
-    SUBTEXT_CLR = pg.SUBTEXT
-    WARN_CLR = pg.ACCENT_YELLOW
-    WHITE = pg.WHITE
-    ACCENT = pg.ACCENT_YELLOW
+    load_pg_colors(_COLOR_MAP, globals())
 
 # ── 레이아웃 ─────────────────────────────────────────
 ALICE_X, ALICE_Y = 100, 250

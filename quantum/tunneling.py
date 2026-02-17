@@ -11,7 +11,7 @@ import pygame
 
 from config_loader import cfg
 from i18n import t, toggle_locale
-from theme import get_pg_theme, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -39,22 +39,18 @@ REFLECT_CLR = (243, 139, 168)   # 반사
 BLOCH_RING = (88, 91, 112)
 
 
+_COLOR_MAP = {
+    "BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_PURPLE",
+    "BARRIER_CLR": "ACCENT_YELLOW", "PARTICLE_CLR": "ACCENT_BLUE",
+    "TUNNEL_FLASH": "GREEN", "REFLECT_CLR": "RED",
+    "BLOCH_RING": "SUBTEXT", "SURFACE_CLR": "SURFACE",
+    "OVERLAY_CLR": "OVERLAY", "WHITE": "WHITE",
+}
+
+
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, ACCENT, BARRIER_CLR, PARTICLE_CLR
-    global TUNNEL_FLASH, REFLECT_CLR, BLOCH_RING, SURFACE_CLR, OVERLAY_CLR, WHITE
-    pg = get_pg_theme()
-    BG = pg.BG
-    TEXT_CLR = pg.TEXT
-    ACCENT = pg.ACCENT_PURPLE
-    BARRIER_CLR = pg.ACCENT_YELLOW
-    PARTICLE_CLR = pg.ACCENT_BLUE
-    TUNNEL_FLASH = pg.GREEN       # 성공 = safe color
-    REFLECT_CLR = pg.RED          # 실패 = danger color
-    BLOCH_RING = pg.SUBTEXT
-    SURFACE_CLR = pg.SURFACE
-    OVERLAY_CLR = pg.OVERLAY
-    WHITE = pg.WHITE
+    load_pg_colors(_COLOR_MAP, globals())
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 TUNNEL_PROB_BASE = cfg("tunneling", "tunnel_prob_base", 0.10)

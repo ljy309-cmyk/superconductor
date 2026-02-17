@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import pygame
 
 from config_loader import cfg
-from theme import get_pg_theme, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -50,22 +50,17 @@ GRAPH_PEAK = (243, 139, 168)    # 피크 (빨강)
 SENSOR_CLR = (116, 199, 236)    # 센서 커서 글로우
 
 
+_COLOR_MAP = {
+    "BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_BLUE",
+    "GRID_CLR": "OVERLAY", "CELL_MARKED": "GREEN", "CELL_WRONG": "RED",
+    "GRAPH_BG": "PANEL_BG", "GRAPH_LINE": "ACCENT_PURPLE", "GRAPH_PEAK": "RED",
+    "SENSOR_CLR": "SENSOR_CLR", "WHITE": "WHITE",
+}
+
+
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, ACCENT, GRID_CLR, CELL_MARKED, CELL_WRONG
-    global GRAPH_BG, GRAPH_LINE, GRAPH_PEAK, SENSOR_CLR, WHITE
-    pg = get_pg_theme()
-    BG = pg.BG
-    TEXT_CLR = pg.TEXT
-    ACCENT = pg.ACCENT_BLUE
-    GRID_CLR = pg.OVERLAY
-    CELL_MARKED = pg.GREEN
-    CELL_WRONG = pg.RED
-    GRAPH_BG = pg.PANEL_BG
-    GRAPH_LINE = pg.ACCENT_PURPLE
-    GRAPH_PEAK = pg.RED
-    SENSOR_CLR = pg.SENSOR_CLR
-    WHITE = pg.WHITE
+    load_pg_colors(_COLOR_MAP, globals())
 
 # ── 그리드 설정 (config.json에서 로드) ────────────────
 GRID_COLS = cfg("squid_mines", "grid_cols", 10)

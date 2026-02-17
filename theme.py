@@ -522,6 +522,37 @@ def get_pg_theme():
     return _PG_THEMES[(_current_theme, _colorblind)]
 
 
+def load_pg_colors(mapping: dict[str, str], target_globals: dict) -> None:
+    """Pygame 모듈의 테마 색상을 일괄 갱신하는 공통 헬퍼.
+
+    각 모듈에서 반복되던 _load_theme_colors() 패턴을 대체합니다.
+
+    Args:
+        mapping: {모듈_글로벌_변수명: PG테마_속성명} 딕셔너리.
+                 예: {"BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_BLUE"}
+        target_globals: 호출 모듈의 globals() 딕셔너리.
+
+    사용법::
+
+        from theme import load_pg_colors, on_theme_change, off_theme_change
+
+        _COLOR_MAP = {"BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_BLUE"}
+
+        def _refresh_colors():
+            load_pg_colors(_COLOR_MAP, globals())
+
+        # 시뮬레이션 시작 시:
+        _refresh_colors()
+        on_theme_change(_refresh_colors)
+
+        # 시뮬레이션 종료 시:
+        off_theme_change(_refresh_colors)
+    """
+    pg = get_pg_theme()
+    for global_name, attr_name in mapping.items():
+        target_globals[global_name] = getattr(pg, attr_name)
+
+
 def save_preferences():
     """현재 테마/색맹 설정을 config.json에 저장."""
     import json

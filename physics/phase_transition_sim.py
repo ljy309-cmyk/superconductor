@@ -19,7 +19,7 @@ import time
 import pygame
 
 from config_loader import cfg
-from theme import get_pg_theme, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change, off_theme_change
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from replay import ReplayRecorder
@@ -53,20 +53,17 @@ COOPER_CLR = (137, 180, 250)    # 쿠퍼쌍 연결
 RESISTANCE_CLR = (243, 139, 168)
 
 
+_COLOR_MAP = {
+    "BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_BLUE",
+    "ATOM_NORMAL": "TEXT", "ATOM_SC": "GREEN",
+    "COOPER_CLR": "ACCENT_BLUE", "RESISTANCE_CLR": "RED",
+    "OVERLAY_CLR": "OVERLAY", "SUBTEXT_CLR": "SUBTEXT",
+}
+
+
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, ACCENT, ATOM_NORMAL, ATOM_SC, COOPER_CLR, RESISTANCE_CLR
-    global OVERLAY_CLR, SUBTEXT_CLR
-    pg = get_pg_theme()
-    BG = pg.BG
-    TEXT_CLR = pg.TEXT
-    ACCENT = pg.ACCENT_BLUE
-    ATOM_NORMAL = pg.TEXT
-    ATOM_SC = pg.GREEN            # 초전도 = safe color
-    COOPER_CLR = pg.ACCENT_BLUE
-    RESISTANCE_CLR = pg.RED       # 저항 = danger color
-    OVERLAY_CLR = pg.OVERLAY
-    SUBTEXT_CLR = pg.SUBTEXT
+    load_pg_colors(_COLOR_MAP, globals())
 
 
 class Atom:

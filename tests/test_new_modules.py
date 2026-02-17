@@ -321,6 +321,59 @@ class TestThemeToggle(unittest.TestCase):
         set_theme("dark")
 
 
+# ── load_pg_colors 공통 헬퍼 테스트 ──────────────────────────
+
+class TestLoadPgColors(unittest.TestCase):
+
+    def test_loads_colors_into_target_dict(self):
+        from theme import load_pg_colors, set_theme, set_colorblind
+        set_theme("dark")
+        set_colorblind(False)
+        target = {}
+        mapping = {"MY_BG": "BG", "MY_TEXT": "TEXT", "MY_GREEN": "GREEN"}
+        load_pg_colors(mapping, target)
+        self.assertIsInstance(target["MY_BG"], tuple)
+        self.assertEqual(len(target["MY_BG"]), 3)
+        self.assertIn("MY_TEXT", target)
+        self.assertIn("MY_GREEN", target)
+
+    def test_reflects_theme_change(self):
+        from theme import load_pg_colors, set_theme, set_colorblind, PG, PG_LIGHT
+        set_colorblind(False)
+        target = {}
+        mapping = {"BG": "BG"}
+        set_theme("dark")
+        load_pg_colors(mapping, target)
+        dark_bg = target["BG"]
+        set_theme("light")
+        load_pg_colors(mapping, target)
+        light_bg = target["BG"]
+        self.assertEqual(dark_bg, PG.BG)
+        self.assertEqual(light_bg, PG_LIGHT.BG)
+        self.assertNotEqual(dark_bg, light_bg)
+        set_theme("dark")
+
+    def test_reflects_colorblind_change(self):
+        from theme import load_pg_colors, set_theme, set_colorblind
+        set_theme("dark")
+        target = {}
+        mapping = {"STABLE": "STABLE"}
+        set_colorblind(False)
+        load_pg_colors(mapping, target)
+        normal = target["STABLE"]
+        set_colorblind(True)
+        load_pg_colors(mapping, target)
+        cb = target["STABLE"]
+        self.assertNotEqual(normal, cb)
+        set_colorblind(False)
+
+    def test_unknown_attr_raises(self):
+        from theme import load_pg_colors
+        target = {}
+        with self.assertRaises(AttributeError):
+            load_pg_colors({"X": "NONEXISTENT_ATTR"}, target)
+
+
 # ── Report 추가 테스트 ──────────────────────────────────────
 
 class TestReportExtended(unittest.TestCase):

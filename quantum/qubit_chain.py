@@ -15,7 +15,7 @@ import pygame
 
 from config_loader import cfg
 from i18n import t, toggle_locale
-from theme import get_pg_theme, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -54,24 +54,22 @@ STATE_COLORS = {
 }
 
 
+_COLOR_MAP = {
+    "BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_BLUE",
+    "LINK_CLR": "SUBTEXT", "LINK_ENTANGLED": "ACCENT_PURPLE",
+    "SHIELD_GLOW": "SHIELD_GLOW", "OVERLAY_CLR": "OVERLAY", "WHITE": "WHITE",
+}
+
+
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, ACCENT, LINK_CLR, LINK_ENTANGLED, STATE_COLORS
-    global SHIELD_GLOW, OVERLAY_CLR, WHITE
+    global STATE_COLORS
+    load_pg_colors(_COLOR_MAP, globals())
+    from theme import get_pg_theme
     pg = get_pg_theme()
-    BG = pg.BG
-    TEXT_CLR = pg.TEXT
-    ACCENT = pg.ACCENT_BLUE
-    LINK_CLR = pg.SUBTEXT
-    LINK_ENTANGLED = pg.ACCENT_PURPLE
-    SHIELD_GLOW = pg.SHIELD_GLOW
-    OVERLAY_CLR = pg.OVERLAY
-    WHITE = pg.WHITE
     STATE_COLORS = {
-        "stable": pg.STABLE,
-        "warning": pg.WARNING,
-        "danger": pg.DANGER,
-        "collapsed": pg.COLLAPSED,
+        "stable": pg.STABLE, "warning": pg.WARNING,
+        "danger": pg.DANGER, "collapsed": pg.COLLAPSED,
     }
 
 # ── 물리 파라미터 (config.json에서 로드, 없으면 기본값) ──

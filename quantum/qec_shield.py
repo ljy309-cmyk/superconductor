@@ -12,7 +12,7 @@ import pygame
 
 from config_loader import cfg
 from i18n import t, toggle_locale
-from theme import get_pg_theme, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -42,28 +42,21 @@ COLLAPSED_CLR = (243, 139, 168)
 PANEL_BG = (24, 24, 37)
 
 
+_COLOR_MAP = {
+    "BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_PURPLE",
+    "SHIELD_CLR": "SHIELD_CLR", "SHIELD_GLOW": "SHIELD_GLOW",
+    "STABLE_CLR": "STABLE", "WARNING_CLR": "WARNING", "COLLAPSED_CLR": "COLLAPSED",
+    "PANEL_BG": "PANEL_BG", "SUBTEXT_CLR": "SUBTEXT", "OVERLAY_CLR": "OVERLAY",
+    "WHITE": "WHITE",
+}
+
+
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, ACCENT, SHIELD_CLR, SHIELD_GLOW
-    global STABLE_CLR, WARNING_CLR, COLLAPSED_CLR, PANEL_BG
-    global SUBTEXT_CLR, OVERLAY_CLR, WHITE
-    pg = get_pg_theme()
-    BG = pg.BG
-    TEXT_CLR = pg.TEXT
-    ACCENT = pg.ACCENT_PURPLE
-    SHIELD_CLR = pg.SHIELD_CLR
-    SHIELD_GLOW = pg.SHIELD_GLOW
-    STABLE_CLR = pg.STABLE
-    WARNING_CLR = pg.WARNING
-    COLLAPSED_CLR = pg.COLLAPSED
-    PANEL_BG = pg.PANEL_BG
-    SUBTEXT_CLR = pg.SUBTEXT
-    OVERLAY_CLR = pg.OVERLAY
-    WHITE = pg.WHITE
-    # STATE_COLORS dict도 갱신
-    STATE_COLORS["stable"] = STABLE_CLR
-    STATE_COLORS["warning"] = WARNING_CLR
-    STATE_COLORS["collapsed"] = COLLAPSED_CLR
+    load_pg_colors(_COLOR_MAP, globals())
+    STATE_COLORS["stable"] = globals()["STABLE_CLR"]
+    STATE_COLORS["warning"] = globals()["WARNING_CLR"]
+    STATE_COLORS["collapsed"] = globals()["COLLAPSED_CLR"]
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 NOISE_RATE = cfg("qec_shield", "noise_rate", 5.0)

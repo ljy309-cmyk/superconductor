@@ -9,7 +9,7 @@ import pygame
 
 from config_loader import cfg
 from i18n import t, toggle_locale
-from theme import get_pg_theme, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change, off_theme_change
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
@@ -26,7 +26,8 @@ HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
 
 # ── 색상 (테마에서 동적 로드) ─────────────────────────
-_pg = get_pg_theme()
+from theme import get_pg_theme as _get_pg_theme_init
+_pg = _get_pg_theme_init()
 BG = _pg.BG
 TEXT_CLR = _pg.TEXT
 MAGNET_N = _pg.MAGNET_N
@@ -34,22 +35,20 @@ MAGNET_S = _pg.MAGNET_S
 SC_COLOR = _pg.SC_COLOR
 SC_GLOW = _pg.SC_GLOW
 FIELD_CLR = (*_pg.SUBTEXT, 60)
+del _get_pg_theme_init
+
+
+_COLOR_MAP = {
+    "BG": "BG", "TEXT_CLR": "TEXT",
+    "MAGNET_N": "MAGNET_N", "MAGNET_S": "MAGNET_S",
+    "SC_COLOR": "SC_COLOR", "SC_GLOW": "SC_GLOW",
+    "SUBTEXT_CLR": "SUBTEXT", "WHITE": "WHITE", "INACTIVE_CLR": "INACTIVE",
+}
 
 
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, MAGNET_N, MAGNET_S, SC_COLOR, SC_GLOW
-    global SUBTEXT_CLR, WHITE, INACTIVE_CLR
-    pg = get_pg_theme()
-    BG = pg.BG
-    TEXT_CLR = pg.TEXT
-    MAGNET_N = pg.MAGNET_N
-    MAGNET_S = pg.MAGNET_S
-    SC_COLOR = pg.SC_COLOR
-    SC_GLOW = pg.SC_GLOW
-    SUBTEXT_CLR = pg.SUBTEXT
-    WHITE = pg.WHITE
-    INACTIVE_CLR = pg.INACTIVE
+    load_pg_colors(_COLOR_MAP, globals())
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 EQUILIBRIUM_GAP = cfg("flux_pinning", "equilibrium_gap", 65.0)
