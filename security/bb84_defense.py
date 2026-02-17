@@ -12,12 +12,14 @@ import random
 import pygame
 
 from config_loader import cfg
-from theme import get_pg_theme
+from i18n import t, toggle_locale
+from theme import get_pg_theme, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
+from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from logger import get_module_logger
 
@@ -319,7 +321,7 @@ def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     pygame.draw.circle(screen, TEXT_CLR, (ALICE_X, ALICE_Y), 30, 2)
     label = big_font.render("Alice", True, ALICE_CLR)
     screen.blit(label, (ALICE_X - label.get_width() // 2, ALICE_Y + 38))
-    role = font.render("Sender", True, SUBTEXT_CLR)
+    role = font.render(t("bb84_sender"), True, SUBTEXT_CLR)
     screen.blit(role, (ALICE_X - role.get_width() // 2, ALICE_Y + 56))
 
     # Bob
@@ -327,7 +329,7 @@ def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     pygame.draw.circle(screen, TEXT_CLR, (BOB_X, BOB_Y), 30, 2)
     label = big_font.render("Bob", True, BOB_CLR)
     screen.blit(label, (BOB_X - label.get_width() // 2, BOB_Y + 38))
-    role = font.render("Receiver", True, SUBTEXT_CLR)
+    role = font.render(t("bb84_receiver"), True, SUBTEXT_CLR)
     screen.blit(role, (BOB_X - role.get_width() // 2, BOB_Y + 56))
 
     # Eve (항상 표시, 도청 시 강조)
@@ -343,7 +345,7 @@ def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     pygame.draw.circle(screen, TEXT_CLR, (EVE_X, EVE_Y), 24, 2)
     label = big_font.render("Eve", True, EVE_CLR)
     screen.blit(label, (EVE_X - label.get_width() // 2, EVE_Y - 42))
-    role = font.render("Eavesdropper", True, SUBTEXT_CLR)
+    role = font.render(t("bb84_eavesdropper"), True, SUBTEXT_CLR)
     screen.blit(role, (EVE_X - role.get_width() // 2, EVE_Y - 28))
 
 
@@ -391,7 +393,7 @@ def _draw_error_meter(screen, game: BB84Game, font, big_font):
     mx, my = 50, 380
     mw, mh = 260, 20
 
-    label = big_font.render("Error Rate (QBER)", True, ACCENT)
+    label = big_font.render(t("bb84_error_rate_label"), True, ACCENT)
     screen.blit(label, (mx, my - 24))
 
     # 배경
@@ -441,17 +443,19 @@ def _draw_stats(screen, game: BB84Game, font, big_font):
 
     # 미션3 (5-2): QRNG 키 잔량 표시
     qrng_remain = shared_key_available() if _QRNG_AVAILABLE else 0
-    qrng_tag = f"QRNG: {game.qrng_bits_used}bit 사용 (잔여 {qrng_remain})"
 
     lines = [
-        (f"전송: {game.total_sent}", TEXT_CLR),
-        (f"안전 수신: {game.total_safe}", SAFE_CLR),
-        (f"에러 감지: {game.total_errors}", DANGER_CLR),
-        (f"Eve 도청: {game.eve_intercept_count}", EVE_CLR),
-        (f"디코이 발사: {game.decoy_sent}  트랩: {game.decoy_trapped}", DECOY_CLR),
-        (f"자동차단: {game.auto_blocks}회  수동: {game.manual_blocks}회", ALICE_CLR),
-        (qrng_tag, ACCENT if qrng_remain > 0 else SUBTEXT_CLR),
-        (f"채널: {'OPEN' if game.channel_open else 'SHUTDOWN'}  |  자동: {'ON' if game.auto_block_enabled else 'OFF'}", SAFE_CLR if game.channel_open else DANGER_CLR),
+        (t("bb84_sent", count=game.total_sent), TEXT_CLR),
+        (t("bb84_safe", count=game.total_safe), SAFE_CLR),
+        (t("bb84_errors", count=game.total_errors), DANGER_CLR),
+        (t("bb84_eve_count", count=game.eve_intercept_count), EVE_CLR),
+        (t("bb84_decoy_stats", sent=game.decoy_sent, trapped=game.decoy_trapped), DECOY_CLR),
+        (t("bb84_block_stats", auto=game.auto_blocks, manual=game.manual_blocks), ALICE_CLR),
+        (t("bb84_qrng_stats", used=game.qrng_bits_used, remain=qrng_remain), ACCENT if qrng_remain > 0 else SUBTEXT_CLR),
+        (t("bb84_channel_status",
+           status="OPEN" if game.channel_open else "SHUTDOWN",
+           auto_state=t("auto_on") if game.auto_block_enabled else t("auto_off")),
+         SAFE_CLR if game.channel_open else DANGER_CLR),
     ]
     for i, (text, color) in enumerate(lines):
         surf = font.render(text, True, color)
@@ -461,7 +465,7 @@ def _draw_stats(screen, game: BB84Game, font, big_font):
 def _draw_log(screen, game: BB84Game, font):
     """프로토콜 로그."""
     lx, ly = 380, 340
-    header = font.render("── Protocol Log ──", True, ACCENT)
+    header = font.render(t("bb84_protocol_log"), True, ACCENT)
     screen.blit(header, (lx, ly))
 
     for i, entry in enumerate(game.log):
@@ -496,8 +500,8 @@ def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
 
         blink = int(t * 4) % 2 == 0
         if blink:
-            msg = "CHANNEL SHUTDOWN" if game.auto_shutdown else "MANUAL SHUTDOWN"
-            reason = " — Error rate exceeded threshold!" if game.auto_shutdown else ""
+            msg = t("bb84_channel_shutdown_msg") if game.auto_shutdown else t("bb84_manual_shutdown_msg")
+            reason = t("bb84_error_exceeded") if game.auto_shutdown else ""
             text = big_font.render(f"⚠ {msg}{reason}", True, DANGER_CLR)
             screen.blit(text, (WIDTH // 2 - text.get_width() // 2, CHANNEL_Y + 60))
 
@@ -506,16 +510,17 @@ def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
 
 def run_simulation():
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
-    pygame.display.set_caption("BB84 Quantum Key Distribution Defense")
+    pygame.display.set_caption(t("game_title_bb84"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 11)
     big_font = pygame.font.SysFont("Consolas", 14, bold=True)
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
 
     game = BB84Game()
-    t = 0.0
+    anim_t = 0.0
     paused = False
 
     # ── 슬라이더 패널 ─────────────────────────────────
@@ -540,7 +545,7 @@ def run_simulation():
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
-        t += dt
+        anim_t += dt
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
@@ -550,8 +555,10 @@ def run_simulation():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if confirm_quit(screen, font):
+                        running = False
                 elif event.key == pygame.K_SPACE:
                     if game.channel_open:
                         game.manual_shutdown()
@@ -566,6 +573,8 @@ def run_simulation():
                 elif event.key == pygame.K_a:
                     # 미션1: 자동 차단 토글
                     game.auto_block_enabled = not game.auto_block_enabled
+                elif event.key == pygame.K_l:
+                    toggle_locale()
 
         # ── 업데이트 ─────────────────────────────────
         preset_hud.update(dt)
@@ -614,7 +623,7 @@ def run_simulation():
         # 미션2: 에러율 10% 초과 시 배경을 짙은 빨강으로 번쩍
         if game.error_rate > WARNING_THRESHOLD and game.channel_open:
             # 번쩍거리는 효과 — sin으로 강도 변조
-            flash_intensity = 0.5 + 0.5 * math.sin(t * 6)
+            flash_intensity = 0.5 + 0.5 * math.sin(anim_t * 6)
             r = int(BG[0] + (WARNING_BG[0] - BG[0]) * flash_intensity)
             g = int(BG[1] + (WARNING_BG[1] - BG[1]) * flash_intensity)
             b = int(BG[2] + (WARNING_BG[2] - BG[2]) * flash_intensity)
@@ -623,7 +632,7 @@ def run_simulation():
             screen.fill(BG)
 
         # 타이틀
-        title = title_font.render("BB84 Quantum Key Distribution Defense", True, ACCENT)
+        title = title_font.render(t("game_title_bb84"), True, ACCENT)
         screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 12))
 
         # 채널
@@ -633,7 +642,7 @@ def run_simulation():
         _draw_packets(screen, game, font)
 
         # 캐릭터
-        _draw_actors(screen, game, t, font, big_font)
+        _draw_actors(screen, game, anim_t, font, big_font)
 
         # 에러 미터
         _draw_error_meter(screen, game, font, big_font)
@@ -645,16 +654,18 @@ def run_simulation():
         _draw_log(screen, game, font)
 
         # 폐쇄 배너
-        _draw_shutdown_banner(screen, game, big_font, t)
+        _draw_shutdown_banner(screen, game, big_font, anim_t)
 
         # 슬라이더 패널 그리기
         panel.draw(screen, font)
 
         # 안내
         hints = [
-            f"SCORE: {game.score}  |  자동차단: {'ON' if game.auto_block_enabled else 'OFF'}  |  {'일시정지' if paused else '실행 중'}",
-            "SPACE: 폐쇄/재개  |  A: 자동차단  |  우측 패널: 슬라이더",
-            "P: 일시정지  |  R: 리셋  |  ESC: 종료",
+            t("hint_bb84_info", score=game.score,
+              auto_state=t("auto_on") if game.auto_block_enabled else t("auto_off"),
+              pause_state=t("paused") if paused else t("running_state")),
+            t("hint_bb84_controls"),
+            t("hint_bb84_pause"),
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
@@ -697,6 +708,7 @@ def run_simulation():
 
     recorder.save()
     snd.quit()
+    off_theme_change(_load_theme_colors)
     pygame.quit()
 
 

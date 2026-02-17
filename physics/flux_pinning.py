@@ -8,11 +8,13 @@ from dataclasses import dataclass, field
 import pygame
 
 from config_loader import cfg
-from theme import get_pg_theme
+from i18n import t, toggle_locale
+from theme import get_pg_theme, on_theme_change, off_theme_change
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
 from replay import ReplayRecorder
+from quit_dialog import confirm_quit
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from logger import get_module_logger
 
@@ -88,9 +90,10 @@ class FluxPinningState:
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Meissner Levitation & Flux Pinning")
+    pygame.display.set_caption(t("game_title_flux_pinning"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 13)
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
@@ -120,8 +123,10 @@ def run_simulation():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE and not help_overlay.visible:
-                    running = False
+                    if confirm_quit(screen, font):
+                        running = False
                 elif event.key == pygame.K_LEFTBRACKET:
                     cycle_sim_speed(-1)
                 elif event.key == pygame.K_RIGHTBRACKET:
@@ -136,6 +141,8 @@ def run_simulation():
                         snd.play("levitate")
                     else:
                         snd.play("fall")
+                elif event.key == pygame.K_l:
+                    toggle_locale()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 if abs(mx - gs.magnet_x) < MAGNET_W / 2 and abs(my - gs.magnet_y) < MAGNET_H / 2:
@@ -203,7 +210,7 @@ def run_simulation():
         screen.fill(BG)
 
         # 타이틀
-        title_surf = title_font.render("Meissner Levitation & Flux Pinning", True, SC_GLOW)
+        title_surf = title_font.render(t("game_title_flux_pinning"), True, SC_GLOW)
         screen.blit(title_surf, (WIDTH // 2 - title_surf.get_width() // 2, 15))
 
         # 자기장 라인
@@ -225,11 +232,15 @@ def run_simulation():
             )
 
         # 안내 텍스트
-        state_label = "FALLEN" if not gs.superconducting else (
-            "FLIPPED" if gs.flipped else "LEVITATING")
+        if not gs.superconducting:
+            state_label = t("flux_state_fallen")
+        elif gs.flipped:
+            state_label = t("flux_state_flipped")
+        else:
+            state_label = t("flux_state_levitating")
         hints = [
-            "Drag/Arrow: Move magnet  |  F: Flip  |  SPACE: SC ON/OFF",
-            f"State: {state_label}  |  [/]: Speed ({speed_label()})  |  ESC: Exit",
+            t("fp_hint_line1"),
+            t("fp_hint_line2", state=state_label, speed=speed_label()),
         ]
         for i, hint in enumerate(hints):
             surf = font.render(hint, True, TEXT_CLR)
@@ -267,6 +278,7 @@ def run_simulation():
 
     recorder.save({"play_time": play_time})
     snd.quit()
+    off_theme_change(_load_theme_colors)
     pygame.quit()
 
 

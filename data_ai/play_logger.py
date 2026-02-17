@@ -16,7 +16,10 @@ import os
 import threading
 from datetime import datetime
 
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None  # pandas 없어도 JSON/CSV 기록은 가능
 
 from logger import get_module_logger
 
@@ -86,8 +89,13 @@ class PlayLogger:
         """기존 기록 파일이 있으면 로드."""
         if os.path.exists(PLAY_LOG_CSV):
             try:
-                df = pd.read_csv(PLAY_LOG_CSV)
-                self.records = df.to_dict("records")
+                if pd is not None:
+                    df = pd.read_csv(PLAY_LOG_CSV)
+                    self.records = df.to_dict("records")
+                else:
+                    with open(PLAY_LOG_CSV, "r", encoding="utf-8") as f:
+                        reader = csv.DictReader(f)
+                        self.records = list(reader)
                 _log.info("기존 기록 %d건 로드", len(self.records))
             except Exception as e:
                 _log.error("기록 로드 실패: %s", e)
@@ -162,6 +170,21 @@ class PlayLogger:
             if not self.records:
                 return ""
 
+            if pd is None:
+                # pandas 없으면 CSV만 저장
+                try:
+                    with open(PLAY_LOG_CSV, "w", encoding="utf-8", newline="") as f:
+                        if self.records:
+                            writer = csv.DictWriter(f, fieldnames=self.records[0].keys())
+                            writer.writeheader()
+                            for rec in self.records:
+                                safe = {k: _sanitize_csv_value(v) for k, v in rec.items()}
+                                writer.writerow(safe)
+                    _log.info("기록 내보내기 완료 (CSV only): %d건", len(self.records))
+                except OSError as e:
+                    _log.error("내보내기 실패: %s", e)
+                return PLAY_LOG_CSV
+
             df = pd.DataFrame(self.records)
 
             # 컬럼 정렬: timestamp, module을 앞으로
@@ -203,15 +226,20 @@ class PlayLogger:
         with self._lock:
             if not self.records:
                 return {"total_sessions": 0}
+            records_copy = list(self.records)
 
-            df = pd.DataFrame(self.records)
+        if pd is not None:
+            return self._get_summary_pandas(records_copy)
+        return self._get_summary_pure(records_copy)
 
+    def _get_summary_pandas(self, records: list[dict]) -> dict:
+        """pandas 사용 요약."""
+        df = pd.DataFrame(records)
         summary = {
             "total_sessions": len(df),
             "modules_played": df["module"].nunique(),
             "sessions_per_module": df["module"].value_counts().to_dict(),
         }
-
         for module in df["module"].unique():
             mod_df = df[df["module"] == module]
             fields = self.FIELDS.get(module, [])
@@ -226,7 +254,39 @@ class PlayLogger:
                             "min": round(series.min(), 2),
                         }
             summary[module] = mod_stats
+        return summary
 
+    def _get_summary_pure(self, records: list[dict]) -> dict:
+        """pandas 없이 순수 Python으로 요약."""
+        modules = {}
+        for rec in records:
+            m = rec.get("module", "unknown")
+            modules.setdefault(m, []).append(rec)
+
+        summary = {
+            "total_sessions": len(records),
+            "modules_played": len(modules),
+            "sessions_per_module": {m: len(recs) for m, recs in modules.items()},
+        }
+        for module, recs in modules.items():
+            fields = self.FIELDS.get(module, [])
+            mod_stats = {}
+            for field in fields:
+                vals = []
+                for rec in recs:
+                    v = rec.get(field)
+                    if v is not None:
+                        try:
+                            vals.append(float(v))
+                        except (ValueError, TypeError):
+                            pass
+                if vals:
+                    mod_stats[field] = {
+                        "mean": round(sum(vals) / len(vals), 2),
+                        "max": round(max(vals), 2),
+                        "min": round(min(vals), 2),
+                    }
+            summary[module] = mod_stats
         return summary
 
     def clear(self):

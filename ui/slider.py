@@ -134,6 +134,22 @@ class Slider:
         # 바 테두리
         pygame.draw.rect(screen, c["subtext"], self.bar_rect, 1, border_radius=4)
 
+        # 툴팁: 마우스가 바 위에 있으면 범위 정보 표시
+        mx, my = pygame.mouse.get_pos()
+        hover_rect = self.bar_rect.inflate(0, 8)
+        if hover_rect.collidepoint(mx, my):
+            tip = f"{self.min_val:{self.fmt}} ~ {self.max_val:{self.fmt}} (step {self.step:{self.fmt}})"
+            tip_surf = font.render(tip, True, c["text"])
+            tip_w = tip_surf.get_width() + 8
+            tip_h = tip_surf.get_height() + 4
+            tip_x = min(mx + 12, screen.get_width() - tip_w - 4)
+            tip_y = my - tip_h - 4
+            pygame.draw.rect(screen, c["panel_bg"],
+                             (tip_x - 4, tip_y - 2, tip_w, tip_h), border_radius=3)
+            pygame.draw.rect(screen, c["subtext"],
+                             (tip_x - 4, tip_y - 2, tip_w, tip_h), 1, border_radius=3)
+            screen.blit(tip_surf, (tip_x, tip_y))
+
     def _ratio(self) -> float:
         if self.max_val <= self.min_val:
             return 0.0

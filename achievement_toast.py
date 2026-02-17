@@ -27,16 +27,22 @@ class AchievementToast:
     SLIDE_TIME = 0.3        # 슬라이드 애니메이션 (초)
     TOAST_W = 320
     TOAST_H = 60
+    HISTORY_MAX = 20        # 히스토리 최대 보관 수
 
     def __init__(self):
         self._queue: list[dict] = []
         self._current: dict | None = None
         self._timer = 0.0
         self._phase = "idle"  # idle | slide_in | show | slide_out
+        self._history: list[dict] = []
+        self.history_visible = False
 
     def show(self, achievement: dict):
         """업적을 토스트 큐에 추가."""
         self._queue.append(achievement)
+        self._history.append(achievement)
+        if len(self._history) > self.HISTORY_MAX:
+            self._history.pop(0)
         if self._phase == "idle":
             self._next()
 
@@ -116,3 +122,59 @@ class AchievementToast:
         surf.blit(desc_surf, (10, 32))
 
         screen.blit(surf, (x, y))
+
+    def toggle_history(self):
+        """히스토리 패널 토글."""
+        self.history_visible = not self.history_visible
+
+    def draw_history(self, screen, font):
+        """업적 히스토리 패널 렌더링."""
+        if not self.history_visible or pygame is None:
+            return
+
+        pg = get_pg_theme()
+
+        # 전체 업적 목록 조회
+        try:
+            from achievements import get_all_achievements
+            all_ach = get_all_achievements()
+        except ImportError:
+            all_ach = []
+
+        if not all_ach:
+            return
+
+        sw, sh = screen.get_size()
+        panel_w = 340
+        line_h = 22
+        panel_h = min(40 + len(all_ach) * line_h, sh - 40)
+        px = sw - panel_w - 10
+        py = 10
+
+        # 반투명 배경
+        panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        pygame.draw.rect(panel_surf, (*pg.PANEL_BG, 230),
+                         (0, 0, panel_w, panel_h), border_radius=8)
+        pygame.draw.rect(panel_surf, pg.OVERLAY,
+                         (0, 0, panel_w, panel_h), 2, border_radius=8)
+
+        # 타이틀
+        title_surf = font.render("Achievements (Tab to close)", True, pg.ACCENT_YELLOW)
+        panel_surf.blit(title_surf, (10, 8))
+
+        # 업적 목록
+        y = 32
+        for ach in all_ach:
+            if y + line_h > panel_h:
+                break
+            icon = ach.get("icon", "?")
+            title = ach.get("title", "")
+            unlocked = ach.get("unlocked", False)
+            clr = pg.GREEN if unlocked else pg.SUBTEXT
+            prefix = "[V]" if unlocked else "[ ]"
+            text = f"{prefix} [{icon}] {title}"
+            text_surf = font.render(text, True, clr)
+            panel_surf.blit(text_surf, (10, y))
+            y += line_h
+
+        screen.blit(panel_surf, (px, py))

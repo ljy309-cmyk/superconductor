@@ -63,6 +63,28 @@ def _save_data(records: list[dict]):
             _log.error("랭킹 데이터 저장 실패: %s", e)
 
 
+# ── 속도 제한 (IP 당 POST 간격) ────────────────────
+_rate_limit_lock = threading.Lock()
+_rate_limit_map: dict[str, float] = {}  # IP → 마지막 POST 시각
+_RATE_LIMIT_SECONDS = 2.0  # 최소 POST 간격 (초)
+
+
+def _check_rate_limit(ip: str) -> bool:
+    """속도 제한 확인. True=허용, False=거부."""
+    import time
+    now = time.time()
+    with _rate_limit_lock:
+        last = _rate_limit_map.get(ip, 0.0)
+        if now - last < _RATE_LIMIT_SECONDS:
+            return False
+        _rate_limit_map[ip] = now
+        # 오래된 항목 정리 (100개 초과 시)
+        if len(_rate_limit_map) > 100:
+            cutoff = now - 60
+            _rate_limit_map.clear()
+    return True
+
+
 class RankingHandler(BaseHTTPRequestHandler):
     """REST API 핸들러."""
 
@@ -96,6 +118,13 @@ class RankingHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == "/ranking":
+            # 속도 제한
+            client_ip = self.client_address[0] if self.client_address else "unknown"
+            if not _check_rate_limit(client_ip):
+                self._set_json_headers(429)
+                self.wfile.write(json.dumps({"error": "Too many requests"}).encode())
+                return
+
             length = int(self.headers.get("Content-Length", 0))
             if length > 10_000:  # 최대 10KB
                 self._set_json_headers(413)

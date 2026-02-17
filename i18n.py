@@ -13,6 +13,9 @@ _LOCALE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locale")
 _current_locale = "ko"
 _strings: dict[str, str] = {}
 _fallback: dict[str, str] = {}
+_locale_listeners: list = []
+
+SUPPORTED_LOCALES = ["ko", "en"]
 
 
 def _load_locale(locale: str) -> dict[str, str]:
@@ -27,17 +30,51 @@ def _load_locale(locale: str) -> dict[str, str]:
 def set_locale(locale: str):
     """현재 로케일 설정."""
     global _current_locale, _strings, _fallback
+    if locale == _current_locale and _strings:
+        return
     _current_locale = locale
     _strings = _load_locale(locale)
     if locale != "ko":
         _fallback = _load_locale("ko")
     else:
         _fallback = {}
+    _notify_locale_listeners()
 
 
 def get_locale() -> str:
     """현재 로케일 반환."""
     return _current_locale
+
+
+def toggle_locale() -> str:
+    """ko ↔ en 토글. 새 로케일 반환."""
+    idx = SUPPORTED_LOCALES.index(_current_locale) if _current_locale in SUPPORTED_LOCALES else 0
+    new_locale = SUPPORTED_LOCALES[(idx + 1) % len(SUPPORTED_LOCALES)]
+    set_locale(new_locale)
+    return new_locale
+
+
+def on_locale_change(callback):
+    """로케일 변경 시 호출될 콜백 등록."""
+    if callback not in _locale_listeners:
+        _locale_listeners.append(callback)
+
+
+def off_locale_change(callback):
+    """로케일 변경 콜백 제거."""
+    try:
+        _locale_listeners.remove(callback)
+    except ValueError:
+        pass
+
+
+def _notify_locale_listeners():
+    """로케일 변경 알림."""
+    for cb in _locale_listeners:
+        try:
+            cb()
+        except Exception:
+            pass
 
 
 def t(key: str, **kwargs) -> str:

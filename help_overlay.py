@@ -19,6 +19,8 @@ try:
 except ImportError:
     pygame = None  # type: ignore[assignment]
 
+from i18n import t
+
 # 모듈별 도움말 텍스트 (한국어)
 _HELP_TEXTS: dict[str, list[str]] = {
     "qubit_chain": [
@@ -172,7 +174,7 @@ class HelpOverlay:
         """오버레이 렌더링."""
         if not self.visible:
             # F1 힌트만 작게 표시
-            hint = font.render("F1: Help", True, (88, 91, 112))
+            hint = font.render(t("help_f1_hint"), True, (88, 91, 112))
             screen.blit(hint, (screen.get_width() - hint.get_width() - 10, 4))
             return
 
@@ -210,5 +212,5 @@ class HelpOverlay:
                 break
 
         # 닫기 안내
-        close = font.render("Press F1 or ESC to close", True, (88, 91, 112))
+        close = font.render(t("help_close"), True, (88, 91, 112))
         screen.blit(close, (box_x + box_w // 2 - close.get_width() // 2, box_y + box_h - 24))

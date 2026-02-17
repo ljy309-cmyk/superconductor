@@ -18,6 +18,7 @@ try:
 except ImportError:
     pygame = None  # type: ignore[assignment]
 
+from i18n import t
 from presets import get_preset, save_profile, load_profile, list_profiles
 from theme import get_pg_theme
 from logger import get_module_logger
@@ -103,7 +104,7 @@ class PresetHUD:
                 slider.value = sec_data[key]
 
         self.current = name
-        self.notification = f"Preset: {name.upper()}"
+        self.notification = t("preset_applied", name=name.upper())
         self.flash_timer = 2.0
         _log.info("프리셋 '%s' 적용: %s", name, self.module_name)
 
@@ -116,7 +117,7 @@ class PresetHUD:
         profile_name = f"{self.module_name}_custom"
         save_profile(profile_name, values)
         self.current = "custom"
-        self.notification = f"Profile saved: {profile_name}"
+        self.notification = t("preset_profile_saved", name=profile_name)
         self.flash_timer = 2.0
 
     def _load_last_profile(self):
@@ -124,7 +125,7 @@ class PresetHUD:
         profile_name = f"{self.module_name}_custom"
         data = load_profile(profile_name)
         if not data:
-            self.notification = "No saved profile"
+            self.notification = t("preset_no_profile")
             self.flash_timer = 1.5
             return
 
@@ -134,7 +135,7 @@ class PresetHUD:
                 slider.value = data[compound_key]
 
         self.current = "custom"
-        self.notification = f"Profile loaded: {profile_name}"
+        self.notification = t("preset_profile_loaded", name=profile_name)
         self.flash_timer = 2.0
 
     def update(self, dt: float):
@@ -153,7 +154,7 @@ class PresetHUD:
         screen.blit(badge_surf, (x, y))
 
         # 단축키 안내
-        hint = "1:Easy 2:Normal 3:Hard"
+        hint = t("preset_keys_hint")
         hint_surf = font.render(hint, True, (88, 91, 112))
         screen.blit(hint_surf, (x + badge_surf.get_width() + 8, y))
 

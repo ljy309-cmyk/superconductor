@@ -57,6 +57,9 @@ class ReplayRecorder:
         """한 프레임의 상태 기록. deque maxlen으로 자동 관리."""
         self._frames.append(state)
 
+    # record_frame 별칭 — 일부 모듈에서 record() 로 호출
+    record = record_frame
+
     def save(self, extra_metadata: dict | None = None) -> str:
         """기록을 파일로 저장."""
         if not self._frames:
@@ -160,9 +163,36 @@ class ReplayPlayer:
         """재생 위치 초기화."""
         self._index = 0
 
+    def prev_frame(self) -> dict | None:
+        """이전 프레임 반환. 처음이면 None."""
+        if self._index > 0:
+            self._index -= 1
+            return self.get_frame(self._index)
+        return None
+
     def seek(self, index: int):
         """특정 위치로 이동."""
         self._index = max(0, min(index, self.total_frames))
+
+    def rewind(self, steps: int = 10):
+        """지정된 프레임 수만큼 되감기."""
+        self.seek(self._index - steps)
+
+    def fast_forward(self, steps: int = 10):
+        """지정된 프레임 수만큼 앞으로."""
+        self.seek(self._index + steps)
+
+    @property
+    def current_index(self) -> int:
+        return self._index
+
+    @property
+    def progress(self) -> float:
+        """재생 진행률 (0.0 ~ 1.0)."""
+        total = self.total_frames
+        if total == 0:
+            return 0.0
+        return self._index / total
 
 
 def list_replays(module_name: str | None = None) -> list[str]:

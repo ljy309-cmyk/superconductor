@@ -347,9 +347,11 @@ class PG_CB_LIGHT:
 
 
 # ── 테마 & 색맹 모드 토글 ─────────────────────────────
+import weakref as _weakref
+
 _current_theme = "dark"
 _colorblind = False
-_listeners: list = []  # 테마 변경 콜백 목록
+_listeners: list = []  # (ref_or_callable, is_weak) 튜플 목록
 
 # 테마 조합 매핑
 _TK_THEMES = {
@@ -368,16 +370,25 @@ _PG_THEMES = {
 
 
 def _notify_listeners():
-    """등록된 모든 콜백에 테마 변경을 알린다."""
-    for cb in _listeners:
+    """등록된 모든 콜백에 테마 변경을 알린다. 죽은 약참조 자동 제거."""
+    alive = []
+    for ref, is_weak in _listeners:
+        cb = ref() if is_weak else ref
+        if cb is None:
+            continue  # 약참조 대상 소멸 → 건너뜀
         try:
             cb()
         except Exception:
             pass  # 리스너 오류가 테마 변경을 차단하지 않도록
+        alive.append((ref, is_weak))
+    _listeners[:] = alive
 
 
 def on_theme_change(callback):
     """테마 변경 시 호출될 콜백 등록.
+
+    바운드 메서드는 약참조(WeakMethod)로 저장되어 객체 소멸 시
+    자동 정리됩니다. 일반 함수/람다는 강참조로 저장됩니다.
 
     콜백은 인자 없이 호출됩니다. get_pg_theme()/get_tk_theme()으로
     새 테마를 조회하세요.
@@ -386,16 +397,50 @@ def on_theme_change(callback):
         from theme import on_theme_change
         on_theme_change(my_module._load_theme_colors)
     """
-    if callback not in _listeners:
-        _listeners.append(callback)
+    # 중복 등록 방지
+    for ref, is_weak in _listeners:
+        existing = ref() if is_weak else ref
+        if existing is not None and existing == callback:
+            return
+
+    if hasattr(callback, '__self__'):
+        # 바운드 메서드 → WeakMethod (객체 GC 허용)
+        _listeners.append((_weakref.WeakMethod(callback), True))
+    else:
+        _listeners.append((callback, False))
 
 
 def off_theme_change(callback):
     """등록된 테마 변경 콜백 제거."""
-    try:
-        _listeners.remove(callback)
-    except ValueError:
-        pass
+    for i, (ref, is_weak) in enumerate(_listeners):
+        existing = ref() if is_weak else ref
+        if existing is not None and existing == callback:
+            _listeners.pop(i)
+            return
+
+
+class use_theme_colors:
+    """_load_theme_colors() 자동 등록/해제 컨텍스트 매니저.
+
+    사용법:
+        with use_theme_colors(_load_theme_colors):
+            # 게임 루프 — 테마 변경 시 색상 자동 갱신
+            ...
+    """
+
+    __slots__ = ('_fn',)
+
+    def __init__(self, load_fn):
+        self._fn = load_fn
+
+    def __enter__(self):
+        self._fn()                 # 초기 로드
+        on_theme_change(self._fn)  # 런타임 갱신 등록
+        return self
+
+    def __exit__(self, *exc):
+        off_theme_change(self._fn)
+        return False
 
 
 def get_theme() -> str:

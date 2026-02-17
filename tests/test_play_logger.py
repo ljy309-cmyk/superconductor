@@ -26,18 +26,22 @@ if "pandas" not in sys.modules:
 class TestPlayLogger(unittest.TestCase):
 
     def setUp(self):
-        """각 테스트마다 임시 디렉토리 사용."""
+        """각 테스트마다 임시 디렉토리 사용 + pandas 모킹 해제."""
         import data_ai.play_logger as pl
         self._orig_csv = pl.PLAY_LOG_CSV
         self._orig_xlsx = pl.PLAY_LOG_XLSX
+        self._orig_pd = pl.pd
         self._tmpdir = tempfile.mkdtemp()
         pl.PLAY_LOG_CSV = os.path.join(self._tmpdir, "test_history.csv")
         pl.PLAY_LOG_XLSX = os.path.join(self._tmpdir, "test_history.xlsx")
+        # pandas 모킹이 불완전하므로 순수 Python 경로 사용
+        pl.pd = None
 
     def tearDown(self):
         import data_ai.play_logger as pl
         pl.PLAY_LOG_CSV = self._orig_csv
         pl.PLAY_LOG_XLSX = self._orig_xlsx
+        pl.pd = self._orig_pd
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_log_session_creates_record(self):

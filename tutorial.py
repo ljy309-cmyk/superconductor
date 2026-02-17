@@ -77,21 +77,29 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
 }
 
 
-def _load_seen() -> set[str]:
-    """이미 본 튜토리얼 모듈 목록."""
+def _load_progress() -> dict:
+    """튜토리얼 진행 상태 로드.
+
+    반환 형식: {"module": {"completed": bool, "step": int}, ...}
+    레거시 형식(리스트)도 호환.
+    """
     if os.path.exists(_SAVE_PATH):
         try:
             with open(_SAVE_PATH, "r") as f:
-                return set(json.load(f))
+                data = json.load(f)
+            # 레거시 호환: 리스트 → dict 변환
+            if isinstance(data, list):
+                return {m: {"completed": True, "step": 0} for m in data}
+            return data
         except (OSError, json.JSONDecodeError, TypeError) as e:
             _log.warning("튜토리얼 상태 로드 실패: %s", e)
-    return set()
+    return {}
 
 
-def _save_seen(seen: set[str]):
+def _save_progress(progress: dict):
     try:
         with open(_SAVE_PATH, "w") as f:
-            json.dump(sorted(seen), f)
+            json.dump(progress, f, indent=2)
     except OSError as e:
         _log.warning("튜토리얼 상태 저장 실패: %s", e)
 
@@ -107,9 +115,16 @@ class TutorialOverlay:
         self._completed = False
 
         if auto_show and self.steps:
-            seen = _load_seen()
-            if module_name not in seen:
+            progress = _load_progress()
+            mod_state = progress.get(module_name, {})
+            if mod_state.get("completed"):
+                self._completed = True
+            else:
                 self.visible = True
+                # 이전 진행률에서 이어서 시작
+                saved_step = mod_state.get("step", 0)
+                if 0 < saved_step < len(self.steps):
+                    self.current_step = saved_step
 
     def handle_event(self, event) -> bool:
         """이벤트 처리. T 키로 토글, Enter/Space로 다음 스텝."""
@@ -131,10 +146,13 @@ class TutorialOverlay:
             self.current_step += 1
             if self.current_step >= len(self.steps):
                 self._finish()
+            else:
+                self._save_step()
             return True
 
         if event.key == pygame.K_LEFT:
             self.current_step = max(0, self.current_step - 1)
+            self._save_step()
             return True
 
         if event.key == pygame.K_ESCAPE:
@@ -143,13 +161,25 @@ class TutorialOverlay:
 
         return False
 
+    def _save_step(self):
+        """현재 진행 단계 저장."""
+        progress = _load_progress()
+        progress[self.module_name] = {
+            "completed": False,
+            "step": self.current_step,
+        }
+        _save_progress(progress)
+
     def _finish(self):
         """튜토리얼 완료."""
         self.visible = False
         self._completed = True
-        seen = _load_seen()
-        seen.add(self.module_name)
-        _save_seen(seen)
+        progress = _load_progress()
+        progress[self.module_name] = {
+            "completed": True,
+            "step": len(self.steps),
+        }
+        _save_progress(progress)
 
     def draw(self, screen, font):
         """튜토리얼 오버레이 렌더링."""
