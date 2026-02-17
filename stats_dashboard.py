@@ -211,7 +211,8 @@ class StatsDashboard(tk.Toplevel):
             ax2.legend(fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
             ax2.set_xlabel(t("stats_session_num"), color="#cdd6f4", fontsize=8)
             ax2.set_ylabel(t("stats_time_sec"), color="#cdd6f4", fontsize=8)
-        except Exception:
+        except Exception as e:
+            _log.warning("생존 시간 차트 렌더링 실패: %s", e)
             ax2.text(0.5, 0.5, t("stats_no_survival_data"), transform=ax2.transAxes,
                      ha="center", va="center", color="#585b70", fontsize=11)
 
@@ -234,7 +235,8 @@ class StatsDashboard(tk.Toplevel):
                 lines.append(f"  {status} [{ach['icon']}] {ach['title']} — {ach['desc']}")
 
             self._ach_text.insert("1.0", "\n".join(lines))
-        except Exception:
+        except Exception as e:
+            _log.warning("업적 로드 실패: %s", e)
             self._ach_text.insert("1.0", t("stats_ach_unavailable"))
 
         self._ach_text.configure(state="disabled")

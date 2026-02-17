@@ -12,6 +12,9 @@ import requests
 
 from data_ai.ranking_server import start_server, get_base_url
 from theme import get_tk_theme
+from logger import get_module_logger
+
+_log = get_module_logger("ranking")
 
 
 def _load_tk_colors():
@@ -373,8 +376,8 @@ class RankingApp(tk.Toplevel):
                         r.get("mode", ""),
                         r.get("timestamp", ""),
                     ))
-        except requests.RequestException:
-            pass  # 미션1: 오프라인이면 조용히 넘어감
+        except requests.RequestException as e:
+            _log.warning("랭킹 조회 실패 (오프라인): %s", e)
 
     # ── 미션2: 점수 비교 로직 ─────────────────────────
 

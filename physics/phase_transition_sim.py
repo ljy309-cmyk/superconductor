@@ -292,8 +292,8 @@ def run_simulation():
             "play_time": play_time,
             "final_temp": round(temperature, 1),
         })
-    except Exception:
-        pass
+    except Exception as e:
+        _log.warning("세션 로깅 실패: %s", e)
 
     recorder.save({"play_time": play_time})
     snd.quit()
