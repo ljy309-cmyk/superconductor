@@ -69,6 +69,26 @@ class SoundManager:
         self.enabled = True
         self._sounds: dict = {}
         self._initialized = False
+        self._volume = 0.7  # 0.0 ~ 1.0
+
+    @property
+    def volume(self) -> float:
+        return self._volume
+
+    @volume.setter
+    def volume(self, val: float):
+        self._volume = max(0.0, min(1.0, round(val, 2)))
+        # 이미 생성된 사운드에 볼륨 적용
+        for snd in self._sounds.values():
+            snd.set_volume(self._volume)
+
+    def volume_up(self, step: float = 0.1):
+        """볼륨 한 단계 증가."""
+        self.volume = self._volume + step
+
+    def volume_down(self, step: float = 0.1):
+        """볼륨 한 단계 감소."""
+        self.volume = self._volume - step
 
     def init(self):
         """사운드 시스템 초기화. pygame.mixer.init() 이후 호출."""
@@ -81,6 +101,9 @@ class SoundManager:
             if not pygame.mixer.get_init():
                 pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
             self._build_sounds()
+            # 초기 볼륨 적용
+            for snd in self._sounds.values():
+                snd.set_volume(self._volume)
             self._initialized = True
         except Exception as e:
             _log.warning("사운드 초기화 실패: %s", e)
@@ -132,6 +155,24 @@ class SoundManager:
         """사운드 ON/OFF 토글. 현재 상태 반환."""
         self.enabled = not self.enabled
         return self.enabled
+
+    def handle_key(self, key) -> bool:
+        """공통 사운드 키 처리. 처리했으면 True 반환.
+
+        M: 뮤트 토글, +/=: 볼륨 업, -: 볼륨 다운
+        """
+        if pygame is None:
+            return False
+        if key == pygame.K_m:
+            self.toggle()
+            return True
+        if key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS):
+            self.volume_up()
+            return True
+        if key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+            self.volume_down()
+            return True
+        return False
 
     def quit(self):
         """정리."""

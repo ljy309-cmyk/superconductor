@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import pygame
 
 from config_loader import cfg
-from i18n import t
+from i18n import t, toggle_locale
 from theme import get_pg_theme, on_theme_change, off_theme_change
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
@@ -123,6 +123,7 @@ def run_simulation():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE and not help_overlay.visible:
                     if confirm_quit(screen, font):
                         running = False
@@ -140,6 +141,8 @@ def run_simulation():
                         snd.play("levitate")
                     else:
                         snd.play("fall")
+                elif event.key == pygame.K_l:
+                    toggle_locale()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 if abs(mx - gs.magnet_x) < MAGNET_W / 2 and abs(my - gs.magnet_y) < MAGNET_H / 2:

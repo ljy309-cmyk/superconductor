@@ -306,5 +306,12 @@
   "summary_eve_detected": "도청 감지",
 
   "quit_confirm": "정말 종료하시겠습니까?",
-  "quit_hint": "Y/Enter: 종료  |  N/ESC: 계속"
+  "quit_hint": "Y/Enter: 종료  |  N/ESC: 계속",
+
+  "sound_volume": "볼륨: {vol}%",
+  "sound_muted": "음소거",
+  "sound_keys_hint": "M: 음소거  |  +/-: 볼륨",
+
+  "lang_switched": "언어: 한국어",
+  "lang_hint": "L: 언어 전환"
 }

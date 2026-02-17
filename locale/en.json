@@ -306,5 +306,12 @@
   "summary_eve_detected": "Eve Detected",
 
   "quit_confirm": "Are you sure you want to quit?",
-  "quit_hint": "Y/Enter: Quit  |  N/ESC: Continue"
+  "quit_hint": "Y/Enter: Quit  |  N/ESC: Continue",
+
+  "sound_volume": "Vol: {vol}%",
+  "sound_muted": "MUTED",
+  "sound_keys_hint": "M: Mute  |  +/-: Volume",
+
+  "lang_switched": "Language: English",
+  "lang_hint": "L: Toggle Language"
 }

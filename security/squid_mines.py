@@ -387,6 +387,7 @@ def run_simulation():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE:
                     if confirm_quit(screen, font):
                         running = False
@@ -403,8 +404,8 @@ def run_simulation():
                 elif event.key == pygame.K_RIGHTBRACKET:
                     cycle_sim_speed(1)
                 elif event.key == pygame.K_m:
-                    # 미션1: 사운드 토글
-                    gs.sound_enabled = not gs.sound_enabled
+                    # 미션1: 사운드 토글 (handle_key에서 snd.toggle 호출됨)
+                    gs.sound_enabled = snd.enabled
                 # ── 키보드 그리드 탐색 (WASD) ──
                 elif event.key == pygame.K_w:
                     gs.kb_active = True

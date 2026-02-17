@@ -11,7 +11,7 @@ import random
 import pygame
 
 from config_loader import cfg
-from i18n import t
+from i18n import t, toggle_locale
 from theme import get_pg_theme, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
@@ -360,6 +360,7 @@ def run_simulation():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE:
                     if confirm_quit(screen, font):
                         running = False
@@ -399,6 +400,8 @@ def run_simulation():
                     elapsed = 0.0
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
+                elif event.key == pygame.K_l:
+                    toggle_locale()
 
         # ── 슬라이더 값 읽기 ─────────────────────────
         qec_reduction = sl_reduction.value

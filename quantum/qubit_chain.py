@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 import pygame
 
 from config_loader import cfg
-from i18n import t
+from i18n import t, toggle_locale
 from theme import get_pg_theme, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
@@ -355,6 +355,7 @@ def run_simulation():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE:
                     if confirm_quit(screen, info_font):
                         running = False
@@ -414,6 +415,10 @@ def run_simulation():
                             n.stress = 0.0
                             snd.play("error_correct")
                             gs.cascade_log.append(f"Q{n.qid} 오류 정정! (stress → 0)")
+                elif event.key == pygame.K_l:
+                    toggle_locale()
+                elif event.key == pygame.K_g:
+                    toast.toggle_history()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 for n in nodes:
@@ -619,6 +624,7 @@ def run_simulation():
         # 업적 토스트 업데이트/렌더링
         toast.update(dt)
         toast.draw(screen, info_font)
+        toast.draw_history(screen, info_font)
 
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, info_font)
