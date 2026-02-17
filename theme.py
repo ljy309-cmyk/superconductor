@@ -97,18 +97,60 @@ LAUNCHER_ACCENTS_PG = {
 
 
 # ── 폰트 정의 ────────────────────────────────────────
+_font_scale: float = 1.0  # 폰트 크기 배율 (0.8 ~ 1.5)
+_FONT_SCALE_MIN = 0.8
+_FONT_SCALE_MAX = 1.5
+_FONT_SCALE_STEP = 0.1
+
+
+def _scaled(size: int) -> int:
+    """폰트 크기에 스케일 적용."""
+    return max(6, int(size * _font_scale))
+
+
 class FONTS:
-    """공용 폰트 정의 (family, size, weight)."""
+    """공용 폰트 정의 (family, size, weight).
+
+    font_scale 변경 시 프로퍼티처럼 동적으로 반환합니다.
+    """
     FAMILY  = "Consolas"
-    TITLE   = (FAMILY, 18, "bold")
-    HEADING = (FAMILY, 14, "bold")
-    BODY    = (FAMILY, 10)
-    BODY_BOLD = (FAMILY, 10, "bold")
-    SMALL   = (FAMILY, 9)
-    TINY    = (FAMILY, 8)
-    MONO_12 = (FAMILY, 12)
-    MONO_11 = (FAMILY, 11)
-    BUTTON  = (FAMILY, 10)
+
+    @staticmethod
+    def _f(size, bold=False):
+        if bold:
+            return (FONTS.FAMILY, _scaled(size), "bold")
+        return (FONTS.FAMILY, _scaled(size))
+
+    @property
+    def TITLE(self):
+        return self._f(18, True)
+    @property
+    def HEADING(self):
+        return self._f(14, True)
+    @property
+    def BODY(self):
+        return self._f(10)
+    @property
+    def BODY_BOLD(self):
+        return self._f(10, True)
+    @property
+    def SMALL(self):
+        return self._f(9)
+    @property
+    def TINY(self):
+        return self._f(8)
+    @property
+    def MONO_12(self):
+        return self._f(12)
+    @property
+    def MONO_11(self):
+        return self._f(11)
+    @property
+    def BUTTON(self):
+        return self._f(10)
+
+# 싱글톤 인스턴스 — 기존 코드와 호환 유지: FONTS.BODY 등 사용 가능
+FONTS = FONTS()
 
 
 # ── 라이트 테마 (Catppuccin Latte 기반) ───────────────
@@ -400,6 +442,31 @@ def toggle_colorblind() -> bool:
     return _colorblind
 
 
+def get_font_scale() -> float:
+    """현재 폰트 크기 배율 반환."""
+    return _font_scale
+
+
+def set_font_scale(scale: float):
+    """폰트 크기 배율 설정 (0.8 ~ 1.5)."""
+    global _font_scale
+    new_scale = round(max(_FONT_SCALE_MIN, min(_FONT_SCALE_MAX, scale)), 1)
+    if new_scale == _font_scale:
+        return
+    _font_scale = new_scale
+    _notify_listeners()
+
+
+def increase_font_scale():
+    """폰트 크기 한 단계 증가."""
+    set_font_scale(_font_scale + _FONT_SCALE_STEP)
+
+
+def decrease_font_scale():
+    """폰트 크기 한 단계 감소."""
+    set_font_scale(_font_scale - _FONT_SCALE_STEP)
+
+
 def get_tk_theme():
     """현재 Tkinter 테마 클래스 반환 (테마 + 색맹 모드 고려)."""
     return _TK_THEMES[(_current_theme, _colorblind)]
@@ -422,6 +489,7 @@ def save_preferences():
         cfg = {}
     cfg["theme"] = _current_theme
     cfg["colorblind_mode"] = _colorblind
+    cfg["font_scale"] = _font_scale
     try:
         with open(cfg_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2, ensure_ascii=False)
@@ -433,7 +501,7 @@ def load_preferences():
     """config.json에서 테마/색맹 설정을 로드 (알림 없이)."""
     import json
     import os
-    global _current_theme, _colorblind
+    global _current_theme, _colorblind, _font_scale
     cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     try:
         with open(cfg_path, "r", encoding="utf-8") as f:
@@ -442,5 +510,7 @@ def load_preferences():
             _current_theme = cfg["theme"]
         if isinstance(cfg.get("colorblind_mode"), bool):
             _colorblind = cfg["colorblind_mode"]
+        if isinstance(cfg.get("font_scale"), (int, float)):
+            _font_scale = round(max(_FONT_SCALE_MIN, min(_FONT_SCALE_MAX, cfg["font_scale"])), 1)
     except (OSError, json.JSONDecodeError):
         pass

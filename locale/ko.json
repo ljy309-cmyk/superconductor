@@ -146,6 +146,18 @@
 
   "colorblind_on": "색맹모드: ON",
   "colorblind_off": "색맹모드: OFF",
+  "font_scale": "글꼴 크기",
+  "profile_title": "프로파일 관리",
+  "profile_heading": "저장된 프로파일",
+  "profile_rename": "이름 변경",
+  "profile_delete": "삭제",
+  "profile_refresh": "새로고침",
+  "profile_count": "프로파일 {count}개",
+  "profile_select_first": "프로파일을 먼저 선택하세요.",
+  "profile_new_name": "새 이름:",
+  "profile_rename_fail": "이름 변경 실패 (이미 존재하거나 원본 없음).",
+  "profile_delete_confirm": "'{name}' 프로파일을 삭제하시겠습니까?",
+  "menu_profiles": "프로파일 관리",
 
   "graph_title_temp": "온도 그래프",
   "graph_live_temp": "실시간 온도",

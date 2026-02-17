@@ -187,5 +187,6 @@
     "decoy_error_mult": 2.0
   },
   "theme": "dark",
-  "colorblind_mode": false
+  "colorblind_mode": false,
+  "font_scale": 1.0
 }

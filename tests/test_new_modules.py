@@ -6,8 +6,14 @@ import sys
 import tempfile
 import shutil
 import unittest
+from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# pygame mock (테스트 환경에 pygame 없는 경우)
+sys.modules.setdefault("pygame", MagicMock())
+sys.modules.setdefault("pygame.time", MagicMock())
+sys.modules.setdefault("pygame.mixer", MagicMock())
 
 
 # ── Achievements 테스트 ─────────────────────────────────────
@@ -407,6 +413,287 @@ class TestStatsDashboardModule(unittest.TestCase):
     def test_importable(self):
         import stats_dashboard
         self.assertTrue(hasattr(stats_dashboard, "open_stats_dashboard"))
+
+
+# ── GameState 데이터클래스 테스트 ──────────────────────────
+
+class TestQubitChainState(unittest.TestCase):
+
+    def test_default_values(self):
+        from quantum.qubit_chain import QubitChainState
+        gs = QubitChainState()
+        self.assertEqual(gs.t, 0.0)
+        self.assertFalse(gs.paused)
+        self.assertFalse(gs.shield_active)
+        self.assertEqual(gs.qec_uses, 0)
+        self.assertFalse(gs.game_over)
+        self.assertEqual(gs.kb_focus, -1)
+        self.assertIsInstance(gs.cascade_log, list)
+        self.assertIsInstance(gs.ach_checked_milestones, set)
+
+    def test_reset(self):
+        from quantum.qubit_chain import QubitChainState
+        gs = QubitChainState()
+        gs.shield_active = True
+        gs.shield_timer = 3.0
+        gs.qec_uses = 5
+        gs.survival_time = 42.0
+        gs.game_over = True
+        gs.cascade_log.append("test")
+        gs.reset()
+        self.assertFalse(gs.shield_active)
+        self.assertEqual(gs.shield_timer, 0.0)
+        self.assertEqual(gs.qec_uses, 0)
+        self.assertEqual(gs.survival_time, 0.0)
+        self.assertFalse(gs.game_over)
+        self.assertEqual(len(gs.cascade_log), 0)
+
+    def test_independent_instances(self):
+        from quantum.qubit_chain import QubitChainState
+        gs1 = QubitChainState()
+        gs2 = QubitChainState()
+        gs1.cascade_log.append("a")
+        self.assertEqual(len(gs2.cascade_log), 0)
+
+
+class TestSQUIDMinesState(unittest.TestCase):
+
+    def test_default_values(self):
+        from security.squid_mines import SQUIDMinesState
+        gs = SQUIDMinesState()
+        self.assertEqual(gs.t, 0.0)
+        self.assertTrue(gs.sound_enabled)
+        self.assertFalse(gs.kb_active)
+        self.assertEqual(gs.kb_col, 0)
+        self.assertEqual(gs.kb_row, 0)
+
+    def test_reset(self):
+        from security.squid_mines import SQUIDMinesState
+        gs = SQUIDMinesState()
+        gs.beep_timer = 1.5
+        gs.reset()
+        self.assertEqual(gs.beep_timer, 0.0)
+
+
+class TestSimSpeed(unittest.TestCase):
+
+    def setUp(self):
+        from sim_speed import set_sim_speed
+        set_sim_speed(1.0)
+
+    def tearDown(self):
+        from sim_speed import set_sim_speed
+        set_sim_speed(1.0)
+
+    def test_default_speed(self):
+        from sim_speed import get_sim_speed
+        self.assertEqual(get_sim_speed(), 1.0)
+
+    def test_apply_speed(self):
+        from sim_speed import apply_speed, set_sim_speed
+        set_sim_speed(2.0)
+        self.assertAlmostEqual(apply_speed(0.016), 0.032)
+
+    def test_cycle_speed(self):
+        from sim_speed import cycle_sim_speed, get_sim_speed
+        cycle_sim_speed(1)
+        self.assertEqual(get_sim_speed(), 2.0)
+        cycle_sim_speed(1)
+        self.assertEqual(get_sim_speed(), 4.0)
+        cycle_sim_speed(1)  # 최대에서 더 올려도 4.0
+        self.assertEqual(get_sim_speed(), 4.0)
+
+    def test_speed_clamped(self):
+        from sim_speed import set_sim_speed, get_sim_speed
+        set_sim_speed(10.0)
+        self.assertEqual(get_sim_speed(), 4.0)
+        set_sim_speed(0.1)
+        self.assertEqual(get_sim_speed(), 0.25)
+
+    def test_speed_label(self):
+        from sim_speed import speed_label, set_sim_speed
+        set_sim_speed(1.0)
+        self.assertEqual(speed_label(), "1x")
+        set_sim_speed(0.5)
+        self.assertEqual(speed_label(), "0.5x")
+
+
+class TestPerfMonitor(unittest.TestCase):
+
+    def test_tick_and_fps(self):
+        from perf_monitor import PerfMonitor
+        pm = PerfMonitor(target_fps=60)
+        pm.tick(1.0 / 60)
+        self.assertAlmostEqual(pm.current_fps, 60.0, places=0)
+        self.assertEqual(pm.total_frames, 1)
+
+    def test_frame_drop_detection(self):
+        from perf_monitor import PerfMonitor
+        pm = PerfMonitor(target_fps=60)
+        pm.tick(0.016)  # 정상
+        pm.tick(0.050)  # 드롭 (50ms > 25ms threshold)
+        self.assertEqual(pm.frame_drops, 1)
+        self.assertEqual(pm.total_frames, 2)
+
+    def test_summary(self):
+        from perf_monitor import PerfMonitor
+        pm = PerfMonitor(target_fps=60)
+        for _ in range(10):
+            pm.tick(1.0 / 60)
+        s = pm.summary()
+        self.assertEqual(s["total_frames"], 10)
+        self.assertGreater(s["avg_fps"], 50)
+        self.assertIsInstance(s["drop_rate"], float)
+
+    def test_avg_and_min_fps(self):
+        from perf_monitor import PerfMonitor
+        pm = PerfMonitor(target_fps=60)
+        pm.tick(0.010)  # 100 FPS
+        pm.tick(0.020)  # 50 FPS
+        pm.tick(0.050)  # 20 FPS
+        self.assertAlmostEqual(pm.min_fps, 20.0, places=0)
+        self.assertGreater(pm.avg_fps, 0)
+
+
+class TestScoreIntegrity(unittest.TestCase):
+
+    def test_sign_and_verify(self):
+        from score_integrity import sign_score, verify_score
+        token = sign_score("Player", 42.5, "qubit_chain")
+        self.assertTrue(verify_score("Player", 42.5, "qubit_chain", token))
+
+    def test_tampered_score_fails(self):
+        from score_integrity import sign_score, verify_score
+        token = sign_score("Player", 42.5, "qubit_chain")
+        self.assertFalse(verify_score("Player", 99.9, "qubit_chain", token))
+
+    def test_tampered_name_fails(self):
+        from score_integrity import sign_score, verify_score
+        token = sign_score("Player", 42.5, "qubit_chain")
+        self.assertFalse(verify_score("Hacker", 42.5, "qubit_chain", token))
+
+    def test_invalid_token_format(self):
+        from score_integrity import verify_score
+        self.assertFalse(verify_score("Player", 42.5, "qubit_chain", "garbage"))
+        self.assertFalse(verify_score("Player", 42.5, "qubit_chain", ""))
+
+    def test_expired_token(self):
+        import time as _time
+        from score_integrity import verify_score
+        # 과거 타임스탬프로 직접 만료 토큰 생성
+        import hashlib, hmac
+        import score_integrity
+        old_ts = int(_time.time()) - score_integrity._TOKEN_TTL - 10
+        msg = f"Player:10.00:test:{old_ts}".encode("utf-8")
+        digest = hmac.new(score_integrity._SECRET, msg, hashlib.sha256).hexdigest()
+        expired_token = f"{old_ts}:{digest}"
+        self.assertFalse(verify_score("Player", 10.0, "test", expired_token))
+
+
+class TestProfileManagement(unittest.TestCase):
+
+    def setUp(self):
+        import presets
+        self._orig_dir = presets.PROFILES_DIR
+        self._tmpdir = tempfile.mkdtemp()
+        presets.PROFILES_DIR = self._tmpdir
+
+    def tearDown(self):
+        import presets
+        presets.PROFILES_DIR = self._orig_dir
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_save_and_list(self):
+        from presets import save_profile, list_profiles
+        save_profile("test_profile", {"noise_rate": 5.0, "damage": 20})
+        profiles = list_profiles()
+        self.assertIn("test_profile", profiles)
+
+    def test_delete_profile(self):
+        from presets import save_profile, delete_profile, list_profiles
+        save_profile("to_delete", {"a": 1})
+        self.assertTrue(delete_profile("to_delete"))
+        self.assertNotIn("to_delete", list_profiles())
+
+    def test_delete_nonexistent(self):
+        from presets import delete_profile
+        self.assertFalse(delete_profile("nonexistent"))
+
+    def test_rename_profile(self):
+        from presets import save_profile, rename_profile, list_profiles, load_profile
+        save_profile("old_name", {"x": 42})
+        self.assertTrue(rename_profile("old_name", "new_name"))
+        profiles = list_profiles()
+        self.assertNotIn("old_name", profiles)
+        self.assertIn("new_name", profiles)
+        data = load_profile("new_name")
+        self.assertEqual(data["x"], 42)
+
+    def test_rename_conflict(self):
+        from presets import save_profile, rename_profile
+        save_profile("a", {"x": 1})
+        save_profile("b", {"y": 2})
+        self.assertFalse(rename_profile("a", "b"))
+
+    def test_rename_nonexistent(self):
+        from presets import rename_profile
+        self.assertFalse(rename_profile("no_such", "new_name"))
+
+
+class TestFontScale(unittest.TestCase):
+
+    def test_default_scale(self):
+        from theme import get_font_scale
+        self.assertEqual(get_font_scale(), 1.0)
+
+    def test_set_scale(self):
+        from theme import set_font_scale, get_font_scale
+        set_font_scale(1.2)
+        self.assertEqual(get_font_scale(), 1.2)
+        set_font_scale(1.0)  # 복원
+
+    def test_scale_clamped(self):
+        from theme import set_font_scale, get_font_scale
+        set_font_scale(0.5)  # 최소 0.8
+        self.assertEqual(get_font_scale(), 0.8)
+        set_font_scale(2.0)  # 최대 1.5
+        self.assertEqual(get_font_scale(), 1.5)
+        set_font_scale(1.0)  # 복원
+
+    def test_increase_decrease(self):
+        from theme import increase_font_scale, decrease_font_scale, get_font_scale, set_font_scale
+        set_font_scale(1.0)
+        increase_font_scale()
+        self.assertAlmostEqual(get_font_scale(), 1.1)
+        decrease_font_scale()
+        self.assertAlmostEqual(get_font_scale(), 1.0)
+
+    def test_fonts_scale_affects_size(self):
+        from theme import FONTS, set_font_scale
+        set_font_scale(1.0)
+        body_normal = FONTS.BODY
+        set_font_scale(1.5)
+        body_large = FONTS.BODY
+        self.assertGreater(body_large[1], body_normal[1])
+        set_font_scale(1.0)  # 복원
+
+
+class TestFluxPinningState(unittest.TestCase):
+
+    def test_default_values(self):
+        from physics.flux_pinning import FluxPinningState
+        gs = FluxPinningState()
+        self.assertFalse(gs.dragging)
+        self.assertFalse(gs.flipped)
+        self.assertTrue(gs.superconducting)
+        self.assertEqual(gs.sc_vx, 0.0)
+        self.assertEqual(gs.sc_vy, 0.0)
+
+    def test_custom_init(self):
+        from physics.flux_pinning import FluxPinningState
+        gs = FluxPinningState(magnet_x=450.0, magnet_y=340.0)
+        self.assertEqual(gs.magnet_x, 450.0)
+        self.assertEqual(gs.magnet_y, 340.0)
 
 
 if __name__ == "__main__":

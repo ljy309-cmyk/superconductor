@@ -146,6 +146,18 @@
 
   "colorblind_on": "Colorblind: ON",
   "colorblind_off": "Colorblind: OFF",
+  "font_scale": "Font Size",
+  "profile_title": "Profile Manager",
+  "profile_heading": "Saved Profiles",
+  "profile_rename": "Rename",
+  "profile_delete": "Delete",
+  "profile_refresh": "Refresh",
+  "profile_count": "{count} profile(s)",
+  "profile_select_first": "Please select a profile first.",
+  "profile_new_name": "New name:",
+  "profile_rename_fail": "Rename failed (already exists or source not found).",
+  "profile_delete_confirm": "Delete profile '{name}'?",
+  "menu_profiles": "Manage Profiles",
 
   "graph_title_temp": "Temperature Graph",
   "graph_live_temp": "Live Temperature",

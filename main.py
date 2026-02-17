@@ -11,7 +11,8 @@ from config_loader import cfg
 from i18n import t, set_locale
 from theme import (TK, FONTS, get_theme, toggle_theme, get_tk_theme,
                    is_colorblind, set_colorblind, toggle_colorblind,
-                   load_preferences, save_preferences)
+                   load_preferences, save_preferences,
+                   get_font_scale, increase_font_scale, decrease_font_scale)
 
 
 class App(tk.Tk):
@@ -72,6 +73,29 @@ class App(tk.Tk):
             command=self._toggle_colorblind, width=14,
         ).pack(side="left", padx=2)
 
+        # 폰트 크기 조절
+        font_frame = tk.Frame(frame, bg=get_tk_theme().BG)
+        font_frame.pack(pady=(4, 0))
+        tk.Button(
+            font_frame, text="A-", font=FONTS.SMALL,
+            command=self._decrease_font, width=4,
+        ).pack(side="left", padx=2)
+        tk.Label(
+            font_frame, text=f"{t('font_scale')}: {get_font_scale():.1f}x",
+            font=FONTS.SMALL, bg=get_tk_theme().BG, fg=get_tk_theme().TEXT,
+        ).pack(side="left", padx=4)
+        tk.Button(
+            font_frame, text="A+", font=FONTS.SMALL,
+            command=self._increase_font, width=4,
+        ).pack(side="left", padx=2)
+
+        # 프로파일 관리 버튼
+        tk.Button(
+            font_frame, text=t("menu_profiles"), font=FONTS.SMALL,
+            command=lambda: __import__("profile_manager").open_profile_manager(self),
+            width=14,
+        ).pack(side="left", padx=(10, 2))
+
     def _switch_locale(self, locale: str):
         """언어 전환 후 UI 재구성."""
         set_locale(locale)
@@ -90,6 +114,22 @@ class App(tk.Tk):
     def _toggle_colorblind(self):
         """색맹 친화 모드 토글 후 UI 재구성."""
         toggle_colorblind()
+        save_preferences()
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._create_widgets()
+
+    def _increase_font(self):
+        """폰트 크기 증가 후 UI 재구성."""
+        increase_font_scale()
+        save_preferences()
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._create_widgets()
+
+    def _decrease_font(self):
+        """폰트 크기 감소 후 UI 재구성."""
+        decrease_font_scale()
         save_preferences()
         for widget in self.winfo_children():
             widget.destroy()

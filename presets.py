@@ -102,6 +102,32 @@ def list_profiles() -> list[str]:
     ]
 
 
+def delete_profile(name: str) -> bool:
+    """프로파일 삭제."""
+    path = os.path.join(PROFILES_DIR, f"{name}.json")
+    if os.path.exists(path):
+        os.remove(path)
+        _log.info("프로파일 삭제: %s", path)
+        return True
+    _log.warning("프로파일 없음 (삭제 실패): %s", path)
+    return False
+
+
+def rename_profile(old_name: str, new_name: str) -> bool:
+    """프로파일 이름 변경."""
+    old_path = os.path.join(PROFILES_DIR, f"{old_name}.json")
+    new_path = os.path.join(PROFILES_DIR, f"{new_name}.json")
+    if not os.path.exists(old_path):
+        _log.warning("프로파일 없음 (이름변경 실패): %s", old_path)
+        return False
+    if os.path.exists(new_path):
+        _log.warning("이름 충돌: %s 이미 존재", new_path)
+        return False
+    os.rename(old_path, new_path)
+    _log.info("프로파일 이름변경: %s → %s", old_name, new_name)
+    return True
+
+
 def apply_profile_to_sliders(profile_name: str, sliders: dict):
     """프로파일 값을 슬라이더에 적용.
 
