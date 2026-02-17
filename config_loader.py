@@ -137,7 +137,10 @@ def _validate(section: str, key: str, value):
             _log.warning("설정 타입 오류: [%s].%s = %r (bool 필요)", section, key, value)
             return None
         return value
-    if expected_type in (int, float) and isinstance(value, (int, float)):
+    if expected_type in (int, float):
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            _log.warning("설정 타입 오류: [%s].%s = %r (%s 필요)", section, key, value, expected_type.__name__)
+            return None
         if expected_type is int:
             value = int(value)
         else:
@@ -176,7 +179,10 @@ def _load() -> dict:
 
 def cfg(section: str, key: str, default=None):
     """설정 값 조회.  cfg("qubit_chain", "noise_rate_base", 3.0)"""
-    raw = _load().get(section, {}).get(key, default)
+    sec_data = _load().get(section, {})
+    if not isinstance(sec_data, dict):
+        return default
+    raw = sec_data.get(key, default)
     if raw is None:
         return default
     validated = _validate(section, key, raw)
