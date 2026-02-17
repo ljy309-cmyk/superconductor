@@ -18,6 +18,8 @@ _cache: dict | None = None
 _SCHEMA: dict[str, dict[str, tuple]] = {
     "display": {
         "fps": (int, 1, 240),
+        "width": (int, 640, 3840),
+        "height": (int, 480, 2160),
     },
     "accessibility": {
         "colorblind_mode": (bool, None, None),

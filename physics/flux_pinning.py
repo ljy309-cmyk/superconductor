@@ -17,7 +17,8 @@ from logger import get_module_logger
 _log = get_module_logger("flux_pinning")
 
 # ── 화면 설정 ────────────────────────────────────────
-WIDTH, HEIGHT = 900, 600
+WIDTH = cfg("display", "width", 900)
+HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
 
 # ── 색상 (테마에서 동적 로드) ─────────────────────────

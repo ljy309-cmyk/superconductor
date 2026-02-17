@@ -1,6 +1,8 @@
 {
   "display": {
-    "fps": 60
+    "fps": 60,
+    "width": 900,
+    "height": 600
   },
   "accessibility": {
     "colorblind_mode": false
