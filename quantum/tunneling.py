@@ -10,6 +10,7 @@ import random
 import pygame
 
 from config_loader import cfg
+from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -24,15 +25,30 @@ _log = get_module_logger("tunneling")
 WIDTH, HEIGHT = 900, 600
 FPS = cfg("display", "fps", 60)
 
-# ── 색상 ─────────────────────────────────────────────
+# ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
 TEXT_CLR = (205, 214, 244)
-ACCENT = (203, 166, 247)   # 보라
-BARRIER_CLR = (249, 226, 175)  # 노랑 장벽
-PARTICLE_CLR = (137, 180, 250)  # 파랑 입자
-TUNNEL_FLASH = (166, 227, 161)  # 터널링 성공 초록 플래시
-REFLECT_CLR = (243, 139, 168)   # 반사 빨강
+ACCENT = (203, 166, 247)
+BARRIER_CLR = (249, 226, 175)
+PARTICLE_CLR = (137, 180, 250)
+TUNNEL_FLASH = (166, 227, 161)  # 터널링 성공
+REFLECT_CLR = (243, 139, 168)   # 반사
 BLOCH_RING = (88, 91, 112)
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, ACCENT, BARRIER_CLR, PARTICLE_CLR
+    global TUNNEL_FLASH, REFLECT_CLR, BLOCH_RING
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    ACCENT = pg.ACCENT_PURPLE
+    BARRIER_CLR = pg.ACCENT_YELLOW
+    PARTICLE_CLR = pg.ACCENT_BLUE
+    TUNNEL_FLASH = pg.GREEN       # 성공 = safe color
+    REFLECT_CLR = pg.RED          # 실패 = danger color
+    BLOCH_RING = pg.SUBTEXT
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 TUNNEL_PROB_BASE = cfg("tunneling", "tunnel_prob_base", 0.10)
@@ -249,6 +265,7 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
 
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
+    _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption("Quantum Superposition & Tunneling")

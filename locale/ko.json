@@ -142,5 +142,8 @@
   "comparison_hint": "C: 비교 모드 | 같은 설정으로 QEC ON/OFF 비교",
 
   "theme_dark": "Dark",
-  "theme_light": "Light"
+  "theme_light": "Light",
+
+  "colorblind_on": "색맹모드: ON",
+  "colorblind_off": "색맹모드: OFF"
 }

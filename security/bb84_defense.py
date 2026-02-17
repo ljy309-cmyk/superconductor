@@ -12,6 +12,7 @@ import random
 import pygame
 
 from config_loader import cfg
+from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -33,21 +34,39 @@ except ImportError:
 WIDTH, HEIGHT = 900, 600
 FPS = cfg("display", "fps", 60)
 
-# ── 색상 ─────────────────────────────────────────────
+# ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
 TEXT_CLR = (205, 214, 244)
 ACCENT = (249, 226, 175)
-ALICE_CLR = (137, 180, 250)    # Alice 파랑
-BOB_CLR = (166, 227, 161)      # Bob 초록
-EVE_CLR = (243, 139, 168)      # Eve 빨강
-QUBIT_CLR = (203, 166, 247)    # 큐비트 보라
-DECOY_CLR = (249, 226, 175)    # 미션3: 디코이 노랑
+ALICE_CLR = (137, 180, 250)
+BOB_CLR = (166, 227, 161)
+EVE_CLR = (243, 139, 168)
+QUBIT_CLR = (203, 166, 247)
+DECOY_CLR = (249, 226, 175)
 SAFE_CLR = (166, 227, 161)
 DANGER_CLR = (243, 139, 168)
-WARNING_BG = (80, 30, 30)      # 미션2: 경고 배경 (짙은 빨강)
+WARNING_BG = (80, 30, 30)
 SHUTDOWN_CLR = (249, 226, 175)
 CHANNEL_CLR = (69, 71, 90)
 PANEL_BG = (24, 24, 37)
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, ALICE_CLR, BOB_CLR, EVE_CLR, QUBIT_CLR
+    global DECOY_CLR, SAFE_CLR, DANGER_CLR, CHANNEL_CLR, PANEL_BG
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    ALICE_CLR = pg.ALICE
+    BOB_CLR = pg.BOB
+    EVE_CLR = pg.EVE
+    QUBIT_CLR = pg.QUBIT
+    DECOY_CLR = pg.DECOY
+    SAFE_CLR = pg.GREEN
+    DANGER_CLR = pg.RED
+    CHANNEL_CLR = pg.OVERLAY
+    PANEL_BG = pg.PANEL_BG
 
 # ── 레이아웃 ─────────────────────────────────────────
 ALICE_X, ALICE_Y = 100, 250
@@ -480,6 +499,7 @@ def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 def run_simulation():
+    _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption("BB84 Quantum Key Distribution Defense")

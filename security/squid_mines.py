@@ -15,6 +15,7 @@ import random
 import pygame
 
 from config_loader import cfg
+from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -29,7 +30,7 @@ _log = get_module_logger("squid_mines")
 WIDTH, HEIGHT = 900, 650
 FPS = cfg("display", "fps", 60)
 
-# ── 색상 ─────────────────────────────────────────────
+# ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
 TEXT_CLR = (205, 214, 244)
 ACCENT = (137, 180, 250)
@@ -43,6 +44,23 @@ GRAPH_BG = (24, 24, 37)
 GRAPH_LINE = (203, 166, 247)    # 자기 선속 그래프 (보라)
 GRAPH_PEAK = (243, 139, 168)    # 피크 (빨강)
 SENSOR_CLR = (116, 199, 236)    # 센서 커서 글로우
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, ACCENT, GRID_CLR, CELL_MARKED, CELL_WRONG
+    global GRAPH_BG, GRAPH_LINE, GRAPH_PEAK, SENSOR_CLR
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    ACCENT = pg.ACCENT_BLUE
+    GRID_CLR = pg.OVERLAY
+    CELL_MARKED = pg.GREEN
+    CELL_WRONG = pg.RED
+    GRAPH_BG = pg.PANEL_BG
+    GRAPH_LINE = pg.ACCENT_PURPLE
+    GRAPH_PEAK = pg.RED
+    SENSOR_CLR = pg.SENSOR_CLR
 
 # ── 그리드 설정 (config.json에서 로드) ────────────────
 GRID_COLS = cfg("squid_mines", "grid_cols", 10)
@@ -297,6 +315,7 @@ def _draw_status(screen, game: SQUIDGame, font, big_font):
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 def run_simulation():
+    _load_theme_colors()
     pygame.init()
     # 미션1: 사운드 초기화
     pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)

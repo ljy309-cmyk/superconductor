@@ -15,12 +15,26 @@ from datetime import datetime
 
 import pandas as pd
 
+from theme import get_tk_theme
+
 BG = "#1e1e2e"
 FG = "#cdd6f4"
 ACCENT = "#89b4fa"
 BIT_0_CLR = "#a6e3a1"
 BIT_1_CLR = "#f38ba8"
 KEY_CLR = "#f9e2af"
+
+
+def _load_qrng_colors():
+    """현재 테마(색맹 모드 포함)에서 비트 색상을 로드."""
+    global BIT_0_CLR, BIT_1_CLR, BG, FG, ACCENT, KEY_CLR
+    _tk = get_tk_theme()
+    BG = _tk.BG
+    FG = _tk.TEXT
+    ACCENT = _tk.ACCENT_BLUE
+    BIT_0_CLR = _tk.GREEN    # 비트 0 = safe color
+    BIT_1_CLR = _tk.RED      # 비트 1 = danger color
+    KEY_CLR = _tk.YELLOW
 
 # ── 미션3: QRNG 키 공유 저장소 (BB84 통합, 스레드 안전) ──
 import queue as _queue
@@ -349,4 +363,5 @@ class QRNGLoggerApp(tk.Toplevel):
 
 def open_qrng_logger(master=None):
     """외부에서 호출하는 진입점."""
+    _load_qrng_colors()
     QRNGLoggerApp(master)

@@ -7,8 +7,10 @@ from physics.launcher import open_physics_launcher
 from quantum.launcher import open_quantum_launcher
 from security.launcher import open_security_launcher
 from data_ai.launcher import open_data_ai_launcher
+from config_loader import cfg
 from i18n import t, set_locale
-from theme import TK, FONTS, get_theme, toggle_theme, get_tk_theme
+from theme import (TK, FONTS, get_theme, toggle_theme, get_tk_theme,
+                   is_colorblind, set_colorblind, toggle_colorblind)
 
 
 class App(tk.Tk):
@@ -16,6 +18,10 @@ class App(tk.Tk):
         super().__init__()
         self.title("Superconductor")
         self.resizable(False, False)
+
+        # config.json에서 색맹 모드 초기 설정 로드
+        if cfg("accessibility", "colorblind_mode", False):
+            set_colorblind(True)
 
         self._buttons = [
             ("menu_scada",    lambda: open_dashboard(self)),
@@ -42,7 +48,7 @@ class App(tk.Tk):
                 width=35, height=2,
             ).pack(pady=4)
 
-        # 언어 전환 + 테마 전환 버튼
+        # 언어 전환 + 테마 전환 + 색맹 모드 버튼
         option_frame = tk.Frame(frame, bg=get_tk_theme().BG)
         option_frame.pack(pady=(10, 0))
         tk.Button(
@@ -60,6 +66,12 @@ class App(tk.Tk):
             command=self._switch_theme, width=12,
         ).pack(side="left", padx=(10, 2))
 
+        cb_label = t("colorblind_on") if is_colorblind() else t("colorblind_off")
+        tk.Button(
+            option_frame, text=cb_label, font=FONTS.SMALL,
+            command=self._toggle_colorblind, width=14,
+        ).pack(side="left", padx=2)
+
     def _switch_locale(self, locale: str):
         """언어 전환 후 UI 재구성."""
         set_locale(locale)
@@ -70,6 +82,13 @@ class App(tk.Tk):
     def _switch_theme(self):
         """다크/라이트 테마 전환 후 UI 재구성."""
         toggle_theme()
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._create_widgets()
+
+    def _toggle_colorblind(self):
+        """색맹 친화 모드 토글 후 UI 재구성."""
+        toggle_colorblind()
         for widget in self.winfo_children():
             widget.destroy()
         self._create_widgets()

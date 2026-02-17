@@ -13,6 +13,7 @@ import time
 import pygame
 
 from config_loader import cfg
+from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -29,12 +30,13 @@ _log = get_module_logger("qubit_chain")
 WIDTH, HEIGHT = 900, 600
 FPS = cfg("display", "fps", 60)
 
-# ── 색상 ─────────────────────────────────────────────
+# ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
 TEXT_CLR = (205, 214, 244)
 ACCENT = (137, 180, 250)
 LINK_CLR = (88, 91, 112)
 LINK_ENTANGLED = (203, 166, 247)  # 얽힘 연결선
+SHIELD_GLOW = (116, 199, 236)
 
 # 큐비트 상태별 색상
 STATE_COLORS = {
@@ -43,6 +45,24 @@ STATE_COLORS = {
     "danger": (250, 179, 135),     # 주황 — 위험
     "collapsed": (243, 139, 168),  # 빨강 — 붕괴
 }
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, ACCENT, LINK_CLR, LINK_ENTANGLED, STATE_COLORS, SHIELD_GLOW
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    ACCENT = pg.ACCENT_BLUE
+    LINK_CLR = pg.SUBTEXT
+    LINK_ENTANGLED = pg.ACCENT_PURPLE
+    SHIELD_GLOW = pg.SHIELD_GLOW
+    STATE_COLORS = {
+        "stable": pg.STABLE,
+        "warning": pg.WARNING,
+        "danger": pg.DANGER,
+        "collapsed": pg.COLLAPSED,
+    }
 
 # ── 물리 파라미터 (config.json에서 로드, 없으면 기본값) ──
 STRESS_THRESHOLD = cfg("qubit_chain", "stress_threshold", 100.0)
@@ -220,6 +240,7 @@ def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y:
 
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
+    _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption("Qubit Entanglement Cascade")
@@ -464,7 +485,7 @@ def run_simulation():
         log_label = info_font.render("── Event Log ──", True, ACCENT)
         screen.blit(log_label, (log_x, log_y - 16))
         for i, msg in enumerate(cascade_log):
-            clr = (243, 139, 168) if "COLLAPSED" in msg else TEXT_CLR
+            clr = STATE_COLORS["collapsed"] if "COLLAPSED" in msg else TEXT_CLR
             surf = info_font.render(msg, True, clr)
             screen.blit(surf, (log_x, log_y + i * 15))
 
@@ -476,20 +497,20 @@ def run_simulation():
             dmg_txt = info_font.render(f"cascade: +{int(cascade_damage)} → +{int(cascade_damage * qec_reduction)}", True, SHIELD_CLR)
             screen.blit(dmg_txt, (hud_x, hud_y + 16))
         elif cooldown_timer > 0:
-            cd_txt = info_font.render(f"Shield CD: {cooldown_timer:.1f}s", True, (249, 226, 175))
+            cd_txt = info_font.render(f"Shield CD: {cooldown_timer:.1f}s", True, STATE_COLORS["warning"])
             screen.blit(cd_txt, (hud_x, hud_y))
         else:
-            ready_txt = info_font.render("Shield: READY (S)", True, (166, 227, 161))
+            ready_txt = info_font.render("Shield: READY (S)", True, STATE_COLORS["stable"])
             screen.blit(ready_txt, (hud_x, hud_y))
 
         if heal_cooldown > 0:
-            heal_txt = info_font.render(f"Heal CD: {heal_cooldown:.1f}s", True, (249, 226, 175))
+            heal_txt = info_font.render(f"Heal CD: {heal_cooldown:.1f}s", True, STATE_COLORS["warning"])
         else:
-            heal_txt = info_font.render("Heal: READY (H)", True, (166, 227, 161))
+            heal_txt = info_font.render("Heal: READY (H)", True, STATE_COLORS["stable"])
         screen.blit(heal_txt, (hud_x, hud_y + 32))
 
         # 최종보스미션: 생존 시간 표시
-        time_clr = (243, 139, 168) if game_over else ACCENT
+        time_clr = STATE_COLORS["collapsed"] if game_over else ACCENT
         time_txt = info_font.render(f"Survival: {survival_time:.1f}s", True, time_clr)
         screen.blit(time_txt, (hud_x, hud_y + 52))
 
@@ -534,7 +555,7 @@ def run_simulation():
         if all_collapsed:
             over_surf = title_font.render(
                 f"ALL QUBITS COLLAPSED  |  Survival: {survival_time:.2f}s  |  Press R to reset",
-                True, (243, 139, 168))
+                True, STATE_COLORS["collapsed"])
             screen.blit(over_surf, (WIDTH // 2 - over_surf.get_width() // 2, HEIGHT // 2 - 80))
 
         preset_hud.draw(screen, info_font, hud_x, hud_y + 72)

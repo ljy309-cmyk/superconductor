@@ -142,5 +142,8 @@
   "comparison_hint": "C: Comparison Mode | Compare QEC ON/OFF with same settings",
 
   "theme_dark": "Dark",
-  "theme_light": "Light"
+  "theme_light": "Light",
+
+  "colorblind_on": "Colorblind: ON",
+  "colorblind_off": "Colorblind: OFF"
 }

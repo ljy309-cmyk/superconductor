@@ -17,6 +17,8 @@ try:
 except ImportError:
     pygame = None  # type: ignore[assignment]
 
+from theme import get_pg_theme
+
 
 class AchievementToast:
     """업적 해금 토스트 알림 (슬라이드 인/아웃 애니메이션)."""
@@ -103,7 +105,7 @@ class AchievementToast:
 
         # 타이틀
         title = self._current.get("title", "Achievement!")
-        title_surf = font.render(f"Achievement: {title}", True, (166, 227, 161))
+        title_surf = font.render(f"Achievement: {title}", True, get_pg_theme().GREEN)
         surf.blit(title_surf, (10 + icon_surf.get_width() + 6, 8))
 
         # 설명

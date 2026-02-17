@@ -22,10 +22,20 @@ from sklearn.metrics import r2_score, mean_absolute_error
 
 from config_loader import cfg
 from data_ai.generate_sample_data import generate as generate_data
+from theme import get_tk_theme
 
 BG = "#1e1e2e"
 FG = "#cdd6f4"
 ACCENT = "#a6e3a1"
+
+
+def _load_tc_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, FG, ACCENT
+    _tk = get_tk_theme()
+    BG = _tk.BG
+    FG = _tk.TEXT
+    ACCENT = _tk.ACCENT_GREEN
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.xlsx")
 CSV_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.csv")
@@ -221,11 +231,13 @@ class TcPredictorApp(tk.Toplevel):
         self._draw_scatter_plots()
         axes = self.fig.get_axes()
         for i, ax in enumerate(axes):
-            ax.axhline(y=tc_pred, color="#f38ba8", linewidth=0.8, linestyle="--", alpha=0.6)
-            ax.scatter([values[i]], [tc_pred], c="#f38ba8", s=60, marker="*", zorder=5)
+            _tk = get_tk_theme()
+            ax.axhline(y=tc_pred, color=_tk.RED, linewidth=0.8, linestyle="--", alpha=0.6)
+            ax.scatter([values[i]], [tc_pred], c=_tk.RED, s=60, marker="*", zorder=5)
         self.canvas.draw()
 
 
 def open_tc_predictor(master=None):
     """외부에서 호출하는 진입점."""
+    _load_tc_colors()
     TcPredictorApp(master)

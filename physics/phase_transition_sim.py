@@ -19,7 +19,7 @@ import time
 import pygame
 
 from config_loader import cfg
-from theme import PG
+from theme import get_pg_theme
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from replay import ReplayRecorder
@@ -30,8 +30,8 @@ _log = get_module_logger("phase_transition_sim")
 WIDTH, HEIGHT = 900, 600
 FPS = cfg("display", "fps", 60)
 
-BG = PG.BG
-TEXT_CLR = PG.TEXT
+BG = (30, 30, 46)
+TEXT_CLR = (205, 214, 244)
 ACCENT = (137, 180, 250)
 
 # 물리 파라미터
@@ -44,11 +44,24 @@ CELL_SIZE = 50
 GRID_OFFSET_X = (WIDTH - GRID_COLS * CELL_SIZE) // 2
 GRID_OFFSET_Y = 80
 
-# 색상
+# 색상 (테마에서 동적 로드)
 ATOM_NORMAL = (205, 214, 244)
 ATOM_SC = (166, 227, 161)       # 초전도 상태
 COOPER_CLR = (137, 180, 250)    # 쿠퍼쌍 연결
 RESISTANCE_CLR = (243, 139, 168)
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, ACCENT, ATOM_NORMAL, ATOM_SC, COOPER_CLR, RESISTANCE_CLR
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    ACCENT = pg.ACCENT_BLUE
+    ATOM_NORMAL = pg.TEXT
+    ATOM_SC = pg.GREEN            # 초전도 = safe color
+    COOPER_CLR = pg.ACCENT_BLUE
+    RESISTANCE_CLR = pg.RED       # 저항 = danger color
 
 
 class Atom:
@@ -75,6 +88,7 @@ class CooperPair:
 
 def run_simulation():
     """Pygame 상전이 시뮬레이션."""
+    _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Phase Transition — Lattice Vibration & Cooper Pairs")
@@ -213,7 +227,7 @@ def run_simulation():
 
         # 상태 표시
         state_text = "SUPERCONDUCTING (R = 0)" if is_superconducting else f"NORMAL (R = {resistance_val:.2f})"
-        state_color = ATOM_SC if is_superconducting else (249, 226, 175)
+        state_color = ATOM_SC if is_superconducting else RESISTANCE_CLR
         state_surf = title_font.render(state_text, True, state_color)
         screen.blit(state_surf, (WIDTH // 2 - state_surf.get_width() // 2, HEIGHT - 125))
 
@@ -246,8 +260,8 @@ def run_simulation():
         # Tc 마크
         tc_ratio = TC_KELVIN / 400.0
         tc_mark_y = bar_y + bar_h - int(bar_h * tc_ratio)
-        pygame.draw.line(screen, (243, 139, 168), (tbar_x - 5, tc_mark_y), (tbar_x + bar_w + 5, tc_mark_y), 2)
-        tc_mark_label = font.render("Tc", True, (243, 139, 168))
+        pygame.draw.line(screen, RESISTANCE_CLR, (tbar_x - 5, tc_mark_y), (tbar_x + bar_w + 5, tc_mark_y), 2)
+        tc_mark_label = font.render("Tc", True, RESISTANCE_CLR)
         screen.blit(tc_mark_label, (tbar_x + bar_w + 8, tc_mark_y - 6))
 
         # 조작법

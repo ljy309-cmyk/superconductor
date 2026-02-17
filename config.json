@@ -2,6 +2,9 @@
   "display": {
     "fps": 60
   },
+  "accessibility": {
+    "colorblind_mode": false
+  },
   "server": {
     "host": "127.0.0.1",
     "port": 18084,

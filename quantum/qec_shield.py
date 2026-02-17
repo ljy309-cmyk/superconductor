@@ -11,6 +11,7 @@ import random
 import pygame
 
 from config_loader import cfg
+from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -25,16 +26,36 @@ _log = get_module_logger("qec_shield")
 WIDTH, HEIGHT = 900, 600
 FPS = cfg("display", "fps", 60)
 
-# ── 색상 ─────────────────────────────────────────────
+# ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
 TEXT_CLR = (205, 214, 244)
 ACCENT = (203, 166, 247)
-SHIELD_CLR = (137, 180, 250)   # 방어막 파랑
-SHIELD_GLOW = (116, 199, 236)  # 방어막 활성 글로우
+SHIELD_CLR = (137, 180, 250)
+SHIELD_GLOW = (116, 199, 236)
 STABLE_CLR = (166, 227, 161)
 WARNING_CLR = (249, 226, 175)
 COLLAPSED_CLR = (243, 139, 168)
 PANEL_BG = (24, 24, 37)
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, ACCENT, SHIELD_CLR, SHIELD_GLOW
+    global STABLE_CLR, WARNING_CLR, COLLAPSED_CLR, PANEL_BG
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    ACCENT = pg.ACCENT_PURPLE
+    SHIELD_CLR = pg.SHIELD_CLR
+    SHIELD_GLOW = pg.SHIELD_GLOW
+    STABLE_CLR = pg.STABLE
+    WARNING_CLR = pg.WARNING
+    COLLAPSED_CLR = pg.COLLAPSED
+    PANEL_BG = pg.PANEL_BG
+    # STATE_COLORS dict도 갱신
+    STATE_COLORS["stable"] = STABLE_CLR
+    STATE_COLORS["warning"] = WARNING_CLR
+    STATE_COLORS["collapsed"] = COLLAPSED_CLR
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 NOISE_RATE = cfg("qec_shield", "noise_rate", 5.0)
@@ -266,6 +287,7 @@ def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int,
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 def run_simulation():
+    _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption("Quantum Error Correction Shield")

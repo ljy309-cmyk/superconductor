@@ -19,6 +19,9 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
     "display": {
         "fps": (int, 1, 240),
     },
+    "accessibility": {
+        "colorblind_mode": (bool, None, None),
+    },
     "server": {
         "host": (str, None, None),
         "port": (int, 1024, 65535),
@@ -113,6 +116,11 @@ def _validate(section: str, key: str, value):
     expected_type, min_val, max_val = schema
 
     # 타입 검증
+    if expected_type is bool:
+        if not isinstance(value, bool):
+            _log.warning("설정 타입 오류: [%s].%s = %r (bool 필요)", section, key, value)
+            return None
+        return value
     if expected_type in (int, float) and isinstance(value, (int, float)):
         if expected_type is int:
             value = int(value)

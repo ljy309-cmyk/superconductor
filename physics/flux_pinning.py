@@ -7,7 +7,7 @@ import time
 import pygame
 
 from config_loader import cfg
-from theme import PG
+from theme import get_pg_theme
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
@@ -20,14 +20,27 @@ _log = get_module_logger("flux_pinning")
 WIDTH, HEIGHT = 900, 600
 FPS = cfg("display", "fps", 60)
 
-# ── 색상 (theme에서 가져옴) ──────────────────────────
-BG = PG.BG
-TEXT_CLR = PG.TEXT
-MAGNET_N = PG.MAGNET_N
-MAGNET_S = PG.MAGNET_S
-SC_COLOR = PG.SC_COLOR
-SC_GLOW = PG.SC_GLOW
+# ── 색상 (테마에서 동적 로드) ─────────────────────────
+_pg = get_pg_theme()
+BG = _pg.BG
+TEXT_CLR = _pg.TEXT
+MAGNET_N = _pg.MAGNET_N
+MAGNET_S = _pg.MAGNET_S
+SC_COLOR = _pg.SC_COLOR
+SC_GLOW = _pg.SC_GLOW
 FIELD_CLR = (88, 91, 112, 60)
+
+
+def _load_theme_colors():
+    """현재 테마(색맹 모드 포함)에서 색상을 로드."""
+    global BG, TEXT_CLR, MAGNET_N, MAGNET_S, SC_COLOR, SC_GLOW
+    pg = get_pg_theme()
+    BG = pg.BG
+    TEXT_CLR = pg.TEXT
+    MAGNET_N = pg.MAGNET_N
+    MAGNET_S = pg.MAGNET_S
+    SC_COLOR = pg.SC_COLOR
+    SC_GLOW = pg.SC_GLOW
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 EQUILIBRIUM_GAP = cfg("flux_pinning", "equilibrium_gap", 65.0)
@@ -45,6 +58,7 @@ SC_W, SC_H = 100, 30
 
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
+    _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Meissner Levitation & Flux Pinning")

@@ -7,7 +7,7 @@
 
 import tkinter as tk
 
-from theme import TK, FONTS
+from theme import TK, FONTS, get_tk_theme
 from logger import get_module_logger
 
 _log = get_module_logger("stats_dashboard")
@@ -193,7 +193,7 @@ class StatsDashboard(tk.Toplevel):
         for spine in ax2.spines.values():
             spine.set_color("#585b70")
         ax2.tick_params(colors="#cdd6f4", labelsize=7)
-        ax2.set_title("Survival Time Trend", color="#a6e3a1", fontsize=10, fontweight="bold")
+        ax2.set_title("Survival Time Trend", color=get_tk_theme().GREEN, fontsize=10, fontweight="bold")
 
         try:
             from data_ai.play_logger import get_logger

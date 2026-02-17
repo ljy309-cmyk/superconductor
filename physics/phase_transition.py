@@ -17,6 +17,7 @@ MATERIALS = {
 DEFAULT_MATERIAL = "YBCO (Tc=77K)"
 
 from config_loader import cfg
+from theme import get_tk_theme
 
 R_NORMAL = cfg("phase_transition", "r_normal", 1.0)
 T_RANGE = (cfg("phase_transition", "t_range_min", -275), cfg("phase_transition", "t_range_max", 50))
@@ -154,14 +155,15 @@ class PhaseTransitionWindow(tk.Toplevel):
 
         # T_c 수직선 (켈빈 병기)
         tc_k = _celsius_to_kelvin(self._tc)
+        _tk = get_tk_theme()
         ax.axvline(
-            x=self._tc, color="#f38ba8", linestyle="--", linewidth=1,
+            x=self._tc, color=_tk.RED, linestyle="--", linewidth=1,
             alpha=0.7, label=f"Tc = {self._tc:.1f}°C ({tc_k:.1f}K)",
         )
 
         # 현재 온도 마커 (켈빈 병기)
         cur_r = resistance(np.array([self._current_temp]), self._tc)[0]
-        marker_color = "#a6e3a1" if self._current_temp <= self._tc else "#f9e2af"
+        marker_color = _tk.GREEN if self._current_temp <= self._tc else _tk.YELLOW
         cur_k = _celsius_to_kelvin(self._current_temp)
         ax.plot(self._current_temp, cur_r, "o", color=marker_color, markersize=10, zorder=5)
         ax.annotate(
@@ -171,8 +173,8 @@ class PhaseTransitionWindow(tk.Toplevel):
         )
 
         # 초전도 / 정상 영역 배경
-        ax.axvspan(T_RANGE[0], self._tc, alpha=0.08, color="#a6e3a1", label="초전도 영역")
-        ax.axvspan(self._tc, T_RANGE[1], alpha=0.08, color="#f38ba8", label="정상 영역")
+        ax.axvspan(T_RANGE[0], self._tc, alpha=0.08, color=_tk.GREEN, label="초전도 영역")
+        ax.axvspan(self._tc, T_RANGE[1], alpha=0.08, color=_tk.RED, label="정상 영역")
 
         ax.legend(
             loc="upper left", fontsize=8,
