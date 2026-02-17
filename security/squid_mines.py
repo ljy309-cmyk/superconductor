@@ -49,7 +49,7 @@ SENSOR_CLR = (116, 199, 236)    # 센서 커서 글로우
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
     global BG, TEXT_CLR, ACCENT, GRID_CLR, CELL_MARKED, CELL_WRONG
-    global GRAPH_BG, GRAPH_LINE, GRAPH_PEAK, SENSOR_CLR
+    global GRAPH_BG, GRAPH_LINE, GRAPH_PEAK, SENSOR_CLR, WHITE
     pg = get_pg_theme()
     BG = pg.BG
     TEXT_CLR = pg.TEXT
@@ -61,6 +61,7 @@ def _load_theme_colors():
     GRAPH_LINE = pg.ACCENT_PURPLE
     GRAPH_PEAK = pg.RED
     SENSOR_CLR = pg.SENSOR_CLR
+    WHITE = pg.WHITE
 
 # ── 그리드 설정 (config.json에서 로드) ────────────────
 GRID_COLS = cfg("squid_mines", "grid_cols", 10)
@@ -234,10 +235,10 @@ def _draw_grid(screen, game: SQUIDGame, hover_cell, font):
 
             # 마킹 표시
             if pos in game.marked:
-                flag = font.render("M", True, (30, 30, 46))
+                flag = font.render("M", True, BG)
                 screen.blit(flag, (rect.centerx - flag.get_width() // 2, rect.centery - flag.get_height() // 2))
             elif pos in game.wrong:
-                x_mark = font.render("X", True, (255, 255, 255))
+                x_mark = font.render("X", True, WHITE)
                 screen.blit(x_mark, (rect.centerx - x_mark.get_width() // 2, rect.centery - x_mark.get_height() // 2))
 
 

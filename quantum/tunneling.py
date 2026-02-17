@@ -39,7 +39,7 @@ BLOCH_RING = (88, 91, 112)
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
     global BG, TEXT_CLR, ACCENT, BARRIER_CLR, PARTICLE_CLR
-    global TUNNEL_FLASH, REFLECT_CLR, BLOCH_RING
+    global TUNNEL_FLASH, REFLECT_CLR, BLOCH_RING, SURFACE_CLR, OVERLAY_CLR, WHITE
     pg = get_pg_theme()
     BG = pg.BG
     TEXT_CLR = pg.TEXT
@@ -49,6 +49,9 @@ def _load_theme_colors():
     TUNNEL_FLASH = pg.GREEN       # 성공 = safe color
     REFLECT_CLR = pg.RED          # 실패 = danger color
     BLOCH_RING = pg.SUBTEXT
+    SURFACE_CLR = pg.SURFACE
+    OVERLAY_CLR = pg.OVERLAY
+    WHITE = pg.WHITE
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 TUNNEL_PROB_BASE = cfg("tunneling", "tunnel_prob_base", 0.10)
@@ -166,8 +169,8 @@ class QuantumParticle:
 
 def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     """시뮬레이션 영역 배경."""
-    pygame.draw.rect(screen, (24, 24, 37), (SIM_LEFT, SIM_TOP, SIM_W, SIM_H))
-    pygame.draw.rect(screen, (69, 71, 90), (SIM_LEFT, SIM_TOP, SIM_W, SIM_H), 1)
+    pygame.draw.rect(screen, SURFACE_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H))
+    pygame.draw.rect(screen, OVERLAY_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H), 1)
 
     # 장벽
     bx = BARRIER_X - barrier_width // 2
@@ -179,9 +182,9 @@ def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     screen.blit(label_rot, (bx - 2, SIM_TOP + SIM_H // 2 - label_rot.get_height() // 2))
 
     # 영역 라벨
-    left_label = font.render("Classical Region", True, (69, 71, 90))
+    left_label = font.render("Classical Region", True, OVERLAY_CLR)
     screen.blit(left_label, (SIM_LEFT + 10, SIM_TOP + 5))
-    right_label = font.render("Tunneled Region", True, (69, 71, 90))
+    right_label = font.render("Tunneled Region", True, OVERLAY_CLR)
     screen.blit(right_label, (BARRIER_X + 20, SIM_TOP + 5))
 
 
@@ -199,13 +202,13 @@ def _draw_particle(screen, p: QuantumParticle, font):
         screen.blit(glow, (cx - flash_r, cy - flash_r))
 
     # 입자 본체 — 터널링 성공 시 흰색, 평상시 파랑
-    color = (255, 255, 255) if (p.tunneled is True and p.flash_timer > 0) else PARTICLE_CLR
+    color = WHITE if (p.tunneled is True and p.flash_timer > 0) else PARTICLE_CLR
     pygame.draw.circle(screen, color, (cx, cy), PARTICLE_RADIUS)
     pygame.draw.circle(screen, TEXT_CLR, (cx, cy), PARTICLE_RADIUS, 1)
 
     # 중첩 |0⟩/|1⟩ 텍스트
     state_text = f"|{p.qubit_state}⟩"
-    surf = font.render(state_text, True, (255, 255, 255))
+    surf = font.render(state_text, True, WHITE)
     screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
 
 
@@ -226,7 +229,7 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     )
 
     # 축
-    pygame.draw.line(screen, (69, 71, 90), (BLOCH_CX, BLOCH_CY - BLOCH_R - 8), (BLOCH_CX, BLOCH_CY + BLOCH_R + 8), 1)
+    pygame.draw.line(screen, OVERLAY_CLR, (BLOCH_CX, BLOCH_CY - BLOCH_R - 8), (BLOCH_CX, BLOCH_CY + BLOCH_R + 8), 1)
 
     # |0⟩, |1⟩ 라벨
     z0 = font.render("|0⟩", True, TUNNEL_FLASH)

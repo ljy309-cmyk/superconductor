@@ -28,12 +28,13 @@ MAGNET_N = _pg.MAGNET_N
 MAGNET_S = _pg.MAGNET_S
 SC_COLOR = _pg.SC_COLOR
 SC_GLOW = _pg.SC_GLOW
-FIELD_CLR = (88, 91, 112, 60)
+FIELD_CLR = (*_pg.SUBTEXT, 60)
 
 
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
     global BG, TEXT_CLR, MAGNET_N, MAGNET_S, SC_COLOR, SC_GLOW
+    global SUBTEXT_CLR, WHITE, INACTIVE_CLR
     pg = get_pg_theme()
     BG = pg.BG
     TEXT_CLR = pg.TEXT
@@ -41,6 +42,9 @@ def _load_theme_colors():
     MAGNET_S = pg.MAGNET_S
     SC_COLOR = pg.SC_COLOR
     SC_GLOW = pg.SC_GLOW
+    SUBTEXT_CLR = pg.SUBTEXT
+    WHITE = pg.WHITE
+    INACTIVE_CLR = pg.INACTIVE
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 EQUILIBRIUM_GAP = cfg("flux_pinning", "equilibrium_gap", 65.0)
@@ -179,7 +183,7 @@ def run_simulation():
         # 연결선 (스프링 시각화)
         if superconducting:
             pygame.draw.line(
-                screen, (88, 91, 112),
+                screen, SUBTEXT_CLR,
                 (int(magnet_x), int(magnet_y)),
                 (int(sc_x), int(draw_sc_y)),
                 1,
@@ -246,8 +250,8 @@ def _draw_magnet(screen, cx, cy, flipped, font):
 
     n_label = "S" if flipped else "N"
     s_label = "N" if flipped else "S"
-    n_surf = font.render(n_label, True, (255, 255, 255))
-    s_surf = font.render(s_label, True, (255, 255, 255))
+    n_surf = font.render(n_label, True, WHITE)
+    s_surf = font.render(s_label, True, WHITE)
     screen.blit(n_surf, (left + MAGNET_W / 4 - n_surf.get_width() / 2, cy - n_surf.get_height() / 2))
     screen.blit(s_surf, (left + 3 * MAGNET_W / 4 - s_surf.get_width() / 2, cy - s_surf.get_height() / 2))
 
@@ -262,9 +266,9 @@ def _draw_superconductor(screen, cx, cy, t, superconducting=True):
         glow_surf.fill((*SC_GLOW, glow_alpha))
         screen.blit(glow_surf, (rect.x - 8, rect.y - 8))
 
-    body_color = SC_COLOR if superconducting else (100, 100, 100)
+    body_color = SC_COLOR if superconducting else INACTIVE_CLR
     pygame.draw.rect(screen, body_color, rect, border_radius=6)
-    pygame.draw.rect(screen, (255, 255, 255), rect, 1, border_radius=6)
+    pygame.draw.rect(screen, WHITE, rect, 1, border_radius=6)
 
 
 def _draw_field_lines(screen, cx, cy, flipped):
@@ -278,7 +282,7 @@ def _draw_field_lines(screen, cx, cy, flipped):
             px = int(cx + x_spread)
             py = int(cy + y_off)
             if 0 <= py <= HEIGHT:
-                pygame.draw.circle(screen, (88, 91, 112), (px, py), 1)
+                pygame.draw.circle(screen, SUBTEXT_CLR, (px, py), 1)
 
 
 def open_flux_pinning():

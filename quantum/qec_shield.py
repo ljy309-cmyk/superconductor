@@ -42,6 +42,7 @@ def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
     global BG, TEXT_CLR, ACCENT, SHIELD_CLR, SHIELD_GLOW
     global STABLE_CLR, WARNING_CLR, COLLAPSED_CLR, PANEL_BG
+    global SUBTEXT_CLR, OVERLAY_CLR, WHITE
     pg = get_pg_theme()
     BG = pg.BG
     TEXT_CLR = pg.TEXT
@@ -52,6 +53,9 @@ def _load_theme_colors():
     WARNING_CLR = pg.WARNING
     COLLAPSED_CLR = pg.COLLAPSED
     PANEL_BG = pg.PANEL_BG
+    SUBTEXT_CLR = pg.SUBTEXT
+    OVERLAY_CLR = pg.OVERLAY
+    WHITE = pg.WHITE
     # STATE_COLORS dict도 갱신
     STATE_COLORS["stable"] = STABLE_CLR
     STATE_COLORS["warning"] = WARNING_CLR
@@ -159,7 +163,7 @@ STATE_COLORS = {
 
 
 def _draw_link(screen, a: QECQubit, b: QECQubit):
-    color = (88, 91, 112)
+    color = SUBTEXT_CLR
     if a.collapsed or b.collapsed:
         color = COLLAPSED_CLR
     pygame.draw.line(screen, color, (int(a.x), int(a.y)), (int(b.x), int(b.y)), 1)
@@ -182,7 +186,7 @@ def _draw_node(screen, node: QECQubit, font, shield_active: bool, t: float):
 
     # 하중 텍스트
     txt = "X" if node.collapsed else f"{int(node.stress)}%"
-    surf = font.render(txt, True, BG if not node.collapsed else (255, 255, 255))
+    surf = font.render(txt, True, BG if not node.collapsed else WHITE)
     screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
 
 
@@ -207,7 +211,7 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
         bar_x, bar_y = hud_x + 20, hud_y + 70
         bar_w, bar_h = hud_w - 40, 16
         ratio = max(shield_timer / QEC_DURATION, 0)
-        pygame.draw.rect(screen, (69, 71, 90), (bar_x, bar_y, bar_w, bar_h))
+        pygame.draw.rect(screen, OVERLAY_CLR, (bar_x, bar_y, bar_w, bar_h))
         pygame.draw.rect(screen, SHIELD_GLOW, (bar_x, bar_y, int(bar_w * ratio), bar_h))
         pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), 1)
 
@@ -236,7 +240,7 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
         bar_x, bar_y = hud_x + 20, hud_y + 70
         bar_w, bar_h = hud_w - 40, 16
         ratio = max(1 - cooldown_timer / QEC_COOLDOWN, 0)
-        pygame.draw.rect(screen, (69, 71, 90), (bar_x, bar_y, bar_w, bar_h))
+        pygame.draw.rect(screen, OVERLAY_CLR, (bar_x, bar_y, bar_w, bar_h))
         pygame.draw.rect(screen, WARNING_CLR, (bar_x, bar_y, int(bar_w * ratio), bar_h))
         pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), 1)
 
@@ -253,7 +257,7 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
     adj_y = hud_y + 140
     adj_label = font.render(f"감쇠 계수: x{qec_reduction:.1f}", True, TEXT_CLR)
     screen.blit(adj_label, (hud_x + 20, adj_y))
-    adj_hint = font.render("←→ 키로 조절", True, (88, 91, 112))
+    adj_hint = font.render("←→ 키로 조절", True, SUBTEXT_CLR)
     screen.blit(adj_hint, (hud_x + 20, adj_y + 16))
 
     # ── 힐링 상태 ──
@@ -264,7 +268,7 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
         heal_txt = font.render("Heal: READY (H키)", True, STABLE_CLR)
     screen.blit(heal_txt, (hud_x + 20, heal_y))
 
-    heal_desc = font.render(f"회복량: -{int(HEAL_AMOUNT)} stress", True, (88, 91, 112))
+    heal_desc = font.render(f"회복량: -{int(HEAL_AMOUNT)} stress", True, SUBTEXT_CLR)
     screen.blit(heal_desc, (hud_x + 20, heal_y + 16))
 
 
@@ -279,7 +283,7 @@ def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int,
         ("Heal 사용", f"{heal_uses}회"),
     ]
     for i, (label, value) in enumerate(lines):
-        lbl = font.render(f"{label}:", True, (88, 91, 112))
+        lbl = font.render(f"{label}:", True, SUBTEXT_CLR)
         val = font.render(value, True, TEXT_CLR)
         screen.blit(lbl, (sx, sy + i * 22))
         screen.blit(val, (sx + 100, sy + i * 22))

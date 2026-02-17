@@ -54,6 +54,7 @@ RESISTANCE_CLR = (243, 139, 168)
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
     global BG, TEXT_CLR, ACCENT, ATOM_NORMAL, ATOM_SC, COOPER_CLR, RESISTANCE_CLR
+    global OVERLAY_CLR, SUBTEXT_CLR
     pg = get_pg_theme()
     BG = pg.BG
     TEXT_CLR = pg.TEXT
@@ -62,6 +63,8 @@ def _load_theme_colors():
     ATOM_SC = pg.GREEN            # 초전도 = safe color
     COOPER_CLR = pg.ACCENT_BLUE
     RESISTANCE_CLR = pg.RED       # 저항 = danger color
+    OVERLAY_CLR = pg.OVERLAY
+    SUBTEXT_CLR = pg.SUBTEXT
 
 
 class Atom:
@@ -238,7 +241,7 @@ def run_simulation():
         # 저항 바
         bar_x, bar_w, bar_h = 50, 30, 400
         bar_y = 100
-        pygame.draw.rect(screen, (69, 71, 90), (bar_x, bar_y, bar_w, bar_h))
+        pygame.draw.rect(screen, OVERLAY_CLR, (bar_x, bar_y, bar_w, bar_h))
         fill_h = int(bar_h * resistance_val)
         if fill_h > 0:
             pygame.draw.rect(screen, RESISTANCE_CLR, (bar_x, bar_y + bar_h - fill_h, bar_w, fill_h))
@@ -248,7 +251,7 @@ def run_simulation():
 
         # 온도 바
         tbar_x = WIDTH - 80
-        pygame.draw.rect(screen, (69, 71, 90), (tbar_x, bar_y, bar_w, bar_h))
+        pygame.draw.rect(screen, OVERLAY_CLR, (tbar_x, bar_y, bar_w, bar_h))
         t_fill = int(bar_h * min(temperature / 400.0, 1.0))
         t_color = RESISTANCE_CLR if temperature > TC_KELVIN else ATOM_SC
         if t_fill > 0:
@@ -278,7 +281,7 @@ def run_simulation():
             desc = "Cooper pairs formed — zero resistance — Meissner effect active"
         else:
             desc = "Lattice vibrations scatter electrons — finite resistance"
-        desc_surf = font.render(desc, True, (88, 91, 112))
+        desc_surf = font.render(desc, True, SUBTEXT_CLR)
         screen.blit(desc_surf, (WIDTH // 2 - desc_surf.get_width() // 2, 48))
 
         help_overlay.draw(screen, font)

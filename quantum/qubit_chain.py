@@ -49,7 +49,8 @@ STATE_COLORS = {
 
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, ACCENT, LINK_CLR, LINK_ENTANGLED, STATE_COLORS, SHIELD_GLOW
+    global BG, TEXT_CLR, ACCENT, LINK_CLR, LINK_ENTANGLED, STATE_COLORS
+    global SHIELD_GLOW, OVERLAY_CLR, WHITE
     pg = get_pg_theme()
     BG = pg.BG
     TEXT_CLR = pg.TEXT
@@ -57,6 +58,8 @@ def _load_theme_colors():
     LINK_CLR = pg.SUBTEXT
     LINK_ENTANGLED = pg.ACCENT_PURPLE
     SHIELD_GLOW = pg.SHIELD_GLOW
+    OVERLAY_CLR = pg.OVERLAY
+    WHITE = pg.WHITE
     STATE_COLORS = {
         "stable": pg.STABLE,
         "warning": pg.WARNING,
@@ -216,7 +219,7 @@ def _draw_node(screen, node: QubitNode, t: float, font: pygame.font.Font,
 
     # 하중 텍스트
     pct_text = "X" if node.collapsed else f"{int(node.stress)}%"
-    surf = font.render(pct_text, True, BG if not node.collapsed else (255, 255, 255))
+    surf = font.render(pct_text, True, BG if not node.collapsed else WHITE)
     screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
 
     # ID 라벨
@@ -231,7 +234,7 @@ def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y:
     screen.blit(label, (x, y))
 
     bar_x = x + 30
-    pygame.draw.rect(screen, (69, 71, 90), (bar_x, y + 2, bar_w, bar_h))
+    pygame.draw.rect(screen, OVERLAY_CLR, (bar_x, y + 2, bar_w, bar_h))
     fill_w = int(bar_w * min(node.stress, 100) / 100)
     color = STATE_COLORS[node.state]
     pygame.draw.rect(screen, color, (bar_x, y + 2, fill_w, bar_h))
