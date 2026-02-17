@@ -57,8 +57,12 @@ PARTICLE_RADIUS = 10
 BARRIER_WIDTH_DEFAULT = cfg("tunneling", "barrier_width_default", 12)
 BARRIER_WIDTH_MIN = cfg("tunneling", "barrier_width_min", 4)
 BARRIER_WIDTH_MAX = cfg("tunneling", "barrier_width_max", 200)
-SUPERPOSITION_HZ = 6.0
+SUPERPOSITION_HZ = cfg("tunneling", "superposition_hz", 6.0)
 TUNNEL_SPEED_BOOST = cfg("tunneling", "tunnel_speed_boost", 2.0)
+_TUNNEL_DECAY = cfg("tunneling", "tunnel_decay_rate", 0.02)
+_VY_RANGE = cfg("tunneling", "particle_vy_range", 60.0)
+_TUNNEL_FLASH = cfg("tunneling", "tunnel_flash_sec", 0.6)
+_REFLECT_FLASH = cfg("tunneling", "reflect_flash_sec", 0.4)
 
 # ── 영역 레이아웃 ────────────────────────────────────
 # 왼쪽: 터널링 시뮬레이션 | 오른쪽: 블로흐 구
@@ -76,7 +80,7 @@ def _calc_tunnel_prob(barrier_width: int) -> float:
 
     기본 두께(12px)에서 10 %, 두께 200px이면 ~0.5 % 수준으로 지수 감쇠.
     """
-    return TUNNEL_PROB_BASE * math.exp(-0.02 * (barrier_width - BARRIER_WIDTH_DEFAULT))
+    return TUNNEL_PROB_BASE * math.exp(-_TUNNEL_DECAY * (barrier_width - BARRIER_WIDTH_DEFAULT))
 
 
 # ── 입자 클래스 ──────────────────────────────────────
@@ -95,7 +99,7 @@ class QuantumParticle:
         self.x = SIM_LEFT + 40.0
         self.y = SIM_TOP + SIM_H / 2.0
         self.vx = PARTICLE_SPEED
-        self.vy = (random.random() - 0.5) * 60  # 약간의 수직 랜덤
+        self.vy = (random.random() - 0.5) * _VY_RANGE  # 약간의 수직 랜덤
         self.alive = True
         self.tunneled: bool | None = None  # None=미결정, True=터널링, False=반사
         self.flash_timer = 0.0
@@ -141,14 +145,14 @@ class QuantumParticle:
                     self.vx = abs(self.vx) * speed_boost
                     self.tunneled = True
                     self.tunnel_count += 1
-                    self.flash_timer = 0.6
+                    self.flash_timer = _TUNNEL_FLASH
                 else:
                     # 반사
                     self.vx = -abs(self.vx) * 0.8
                     self.x = BARRIER_X - barrier_width / 2 - PARTICLE_RADIUS - 2
                     self.tunneled = False
                     self.reflect_count += 1
-                    self.flash_timer = 0.4
+                    self.flash_timer = _REFLECT_FLASH
 
         # 화면 밖으로 나가면 재발사
         if self.x < SIM_LEFT - 20 or self.x > SIM_LEFT + SIM_W + 20:

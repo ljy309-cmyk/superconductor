@@ -66,10 +66,12 @@ def _load_theme_colors():
 
 # ── 물리 파라미터 (config.json에서 로드, 없으면 기본값) ──
 STRESS_THRESHOLD = cfg("qubit_chain", "stress_threshold", 100.0)
+_STRESS_DANGER = cfg("qubit_chain", "stress_danger", 85.0)
+_STRESS_WARNING = cfg("qubit_chain", "stress_warning", 50.0)
 CASCADE_DAMAGE = cfg("qubit_chain", "cascade_damage", 20.0)
 NOISE_RATE_BASE = cfg("qubit_chain", "noise_rate_base", 3.0)
 RECOVERY_RATE = cfg("qubit_chain", "recovery_rate", 5.0)
-COLLAPSE_ANIM_DURATION = 0.5
+COLLAPSE_ANIM_DURATION = cfg("qubit_chain", "collapse_anim_duration", 0.5)
 
 # ── QEC 방어막 ──────────────────────────────────────
 QEC_REDUCTION_DEFAULT = cfg("qubit_chain", "qec_reduction", 0.2)
@@ -80,7 +82,7 @@ HEAL_COOLDOWN_SEC = cfg("qubit_chain", "heal_cooldown", 3.0)
 SHIELD_CLR = (137, 180, 250)
 SHIELD_GLOW = (116, 199, 236)
 
-NODE_RADIUS = 28
+NODE_RADIUS = cfg("qubit_chain", "node_radius", 28)
 PULSE_MAX = 8  # 글로우 펄스 최대 크기
 
 
@@ -102,9 +104,9 @@ class QubitNode:
     def state(self) -> str:
         if self.collapsed:
             return "collapsed"
-        if self.stress >= 85:
+        if self.stress >= _STRESS_DANGER:
             return "danger"
-        if self.stress >= 50:
+        if self.stress >= _STRESS_WARNING:
             return "warning"
         return "stable"
 
@@ -148,7 +150,7 @@ class QubitNode:
 def _build_network() -> list[QubitNode]:
     """큐비트 네트워크 생성 (육각형 + 중앙)."""
     cx, cy = WIDTH // 2, HEIGHT // 2 + 20
-    ring_r = 150
+    ring_r = cfg("qubit_chain", "ring_radius", 150)
     nodes: list[QubitNode] = []
 
     # 중앙 노드

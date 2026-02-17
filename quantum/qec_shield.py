@@ -69,7 +69,8 @@ HEAL_AMOUNT = cfg("qec_shield", "heal_amount", 20.0)
 STRESS_THRESHOLD = cfg("qec_shield", "stress_threshold", 100.0)
 CASCADE_DAMAGE = cfg("qec_shield", "cascade_damage", 15.0)
 
-NODE_RADIUS = 30
+NODE_RADIUS = cfg("qec_shield", "node_radius", 30)
+_STRESS_WARNING = cfg("qec_shield", "stress_warning", 70.0)
 GRID_COLS = cfg("qec_shield", "grid_cols", 5)
 GRID_ROWS = cfg("qec_shield", "grid_rows", 3)
 
@@ -91,7 +92,7 @@ class QECQubit:
     def state(self) -> str:
         if self.collapsed:
             return "collapsed"
-        if self.stress >= 70:
+        if self.stress >= _STRESS_WARNING:
             return "warning"
         return "stable"
 

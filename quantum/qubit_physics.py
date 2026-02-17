@@ -20,7 +20,9 @@ from config_loader import cfg
 STRESS_THRESHOLD = cfg("qubit_chain", "stress_threshold", 100.0)
 CASCADE_DAMAGE = cfg("qubit_chain", "cascade_damage", 20.0)
 NOISE_RATE_BASE = cfg("qubit_chain", "noise_rate_base", 3.0)
-COLLAPSE_ANIM_DURATION = 0.5
+COLLAPSE_ANIM_DURATION = cfg("qubit_chain", "collapse_anim_duration", 0.5)
+_STRESS_DANGER = cfg("qubit_chain", "stress_danger", 85.0)
+_STRESS_WARNING = cfg("qubit_chain", "stress_warning", 50.0)
 
 
 class QubitNode:
@@ -39,9 +41,9 @@ class QubitNode:
     def state(self) -> str:
         if self.collapsed:
             return "collapsed"
-        if self.stress >= 85:
+        if self.stress >= _STRESS_DANGER:
             return "danger"
-        if self.stress >= 50:
+        if self.stress >= _STRESS_WARNING:
             return "warning"
         return "stable"
 

@@ -85,8 +85,8 @@ HISTORY_WINDOW = cfg("bb84", "history_window", 20)
 
 # ── 자동 차단 시스템 ────────────────────────────────
 AUTO_BLOCK_THRESHOLD = cfg("bb84", "auto_block_threshold", 0.15)
-AUTO_BLOCK_SCORE = 50
-MANUAL_BLOCK_SCORE = 100
+AUTO_BLOCK_SCORE = cfg("bb84", "auto_block_score", 50)
+MANUAL_BLOCK_SCORE = cfg("bb84", "manual_block_score", 100)
 
 # ── 경고 알람 ───────────────────────────────────────
 WARNING_THRESHOLD = cfg("bb84", "warning_threshold", 0.10)

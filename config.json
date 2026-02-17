@@ -24,15 +24,20 @@
   },
   "qubit_chain": {
     "stress_threshold": 100.0,
+    "stress_danger": 85.0,
+    "stress_warning": 50.0,
     "cascade_damage": 20.0,
     "noise_rate_base": 3.0,
     "recovery_rate": 5.0,
+    "collapse_anim_duration": 0.5,
     "qec_reduction": 0.2,
     "qec_duration": 5.0,
     "qec_cooldown": 8.0,
     "heal_amount": 20.0,
     "heal_cooldown": 3.0,
-    "outer_nodes": 6
+    "outer_nodes": 6,
+    "node_radius": 28,
+    "ring_radius": 150
   },
   "tunneling": {
     "tunnel_prob_base": 0.10,
@@ -40,7 +45,12 @@
     "barrier_width_default": 12,
     "barrier_width_min": 4,
     "barrier_width_max": 200,
-    "tunnel_speed_boost": 2.0
+    "tunnel_speed_boost": 2.0,
+    "superposition_hz": 6.0,
+    "tunnel_decay_rate": 0.02,
+    "particle_vy_range": 60.0,
+    "tunnel_flash_sec": 0.6,
+    "reflect_flash_sec": 0.4
   },
   "qec_shield": {
     "noise_rate": 5.0,
@@ -54,7 +64,9 @@
     "stress_threshold": 100.0,
     "cascade_damage": 15.0,
     "grid_cols": 5,
-    "grid_rows": 3
+    "grid_rows": 3,
+    "node_radius": 30,
+    "stress_warning": 70.0
   },
   "squid_mines": {
     "grid_cols": 10,
@@ -109,6 +121,8 @@
     "error_threshold": 0.25,
     "history_window": 20,
     "auto_block_threshold": 0.15,
+    "auto_block_score": 50,
+    "manual_block_score": 100,
     "warning_threshold": 0.10,
     "decoy_chance": 0.15,
     "decoy_error_mult": 2.0
