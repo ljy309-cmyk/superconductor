@@ -27,11 +27,10 @@ jobs:
           pip install pandas numpy matplotlib requests flask
           pip install pytest pytest-cov
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         run: |
           cd ${{ github.workspace }}
-          python -m pytest tests/ -v --tb=short --co -q 2>/dev/null || true
-          python -m pytest tests/ -v --tb=short -x
+          python -m pytest tests/ -v --tb=short --cov=. --cov-report=term-missing --cov-report=xml -x
 
       - name: Check imports
         run: |
