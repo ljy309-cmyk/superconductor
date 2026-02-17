@@ -77,7 +77,7 @@ class Dashboard(tk.Toplevel):
 
         # ── 중앙: 실시간 온도 그래프 ──
         mid = tk.LabelFrame(
-            body, text=" Temperature Graph ",
+            body, text=f" {t('graph_title_temp')} ",
             font=FONTS.BODY_BOLD, bg=TK.PANEL_BG, fg=TK.TEXT, bd=1,
         )
         mid.pack(side="left", fill="both", expand=True, padx=6)
@@ -156,14 +156,14 @@ class Dashboard(tk.Toplevel):
         for spine in ax.spines.values():
             spine.set_color("#585b70")
         ax.tick_params(colors="#cdd6f4", labelsize=7)
-        ax.set_xlabel("Time (ticks)", color="#cdd6f4", fontsize=8)
-        ax.set_ylabel("Temperature (°C)", color="#cdd6f4", fontsize=8)
-        ax.set_title("Live Temperature", color="#89b4fa", fontsize=10, fontweight="bold")
+        ax.set_xlabel(t("graph_time_ticks"), color="#cdd6f4", fontsize=8)
+        ax.set_ylabel(t("graph_temp_celsius"), color="#cdd6f4", fontsize=8)
+        ax.set_title(t("graph_live_temp"), color="#89b4fa", fontsize=10, fontweight="bold")
         _tk = get_tk_theme()
-        ax.axhline(y=-196.0, color=_tk.RED, linestyle="--", linewidth=1, alpha=0.7, label="Target Tc")
+        ax.axhline(y=-196.0, color=_tk.RED, linestyle="--", linewidth=1, alpha=0.7, label=t("graph_target_tc"))
 
         # 라인 객체를 미리 생성 (blitting용)
-        self._temp_line, = ax.plot([], [], color="#89b4fa", linewidth=1.5, label="Temperature")
+        self._temp_line, = ax.plot([], [], color="#89b4fa", linewidth=1.5, label=t("graph_temperature"))
         ax.legend(loc="upper right", fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
         self._fig.tight_layout()
         self._canvas.draw()

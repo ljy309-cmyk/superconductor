@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 
 from theme import TK, FONTS
+from i18n import t
 from replay import list_replays, REPLAY_DIR
 from logger import get_module_logger
 
@@ -21,7 +22,7 @@ class ReplayViewer(tk.Toplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
-        self.title("Replay Viewer")
+        self.title(t("replay_title"))
         self.configure(bg=TK.BG)
         self.geometry("700x500")
         self.resizable(False, False)
@@ -40,7 +41,7 @@ class ReplayViewer(tk.Toplevel):
         top = tk.Frame(self, bg=TK.BG)
         top.pack(fill="x", padx=12, pady=(10, 4))
 
-        tk.Label(top, text="Replay File:", font=FONTS.BODY_BOLD,
+        tk.Label(top, text=t("replay_file"), font=FONTS.BODY_BOLD,
                  bg=TK.BG, fg=TK.TEXT).pack(side="left")
 
         self._replay_var = tk.StringVar()
@@ -49,21 +50,21 @@ class ReplayViewer(tk.Toplevel):
         self._combo.pack(side="left", padx=6)
         self._combo.bind("<<ComboboxSelected>>", self._on_select)
 
-        tk.Button(top, text="Browse...", font=FONTS.SMALL,
+        tk.Button(top, text=t("replay_browse"), font=FONTS.SMALL,
                   command=self._browse).pack(side="left", padx=4)
 
         # 메타데이터
-        meta_frame = tk.LabelFrame(self, text=" Metadata ", font=FONTS.BODY_BOLD,
+        meta_frame = tk.LabelFrame(self, text=f" {t('replay_metadata')} ", font=FONTS.BODY_BOLD,
                                    bg=TK.PANEL_BG, fg=TK.TEXT, bd=1)
         meta_frame.pack(fill="x", padx=12, pady=4)
 
-        self._meta_label = tk.Label(meta_frame, text="No replay loaded",
+        self._meta_label = tk.Label(meta_frame, text=t("replay_no_data"),
                                     font=FONTS.BODY, bg=TK.PANEL_BG, fg=TK.TEXT,
                                     anchor="w", justify="left")
         self._meta_label.pack(fill="x", padx=8, pady=4)
 
         # 프레임 데이터 표시
-        data_frame = tk.LabelFrame(self, text=" Frame Data ", font=FONTS.BODY_BOLD,
+        data_frame = tk.LabelFrame(self, text=f" {t('replay_frame_data')} ", font=FONTS.BODY_BOLD,
                                    bg=TK.PANEL_BG, fg=TK.TEXT, bd=1)
         data_frame.pack(fill="both", expand=True, padx=12, pady=4)
 
@@ -88,7 +89,7 @@ class ReplayViewer(tk.Toplevel):
         )
         self._slider.pack(fill="x")
 
-        self._frame_info = tk.Label(timeline_frame, text="Frame: 0 / 0",
+        self._frame_info = tk.Label(timeline_frame, text=t("replay_frame_info", idx=0, total=0),
                                     font=FONTS.SMALL, bg=TK.BG, fg=TK.TEXT)
         self._frame_info.pack()
 
@@ -96,7 +97,7 @@ class ReplayViewer(tk.Toplevel):
         ctrl = tk.Frame(self, bg=TK.BG)
         ctrl.pack(pady=(0, 10))
 
-        self._play_btn = tk.Button(ctrl, text="Play", font=FONTS.BUTTON,
+        self._play_btn = tk.Button(ctrl, text=t("replay_play"), font=FONTS.BUTTON,
                                    width=8, command=self._toggle_play)
         self._play_btn.pack(side="left", padx=4)
 
@@ -110,7 +111,7 @@ class ReplayViewer(tk.Toplevel):
                   command=lambda: self._seek(-1)).pack(side="left", padx=2)
 
         # 속도 조절
-        tk.Label(ctrl, text="Speed:", font=FONTS.SMALL,
+        tk.Label(ctrl, text=t("replay_speed"), font=FONTS.SMALL,
                  bg=TK.BG, fg=TK.TEXT).pack(side="left", padx=(12, 2))
         self._speed_var = tk.StringVar(value="1x")
         for spd, label in [(0.25, "0.25x"), (0.5, "0.5x"), (1, "1x"), (2, "2x"), (4, "4x")]:
@@ -151,7 +152,7 @@ class ReplayViewer(tk.Toplevel):
             with open(path, "r", encoding="utf-8") as f:
                 self._data = json.load(f)
         except (OSError, json.JSONDecodeError) as e:
-            self._meta_label.config(text=f"Load error: {e}")
+            self._meta_label.config(text=t("replay_load_error", error=e))
             return
 
         self._frames = self._data.get("frames", [])
@@ -159,10 +160,10 @@ class ReplayViewer(tk.Toplevel):
         total = len(self._frames)
 
         # 메타데이터 표시
-        meta_lines = [f"Module: {meta.get('module', '?')}",
-                      f"Start: {meta.get('start_time', '?')}",
-                      f"End: {meta.get('end_time', '?')}",
-                      f"Total Frames: {total}"]
+        meta_lines = [t("replay_module", name=meta.get('module', '?')),
+                      t("replay_start_time", time=meta.get('start_time', '?')),
+                      t("replay_end_time", time=meta.get('end_time', '?')),
+                      t("replay_total_frames", count=total)]
         for k, v in meta.items():
             if k not in ("module", "start_time", "end_time", "total_frames"):
                 meta_lines.append(f"{k}: {v}")
@@ -176,13 +177,13 @@ class ReplayViewer(tk.Toplevel):
     def _show_frame(self, idx: int):
         """특정 프레임 데이터 표시."""
         total = len(self._frames)
-        self._frame_info.config(text=f"Frame: {idx} / {total}")
+        self._frame_info.config(text=t("replay_frame_info", idx=idx, total=total))
 
         if 0 <= idx < total:
             frame = self._frames[idx]
             text = json.dumps(frame, indent=2, ensure_ascii=False)
         else:
-            text = "(no data)"
+            text = t("replay_no_frame_data")
 
         self._frame_text.configure(state="normal")
         self._frame_text.delete("1.0", "end")
@@ -197,14 +198,14 @@ class ReplayViewer(tk.Toplevel):
         """재생/정지 토글."""
         if self._playing:
             self._playing = False
-            self._play_btn.config(text="Play")
+            self._play_btn.config(text=t("replay_play"))
             if self._play_after_id:
                 self.after_cancel(self._play_after_id)
         else:
             if not self._frames:
                 return
             self._playing = True
-            self._play_btn.config(text="Pause")
+            self._play_btn.config(text=t("replay_pause"))
             self._auto_advance()
 
     def _auto_advance(self):
@@ -214,7 +215,7 @@ class ReplayViewer(tk.Toplevel):
         idx = self._frame_var.get() + 1
         if idx >= len(self._frames):
             self._playing = False
-            self._play_btn.config(text="Play")
+            self._play_btn.config(text=t("replay_play"))
             return
         self._frame_var.set(idx)
         self._slider.set(idx)
