@@ -32,8 +32,10 @@ class ReplayViewer(tk.Toplevel):
         self._playing = False
         self._play_speed = 1.0
         self._play_after_id: str | None = None
+        self._loop = False
 
         self._build_ui()
+        self._bind_keys()
         self._populate_replay_list()
 
     def _build_ui(self):
@@ -89,9 +91,16 @@ class ReplayViewer(tk.Toplevel):
         )
         self._slider.pack(fill="x")
 
-        self._frame_info = tk.Label(timeline_frame, text=t("replay_frame_info", idx=0, total=0),
+        info_row = tk.Frame(timeline_frame, bg=TK.BG)
+        info_row.pack(fill="x")
+
+        self._frame_info = tk.Label(info_row, text=t("replay_frame_info", idx=0, total=0),
                                     font=FONTS.SMALL, bg=TK.BG, fg=TK.TEXT)
-        self._frame_info.pack()
+        self._frame_info.pack(side="left")
+
+        self._progress_label = tk.Label(info_row, text="",
+                                        font=FONTS.SMALL, bg=TK.BG, fg=TK.TEXT)
+        self._progress_label.pack(side="right")
 
         # 컨트롤 버튼
         ctrl = tk.Frame(self, bg=TK.BG)
@@ -110,16 +119,60 @@ class ReplayViewer(tk.Toplevel):
         tk.Button(ctrl, text=">|", font=FONTS.SMALL, width=4,
                   command=lambda: self._seek(-1)).pack(side="left", padx=2)
 
+        # 루프 토글
+        self._loop_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(ctrl, text=t("replay_loop"), variable=self._loop_var,
+                       font=FONTS.SMALL, bg=TK.BG, fg=TK.TEXT, selectcolor=TK.SURFACE,
+                       command=self._on_loop_toggle).pack(side="left", padx=(8, 4))
+
         # 속도 조절
         tk.Label(ctrl, text=t("replay_speed"), font=FONTS.SMALL,
                  bg=TK.BG, fg=TK.TEXT).pack(side="left", padx=(12, 2))
         self._speed_var = tk.StringVar(value="1x")
+        self._speed_levels = [0.25, 0.5, 1, 2, 4]
         for spd, label in [(0.25, "0.25x"), (0.5, "0.5x"), (1, "1x"), (2, "2x"), (4, "4x")]:
             tk.Radiobutton(
                 ctrl, text=label, variable=self._speed_var, value=label,
                 font=FONTS.SMALL, bg=TK.BG, fg=TK.TEXT, selectcolor=TK.SURFACE,
                 command=lambda s=spd: self._set_speed(s),
             ).pack(side="left")
+
+        # 단축키 안내
+        shortcut_label = tk.Label(self, text=t("replay_shortcuts"),
+                                  font=FONTS.SMALL, bg=TK.BG, fg=TK.TEXT)
+        shortcut_label.pack(pady=(0, 6))
+
+    def _bind_keys(self):
+        """키보드 단축키 바인딩."""
+        self.bind("<space>", lambda e: self._toggle_play())
+        self.bind("<Left>", lambda e: self._step(-1))
+        self.bind("<Right>", lambda e: self._step(1))
+        self.bind("<Shift-Left>", lambda e: self._step(-10))
+        self.bind("<Shift-Right>", lambda e: self._step(10))
+        self.bind("<Home>", lambda e: self._seek(0))
+        self.bind("<End>", lambda e: self._seek(-1))
+        self.bind("<plus>", lambda e: self._cycle_speed(1))
+        self.bind("<equal>", lambda e: self._cycle_speed(1))
+        self.bind("<minus>", lambda e: self._cycle_speed(-1))
+        self.bind("<l>", lambda e: self._on_loop_toggle())
+        self.focus_set()
+
+    def _on_loop_toggle(self):
+        """루프 재생 토글."""
+        self._loop = self._loop_var.get() if hasattr(self, '_loop_var') else not self._loop
+        if hasattr(self, '_loop_var'):
+            self._loop_var.set(self._loop)
+
+    def _cycle_speed(self, direction: int):
+        """속도를 한 단계 올리거나(+1) 내린다(-1)."""
+        try:
+            cur_idx = self._speed_levels.index(self._play_speed)
+        except ValueError:
+            cur_idx = 2  # 1x
+        new_idx = max(0, min(cur_idx + direction, len(self._speed_levels) - 1))
+        spd = self._speed_levels[new_idx]
+        self._set_speed(spd)
+        self._speed_var.set(f"{spd}x" if spd != int(spd) else f"{int(spd)}x")
 
     def _populate_replay_list(self):
         """저장된 리플레이 목록 로드."""
@@ -179,6 +232,14 @@ class ReplayViewer(tk.Toplevel):
         total = len(self._frames)
         self._frame_info.config(text=t("replay_frame_info", idx=idx, total=total))
 
+        # 진행률 + 예상 시간 (~60fps 기준)
+        if total > 0:
+            pct = int(idx / max(total - 1, 1) * 100)
+            sec = round(idx / 60.0, 1)
+            self._progress_label.config(text=t("replay_progress", pct=pct, sec=sec))
+        else:
+            self._progress_label.config(text="")
+
         if 0 <= idx < total:
             frame = self._frames[idx]
             text = json.dumps(frame, indent=2, ensure_ascii=False)
@@ -214,9 +275,12 @@ class ReplayViewer(tk.Toplevel):
             return
         idx = self._frame_var.get() + 1
         if idx >= len(self._frames):
-            self._playing = False
-            self._play_btn.config(text=t("replay_play"))
-            return
+            if self._loop:
+                idx = 0
+            else:
+                self._playing = False
+                self._play_btn.config(text=t("replay_play"))
+                return
         self._frame_var.set(idx)
         self._slider.set(idx)
         self._show_frame(idx)

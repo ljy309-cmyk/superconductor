@@ -192,5 +192,8 @@
   "replay_start_time": "Start: {time}",
   "replay_end_time": "End: {time}",
   "replay_total_frames": "Total Frames: {count}",
-  "replay_no_frame_data": "(no data)"
+  "replay_no_frame_data": "(no data)",
+  "replay_loop": "Loop",
+  "replay_progress": "{pct}%  |  ~{sec}s",
+  "replay_shortcuts": "Space: Play  ←→: Step  Shift+←→: 10f  Home/End: Start/End  +/-: Speed"
 }

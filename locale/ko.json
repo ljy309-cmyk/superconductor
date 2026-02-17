@@ -192,5 +192,8 @@
   "replay_start_time": "시작: {time}",
   "replay_end_time": "종료: {time}",
   "replay_total_frames": "총 프레임: {count}",
-  "replay_no_frame_data": "(데이터 없음)"
+  "replay_no_frame_data": "(데이터 없음)",
+  "replay_loop": "루프",
+  "replay_progress": "{pct}%  |  ~{sec}초",
+  "replay_shortcuts": "Space: 재생  ←→: 1칸  Shift+←→: 10칸  Home/End: 처음/끝  +/-: 속도"
 }
