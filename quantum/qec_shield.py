@@ -187,6 +187,10 @@ def _draw_node(screen, node: QECQubit, font, shield_active: bool, t: float):
     surf = font.render(txt, True, BG if not node.collapsed else WHITE)
     screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
 
+    # 상태 텍스트 라벨 (색상에만 의존하지 않도록)
+    state_label = font.render(node.state.label, True, color)
+    screen.blit(state_label, (cx - state_label.get_width() // 2, cy + NODE_RADIUS + 4))
+
 
 def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
                      cooldown_timer: float, qec_reduction: float,

@@ -24,6 +24,20 @@ class QubitState(Enum):
     DANGER = "danger"
     COLLAPSED = "collapsed"
 
+    @property
+    def label(self) -> str:
+        """노드 아래에 표시할 짧은 상태 라벨."""
+        return _STATE_LABELS[self]
+
+
+# 렌더링용 짧은 라벨 (i18n 미적용 — 짧은 약어이므로 고정)
+_STATE_LABELS = {
+    QubitState.STABLE: "OK",
+    QubitState.WARNING: "WARN",
+    QubitState.DANGER: "CRIT",
+    QubitState.COLLAPSED: "DEAD",
+}
+
 
 # 물리 파라미터 (config.json에서 로드, 없으면 기본값)
 STRESS_THRESHOLD = cfg("qubit_chain", "stress_threshold", 100.0)

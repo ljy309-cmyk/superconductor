@@ -270,6 +270,10 @@ def _draw_node(screen, node: QubitNode, t: float, font: pygame.font.Font,
     id_surf = font.render(f"Q{node.qid}", True, TEXT_CLR)
     screen.blit(id_surf, (cx - id_surf.get_width() // 2, cy + NODE_RADIUS + 4))
 
+    # 상태 텍스트 라벨 (색상에만 의존하지 않도록)
+    state_label = font.render(node.state.label, True, color)
+    screen.blit(state_label, (cx - state_label.get_width() // 2, cy + NODE_RADIUS + 16))
+
 
 def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y: int):
     """개별 큐비트 하중 바."""
@@ -283,6 +287,10 @@ def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y:
     color = STATE_COLORS[node.state]
     pygame.draw.rect(screen, color, (bar_x, y + 2, fill_w, bar_h))
     pygame.draw.rect(screen, TEXT_CLR, (bar_x, y + 2, bar_w, bar_h), 1)
+
+    # 상태 라벨
+    sl = font.render(node.state.label, True, color)
+    screen.blit(sl, (bar_x + bar_w + 4, y))
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────

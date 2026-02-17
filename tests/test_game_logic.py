@@ -67,6 +67,17 @@ class TestQubitNode(unittest.TestCase):
         node.collapsed = True
         self.assertEqual(node.state, QubitState.COLLAPSED)
 
+    def test_state_labels_are_strings(self):
+        """모든 QubitState에 짧은 문자열 라벨이 있어야 함."""
+        for state in QubitState:
+            self.assertIsInstance(state.label, str)
+            self.assertGreater(len(state.label), 0)
+
+    def test_state_labels_unique(self):
+        """각 상태의 라벨이 서로 다르야 함."""
+        labels = [s.label for s in QubitState]
+        self.assertEqual(len(labels), len(set(labels)))
+
     def test_collapse_at_threshold(self):
         node = self._make_node()
         node.stress = 100.0  # STRESS_THRESHOLD
