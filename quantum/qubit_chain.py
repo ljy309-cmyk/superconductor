@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 import pygame
 
 from config_loader import cfg
+from i18n import t
 from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
@@ -290,7 +291,7 @@ def run_simulation():
     _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
-    pygame.display.set_caption("Qubit Entanglement Cascade")
+    pygame.display.set_caption(t("game_title_qubit_chain"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
@@ -499,7 +500,7 @@ def run_simulation():
             screen.blit(overlay, (0, 0))
 
         # 타이틀
-        title_surf = title_font.render("Qubit Entanglement Cascade", True, ACCENT)
+        title_surf = title_font.render(t("game_title_qubit_chain"), True, ACCENT)
         screen.blit(title_surf, (WIDTH // 2 - title_surf.get_width() // 2, 12))
 
         # 얽힘 연결선
@@ -517,7 +518,7 @@ def run_simulation():
 
         # 하중 바 패널
         panel_x, panel_y = 15, 50
-        panel_label = info_font.render("── Stress ──", True, ACCENT)
+        panel_label = info_font.render(t("qc_stress_panel"), True, ACCENT)
         screen.blit(panel_label, (panel_x, panel_y - 16))
         for i, n in enumerate(nodes):
             _draw_stress_bar(screen, n, font, panel_x, panel_y + i * 18)
@@ -525,7 +526,7 @@ def run_simulation():
         # 이벤트 로그
         log_x = 15
         log_y = panel_y + len(nodes) * 18 + 20
-        log_label = info_font.render("── Event Log ──", True, ACCENT)
+        log_label = info_font.render(t("qc_event_log"), True, ACCENT)
         screen.blit(log_label, (log_x, log_y - 16))
         for i, msg in enumerate(gs.cascade_log):
             clr = STATE_COLORS["collapsed"] if "COLLAPSED" in msg else TEXT_CLR
@@ -535,26 +536,26 @@ def run_simulation():
         # 방어막 상태 HUD (미션3)
         hud_x, hud_y = 720, 50
         if gs.shield_active:
-            shield_txt = info_font.render(f"SHIELD ON ({gs.shield_timer:.1f}s)", True, SHIELD_GLOW)
+            shield_txt = info_font.render(t("qc_shield_on_timer", time=gs.shield_timer), True, SHIELD_GLOW)
             screen.blit(shield_txt, (hud_x, hud_y))
-            dmg_txt = info_font.render(f"cascade: +{int(cascade_damage)} → +{int(cascade_damage * gs.qec_reduction)}", True, SHIELD_CLR)
+            dmg_txt = info_font.render(t("qc_cascade_dmg", orig=int(cascade_damage), reduced=int(cascade_damage * gs.qec_reduction)), True, SHIELD_CLR)
             screen.blit(dmg_txt, (hud_x, hud_y + 16))
         elif gs.cooldown_timer > 0:
-            cd_txt = info_font.render(f"Shield CD: {gs.cooldown_timer:.1f}s", True, STATE_COLORS["warning"])
+            cd_txt = info_font.render(t("qc_shield_cd", time=gs.cooldown_timer), True, STATE_COLORS["warning"])
             screen.blit(cd_txt, (hud_x, hud_y))
         else:
-            ready_txt = info_font.render("Shield: READY (S)", True, STATE_COLORS["stable"])
+            ready_txt = info_font.render(t("qc_shield_ready"), True, STATE_COLORS["stable"])
             screen.blit(ready_txt, (hud_x, hud_y))
 
         if gs.heal_cooldown > 0:
-            heal_txt = info_font.render(f"Heal CD: {gs.heal_cooldown:.1f}s", True, STATE_COLORS["warning"])
+            heal_txt = info_font.render(t("qc_heal_cd", time=gs.heal_cooldown), True, STATE_COLORS["warning"])
         else:
-            heal_txt = info_font.render("Heal: READY (H)", True, STATE_COLORS["stable"])
+            heal_txt = info_font.render(t("qc_heal_ready"), True, STATE_COLORS["stable"])
         screen.blit(heal_txt, (hud_x, hud_y + 32))
 
         # 최종보스미션: 생존 시간 표시
         time_clr = STATE_COLORS["collapsed"] if gs.game_over else ACCENT
-        time_txt = info_font.render(f"Survival: {gs.survival_time:.1f}s", True, time_clr)
+        time_txt = info_font.render(t("survival_time", time=gs.survival_time), True, time_clr)
         screen.blit(time_txt, (hud_x, hud_y + 52))
 
         # 슬라이더 패널 그리기
@@ -562,10 +563,12 @@ def run_simulation():
 
         # 조작 안내
         hints = [
-            f"노이즈: {noise_rate:.1f}%/s  |  연쇄: +{int(cascade_damage)}  |  {'SHIELD' if gs.shield_active else ''}  |  {'일시정지' if gs.paused else '실행 중'}",
-            "클릭/Enter: 오류 정정  |  Tab: 큐비트 선택  |  N: 노이즈  |  S: 방어막  |  H: 힐링",
-            "↑↓/←→: 파라미터 조절  |  우측 패널: 슬라이더  |  SPACE: 일시정지",
-            f"R: 전체 리셋  |  [/]: 속도 ({speed_label()})  |  ESC: 종료",
+            t("hint_noise_info", rate=noise_rate, damage=int(cascade_damage),
+              shield_state=t("shield_on") if gs.shield_active else "",
+              pause_state=t("paused") if gs.paused else t("running_state")),
+            t("hint_click_correct"),
+            t("hint_params"),
+            t("hint_reset") + f"  |  [/]: {speed_label()}",
         ]
         for i, hint in enumerate(hints):
             surf = info_font.render(hint, True, TEXT_CLR)
@@ -597,7 +600,7 @@ def run_simulation():
 
         if all_collapsed:
             over_surf = title_font.render(
-                f"ALL QUBITS COLLAPSED  |  Survival: {gs.survival_time:.2f}s  |  Press R to reset",
+                t("qc_game_over_msg", time=gs.survival_time),
                 True, STATE_COLORS["collapsed"])
             screen.blit(over_surf, (WIDTH // 2 - over_surf.get_width() // 2, HEIGHT // 2 - 80))
 

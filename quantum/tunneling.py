@@ -10,6 +10,7 @@ import random
 import pygame
 
 from config_loader import cfg
+from i18n import t
 from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
@@ -178,14 +179,14 @@ def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, barrier_width, SIM_H))
 
     # 장벽 라벨
-    label = font.render("BARRIER", True, BG)
+    label = font.render(t("tn_barrier"), True, BG)
     label_rot = pygame.transform.rotate(label, 90)
     screen.blit(label_rot, (bx - 2, SIM_TOP + SIM_H // 2 - label_rot.get_height() // 2))
 
     # 영역 라벨
-    left_label = font.render("Classical Region", True, OVERLAY_CLR)
+    left_label = font.render(t("tn_classical"), True, OVERLAY_CLR)
     screen.blit(left_label, (SIM_LEFT + 10, SIM_TOP + 5))
-    right_label = font.render("Tunneled Region", True, OVERLAY_CLR)
+    right_label = font.render(t("tn_tunneled"), True, OVERLAY_CLR)
     screen.blit(right_label, (BARRIER_X + 20, SIM_TOP + 5))
 
 
@@ -216,7 +217,7 @@ def _draw_particle(screen, p: QuantumParticle, font):
 def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     """블로흐 구 시각화."""
     # 타이틀
-    label = title_font.render("Bloch Sphere", True, ACCENT)
+    label = title_font.render(t("tn_bloch"), True, ACCENT)
     screen.blit(label, (BLOCH_CX - label.get_width() // 2, BLOCH_CY - BLOCH_R - 40))
 
     # 구 외곽 (원)
@@ -258,13 +259,12 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
     stats_y = BLOCH_CY + BLOCH_R + 60
 
     lines = [
-        f"총 시도: {p.total_attempts}",
-        f"터널링: {p.tunnel_count}  ({(p.tunnel_count / max(p.total_attempts, 1) * 100):.1f}%)",
-        f"반사:   {p.reflect_count}  ({(p.reflect_count / max(p.total_attempts, 1) * 100):.1f}%)",
-        f"현재 확률: {tunnel_prob * 100:.1f}%",
+        (t("tn_attempts", count=p.total_attempts), TEXT_CLR),
+        (t("tn_tunnel_stat", count=p.tunnel_count, pct=p.tunnel_count / max(p.total_attempts, 1) * 100), TUNNEL_FLASH),
+        (t("tn_reflect_stat", count=p.reflect_count, pct=p.reflect_count / max(p.total_attempts, 1) * 100), REFLECT_CLR),
+        (t("tn_current_prob", prob=tunnel_prob * 100), TEXT_CLR),
     ]
-    for i, line in enumerate(lines):
-        color = TUNNEL_FLASH if "터널링" in line else REFLECT_CLR if "반사" in line else TEXT_CLR
+    for i, (line, color) in enumerate(lines):
         surf = font.render(line, True, color)
         screen.blit(surf, (stats_x, stats_y + i * 17))
 
@@ -276,7 +276,7 @@ def run_simulation():
     _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
-    pygame.display.set_caption("Quantum Superposition & Tunneling")
+    pygame.display.set_caption(t("game_title_tunneling"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
     title_font = pygame.font.SysFont("Consolas", 16, bold=True)
@@ -372,7 +372,7 @@ def run_simulation():
         screen.fill(BG)
 
         # 타이틀
-        t_surf = big_font.render("Quantum Superposition & Tunneling", True, ACCENT)
+        t_surf = big_font.render(t("game_title_tunneling"), True, ACCENT)
         screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
 
         # 시뮬레이션 영역
@@ -392,9 +392,10 @@ def run_simulation():
 
         # 안내
         hints = [
-            f"속도: x{speed_mult:.1f}  |  벽 두께: {barrier_width}px  |  확률: {tunnel_prob*100:.1f}%  |  {'일시정지' if paused else '실행 중'}",
-            "클릭: 재발사  |  ↑↓/←→: 파라미터  |  우측 패널: 슬라이더",
-            "SPACE: 일시정지  |  R: 리셋  |  ESC: 종료",
+            t("hint_speed_info", speed=speed_mult, width=barrier_width, prob=tunnel_prob*100,
+              pause_state=t("paused") if paused else t("running_state")),
+            t("hint_click_launch"),
+            t("hint_pause_reset"),
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)

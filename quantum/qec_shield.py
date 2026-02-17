@@ -11,6 +11,7 @@ import random
 import pygame
 
 from config_loader import cfg
+from i18n import t
 from theme import get_pg_theme
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
@@ -201,11 +202,11 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
     pygame.draw.rect(screen, PANEL_BG, (hud_x, hud_y, hud_w, hud_h), border_radius=8)
     pygame.draw.rect(screen, ACCENT, (hud_x, hud_y, hud_w, hud_h), 2, border_radius=8)
 
-    title = big_font.render("QEC Shield", True, ACCENT)
+    title = big_font.render(t("qec_shield_title"), True, ACCENT)
     screen.blit(title, (hud_x + hud_w // 2 - title.get_width() // 2, hud_y + 10))
 
     if shield_active:
-        status = big_font.render("ACTIVE", True, SHIELD_GLOW)
+        status = big_font.render(t("qec_active"), True, SHIELD_GLOW)
         screen.blit(status, (hud_x + hud_w // 2 - status.get_width() // 2, hud_y + 40))
 
         # 남은 시간 바
@@ -216,26 +217,26 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
         pygame.draw.rect(screen, SHIELD_GLOW, (bar_x, bar_y, int(bar_w * ratio), bar_h))
         pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), 1)
 
-        time_txt = font.render(f"{shield_timer:.1f}s remaining", True, TEXT_CLR)
+        time_txt = font.render(t("qec_remaining", time=shield_timer), True, TEXT_CLR)
         screen.blit(time_txt, (bar_x, bar_y + 20))
 
         # 감쇠 계수 표시 — 0.0이면 무적, 1.0이면 무효
         if qec_reduction == 0.0:
-            label = "INVINCIBLE"
+            label = t("qec_invincible")
             clr = SHIELD_GLOW
         elif qec_reduction < 0.5:
-            label = f"Noise x{qec_reduction:.1f} (강력)"
+            label = t("qec_noise_strong", red=qec_reduction)
             clr = STABLE_CLR
         elif qec_reduction == 0.5:
-            label = f"Noise x{qec_reduction:.1f} (기본)"
+            label = t("qec_noise_default", red=qec_reduction)
             clr = STABLE_CLR
         else:
-            label = f"Noise x{qec_reduction:.1f} (약함)"
+            label = t("qec_noise_weak", red=qec_reduction)
             clr = WARNING_CLR
         effect = font.render(label, True, clr)
         screen.blit(effect, (bar_x, bar_y + 38))
     elif cooldown_timer > 0:
-        status = big_font.render("COOLDOWN", True, WARNING_CLR)
+        status = big_font.render(t("qec_cooldown_label"), True, WARNING_CLR)
         screen.blit(status, (hud_x + hud_w // 2 - status.get_width() // 2, hud_y + 40))
 
         bar_x, bar_y = hud_x + 20, hud_y + 70
@@ -245,31 +246,31 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
         pygame.draw.rect(screen, WARNING_CLR, (bar_x, bar_y, int(bar_w * ratio), bar_h))
         pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), 1)
 
-        time_txt = font.render(f"{cooldown_timer:.1f}s until ready", True, TEXT_CLR)
+        time_txt = font.render(t("qec_until_ready", time=cooldown_timer), True, TEXT_CLR)
         screen.blit(time_txt, (bar_x, bar_y + 20))
     else:
-        status = big_font.render("READY", True, STABLE_CLR)
+        status = big_font.render(t("qec_ready"), True, STABLE_CLR)
         screen.blit(status, (hud_x + hud_w // 2 - status.get_width() // 2, hud_y + 40))
 
-        prompt = font.render("S 키를 눌러 활성화", True, TEXT_CLR)
+        prompt = font.render(t("qec_activate_hint"), True, TEXT_CLR)
         screen.blit(prompt, (hud_x + hud_w // 2 - prompt.get_width() // 2, hud_y + 70))
 
     # ── 감쇠 계수 조절 표시 ──
     adj_y = hud_y + 140
-    adj_label = font.render(f"감쇠 계수: x{qec_reduction:.1f}", True, TEXT_CLR)
+    adj_label = font.render(t("qec_reduction_label", red=qec_reduction), True, TEXT_CLR)
     screen.blit(adj_label, (hud_x + 20, adj_y))
-    adj_hint = font.render("←→ 키로 조절", True, SUBTEXT_CLR)
+    adj_hint = font.render(t("qec_adjust_hint"), True, SUBTEXT_CLR)
     screen.blit(adj_hint, (hud_x + 20, adj_y + 16))
 
     # ── 힐링 상태 ──
     heal_y = adj_y + 40
     if heal_cooldown > 0:
-        heal_txt = font.render(f"Heal: {heal_cooldown:.1f}s 대기", True, WARNING_CLR)
+        heal_txt = font.render(t("qec_heal_wait", time=heal_cooldown), True, WARNING_CLR)
     else:
-        heal_txt = font.render("Heal: READY (H키)", True, STABLE_CLR)
+        heal_txt = font.render(t("qec_heal_ready"), True, STABLE_CLR)
     screen.blit(heal_txt, (hud_x + 20, heal_y))
 
-    heal_desc = font.render(f"회복량: -{int(HEAL_AMOUNT)} stress", True, SUBTEXT_CLR)
+    heal_desc = font.render(t("qec_heal_amount", amount=int(HEAL_AMOUNT)), True, SUBTEXT_CLR)
     screen.blit(heal_desc, (hud_x + 20, heal_y + 16))
 
 
@@ -278,10 +279,10 @@ def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int,
     """경과 시간 · 생존 큐비트 수 · QEC/Heal 사용 횟수."""
     sx, sy = 660, 400
     lines = [
-        ("경과 시간", f"{elapsed:.1f}s"),
-        ("생존 큐비트", f"{alive_count} / {total}"),
-        ("QEC 사용", f"{qec_uses}회"),
-        ("Heal 사용", f"{heal_uses}회"),
+        (t("qec_elapsed"), f"{elapsed:.1f}s"),
+        (t("qec_alive_qubits"), f"{alive_count} / {total}"),
+        (t("qec_uses_count"), f"{qec_uses}"),
+        (t("qec_heal_uses_count"), f"{heal_uses}"),
     ]
     for i, (label, value) in enumerate(lines):
         lbl = font.render(f"{label}:", True, SUBTEXT_CLR)
@@ -296,7 +297,7 @@ def run_simulation():
     _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
-    pygame.display.set_caption("Quantum Error Correction Shield")
+    pygame.display.set_caption(t("game_title_qec_shield"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
     big_font = pygame.font.SysFont("Consolas", 16, bold=True)
@@ -336,12 +337,12 @@ def run_simulation():
     heal_uses = 0
     elapsed = 0.0
     paused = False
-    t = 0.0
+    anim_t = 0.0
 
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
-        t += dt
+        anim_t += dt
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
@@ -449,13 +450,13 @@ def run_simulation():
         screen.fill(BG)
 
         # 타이틀
-        title = title_font.render("Quantum Error Correction (QEC) Shield", True, ACCENT)
+        title = title_font.render(t("game_title_qec_shield"), True, ACCENT)
         screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 12))
 
         # 방어막 활성 시 전체 배경 글로우
         if shield_active:
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-            alpha = int(12 + 8 * math.sin(t * 3))
+            alpha = int(12 + 8 * math.sin(anim_t * 3))
             overlay.fill((*SHIELD_GLOW, alpha))
             screen.blit(overlay, (0, 0))
 
@@ -470,7 +471,7 @@ def run_simulation():
 
         # 큐비트
         for n in nodes:
-            _draw_node(screen, n, font, shield_active, t)
+            _draw_node(screen, n, font, shield_active, anim_t)
 
         # HUD
         _draw_shield_hud(screen, shield_active, shield_timer, cooldown_timer,
@@ -481,9 +482,9 @@ def run_simulation():
 
         # 전체 붕괴
         if alive_count == 0:
-            over = title_font.render("ALL QUBITS COLLAPSED — Press R to reset", True, COLLAPSED_CLR)
+            over = title_font.render(t("qec_game_over_msg"), True, COLLAPSED_CLR)
             screen.blit(over, (WIDTH // 2 - over.get_width() // 2, HEIGHT // 2 - 60))
-            final = big_font.render(f"생존 시간: {elapsed:.1f}s  |  QEC 사용: {qec_uses}회", True, TEXT_CLR)
+            final = big_font.render(t("qec_game_stats", time=elapsed, uses=qec_uses), True, TEXT_CLR)
             screen.blit(final, (WIDTH // 2 - final.get_width() // 2, HEIGHT // 2 - 30))
 
         # 슬라이더 패널 그리기
@@ -491,9 +492,11 @@ def run_simulation():
 
         # 안내
         hints = [
-            f"감쇠: x{qec_reduction:.1f}  |  {'SHIELD ON' if shield_active else 'SHIELD OFF'}  |  {'일시정지' if paused else '실행 중'}",
-            "S: 방어막  |  H: 힐링  |  ←→: 감쇠  |  우측 패널: 슬라이더",
-            "SPACE: 일시정지  |  R: 전체 리셋  |  ESC: 종료",
+            t("hint_reduction_info", red=qec_reduction,
+              shield_state=t("shield_on") if shield_active else "",
+              pause_state=t("paused") if paused else t("running_state")),
+            t("hint_qec_controls"),
+            t("hint_pause_reset"),
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 import pygame
 
 from config_loader import cfg
+from i18n import t
 from theme import get_pg_theme
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
@@ -90,7 +91,7 @@ def run_simulation():
     _load_theme_colors()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Meissner Levitation & Flux Pinning")
+    pygame.display.set_caption(t("game_title_flux_pinning"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 13)
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
@@ -203,7 +204,7 @@ def run_simulation():
         screen.fill(BG)
 
         # 타이틀
-        title_surf = title_font.render("Meissner Levitation & Flux Pinning", True, SC_GLOW)
+        title_surf = title_font.render(t("game_title_flux_pinning"), True, SC_GLOW)
         screen.blit(title_surf, (WIDTH // 2 - title_surf.get_width() // 2, 15))
 
         # 자기장 라인
@@ -225,11 +226,15 @@ def run_simulation():
             )
 
         # 안내 텍스트
-        state_label = "FALLEN" if not gs.superconducting else (
-            "FLIPPED" if gs.flipped else "LEVITATING")
+        if not gs.superconducting:
+            state_label = t("flux_state_fallen")
+        elif gs.flipped:
+            state_label = t("flux_state_flipped")
+        else:
+            state_label = t("flux_state_levitating")
         hints = [
-            "Drag/Arrow: Move magnet  |  F: Flip  |  SPACE: SC ON/OFF",
-            f"State: {state_label}  |  [/]: Speed ({speed_label()})  |  ESC: Exit",
+            t("fp_hint_line1"),
+            t("fp_hint_line2", state=state_label, speed=speed_label()),
         ]
         for i, hint in enumerate(hints):
             surf = font.render(hint, True, TEXT_CLR)
