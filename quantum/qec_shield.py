@@ -12,13 +12,15 @@ import pygame
 
 from config_loader import cfg
 from i18n import t
-from theme import get_pg_theme
+from theme import get_pg_theme, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
 from replay import ReplayRecorder
+from game_summary import draw_game_summary
+from quit_dialog import confirm_quit
 from logger import get_module_logger
 
 _log = get_module_logger("qec_shield")
@@ -295,6 +297,7 @@ def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int,
 
 def run_simulation():
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption(t("game_title_qec_shield"))
@@ -339,6 +342,11 @@ def run_simulation():
     paused = False
     anim_t = 0.0
 
+    # ── 비교 모드 ──
+    compare_mode = False      # QEC/Heal 비활성화 모드
+    best_with_qec = 0.0       # QEC ON 최고 생존 시간
+    best_without_qec = 0.0    # QEC OFF 최고 생존 시간
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -353,23 +361,27 @@ def run_simulation():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if confirm_quit(screen, font):
+                        running = False
                 elif event.key == pygame.K_s:
                     # QEC 방어막 활성화 (S = Shield)
-                    if not shield_active and cooldown_timer <= 0:
+                    if not compare_mode and not shield_active and cooldown_timer <= 0:
                         shield_active = True
                         shield_timer = QEC_DURATION
                         qec_uses += 1
                         snd.play("shield_on")
                 elif event.key == pygame.K_h:
                     # 미션2: 힐링 — 모든 생존 큐비트 stress -20
-                    if heal_cooldown <= 0:
+                    if not compare_mode and heal_cooldown <= 0:
                         for n in nodes:
                             if not n.collapsed:
                                 n.stress = max(n.stress - HEAL_AMOUNT, 0.0)
                         heal_uses += 1
                         heal_cooldown = HEAL_COOLDOWN_SEC
                         snd.play("heal")
+                elif event.key == pygame.K_c:
+                    # 비교 모드 토글
+                    compare_mode = not compare_mode
                 elif event.key == pygame.K_LEFT:
                     sl_reduction.value = sl_reduction.value - QEC_REDUCTION_STEP
                 elif event.key == pygame.K_RIGHT:
@@ -482,13 +494,30 @@ def run_simulation():
 
         # 전체 붕괴
         if alive_count == 0:
-            over = title_font.render(t("qec_game_over_msg"), True, COLLAPSED_CLR)
-            screen.blit(over, (WIDTH // 2 - over.get_width() // 2, HEIGHT // 2 - 60))
-            final = big_font.render(t("qec_game_stats", time=elapsed, uses=qec_uses), True, TEXT_CLR)
-            screen.blit(final, (WIDTH // 2 - final.get_width() // 2, HEIGHT // 2 - 30))
+            # 최고 기록 갱신
+            if compare_mode:
+                best_without_qec = max(best_without_qec, elapsed)
+            else:
+                best_with_qec = max(best_with_qec, elapsed)
+            stats = [
+                (t("summary_elapsed"), f"{elapsed:.1f}s"),
+                (t("summary_collapsed"), f"{total - alive_count} / {total}"),
+                (t("summary_qec_uses"), str(qec_uses)),
+                (t("summary_heal_uses"), str(heal_uses)),
+            ]
+            if best_with_qec > 0 and best_without_qec > 0:
+                stats.append((t("comparison_title"),
+                              f"QEC: {best_with_qec:.1f}s / NO QEC: {best_without_qec:.1f}s"))
+            draw_game_summary(screen, t("summary_title_gameover"), stats,
+                              font=font, title_font=title_font)
 
         # 슬라이더 패널 그리기
         spanel.draw(screen, font)
+
+        # 비교 모드 표시
+        if compare_mode:
+            cmp_surf = big_font.render(t("comparison_hint"), True, WARNING_CLR)
+            screen.blit(cmp_surf, (WIDTH // 2 - cmp_surf.get_width() // 2, 8))
 
         # 안내
         hints = [
@@ -552,6 +581,7 @@ def run_simulation():
 
     recorder.save({"survival_time": round(elapsed, 1)})
     snd.quit()
+    off_theme_change(_load_theme_colors)
 
     pygame.quit()
 

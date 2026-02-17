@@ -15,7 +15,7 @@ import pygame
 
 from config_loader import cfg
 from i18n import t
-from theme import get_pg_theme
+from theme import get_pg_theme, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -23,6 +23,8 @@ from sound_manager import get_sound_manager
 from achievements import check_achievements
 from replay import ReplayRecorder
 from achievement_toast import AchievementToast
+from game_summary import draw_game_summary
+from quit_dialog import confirm_quit
 from tutorial import TutorialOverlay
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from perf_monitor import PerfMonitor
@@ -289,6 +291,7 @@ def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y:
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption(t("game_title_qubit_chain"))
@@ -353,7 +356,8 @@ def run_simulation():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if confirm_quit(screen, info_font):
+                        running = False
                 elif event.key == pygame.K_r:
                     # 전체 리셋
                     for n in nodes:
@@ -599,10 +603,16 @@ def run_simulation():
                         _log.warning("실시간 업적 확인 실패: %s", e)
 
         if all_collapsed:
-            over_surf = title_font.render(
-                t("qc_game_over_msg", time=gs.survival_time),
-                True, STATE_COLORS["collapsed"])
-            screen.blit(over_surf, (WIDTH // 2 - over_surf.get_width() // 2, HEIGHT // 2 - 80))
+            collapsed_n = sum(1 for n in nodes if n.collapsed)
+            alive_n = len(nodes) - collapsed_n
+            draw_game_summary(screen, t("summary_title_gameover"), [
+                (t("summary_survival_time"), f"{gs.survival_time:.2f}s"),
+                (t("summary_collapsed"), f"{collapsed_n} / {len(nodes)}"),
+                (t("summary_alive"), str(alive_n)),
+                (t("summary_shield_uses"), str(gs.qec_uses)),
+                (t("summary_noise_rate"), f"{noise_rate:.3f}"),
+                (t("summary_cascade_dmg"), str(int(cascade_damage))),
+            ], font=info_font, title_font=title_font)
 
         preset_hud.draw(screen, info_font, hud_x, hud_y + 72)
 
@@ -682,6 +692,7 @@ def run_simulation():
 
     recorder.save({"survival_time": round(gs.survival_time, 2)})
     snd.quit()
+    off_theme_change(_load_theme_colors)
     pygame.quit()
 
 

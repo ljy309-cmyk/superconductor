@@ -19,10 +19,11 @@ import time
 import pygame
 
 from config_loader import cfg
-from theme import get_pg_theme
+from theme import get_pg_theme, on_theme_change, off_theme_change
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from replay import ReplayRecorder
+from quit_dialog import confirm_quit
 from logger import get_module_logger
 
 _log = get_module_logger("phase_transition_sim")
@@ -93,6 +94,7 @@ class CooperPair:
 def run_simulation():
     """Pygame 상전이 시뮬레이션."""
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Phase Transition — Lattice Vibration & Cooper Pairs")
@@ -144,7 +146,8 @@ def run_simulation():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if confirm_quit(screen, font):
+                        running = False
                 elif event.key == pygame.K_UP:
                     temperature = min(temperature + 5, 400)
                 elif event.key == pygame.K_DOWN:
@@ -301,6 +304,7 @@ def run_simulation():
 
     recorder.save({"play_time": play_time})
     snd.quit()
+    off_theme_change(_load_theme_colors)
     pygame.quit()
 
 

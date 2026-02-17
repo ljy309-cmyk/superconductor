@@ -285,5 +285,26 @@
   "preset_applied": "Preset: {name}",
   "preset_profile_saved": "Profile saved: {name}",
   "preset_profile_loaded": "Profile loaded: {name}",
-  "preset_no_profile": "No saved profile"
+  "preset_no_profile": "No saved profile",
+
+  "summary_hint": "R: Restart  |  ESC: Quit",
+  "summary_title_gameover": "GAME OVER",
+  "summary_survival_time": "Survival Time",
+  "summary_collapsed": "Collapsed Qubits",
+  "summary_alive": "Alive Qubits",
+  "summary_shield_uses": "Shield Uses",
+  "summary_noise_rate": "Noise Rate",
+  "summary_cascade_dmg": "Cascade Damage",
+  "summary_qec_uses": "QEC Uses",
+  "summary_heal_uses": "Heal Uses",
+  "summary_elapsed": "Elapsed Time",
+  "summary_total_sent": "Total Sent",
+  "summary_total_safe": "Safe Received",
+  "summary_total_errors": "Errors",
+  "summary_error_rate": "Error Rate",
+  "summary_score": "Score",
+  "summary_eve_detected": "Eve Detected",
+
+  "quit_confirm": "Are you sure you want to quit?",
+  "quit_hint": "Y/Enter: Quit  |  N/ESC: Continue"
 }

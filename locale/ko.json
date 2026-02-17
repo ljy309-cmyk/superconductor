@@ -285,5 +285,26 @@
   "preset_applied": "프리셋: {name}",
   "preset_profile_saved": "프로파일 저장: {name}",
   "preset_profile_loaded": "프로파일 로드: {name}",
-  "preset_no_profile": "저장된 프로파일 없음"
+  "preset_no_profile": "저장된 프로파일 없음",
+
+  "summary_hint": "R: 재시작  |  ESC: 종료",
+  "summary_title_gameover": "게임 종료",
+  "summary_survival_time": "생존 시간",
+  "summary_collapsed": "붕괴된 큐비트",
+  "summary_alive": "생존 큐비트",
+  "summary_shield_uses": "방어막 사용",
+  "summary_noise_rate": "노이즈 비율",
+  "summary_cascade_dmg": "연쇄 피해",
+  "summary_qec_uses": "QEC 사용",
+  "summary_heal_uses": "Heal 사용",
+  "summary_elapsed": "경과 시간",
+  "summary_total_sent": "전송 횟수",
+  "summary_total_safe": "안전 수신",
+  "summary_total_errors": "오류 수",
+  "summary_error_rate": "오류율",
+  "summary_score": "점수",
+  "summary_eve_detected": "도청 감지",
+
+  "quit_confirm": "정말 종료하시겠습니까?",
+  "quit_hint": "Y/Enter: 종료  |  N/ESC: 계속"
 }

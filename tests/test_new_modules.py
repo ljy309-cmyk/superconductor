@@ -290,6 +290,36 @@ class TestThemeToggle(unittest.TestCase):
         set_colorblind(False)
         save_preferences()
 
+    def test_weakref_listener_auto_cleanup(self):
+        """바운드 메서드 리스너가 객체 소멸 시 자동 정리되는지 확인."""
+        import gc
+        import theme as _theme
+        from theme import set_theme, on_theme_change, toggle_theme
+
+        set_theme("dark")
+
+        class Observer:
+            def __init__(self):
+                self.calls = 0
+            def on_change(self):
+                self.calls += 1
+
+        obj = Observer()
+        on_theme_change(obj.on_change)
+        initial_count = len(_theme._listeners)
+
+        toggle_theme()
+        self.assertEqual(obj.calls, 1)
+
+        # 객체 삭제 → 약참조 소멸
+        del obj
+        gc.collect()
+
+        # 다음 notify에서 죽은 참조 정리
+        toggle_theme()
+        self.assertLess(len(_theme._listeners), initial_count)
+        set_theme("dark")
+
 
 # ── Report 추가 테스트 ──────────────────────────────────────
 

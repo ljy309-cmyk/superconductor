@@ -13,12 +13,13 @@ import pygame
 
 from config_loader import cfg
 from i18n import t
-from theme import get_pg_theme
+from theme import get_pg_theme, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
+from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from logger import get_module_logger
 
@@ -509,6 +510,7 @@ def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
 
 def run_simulation():
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption(t("game_title_bb84"))
@@ -554,7 +556,8 @@ def run_simulation():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if confirm_quit(screen, font):
+                        running = False
                 elif event.key == pygame.K_SPACE:
                     if game.channel_open:
                         game.manual_shutdown()
@@ -702,6 +705,7 @@ def run_simulation():
 
     recorder.save()
     snd.quit()
+    off_theme_change(_load_theme_colors)
     pygame.quit()
 
 

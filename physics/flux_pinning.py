@@ -9,11 +9,12 @@ import pygame
 
 from config_loader import cfg
 from i18n import t
-from theme import get_pg_theme
+from theme import get_pg_theme, on_theme_change, off_theme_change
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
 from replay import ReplayRecorder
+from quit_dialog import confirm_quit
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from logger import get_module_logger
 
@@ -89,6 +90,7 @@ class FluxPinningState:
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption(t("game_title_flux_pinning"))
@@ -122,7 +124,8 @@ def run_simulation():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE and not help_overlay.visible:
-                    running = False
+                    if confirm_quit(screen, font):
+                        running = False
                 elif event.key == pygame.K_LEFTBRACKET:
                     cycle_sim_speed(-1)
                 elif event.key == pygame.K_RIGHTBRACKET:
@@ -272,6 +275,7 @@ def run_simulation():
 
     recorder.save({"play_time": play_time})
     snd.quit()
+    off_theme_change(_load_theme_colors)
     pygame.quit()
 
 

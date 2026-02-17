@@ -16,13 +16,14 @@ from dataclasses import dataclass
 import pygame
 
 from config_loader import cfg
-from theme import get_pg_theme
+from theme import get_pg_theme, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
 from achievements import check_achievements
 from replay import ReplayRecorder
+from quit_dialog import confirm_quit
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from logger import get_module_logger
 
@@ -342,6 +343,7 @@ def _draw_status(screen, game: SQUIDGame, font, big_font):
 
 def run_simulation():
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     # 미션1: 사운드 초기화
     pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
@@ -386,7 +388,8 @@ def run_simulation():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if confirm_quit(screen, font):
+                        running = False
                 elif event.key == pygame.K_r:
                     game.reset()
                     panel.reset_all()
@@ -528,6 +531,7 @@ def run_simulation():
     recorder.save()
     snd.quit()
     pygame.mixer.quit()
+    off_theme_change(_load_theme_colors)
     pygame.quit()
 
 
