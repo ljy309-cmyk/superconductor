@@ -8,6 +8,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from quantum.qubit_physics import QubitState
+
 
 # ── QubitNode 물리 로직 테스트 ──────────────────────────────
 
@@ -22,7 +24,7 @@ class TestQubitNode(unittest.TestCase):
         node = self._make_node()
         self.assertEqual(node.stress, 0.0)
         self.assertFalse(node.collapsed)
-        self.assertEqual(node.state, "stable")
+        self.assertEqual(node.state, QubitState.STABLE)
 
     def test_apply_noise_increases_stress(self):
         node = self._make_node()
@@ -54,16 +56,16 @@ class TestQubitNode(unittest.TestCase):
 
     def test_state_transitions(self):
         node = self._make_node()
-        self.assertEqual(node.state, "stable")
+        self.assertEqual(node.state, QubitState.STABLE)
 
         node.stress = 50.0
-        self.assertEqual(node.state, "warning")
+        self.assertEqual(node.state, QubitState.WARNING)
 
         node.stress = 85.0
-        self.assertEqual(node.state, "danger")
+        self.assertEqual(node.state, QubitState.DANGER)
 
         node.collapsed = True
-        self.assertEqual(node.state, "collapsed")
+        self.assertEqual(node.state, QubitState.COLLAPSED)
 
     def test_collapse_at_threshold(self):
         node = self._make_node()

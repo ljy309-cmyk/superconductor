@@ -12,8 +12,17 @@
 
 import math
 import random
+from enum import Enum
 
 from config_loader import cfg
+
+
+class QubitState(Enum):
+    """큐비트 상태 — 문자열 대신 Enum 사용."""
+    STABLE = "stable"
+    WARNING = "warning"
+    DANGER = "danger"
+    COLLAPSED = "collapsed"
 
 
 # 물리 파라미터 (config.json에서 로드, 없으면 기본값)
@@ -38,14 +47,14 @@ class QubitNode:
         self.neighbors: list["QubitNode"] = []
 
     @property
-    def state(self) -> str:
+    def state(self) -> QubitState:
         if self.collapsed:
-            return "collapsed"
+            return QubitState.COLLAPSED
         if self.stress >= _STRESS_DANGER:
-            return "danger"
+            return QubitState.DANGER
         if self.stress >= _STRESS_WARNING:
-            return "warning"
-        return "stable"
+            return QubitState.WARNING
+        return QubitState.STABLE
 
     def add_neighbor(self, other: "QubitNode"):
         if other not in self.neighbors:

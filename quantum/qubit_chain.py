@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 import pygame
 
 from config_loader import cfg
+from quantum.qubit_physics import QubitState
 from i18n import t, toggle_locale
 from theme import load_pg_colors, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
@@ -47,10 +48,10 @@ SHIELD_GLOW = (116, 199, 236)
 
 # 큐비트 상태별 색상
 STATE_COLORS = {
-    "stable": (166, 227, 161),     # 녹색 — 안정
-    "warning": (249, 226, 175),    # 노랑 — 경고
-    "danger": (250, 179, 135),     # 주황 — 위험
-    "collapsed": (243, 139, 168),  # 빨강 — 붕괴
+    QubitState.STABLE: (166, 227, 161),     # 녹색 — 안정
+    QubitState.WARNING: (249, 226, 175),    # 노랑 — 경고
+    QubitState.DANGER: (250, 179, 135),     # 주황 — 위험
+    QubitState.COLLAPSED: (243, 139, 168),  # 빨강 — 붕괴
 }
 
 
@@ -67,10 +68,10 @@ def _load_theme_colors():
     load_pg_colors(_COLOR_MAP, globals())
     from theme import get_pg_theme
     pg = get_pg_theme()
-    STATE_COLORS = {
-        "stable": pg.STABLE, "warning": pg.WARNING,
-        "danger": pg.DANGER, "collapsed": pg.COLLAPSED,
-    }
+    STATE_COLORS[QubitState.STABLE] = pg.STABLE
+    STATE_COLORS[QubitState.WARNING] = pg.WARNING
+    STATE_COLORS[QubitState.DANGER] = pg.DANGER
+    STATE_COLORS[QubitState.COLLAPSED] = pg.COLLAPSED
 
 # ── 물리 파라미터 (config.json에서 로드, 없으면 기본값) ──
 STRESS_THRESHOLD = cfg("qubit_chain", "stress_threshold", 100.0)
@@ -142,14 +143,14 @@ class QubitNode:
         self.neighbors: list["QubitNode"] = []
 
     @property
-    def state(self) -> str:
+    def state(self) -> QubitState:
         if self.collapsed:
-            return "collapsed"
+            return QubitState.COLLAPSED
         if self.stress >= _STRESS_DANGER:
-            return "danger"
+            return QubitState.DANGER
         if self.stress >= _STRESS_WARNING:
-            return "warning"
-        return "stable"
+            return QubitState.WARNING
+        return QubitState.STABLE
 
     def add_neighbor(self, other: "QubitNode"):
         if other not in self.neighbors:
@@ -545,7 +546,7 @@ def run_simulation():
         log_label = info_font.render(t("qc_event_log"), True, ACCENT)
         screen.blit(log_label, (log_x, log_y - 16))
         for i, msg in enumerate(gs.cascade_log):
-            clr = STATE_COLORS["collapsed"] if "COLLAPSED" in msg else TEXT_CLR
+            clr = STATE_COLORS[QubitState.COLLAPSED] if "COLLAPSED" in msg else TEXT_CLR
             surf = info_font.render(msg, True, clr)
             screen.blit(surf, (log_x, log_y + i * 15))
 
@@ -557,20 +558,20 @@ def run_simulation():
             dmg_txt = info_font.render(t("qc_cascade_dmg", orig=int(cascade_damage), reduced=int(cascade_damage * gs.qec_reduction)), True, SHIELD_CLR)
             screen.blit(dmg_txt, (hud_x, hud_y + 16))
         elif gs.cooldown_timer > 0:
-            cd_txt = info_font.render(t("qc_shield_cd", time=gs.cooldown_timer), True, STATE_COLORS["warning"])
+            cd_txt = info_font.render(t("qc_shield_cd", time=gs.cooldown_timer), True, STATE_COLORS[QubitState.WARNING])
             screen.blit(cd_txt, (hud_x, hud_y))
         else:
-            ready_txt = info_font.render(t("qc_shield_ready"), True, STATE_COLORS["stable"])
+            ready_txt = info_font.render(t("qc_shield_ready"), True, STATE_COLORS[QubitState.STABLE])
             screen.blit(ready_txt, (hud_x, hud_y))
 
         if gs.heal_cooldown > 0:
-            heal_txt = info_font.render(t("qc_heal_cd", time=gs.heal_cooldown), True, STATE_COLORS["warning"])
+            heal_txt = info_font.render(t("qc_heal_cd", time=gs.heal_cooldown), True, STATE_COLORS[QubitState.WARNING])
         else:
-            heal_txt = info_font.render(t("qc_heal_ready"), True, STATE_COLORS["stable"])
+            heal_txt = info_font.render(t("qc_heal_ready"), True, STATE_COLORS[QubitState.STABLE])
         screen.blit(heal_txt, (hud_x, hud_y + 32))
 
         # 최종보스미션: 생존 시간 표시
-        time_clr = STATE_COLORS["collapsed"] if gs.game_over else ACCENT
+        time_clr = STATE_COLORS[QubitState.COLLAPSED] if gs.game_over else ACCENT
         time_txt = info_font.render(t("survival_time", time=gs.survival_time), True, time_clr)
         screen.blit(time_txt, (hud_x, hud_y + 52))
 

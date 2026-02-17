@@ -11,6 +11,7 @@ import random
 import pygame
 
 from config_loader import cfg
+from quantum.qubit_physics import QubitState
 from i18n import t, toggle_locale
 from theme import load_pg_colors, on_theme_change, off_theme_change
 from ui.slider import SliderPanel, PANEL_W
@@ -54,9 +55,9 @@ _COLOR_MAP = {
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
     load_pg_colors(_COLOR_MAP, globals())
-    STATE_COLORS["stable"] = globals()["STABLE_CLR"]
-    STATE_COLORS["warning"] = globals()["WARNING_CLR"]
-    STATE_COLORS["collapsed"] = globals()["COLLAPSED_CLR"]
+    STATE_COLORS[QubitState.STABLE] = globals()["STABLE_CLR"]
+    STATE_COLORS[QubitState.WARNING] = globals()["WARNING_CLR"]
+    STATE_COLORS[QubitState.COLLAPSED] = globals()["COLLAPSED_CLR"]
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 NOISE_RATE = cfg("qec_shield", "noise_rate", 5.0)
@@ -90,12 +91,12 @@ class QECQubit:
         self.neighbors: list["QECQubit"] = []
 
     @property
-    def state(self) -> str:
+    def state(self) -> QubitState:
         if self.collapsed:
-            return "collapsed"
+            return QubitState.COLLAPSED
         if self.stress >= _STRESS_WARNING:
-            return "warning"
-        return "stable"
+            return QubitState.WARNING
+        return QubitState.STABLE
 
     def add_neighbor(self, other: "QECQubit"):
         if other not in self.neighbors:
@@ -153,9 +154,9 @@ def _build_grid() -> list[QECQubit]:
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
 STATE_COLORS = {
-    "stable": STABLE_CLR,
-    "warning": WARNING_CLR,
-    "collapsed": COLLAPSED_CLR,
+    QubitState.STABLE: STABLE_CLR,
+    QubitState.WARNING: WARNING_CLR,
+    QubitState.COLLAPSED: COLLAPSED_CLR,
 }
 
 
