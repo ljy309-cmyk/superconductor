@@ -86,13 +86,18 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "none",
         },
         {
+            "title": "Multi-Party GHZ (3~5)",
+            "text": "GHZ 모드에서 Up/Down 키로 파티 수를 변경합니다.\n3→4→5자간 얽힘 네트워크를 확장할 수 있습니다!",
+            "highlight": "none",
+        },
+        {
             "title": "BB84 vs E91 Compare",
             "text": "같은 Eve 조건에서 BB84(QBER)와 E91(Bell)\n두 탐지 방식의 차이를 실시간 비교합니다.",
             "highlight": "none",
         },
         {
             "title": "Controls",
-            "text": "SPACE: 배치 실행  |  Tab: 모드 전환  |  E: Eve 토글\nS: 키 시프팅  |  A: 자동  |  R: 리셋",
+            "text": "SPACE: 배치 실행  |  Tab: 모드 전환  |  E: Eve 토글\nS: 키 시프팅  |  A: 자동  |  R: 리셋  |  Up/Down: 파티 수",
             "highlight": "none",
         },
     ],

@@ -69,6 +69,8 @@
   "qa_cmp_note_e91": "E91: Physics-based detection via Bell inequality violation (CHSH)",
   "qa_bell_s_graph": "Bell S Convergence",
   "qa_bell_s_nodata": "Run rounds to see S convergence",
+  "qa_ghz_parties": "Parties",
+  "qa_ghz_updown": "Up/Down: change",
   "qa_hint_line1": "SPACE: Run Batch  |  A: Auto ({auto})  |  E: Eve Toggle  |  {pause}",
   "qa_hint_line2": "Tab: Mode  |  S: Sift/PA  |  P: Pause  |  R: Reset  |  F1: Help  |  ESC: Exit",
   "game_title_scada_security": "SCADA Security — MITM Attack & Quantum Defense",

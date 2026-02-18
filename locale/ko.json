@@ -69,6 +69,8 @@
   "qa_cmp_note_e91": "E91: 벨 부등식 위반으로 물리적 탐지 (CHSH)",
   "qa_bell_s_graph": "Bell S 수렴 그래프",
   "qa_bell_s_nodata": "라운드를 실행하면 S 수렴 과정이 표시됩니다",
+  "qa_ghz_parties": "파티 수",
+  "qa_ghz_updown": "Up/Down: 변경",
   "qa_hint_line1": "SPACE: 배치 실행  |  A: 자동 ({auto})  |  E: Eve 토글  |  {pause}",
   "qa_hint_line2": "Tab: 모드  |  S: 시프팅/PA  |  P: 일시정지  |  R: 리셋  |  F1: 도움말  |  ESC: 종료",
   "game_title_scada_security": "SCADA 보안 — MITM 공격 & 양자 방어",

@@ -53,6 +53,9 @@ PA_COMPRESSION_RATIO = cfg("qkd_advanced", "pa_compression", 0.5)
 
 # 다자간 QKD 설정
 GHZ_PARTIES = 3
+GHZ_MIN_PARTIES = 3
+GHZ_MAX_PARTIES = 5
+_GHZ_PARTY_NAMES = ["Alice", "Bob", "Charlie", "Dave", "Erin"]
 
 
 def _qrng_randint(lo: int, hi: int) -> int:
@@ -473,7 +476,7 @@ def privacy_amplification(state: E91State) -> str:
 
 @dataclass
 class GHZRound:
-    """GHZ 3자간 QKD 1 라운드."""
+    """GHZ N자간 QKD 1 라운드."""
     round_id: int
     bases: list[str]       # 각 파티의 기저 ("X" 또는 "Z")
     results: list[int]     # 각 파티의 측정 결과 (0 or 1)
@@ -486,11 +489,11 @@ class GHZRound:
 class GHZState:
     """GHZ 다자간 QKD 상태."""
     n_parties: int = GHZ_PARTIES
-    party_names: list[str] = field(default_factory=lambda: ["Alice", "Bob", "Charlie"])
+    party_names: list[str] = field(default_factory=lambda: list(_GHZ_PARTY_NAMES[:GHZ_PARTIES]))
     rounds: list[GHZRound] = field(default_factory=list)
 
     # 키
-    raw_keys: list[list[int]] = field(default_factory=lambda: [[], [], []])
+    raw_keys: list[list[int]] = field(default_factory=lambda: [[] for _ in range(GHZ_PARTIES)])
     sifted_key: list[int] = field(default_factory=list)
     final_key: str = ""
 
@@ -508,10 +511,10 @@ class GHZState:
 
 
 def _ghz_measure(bases: list[str], eve_present: bool = False) -> list[int]:
-    """GHZ 상태 |000⟩+|111⟩)/√2 측정 시뮬레이션.
+    """GHZ 상태 |0...0⟩+|1...1⟩)/√2 측정 시뮬레이션 (N자간).
 
-    Z 기저: 000 또는 111 (50:50) → 모든 파티 같은 결과
-    X 기저: GHZ 상관관계 → 짝수 개의 1 (000, 011, 101, 110)
+    Z 기저: 0...0 또는 1...1 (50:50) → 모든 파티 같은 결과
+    X 기저: GHZ 상관관계 → 짝수 패리티
     """
     n = len(bases)
     all_z = all(b == "Z" for b in bases)
@@ -759,10 +762,9 @@ def reset_e91(state: E91State):
 
 
 def reset_ghz(state: GHZState):
-    """GHZ 상태 리셋."""
+    """GHZ 상태 리셋 (파티 수 유지)."""
     state.rounds.clear()
-    for k in state.raw_keys:
-        k.clear()
+    state.raw_keys = [[] for _ in range(state.n_parties)]
     state.sifted_key.clear()
     state.final_key = ""
     state.total_rounds = 0
@@ -773,3 +775,11 @@ def reset_ghz(state: GHZState):
     state.error_rate = 0.0
     state.sift_done = False
     state.pa_done = False
+
+
+def resize_ghz(state: GHZState, n_parties: int):
+    """파티 수를 변경하고 상태를 리셋."""
+    n_parties = max(GHZ_MIN_PARTIES, min(GHZ_MAX_PARTIES, n_parties))
+    state.n_parties = n_parties
+    state.party_names = list(_GHZ_PARTY_NAMES[:n_parties])
+    reset_ghz(state)

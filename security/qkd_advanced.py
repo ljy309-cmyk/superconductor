@@ -23,6 +23,8 @@ from security.qkd_advanced_engine import (
     CHSH_CLASSICAL_BOUND,
     CHSH_QUANTUM_BOUND,
     E91State,
+    GHZ_MAX_PARTIES,
+    GHZ_MIN_PARTIES,
     GHZState,
     bb84_round,
     compute_bell_S,
@@ -37,6 +39,7 @@ from security.qkd_advanced_engine import (
     reset_bb84,
     reset_e91,
     reset_ghz,
+    resize_ghz,
 )
 from sound_manager import get_sound_manager
 from theme import load_pg_colors, on_theme_change
@@ -367,15 +370,37 @@ def _draw_key_bits(screen, label, bits, color, x, y, font, big_font):
 # ── GHZ Multi-Party 모드 ────────────────────────────
 
 def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
-    """GHZ 다자간 QKD 시각화."""
-    # 3자 네트워크 토폴로지 (삼각형)
-    cx, cy = WIDTH // 2, 160
-    radius = 100
-    positions = []
-    colors = [BLUE, GREEN, PEACH]
+    """GHZ N자간 QKD 시각화."""
+    n = ghz.n_parties
+    node_colors = [BLUE, GREEN, PEACH, YELLOW, RED]
 
-    for i in range(3):
-        angle = -math.pi / 2 + i * 2 * math.pi / 3
+    # 파티 수 슬라이더 표시
+    slider_x, slider_y = WIDTH - 180, 62
+    slider_lbl = big_font.render(t("qa_ghz_parties"), True, ACCENT)
+    screen.blit(slider_lbl, (slider_x, slider_y))
+    # 버튼 스타일 숫자 표시
+    for pn in range(GHZ_MIN_PARTIES, GHZ_MAX_PARTIES + 1):
+        bx = slider_x + (pn - GHZ_MIN_PARTIES) * 36
+        by = slider_y + 18
+        active = pn == n
+        btn_clr = ACCENT if active else SUBTEXT_CLR
+        pygame.draw.rect(screen, PANEL_BG if active else BG,
+                         (bx, by, 30, 20), border_radius=4)
+        if active:
+            pygame.draw.rect(screen, btn_clr, (bx, by, 30, 20), 2, border_radius=4)
+        num = big_font.render(str(pn), True, btn_clr)
+        screen.blit(num, (bx + 15 - num.get_width() // 2, by + 2))
+    hint = font.render(t("qa_ghz_updown"), True, SUBTEXT_CLR)
+    screen.blit(hint, (slider_x, slider_y + 42))
+
+    # N자 네트워크 토폴로지 (정다각형)
+    cx, cy = WIDTH // 2, 170
+    radius = 80 + n * 8
+    positions = []
+    colors = node_colors[:n]
+
+    for i in range(n):
+        angle = -math.pi / 2 + i * 2 * math.pi / n
         px = int(cx + radius * math.cos(angle))
         py = int(cy + radius * math.sin(angle))
         positions.append((px, py))
@@ -395,17 +420,19 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
 
     # 노드
     for i, (pos, name, clr) in enumerate(zip(positions, ghz.party_names, colors)):
-        pygame.draw.circle(screen, clr, pos, 26)
-        pygame.draw.circle(screen, TEXT_CLR, pos, 26, 2)
+        pygame.draw.circle(screen, clr, pos, 24)
+        pygame.draw.circle(screen, TEXT_CLR, pos, 24, 2)
         lbl = big_font.render(name, True, clr)
-        screen.blit(lbl, (pos[0] - lbl.get_width() // 2, pos[1] + 30))
+        screen.blit(lbl, (pos[0] - lbl.get_width() // 2, pos[1] + 28))
 
-    # GHZ 상태 표시
-    state_lbl = font.render("|GHZ⟩ = (|000⟩ + |111⟩) / √2", True, MAUVE)
+    # GHZ 상태 표시 (N자간)
+    zeros = "0" * n
+    ones = "1" * n
+    state_lbl = font.render(f"|GHZ⟩ = (|{zeros}⟩ + |{ones}⟩) / √2", True, MAUVE)
     screen.blit(state_lbl, (cx - state_lbl.get_width() // 2, cy + 22))
 
     # 통계
-    sy = 290
+    sy = 300
     stats = [
         (f"Rounds: {ghz.total_rounds}  (Key: {ghz.key_rounds}  Check: {ghz.consistency_checks})", TEXT_CLR),
         (f"Raw Key Length: {len(ghz.raw_keys[0])} bits", BLUE),
@@ -812,6 +839,12 @@ def run_simulation():
                 elif event.key == pygame.K_e:
                     # Eve 토글
                     eve_chance = 0.3 if eve_chance < 0.01 else 0.0
+                elif event.key == pygame.K_UP and mode == MODE_GHZ:
+                    if ghz.n_parties < GHZ_MAX_PARTIES:
+                        resize_ghz(ghz, ghz.n_parties + 1)
+                elif event.key == pygame.K_DOWN and mode == MODE_GHZ:
+                    if ghz.n_parties > GHZ_MIN_PARTIES:
+                        resize_ghz(ghz, ghz.n_parties - 1)
                 elif event.key == pygame.K_l:
                     toggle_locale()
 

@@ -482,6 +482,83 @@ class TestGHZProtocol(unittest.TestCase):
         self.assertEqual(len(state.rounds), 0)
         self.assertEqual(len(state.raw_keys[0]), 0)
 
+    def test_resize_ghz_to_4(self):
+        """4자간으로 리사이즈 후 정상 동작."""
+        from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+        state = GHZState()
+        resize_ghz(state, 4)
+        self.assertEqual(state.n_parties, 4)
+        self.assertEqual(len(state.party_names), 4)
+        self.assertEqual(len(state.raw_keys), 4)
+        rd = ghz_round(state)
+        self.assertEqual(len(rd.bases), 4)
+        self.assertEqual(len(rd.results), 4)
+
+    def test_resize_ghz_to_5(self):
+        """5자간으로 리사이즈 후 정상 동작."""
+        from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+        state = GHZState()
+        resize_ghz(state, 5)
+        self.assertEqual(state.n_parties, 5)
+        self.assertEqual(len(state.party_names), 5)
+        self.assertEqual(len(state.raw_keys), 5)
+        for _ in range(100):
+            ghz_round(state)
+        self.assertGreater(state.key_rounds, 0)
+
+    def test_resize_ghz_clamps(self):
+        """범위 밖 값은 클램프."""
+        from security.qkd_advanced_engine import (
+            GHZ_MAX_PARTIES,
+            GHZ_MIN_PARTIES,
+            GHZState,
+            resize_ghz,
+        )
+        state = GHZState()
+        resize_ghz(state, 1)
+        self.assertEqual(state.n_parties, GHZ_MIN_PARTIES)
+        resize_ghz(state, 99)
+        self.assertEqual(state.n_parties, GHZ_MAX_PARTIES)
+
+    def test_resize_ghz_resets_state(self):
+        """리사이즈 시 상태가 리셋."""
+        from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+        state = GHZState()
+        for _ in range(50):
+            ghz_round(state)
+        resize_ghz(state, 4)
+        self.assertEqual(state.total_rounds, 0)
+        self.assertEqual(len(state.rounds), 0)
+        self.assertEqual(state.key_rounds, 0)
+
+    def test_ghz_4party_z_correlation(self):
+        """4자간 Z 기저 상관관계 (Eve 없음)."""
+        from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+        state = GHZState()
+        resize_ghz(state, 4)
+        all_same = 0
+        key_count = 0
+        for _ in range(500):
+            rd = ghz_round(state, eve_chance=0.0)
+            if rd.all_same_basis and rd.bases[0] == "Z":
+                key_count += 1
+                if len(set(rd.results)) == 1:
+                    all_same += 1
+        if key_count > 0:
+            self.assertGreater(all_same / key_count, 0.9)
+
+    def test_ghz_5party_sift(self):
+        """5자간 키 시프팅 정상 동작."""
+        from security.qkd_advanced_engine import GHZState, ghz_key_sift, ghz_round, resize_ghz
+        state = GHZState()
+        resize_ghz(state, 5)
+        for _ in range(300):
+            ghz_round(state, eve_chance=0.0)
+        sifted = ghz_key_sift(state)
+        self.assertTrue(state.sift_done)
+        if state.raw_keys[0]:
+            self.assertLessEqual(len(sifted), len(state.raw_keys[0]))
+
 
 class TestE91Constants(unittest.TestCase):
     """E91 상수 검증."""
