@@ -8,6 +8,7 @@
 """
 
 import math
+import os
 
 import pygame
 
@@ -300,9 +301,60 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     # 상관 함수 테이블
     _draw_correlator_table(screen, e91, font, big_font)
 
+    # 얽힘 증인 게이지
+    _draw_witness_gauge(screen, e91, font, big_font)
+
     # Bell S 시계열 수렴 그래프
     _draw_bell_s_graph(screen, e91.bell_S_history, 480, 340, 390, 170,
                        font, big_font)
+
+
+def _draw_witness_gauge(screen, e91: E91State, font, big_font):
+    """얽힘 증인 (Entanglement Witness) 아크 게이지."""
+    gx, gy = 770, 68
+    gr = 32  # arc radius
+    W = e91.witness_value
+
+    # 배경 아크 (회색)
+    arc_rect = pygame.Rect(gx - gr, gy - gr, gr * 2, gr * 2)
+    pygame.draw.arc(screen, OVERLAY, arc_rect, 0.2, math.pi - 0.2, 3)
+
+    # 값 아크 (W 비율에 따른 색상)
+    if W > 0.7:
+        arc_clr = GREEN
+    elif W > 0.5:
+        arc_clr = YELLOW
+    else:
+        arc_clr = RED
+    arc_end = 0.2 + (math.pi - 0.4) * min(W, 1.0)
+    if W > 0.01:
+        pygame.draw.arc(screen, arc_clr, arc_rect, 0.2, arc_end, 3)
+
+    # 0.5 임계선 마커
+    thresh_angle = 0.2 + (math.pi - 0.4) * 0.5
+    tx = gx + int(gr * math.cos(thresh_angle))
+    ty = gy - int(gr * math.sin(thresh_angle))
+    pygame.draw.circle(screen, YELLOW, (tx, ty), 2)
+
+    # 중앙 텍스트
+    w_txt = f"W={W:.2f}"
+    w_surf = font.render(w_txt, True, arc_clr)
+    screen.blit(w_surf, (gx - w_surf.get_width() // 2, gy - 4))
+
+    # 상태 뱃지
+    if e91.bell_rounds > 5:
+        if W > 0.7:
+            badge = t("qa_witness_entangled")
+        elif W > 0.5:
+            badge = t("qa_witness_border")
+        else:
+            badge = t("qa_witness_separable")
+        b_surf = font.render(badge, True, arc_clr)
+        screen.blit(b_surf, (gx - b_surf.get_width() // 2, gy + gr + 4))
+
+    # 라벨
+    lbl = font.render(t("qa_witness_title"), True, SUBTEXT_CLR)
+    screen.blit(lbl, (gx - lbl.get_width() // 2, gy - gr - 14))
 
 
 def _draw_correlator_table(screen, e91: E91State, font, big_font):
@@ -464,6 +516,10 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
         ec_txt = t("qa_sift_ec_msg", flips=e91.correction_flips)
         screen.blit(font.render(ec_txt, True, TEXT_CLR), (40, ec_y + 18))
 
+        # 에러 패턴 히트맵 (블록 기반)
+        if e91.error_positions:
+            _draw_error_heatmap(screen, e91, 460, ec_y - 10, font, big_font)
+
     # 최종 키 + 키 합의 검증
     if e91.pa_done and e91.final_key:
         fy = ky + 140
@@ -498,6 +554,49 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
     ]
     for i, (txt, clr) in enumerate(stats):
         screen.blit(font.render(txt, True, clr), (40, stats_y + i * 16))
+
+
+def _draw_error_heatmap(screen, e91: E91State, x, y, font, big_font):
+    """에러 패턴 히트맵 — 블록별 에러 분포 시각화."""
+    key_len = len(e91.sifted_key)
+    if key_len == 0:
+        return
+    # 8블록으로 나눔
+    n_blocks = min(8, max(1, key_len // 4))
+    block_size = key_len // n_blocks if n_blocks > 0 else key_len
+
+    hdr = big_font.render(t("qa_error_heatmap"), True, ACCENT)
+    screen.blit(hdr, (x, y))
+
+    cell_w, cell_h = 28, 18
+    hy = y + 16
+    error_set = set(e91.error_positions)
+    for bi in range(n_blocks):
+        start = bi * block_size
+        end = start + block_size
+        errs = sum(1 for p in error_set if start <= p < end)
+        # 열강도: 0=deep blue, high=red
+        if block_size > 0:
+            ratio = min(errs / max(block_size * 0.3, 1), 1.0)
+        else:
+            ratio = 0
+        r = int(RED[0] * ratio + BLUE[0] * (1 - ratio))
+        g = int(RED[1] * ratio + BLUE[1] * (1 - ratio))
+        b = int(RED[2] * ratio + BLUE[2] * (1 - ratio))
+        cell_clr = (max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)))
+
+        cx = x + bi * (cell_w + 2)
+        pygame.draw.rect(screen, cell_clr, (cx, hy, cell_w, cell_h), border_radius=2)
+        pygame.draw.rect(screen, OVERLAY, (cx, hy, cell_w, cell_h), 1, border_radius=2)
+        # 에러 수 표시
+        etxt = font.render(str(errs), True, WHITE if ratio > 0.3 else TEXT_CLR)
+        screen.blit(etxt, (cx + cell_w // 2 - etxt.get_width() // 2,
+                           hy + 3))
+
+    # 범례
+    leg_txt = font.render(t("qa_error_legend", n=len(e91.error_positions),
+                             total=key_len), True, SUBTEXT_CLR)
+    screen.blit(leg_txt, (x, hy + cell_h + 3))
 
 
 def _draw_key_bits(screen, label, bits, color, x, y, font, big_font):
@@ -927,6 +1026,10 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
     for i, note in enumerate(notes):
         screen.blit(font.render(note, True, SUBTEXT_CLR), (30, note_y + i * 14))
 
+    # 프로토콜 스펙트럼 레이더 차트 (충분한 데이터 후)
+    if e91.total_rounds > 50 and bb84.total_rounds > 50:
+        _draw_spectrum_chart(screen, bb84, e91, font, big_font)
+
     # 프로토콜 승자 하이라이트 (충분한 라운드 후)
     min_rounds = 100
     if e91.total_rounds > min_rounds and bb84.total_rounds > min_rounds:
@@ -944,6 +1047,85 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
         pygame.draw.rect(screen, winner_clr, (wx - 8, win_y - 2,
                          win_surf.get_width() + 16, 20), 2, border_radius=4)
         screen.blit(win_surf, (wx, win_y))
+
+
+def _draw_spectrum_chart(screen, bb84: BB84State, e91: E91State,
+                         font, big_font):
+    """BB84 vs E91 레이더 차트 — 5축 비교."""
+    cx, cy = WIDTH // 2, 530
+    radius = 42
+    n_axes = 5
+
+    # 5축 메트릭 계산 (0~100 스케일)
+    bb84_qber_score = max(0, 100 * (1 - bb84.qber / 0.25)) if bb84.total_rounds > 0 else 50
+    e91_qber_score = max(0, 100 * (1 - e91.qber_value / 0.25)) if e91.qber_done else 50
+
+    bb84_key_rate = (bb84.basis_match_rounds / max(bb84.total_rounds, 1)) * 100
+    e91_key_rate = (e91.key_rounds / max(e91.total_rounds, 1)) * 100
+
+    bb84_eve_resist = 100 * (1 - bb84.eve_rounds / max(bb84.total_rounds, 1))
+    e91_eve_resist = 100 * (1 - e91.eve_rounds / max(e91.total_rounds, 1))
+
+    e91_bell_score = min(100, abs(e91.bell_S) / CHSH_QUANTUM_BOUND * 100)
+    bb84_detect_score = min(100, bb84.raw_key_bits / max(bb84.total_rounds, 1) * 200)
+    e91_detect_score = min(100, len(e91.raw_key_alice) / max(e91.total_rounds, 1) * 200)
+
+    labels = ["QBER", "Key Rate", "Eve Resist", "Detection", "Security"]
+    bb84_vals = [bb84_qber_score, bb84_key_rate, bb84_eve_resist,
+                 bb84_detect_score, 80 if bb84.eve_detected else 50]
+    e91_vals = [e91_qber_score, e91_key_rate, e91_eve_resist,
+                e91_detect_score, e91_bell_score]
+
+    # 축 그리기
+    angles = []
+    for i in range(n_axes):
+        angle = -math.pi / 2 + i * 2 * math.pi / n_axes
+        angles.append(angle)
+        ex = cx + int(radius * math.cos(angle))
+        ey = cy + int(radius * math.sin(angle))
+        pygame.draw.line(screen, OVERLAY, (cx, cy), (ex, ey), 1)
+        # 축 라벨
+        lx = cx + int((radius + 14) * math.cos(angle))
+        ly = cy + int((radius + 14) * math.sin(angle))
+        lbl = font.render(labels[i], True, SUBTEXT_CLR)
+        screen.blit(lbl, (lx - lbl.get_width() // 2, ly - 5))
+
+    # 외곽 오각형
+    outer_pts = [(cx + int(radius * math.cos(a)),
+                  cy + int(radius * math.sin(a))) for a in angles]
+    pygame.draw.polygon(screen, OVERLAY, outer_pts, 1)
+
+    # BB84 폴리곤 (BLUE)
+    bb84_pts = []
+    for i, a in enumerate(angles):
+        r = radius * min(bb84_vals[i], 100) / 100
+        bb84_pts.append((cx + int(r * math.cos(a)), cy + int(r * math.sin(a))))
+    if len(bb84_pts) >= 3:
+        bb84_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        pygame.draw.polygon(bb84_surf, (*BLUE[:3], 50), bb84_pts)
+        pygame.draw.polygon(bb84_surf, BLUE, bb84_pts, 2)
+        screen.blit(bb84_surf, (0, 0))
+
+    # E91 폴리곤 (MAUVE)
+    e91_pts = []
+    for i, a in enumerate(angles):
+        r = radius * min(e91_vals[i], 100) / 100
+        e91_pts.append((cx + int(r * math.cos(a)), cy + int(r * math.sin(a))))
+    if len(e91_pts) >= 3:
+        e91_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        pygame.draw.polygon(e91_surf, (*MAUVE[:3], 50), e91_pts)
+        pygame.draw.polygon(e91_surf, MAUVE, e91_pts, 2)
+        screen.blit(e91_surf, (0, 0))
+
+    # 범례
+    pygame.draw.line(screen, BLUE, (cx - 50, cy + radius + 22),
+                     (cx - 36, cy + radius + 22), 2)
+    screen.blit(font.render("BB84", True, BLUE),
+                (cx - 34, cy + radius + 17))
+    pygame.draw.line(screen, MAUVE, (cx + 10, cy + radius + 22),
+                     (cx + 24, cy + radius + 22), 2)
+    screen.blit(font.render("E91", True, MAUVE),
+                (cx + 26, cy + radius + 17))
 
 
 def _draw_qber_meter(screen, qber, x, y, w, font, big_font):
@@ -1415,6 +1597,9 @@ def run_simulation():
     _ghz_flash_timer = 0.0  # GHZ 측정 플래시 타이머
     _ghz_prev_rounds = 0  # GHZ 라운드 변화 감지용
     noise_model = "depolarizing"  # 양자 노이즈 모델
+    step_mode = False  # 단계별 학습 모드
+    _step_milestone = 0  # 현재 마일스톤 인덱스
+    _step_waiting = False  # 마일스톤 도달 → 일시정지 대기
 
     help_overlay = HelpOverlay("qkd_advanced")
     tutorial = TutorialOverlay("qkd_advanced")
@@ -1448,6 +1633,9 @@ def run_simulation():
                     mode = (mode + 1) % NUM_MODES
                     _fade_timer = 0.15
                 elif event.key == pygame.K_SPACE:
+                    if _step_waiting:
+                        _step_waiting = False
+                        paused = False
                     _engine_error = None
                     try:
                         if mode == MODE_E91:
@@ -1511,6 +1699,15 @@ def run_simulation():
                     paused = not paused
                 elif event.key == pygame.K_a:
                     auto_run = not auto_run
+                elif event.key == pygame.K_h:
+                    step_mode = not step_mode
+                    _step_milestone = 0
+                    _step_waiting = False
+                    if step_mode:
+                        auto_run = True
+                        _toasts.append([t("qa_step_on"), ACCENT, 2.0])
+                    else:
+                        _toasts.append([t("qa_step_off"), SUBTEXT_CLR, 2.0])
                 elif event.key == pygame.K_RIGHTBRACKET:
                     idx = _AUTO_SPEEDS.index(auto_speed) if auto_speed in _AUTO_SPEEDS else 1
                     auto_speed = _AUTO_SPEEDS[min(idx + 1, len(_AUTO_SPEEDS) - 1)]
@@ -1519,6 +1716,15 @@ def run_simulation():
                     auto_speed = _AUTO_SPEEDS[max(idx - 1, 0)]
                 elif event.key == pygame.K_F10:
                     show_fps = not show_fps
+                elif event.key == pygame.K_F12:
+                    _screenshot_dir = os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)), "..", "screenshots")
+                    os.makedirs(_screenshot_dir, exist_ok=True)
+                    from datetime import datetime as _dt
+                    _ss_name = f"qkd_{_dt.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    _ss_path = os.path.join(_screenshot_dir, _ss_name)
+                    pygame.image.save(screen, _ss_path)
+                    _toasts.append([t("qa_screenshot", path=_ss_name), GREEN, 2.5])
                 elif event.key == pygame.K_e:
                     # Eve 단계별 순환: 0→10→30→50→80→100→0%
                     _EVE_LEVELS = [0.0, 0.1, 0.3, 0.5, 0.8, 1.0]
@@ -1656,6 +1862,26 @@ def run_simulation():
         for toast in _toasts:
             toast[2] -= dt
         _toasts = [t_ for t_ in _toasts if t_[2] > 0]
+
+        # 단계별 모드 마일스톤 감지
+        if step_mode and not _step_waiting:
+            _milestones = [
+                (0, lambda: e91.key_rounds >= 1, "qa_step_first_key"),
+                (1, lambda: e91.bell_violated, "qa_step_bell_violated"),
+                (2, lambda: e91.qber_done, "qa_step_qber_done"),
+                (3, lambda: e91.correction_done, "qa_step_ec_done"),
+                (4, lambda: e91.pa_done, "qa_step_pa_done"),
+            ]
+            for mi, (idx, cond, key) in enumerate(_milestones):
+                if mi == _step_milestone and cond():
+                    paused = True
+                    _step_waiting = True
+                    _step_milestone = mi + 1
+                    _toasts.append([t(key), ACCENT, 4.0])
+                    break
+
+        # SPACE가 눌리면 step_waiting 해제 (이미 핸들러에서 처리)
+        # _step_waiting은 SPACE 처리 후 자동 해제
 
         # 리플레이 기록
         if not paused:
@@ -1829,6 +2055,11 @@ def run_simulation():
         nm_txt = font.render(t("qa_noise_label", model=nm), True, PEACH)
         screen.blit(nm_txt, (10, 10))
 
+        # 단계별 모드 표시
+        if step_mode:
+            step_txt = font.render(t("qa_step_active"), True, ACCENT)
+            screen.blit(step_txt, (10, 22))
+
         # FPS 카운터
         if show_fps:
             fps_val = int(clock.get_fps())
@@ -1872,10 +2103,12 @@ def run_simulation():
                 f"L       {t('qa_sc_locale')}",
                 f"T       {t('qa_sc_theme')}",
                 f"N       {t('qa_sc_noise')}",
+                f"H       {t('qa_sc_step')}",
                 f"Up/Down {t('qa_sc_updown')}",
                 f"[ / ]   {t('qa_sc_speed')}",
                 f"F1      {t('qa_sc_help')}",
                 f"F10     {t('qa_sc_fps')}",
+                f"F12     {t('qa_sc_screenshot')}",
                 f"?       {t('qa_sc_shortcuts')}",
                 f"Ctrl+X  {t('qa_sc_export')}",
                 f"ESC     {t('qa_sc_exit')}",

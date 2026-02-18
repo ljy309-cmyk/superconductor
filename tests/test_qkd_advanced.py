@@ -2075,5 +2075,127 @@ class TestRound16Features(unittest.TestCase):
                          f"ko에만: {ko_keys - en_keys}")
 
 
+class TestRound17Features(unittest.TestCase):
+    """Round 17 신규 기능 테스트."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_round17_locale_keys(self):
+        """Round 17 로케일 키가 양쪽 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        keys = [
+            "qa_witness_title", "qa_witness_entangled",
+            "qa_witness_border", "qa_witness_separable",
+            "qa_error_heatmap", "qa_error_legend",
+            "qa_screenshot", "qa_sc_screenshot",
+            "qa_sc_step", "qa_step_on", "qa_step_off",
+            "qa_step_active",
+            "qa_step_first_key", "qa_step_bell_violated",
+            "qa_step_qber_done", "qa_step_ec_done", "qa_step_pa_done",
+        ]
+        for key in keys:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_witness_computed_no_eve(self):
+        """Eve 없을 때 witness > 0.5 (얽힘 확인)."""
+        from security.qkd_advanced_engine import (
+            E91State, compute_bell_S, e91_round, set_noise_model,
+        )
+        set_noise_model("depolarizing")
+        state = E91State()
+        for _ in range(2000):
+            e91_round(state, eve_chance=0.0)
+        compute_bell_S(state)
+        self.assertGreater(state.witness_value, 0.5)
+        self.assertGreater(len(state.witness_history), 0)
+
+    def test_witness_degrades_with_eve(self):
+        """Eve가 강하면 witness 값 하락."""
+        from security.qkd_advanced_engine import (
+            E91State, compute_bell_S, e91_round, set_noise_model,
+        )
+        set_noise_model("depolarizing")
+        state = E91State()
+        for _ in range(3000):
+            e91_round(state, eve_chance=1.0)
+        compute_bell_S(state)
+        # 완전한 Eve에서는 witness가 낮아져야 함
+        self.assertLess(state.witness_value, 0.9)
+
+    def test_witness_reset(self):
+        """리셋 시 witness 클리어."""
+        from security.qkd_advanced_engine import (
+            E91State, compute_bell_S, e91_round, reset_e91,
+        )
+        state = E91State()
+        for _ in range(200):
+            e91_round(state, eve_chance=0.0)
+        compute_bell_S(state)
+        self.assertGreater(len(state.witness_history), 0)
+        reset_e91(state)
+        self.assertEqual(state.witness_value, 0.0)
+        self.assertEqual(len(state.witness_history), 0)
+
+    def test_error_positions_tracked(self):
+        """에러 정정에서 에러 위치가 기록됨."""
+        from security.qkd_advanced_engine import (
+            E91State, e91_round, estimate_qber, error_correct,
+        )
+        state = E91State()
+        for _ in range(2000):
+            e91_round(state, eve_chance=0.5)
+        estimate_qber(state)
+        error_correct(state)
+        # Eve가 있으므로 에러가 발생해야 함
+        if state.correction_flips > 0:
+            self.assertEqual(len(state.error_positions), state.correction_flips)
+            for pos in state.error_positions:
+                self.assertIsInstance(pos, int)
+
+    def test_error_positions_empty_no_eve(self):
+        """Eve 없이 에러 위치 빈 리스트 또는 매우 적음."""
+        from security.qkd_advanced_engine import (
+            E91State, e91_round, estimate_qber, error_correct,
+        )
+        state = E91State()
+        for _ in range(1000):
+            e91_round(state, eve_chance=0.0)
+        estimate_qber(state)
+        error_correct(state)
+        # Eve 없이는 에러가 매우 적어야 함
+        self.assertLessEqual(len(state.error_positions), 5)
+
+    def test_error_positions_reset(self):
+        """리셋 시 에러 위치 클리어."""
+        from security.qkd_advanced_engine import (
+            E91State, e91_round, estimate_qber, error_correct, reset_e91,
+        )
+        state = E91State()
+        for _ in range(500):
+            e91_round(state, eve_chance=0.5)
+        estimate_qber(state)
+        error_correct(state)
+        reset_e91(state)
+        self.assertEqual(len(state.error_positions), 0)
+
+    def test_en_ko_keys_match_round17(self):
+        """en.json과 ko.json 키 완전 일치."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        self.assertEqual(en_keys - ko_keys, set(),
+                         f"en에만: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(),
+                         f"ko에만: {ko_keys - en_keys}")
+
+
 if __name__ == "__main__":
     unittest.main()

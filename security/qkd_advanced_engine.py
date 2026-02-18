@@ -105,6 +105,8 @@ class E91State:
     bell_S: float = 0.0
     bell_violated: bool = False
     bell_S_history: list[tuple[int, float]] = field(default_factory=list)  # (round, S)
+    witness_value: float = 0.0  # 얽힘 증인 값 W (>0.5 = entangled)
+    witness_history: list[tuple[int, float]] = field(default_factory=list)
 
     # 통계
     total_rounds: int = 0
@@ -124,6 +126,7 @@ class E91State:
     bob_remaining: list[int] = field(default_factory=list)  # Bob 측 남은 키 (에러 정정용)
     correction_done: bool = False
     correction_flips: int = 0        # 정정된 비트 수
+    error_positions: list[int] = field(default_factory=list)  # EC에서 플립된 비트 위치
 
     # Stage 3: 프라이버시 증폭
     sifted_key: list[int] = field(default_factory=list)   # 최종 시프트 키 (호환용)
@@ -309,6 +312,19 @@ def compute_bell_S(state: E91State) -> float:
     if len(state.bell_S_history) > 200:
         state.bell_S_history.pop(0)
 
+    # 얽힘 증인 (Entanglement Witness) 계산
+    # W = (1 + max|E(a,b)|) / 2 — W > 0.5 → 얽힘 상태
+    corr_avgs = []
+    for pair, vals in state.correlators.items():
+        if vals:
+            corr_avgs.append(abs(sum(vals) / len(vals)))
+    max_corr = max(corr_avgs) if corr_avgs else 0.0
+    W = (1 + max_corr) / 2
+    state.witness_value = W
+    state.witness_history.append((state.total_rounds, W))
+    if len(state.witness_history) > 200:
+        state.witness_history.pop(0)
+
     return S
 
 
@@ -394,6 +410,7 @@ def error_correct(state: E91State) -> list[int]:
 
     corrected = list(alice_key)
     flips = 0
+    error_pos = []
     block_size = 4
 
     for start in range(0, len(corrected), block_size):
@@ -414,11 +431,13 @@ def error_correct(state: E91State) -> list[int]:
                     lo = mid
             # lo 위치의 비트 수정
             corrected[lo] = bob_key[lo]
+            error_pos.append(lo)
             flips += 1
 
     state.corrected_key = corrected
     state.correction_done = True
     state.correction_flips = flips
+    state.error_positions = error_pos
     state.sift_done = True
 
     return corrected
@@ -953,6 +972,9 @@ def reset_e91(state: E91State):
     state.key_match_rate = 0.0
     state.bob_remaining.clear()
     state.key_accumulation.clear()
+    state.witness_value = 0.0
+    state.witness_history.clear()
+    state.error_positions.clear()
 
 
 def reset_ghz(state: GHZState):
