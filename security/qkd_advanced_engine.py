@@ -16,7 +16,6 @@ E91 프로토콜 흐름:
   GHZ 상태 |000⟩+|111⟩)/√2 로 3자간 상관 키 생성
 """
 
-import hashlib
 import math
 import random
 from dataclasses import dataclass, field
@@ -349,16 +348,61 @@ def key_sift(state: E91State) -> list[int]:
     return state.corrected_key
 
 
+def _toeplitz_hash(key_bits: list[int], output_len: int,
+                   seed: list[int] | None = None) -> tuple[list[int], list[int]]:
+    """Toeplitz 범용 해시 (2-universal hash family).
+
+    Toeplitz 행렬은 대각선이 일정한 행렬로, 첫 행과 첫 열만으로
+    전체 행렬을 정의할 수 있습니다.
+
+    구조:
+      - 입력: n-bit 키 벡터 x
+      - 시드: (m + n - 1) 랜덤 비트 r (공개 — Eve도 알지만 보안에 영향 없음)
+      - Toeplitz 행렬 T: m×n, T[i][j] = r[i + j]
+      - 출력: y = T · x (mod 2), m-bit 압축 키
+
+    보안 보장 (Leftover Hash Lemma):
+      m ≤ n - t 이면, Eve의 정보 t 비트를 완전히 제거 가능.
+      즉 출력 키는 균등 분포에 통계적으로 가까움.
+
+    Returns:
+        (output_bits, seed): 압축된 비트 리스트와 사용된 시드
+    """
+    n = len(key_bits)
+    m = output_len
+
+    if n == 0 or m == 0:
+        return [], seed or []
+
+    # 시드 생성 (m + n - 1 랜덤 비트)
+    seed_len = m + n - 1
+    if seed is None:
+        seed = [random.randint(0, 1) for _ in range(seed_len)]
+    elif len(seed) < seed_len:
+        # 시드가 짧으면 확장
+        seed = seed + [random.randint(0, 1) for _ in range(seed_len - len(seed))]
+
+    # T · x (mod 2) — 행렬 곱을 직접 계산
+    # T[i][j] = seed[i + j], 출력 y[i] = Σ_j T[i][j] · x[j] (mod 2)
+    output = []
+    for i in range(m):
+        bit_sum = 0
+        for j in range(n):
+            bit_sum ^= seed[i + j] & key_bits[j]
+        output.append(bit_sum)
+
+    return output, seed
+
+
 def privacy_amplification(state: E91State) -> str:
-    """Stage 3: 프라이버시 증폭 — 해시 압축으로 최종 보안 키 생성.
+    """Stage 3: 프라이버시 증폭 — Toeplitz 범용 해시로 최종 보안 키 생성.
 
     Eve가 QBER 추정/에러 정정 과정에서 노출된 패리티 정보를 통해
-    부분 키 정보를 가질 수 있습니다. 해시 함수로 키를 압축하여
+    부분 키 정보를 가질 수 있습니다. Toeplitz 범용 해시로 키를 압축하여
     Eve의 정보를 정보이론적으로 제거합니다.
 
-    교육용 단순화: 실제는 Toeplitz 행렬 등 범용 해시를 사용하지만,
-    여기서는 SHA-256을 사용합니다. SHA-256은 암호학적 해시이므로
-    범용 해시의 보안 속성을 근사적으로 만족합니다.
+    Toeplitz 해시는 2-universal hash family의 구성원으로,
+    Leftover Hash Lemma에 의해 출력 키가 균등 분포에 가까워짐을 보장합니다.
     """
     # 에러 정정된 키 또는 시프트 키 사용
     key_source = state.corrected_key if state.corrected_key else state.sifted_key
@@ -368,15 +412,20 @@ def privacy_amplification(state: E91State) -> str:
         state.pa_done = True
         return ""
 
-    # 키를 바이트열로 변환
-    key_bits = "".join(str(b) for b in key_source)
+    # 출력 길이 결정: 입력의 PA_COMPRESSION_RATIO 배 (Eve 정보량만큼 단축)
+    n = len(key_source)
+    output_bits = max(8, int(n * PA_COMPRESSION_RATIO))
 
-    # SHA-256 해시로 압축 (교육용 단순화 — 실제는 Toeplitz 범용 해시)
-    h = hashlib.sha256(key_bits.encode()).hexdigest()
+    # Toeplitz 해시 적용
+    hashed_bits, _seed = _toeplitz_hash(key_source, output_bits)
 
-    # 압축 비율에 따라 잘라냄 — Eve의 정보량만큼 키 길이 단축
-    target_len = max(4, int(len(h) * PA_COMPRESSION_RATIO))
-    final = h[:target_len]
+    # 비트 → 16진수 문자열 변환
+    hex_chars = []
+    for i in range(0, len(hashed_bits) - 3, 4):
+        nibble = (hashed_bits[i] << 3 | hashed_bits[i + 1] << 2 |
+                  hashed_bits[i + 2] << 1 | hashed_bits[i + 3])
+        hex_chars.append(f"{nibble:x}")
+    final = "".join(hex_chars)
 
     state.final_key = final
     state.pa_done = True
@@ -531,16 +580,22 @@ def ghz_key_sift(state: GHZState) -> list[int]:
 
 
 def ghz_privacy_amplification(state: GHZState) -> str:
-    """GHZ 프라이버시 증폭."""
+    """GHZ 프라이버시 증폭 — Toeplitz 범용 해시."""
     if not state.sifted_key:
         state.final_key = ""
         state.pa_done = True
         return ""
 
-    key_bits = "".join(str(b) for b in state.sifted_key)
-    h = hashlib.sha256(key_bits.encode()).hexdigest()
-    target_len = max(4, int(len(h) * PA_COMPRESSION_RATIO))
-    final = h[:target_len]
+    n = len(state.sifted_key)
+    output_bits = max(8, int(n * PA_COMPRESSION_RATIO))
+    hashed_bits, _seed = _toeplitz_hash(state.sifted_key, output_bits)
+
+    hex_chars = []
+    for i in range(0, len(hashed_bits) - 3, 4):
+        nibble = (hashed_bits[i] << 3 | hashed_bits[i + 1] << 2 |
+                  hashed_bits[i + 2] << 1 | hashed_bits[i + 3])
+        hex_chars.append(f"{nibble:x}")
+    final = "".join(hex_chars)
 
     state.final_key = final
     state.pa_done = True

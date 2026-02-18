@@ -313,7 +313,7 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
     # 최종 키
     if e91.pa_done and e91.final_key:
         fy = ky + 140
-        header = big_font.render("Final Key (SHA-256, simplified PA):", True, ACCENT)
+        header = big_font.render("Final Key (Toeplitz universal hash):", True, ACCENT)
         screen.blit(header, (40, fy))
         key = e91.final_key
         for i in range(0, len(key), 32):

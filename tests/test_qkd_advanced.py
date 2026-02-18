@@ -229,8 +229,60 @@ class TestKeySifting(unittest.TestCase):
         self.assertGreater(state.error_rate, 0.0)
 
 
+class TestToeplitzHash(unittest.TestCase):
+    """Toeplitz 범용 해시 테스트."""
+
+    def test_output_length(self):
+        """출력 길이가 지정한 대로."""
+        from security.qkd_advanced_engine import _toeplitz_hash
+        key = [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]
+        for m in [4, 8, 5]:
+            out, seed = _toeplitz_hash(key, m)
+            self.assertEqual(len(out), m)
+
+    def test_output_is_binary(self):
+        """출력이 0/1 비트."""
+        from security.qkd_advanced_engine import _toeplitz_hash
+        key = [1, 0, 1, 1, 0, 0, 1, 0]
+        out, seed = _toeplitz_hash(key, 4)
+        for bit in out:
+            self.assertIn(bit, (0, 1))
+
+    def test_deterministic_with_same_seed(self):
+        """같은 시드 → 같은 출력."""
+        from security.qkd_advanced_engine import _toeplitz_hash
+        key = [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]
+        out1, seed = _toeplitz_hash(key, 5)
+        out2, _ = _toeplitz_hash(key, 5, seed=seed)
+        self.assertEqual(out1, out2)
+
+    def test_different_keys_different_output(self):
+        """다른 키 → 높은 확률로 다른 출력 (2-universal)."""
+        from security.qkd_advanced_engine import _toeplitz_hash
+        key1 = [1, 0, 1, 1, 0, 0, 1, 0]
+        key2 = [0, 1, 0, 0, 1, 1, 0, 1]
+        seed = [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1]  # m + n - 1 = 4 + 8 - 1 = 11
+        out1, _ = _toeplitz_hash(key1, 4, seed=seed)
+        out2, _ = _toeplitz_hash(key2, 4, seed=seed)
+        # 2-universal: 충돌 확률 ≤ 1/2^m = 1/16
+        # 이 특정 입력에서는 다른 출력이어야 함
+        self.assertNotEqual(out1, out2)
+
+    def test_empty_key(self):
+        from security.qkd_advanced_engine import _toeplitz_hash
+        out, seed = _toeplitz_hash([], 4)
+        self.assertEqual(out, [])
+
+    def test_seed_length(self):
+        """시드 길이 = m + n - 1."""
+        from security.qkd_advanced_engine import _toeplitz_hash
+        key = [1, 0, 1, 0, 1]  # n=5
+        out, seed = _toeplitz_hash(key, 3)  # m=3
+        self.assertEqual(len(seed), 3 + 5 - 1)  # 7
+
+
 class TestPrivacyAmplification(unittest.TestCase):
-    """프라이버시 증폭 테스트."""
+    """프라이버시 증폭 (Toeplitz 해시) 테스트."""
 
     def test_pa_empty_key(self):
         from security.qkd_advanced_engine import E91State, privacy_amplification
@@ -256,26 +308,29 @@ class TestPrivacyAmplification(unittest.TestCase):
         int(final, 16)
         self.assertTrue(state.pa_done)
 
-    def test_pa_deterministic(self):
-        """같은 시프트 키 → 같은 최종 키."""
-        from security.qkd_advanced_engine import E91State, privacy_amplification
-        state = E91State()
-        state.sifted_key = [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]
-        key1 = privacy_amplification(state)
-        state.pa_done = False
-        key2 = privacy_amplification(state)
-        self.assertEqual(key1, key2)
-
     def test_pa_compressed(self):
-        """PA 후 키는 SHA-256 길이의 절반 이하."""
+        """PA 후 키는 입력보다 짧아야 함."""
         from security.qkd_advanced_engine import E91State, privacy_amplification
         state = E91State()
-        state.sifted_key = [random_bit() for _ in range(100)]
+        state.sifted_key = [_random_bit() for _ in range(100)]
         final = privacy_amplification(state)
-        self.assertLessEqual(len(final), 64)  # SHA-256 = 64 hex chars
+        # 100 bits * 0.5 = 50 bits = ~12 hex chars
+        self.assertLessEqual(len(final), 25)
+        self.assertGreater(len(final), 0)
+
+    def test_pa_different_runs_differ(self):
+        """Toeplitz 시드가 랜덤이므로 다른 실행마다 다른 키 (높은 확률)."""
+        from security.qkd_advanced_engine import E91State, privacy_amplification
+        results = set()
+        for _ in range(5):
+            state = E91State()
+            state.sifted_key = [1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1]
+            results.add(privacy_amplification(state))
+        # 5번 중 최소 2개는 달라야 함 (랜덤 시드)
+        self.assertGreater(len(results), 1)
 
 
-def random_bit():
+def _random_bit():
     import random
     return random.randint(0, 1)
 
