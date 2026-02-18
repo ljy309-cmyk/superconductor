@@ -40,9 +40,10 @@ except ImportError:
 E91_ALICE_BASES = [0.0, math.pi / 8, math.pi / 4]  # a1=0, a2=π/8, a3=π/4
 E91_BOB_BASES = [math.pi / 8, math.pi / 4, 3 * math.pi / 8]  # b1=π/8, b2=π/4, b3=3π/8
 
-# 키 생성용 기저 쌍 인덱스 (Alice a3=π/4, Bob b1=π/8 → 같은 기저 아님!)
-# 실제 E91: Alice a2=π/8, Bob b1=π/8 → 같은 기저 → 키 생성
-# Alice a3=π/4, Bob b2=π/4 → 같은 기저 → 키 생성
+# 키 생성용 기저 쌍 인덱스 — 같은 각도를 공유하는 쌍:
+#   (1, 0): Alice a2=π/8, Bob b1=π/8 → 같은 기저 → 키 생성
+#   (2, 1): Alice a3=π/4, Bob b2=π/4 → 같은 기저 → 키 생성
+# 나머지 7쌍은 CHSH 벨 부등식 검증에 사용
 E91_KEY_PAIRS = [(1, 0), (2, 1)]  # (Alice idx, Bob idx) 같은 기저 쌍
 
 CHSH_CLASSICAL_BOUND = 2.0
@@ -120,6 +121,7 @@ class E91State:
 
     # Stage 2: 에러 정정 (블록 패리티 기반)
     corrected_key: list[int] = field(default_factory=list)
+    bob_remaining: list[int] = field(default_factory=list)  # Bob 측 남은 키 (에러 정정용)
     correction_done: bool = False
     correction_flips: int = 0        # 정정된 비트 수
 
@@ -308,7 +310,7 @@ def estimate_qber(state: E91State) -> float:
     # 샘플 제외한 나머지를 sifted_key로 보존 (아직 에러 포함)
     state.sifted_key = [state.raw_key_alice[i] for i in remaining_indices]
     # Bob 측 키도 에러 정정용으로 보관
-    state._bob_remaining = [state.raw_key_bob[i] for i in remaining_indices]
+    state.bob_remaining = [state.raw_key_bob[i] for i in remaining_indices]
 
     state.error_rate = state.qber_value
     state.key_match_rate = 1.0 - state.qber_value
@@ -330,7 +332,7 @@ def error_correct(state: E91State) -> list[int]:
         return []
 
     alice_key = state.sifted_key
-    bob_key = getattr(state, '_bob_remaining', [])
+    bob_key = state.bob_remaining
 
     if not alice_key or not bob_key:
         state.corrected_key = list(alice_key)
@@ -798,8 +800,7 @@ def reset_e91(state: E91State):
     state.pa_done = False
     state.error_rate = 0.0
     state.key_match_rate = 0.0
-    if hasattr(state, '_bob_remaining'):
-        del state._bob_remaining
+    state.bob_remaining.clear()
 
 
 def reset_ghz(state: GHZState):

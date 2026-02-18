@@ -914,5 +914,136 @@ class TestE91StateDuplicate(unittest.TestCase):
         self.assertEqual(state.sifted_key, [1, 0, 1])
 
 
+class TestBobRemainingField(unittest.TestCase):
+    """bob_remaining이 정식 dataclass 필드인지 확인."""
+
+    def test_bob_remaining_exists(self):
+        from security.qkd_advanced_engine import E91State
+        state = E91State()
+        self.assertEqual(state.bob_remaining, [])
+
+    def test_bob_remaining_populated_after_qber(self):
+        from security.qkd_advanced_engine import E91State, e91_round, estimate_qber
+        state = E91State()
+        for _ in range(200):
+            e91_round(state, eve_chance=0.0)
+        estimate_qber(state)
+        self.assertGreater(len(state.bob_remaining), 0)
+        # bob_remaining + qber_sample = raw_key 길이
+        self.assertEqual(
+            len(state.bob_remaining) + state.qber_sample_size,
+            len(state.raw_key_bob),
+        )
+
+    def test_reset_clears_bob_remaining(self):
+        from security.qkd_advanced_engine import E91State, e91_round, estimate_qber, reset_e91
+        state = E91State()
+        for _ in range(200):
+            e91_round(state)
+        estimate_qber(state)
+        self.assertGreater(len(state.bob_remaining), 0)
+        reset_e91(state)
+        self.assertEqual(len(state.bob_remaining), 0)
+
+
+class TestCompareModeEngine(unittest.TestCase):
+    """BB84 vs E91 비교 모드 동시 실행 테스트."""
+
+    def test_concurrent_bb84_e91(self):
+        """BB84과 E91이 같은 Eve 조건에서 동시 실행 가능."""
+        from security.qkd_advanced_engine import (
+            BB84State,
+            E91State,
+            bb84_round,
+            compute_bell_S,
+            e91_round,
+        )
+        bb84 = BB84State()
+        e91 = E91State()
+        eve_chance = 0.5
+        for _ in range(200):
+            bb84_round(bb84, eve_chance)
+            e91_round(e91, eve_chance)
+        compute_bell_S(e91)
+
+        self.assertEqual(bb84.total_rounds, 200)
+        self.assertEqual(e91.total_rounds, 200)
+        self.assertGreater(bb84.basis_match_rounds, 0)
+        self.assertGreater(e91.key_rounds, 0)
+        self.assertGreater(bb84.eve_rounds, 0)
+        self.assertGreater(e91.eve_rounds, 0)
+
+    def test_both_detect_eve(self):
+        """높은 Eve 확률에서 양 프로토콜 모두 도청 탐지."""
+        from security.qkd_advanced_engine import (
+            BB84State,
+            E91State,
+            bb84_round,
+            compute_bell_S,
+            e91_round,
+        )
+        bb84 = BB84State()
+        e91 = E91State()
+        for _ in range(1000):
+            bb84_round(bb84, eve_chance=1.0)
+            e91_round(e91, eve_chance=1.0)
+        compute_bell_S(e91)
+
+        # BB84: QBER > 11%
+        self.assertTrue(bb84.eve_detected)
+        # E91: Eve 도청 시 Bell S가 양자 한계(2√2)보다 크게 약화
+        self.assertLess(abs(e91.bell_S), 2.8,
+                        f"S = {e91.bell_S:.3f} should be weakened with Eve")
+
+
+class TestFullPipeline(unittest.TestCase):
+    """전체 QKD 파이프라인 통합 테스트."""
+
+    def test_e91_full_pipeline_no_eve(self):
+        """E91 전체: 라운드→QBER→정정→PA→OTP 파이프라인."""
+        from security.qkd_advanced_engine import (
+            E91State,
+            _DEMO_PLAINTEXT,
+            compute_bell_S,
+            e91_round,
+            error_correct,
+            estimate_qber,
+            privacy_amplification,
+            xor_decrypt,
+            xor_encrypt,
+        )
+        state = E91State()
+        for _ in range(300):
+            e91_round(state, eve_chance=0.0)
+        S = compute_bell_S(state)
+        self.assertGreater(abs(S), 2.0)
+
+        estimate_qber(state)
+        self.assertLess(state.qber_value, 0.11)
+
+        error_correct(state)
+        self.assertGreater(len(state.corrected_key), 0)
+
+        final = privacy_amplification(state)
+        self.assertGreater(len(final), 0)
+
+        # OTP roundtrip
+        cipher = xor_encrypt(_DEMO_PLAINTEXT, final)
+        if len(final) >= len(_DEMO_PLAINTEXT) * 2:
+            decrypted = xor_decrypt(cipher, final)
+            self.assertEqual(decrypted, _DEMO_PLAINTEXT)
+
+    def test_ghz_5party_with_eve(self):
+        """GHZ 5자간 Eve 있을 때 에러율 상승."""
+        from security.qkd_advanced_engine import GHZState, ghz_key_sift, ghz_round, resize_ghz
+        state = GHZState()
+        resize_ghz(state, 5)
+        for _ in range(500):
+            ghz_round(state, eve_chance=0.8)
+        sifted = ghz_key_sift(state)
+        # Eve → 상관관계 파괴 → 에러율 상승
+        self.assertGreater(state.error_rate, 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

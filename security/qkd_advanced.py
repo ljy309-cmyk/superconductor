@@ -328,7 +328,7 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
     if e91.correction_done:
         ec_y = ky + 100
         _draw_key_bits(screen, t("qa_sift_corrected"), e91.corrected_key[:64], GREEN, 40, ec_y, font, big_font)
-        ec_txt = f"Error correction: {e91.correction_flips} bits flipped (block parity)"
+        ec_txt = t("qa_sift_ec_msg", flips=e91.correction_flips)
         screen.blit(font.render(ec_txt, True, TEXT_CLR), (40, ec_y + 18))
 
     # 최종 키
@@ -353,7 +353,7 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
         (f"E91 Rounds: {e91.total_rounds}  (Key: {e91.key_rounds}  Bell: {e91.bell_rounds})", TEXT_CLR),
         (f"Pipeline: Raw {raw_n} → QBER sample {e91.qber_sample_size} → Corrected {corr_n} → Final {final_n} bits", ACCENT),
         (f"QBER: {e91.qber_value * 100:.1f}%  |  Corrected flips: {e91.correction_flips}", TEXT_CLR),
-        (f"Bell S = {e91.bell_S:.3f}  {'SECURE' if e91.bell_violated else 'WARNING'}", GREEN if e91.bell_violated else RED),
+        (f"Bell S = {e91.bell_S:.3f}  {t('qa_sift_stat_secure') if e91.bell_violated else t('qa_sift_stat_warning')}", GREEN if e91.bell_violated else RED),
     ]
     for i, (txt, clr) in enumerate(stats):
         screen.blit(font.render(txt, True, clr), (40, stats_y + i * 16))
@@ -417,7 +417,7 @@ def _draw_otp_demo(screen, final_key, x, y, font, big_font):
 
     # XOR 수식 표시
     fy = dy + 20
-    formula = font.render("plaintext XOR key = cipher  |  cipher XOR key = plaintext", True, SUBTEXT_CLR)
+    formula = font.render(t("qa_otp_xor_formula"), True, SUBTEXT_CLR)
     screen.blit(formula, (x + 8, fy))
 
     # OTP 보안 노트
@@ -912,10 +912,24 @@ def run_simulation():
             auto_timer += dt
             if auto_timer >= 0.05:
                 auto_timer = 0.0
-                if mode == MODE_E91 or mode == MODE_SIFT:
+                if mode == MODE_E91:
                     e91_round(e91, eve_chance)
                     if e91.total_rounds % 10 == 0:
                         compute_bell_S(e91)
+                elif mode == MODE_SIFT:
+                    e91_round(e91, eve_chance)
+                    if e91.total_rounds % 10 == 0:
+                        compute_bell_S(e91)
+                    # 자동 파이프라인: 충분한 키가 쌓이면 순차 실행
+                    if (e91.total_rounds > 0
+                            and e91.total_rounds % CHSH_SHOTS == 0
+                            and not e91.pa_done):
+                        if not e91.qber_done:
+                            estimate_qber(e91)
+                        elif not e91.correction_done:
+                            error_correct(e91)
+                        elif not e91.pa_done:
+                            privacy_amplification(e91)
                 elif mode == MODE_GHZ:
                     ghz_round(ghz, eve_chance)
                 elif mode == MODE_COMPARE:
