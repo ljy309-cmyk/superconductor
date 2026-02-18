@@ -23,6 +23,28 @@ from i18n import t
 
 # 모듈별 도움말 텍스트 (한국어)
 _HELP_TEXTS: dict[str, list[str]] = {
+    "gate_builder": [
+        "=== Quantum Gate Builder ===",
+        "",
+        "[양자 게이트]",
+        "  H (Hadamard): |0⟩→|+⟩, |1⟩→|−⟩  중첩 생성",
+        "  X (Pauli-X): 비트 플립 (NOT)  |0⟩↔|1⟩",
+        "  Y (Pauli-Y): Y축 회전",
+        "  Z (Pauli-Z): 위상 플립  |1⟩→-|1⟩",
+        "  S (Phase): π/2 위상 회전",
+        "  T (π/8): π/4 위상 회전",
+        "  CNOT: 조건부 NOT (제어 큐비트 = 1이면 타겟 플립)",
+        "",
+        "[블로흐 구]",
+        "  |0⟩ = 북극, |1⟩ = 남극",
+        "  |+⟩ = +X, |−⟩ = −X",
+        "  Tab: 표시할 큐비트 전환",
+        "",
+        "[조작법]",
+        "  팔레트 클릭 → 와이어 클릭: 게이트 배치",
+        "  Enter: 측정  |  Backspace: 마지막 게이트 삭제",
+        "  Delete: 전체 초기화",
+    ],
     "qubit_chain": [
         "=== Qubit Entanglement Cascade ===",
         "",

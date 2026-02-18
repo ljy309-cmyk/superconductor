@@ -104,6 +104,9 @@
     "bb84_decoy_trapped": 3,
     "all_modules_count": 5
   },
+  "gate_builder": {
+    "num_qubits": 2
+  },
   "josephson_junction": {
     "ic_default": 1.0,
     "bias_max": 3.0,
