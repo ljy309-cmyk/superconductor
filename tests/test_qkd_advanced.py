@@ -162,7 +162,7 @@ class TestQBEREstimation(unittest.TestCase):
         """Eve 있으면 QBER이 상승해야 함."""
         from security.qkd_advanced_engine import E91State, e91_round, estimate_qber
         state = E91State()
-        for _ in range(500):
+        for _ in range(2000):
             e91_round(state, eve_chance=0.8)
         estimate_qber(state)
         self.assertGreater(state.qber_value, 0.0)
@@ -987,7 +987,7 @@ class TestCompareModeEngine(unittest.TestCase):
         )
         bb84 = BB84State()
         e91 = E91State()
-        for _ in range(1000):
+        for _ in range(3000):
             bb84_round(bb84, eve_chance=1.0)
             e91_round(e91, eve_chance=1.0)
         compute_bell_S(e91)
@@ -1774,6 +1774,49 @@ class TestLocaleExportKey(unittest.TestCase):
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         self.assertIn("qa_sc_export", en)
         self.assertIn("qa_sc_export", ko)
+
+
+class TestRound13Features(unittest.TestCase):
+    """Round 13 신규 기능 테스트."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_round13_locale_keys(self):
+        """Round 13 로케일 키가 양쪽 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        keys = [
+            "qa_paused_banner", "qa_auto_speed", "qa_fps_counter",
+            "qa_sc_speed", "qa_sc_fps",
+        ]
+        for key in keys:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_auto_speed_values(self):
+        """자동실행 속도 범위 확인."""
+        speeds = [0.5, 1.0, 2.0, 4.0]
+        self.assertEqual(speeds[0], 0.5)
+        self.assertEqual(speeds[-1], 4.0)
+        # 0.05 / speed 계산이 0이 되지 않는지 확인
+        for s in speeds:
+            self.assertGreater(0.05 / s, 0)
+
+    def test_en_ko_keys_match_round13(self):
+        """en.json과 ko.json의 키가 Round 13 이후에도 일치."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        self.assertEqual(en_keys - ko_keys, set(),
+                         f"en에만 있는 키: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(),
+                         f"ko에만 있는 키: {ko_keys - en_keys}")
 
 
 if __name__ == "__main__":

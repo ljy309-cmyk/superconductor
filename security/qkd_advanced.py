@@ -738,6 +738,31 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
     _draw_bell_s_graph(screen, e91.bell_S_history,
                        right_x, graph_y, half_w, 100, font, big_font)
 
+    # E91 미니 파이프라인 (Compare 모드)
+    e91_pipe_y = graph_y + 108
+    corrected_e91 = len(e91.corrected_key)
+    e91_stages = [
+        (t("qa_sift_raw_key"), len(e91.raw_key_alice), BLUE, len(e91.raw_key_alice) > 0),
+        (t("qa_sift_qber_est"), e91.qber_sample_size, YELLOW, e91.qber_done),
+        (t("qa_sift_err_corr"), corrected_e91, GREEN, e91.correction_done),
+        (t("qa_sift_priv_amp"), len(e91.final_key) * 4, MAUVE, e91.pa_done),
+    ]
+    mini_w = (half_w - 16) // 4
+    for si, (slbl, ssize, sclr, sdone) in enumerate(e91_stages):
+        sx = right_x + si * (mini_w + 2)
+        pygame.draw.rect(screen, PANEL_BG, (sx, e91_pipe_y, mini_w - 2, 28), border_radius=4)
+        bdr = sclr if sdone else OVERLAY
+        pygame.draw.rect(screen, bdr, (sx, e91_pipe_y, mini_w - 2, 28), 1, border_radius=4)
+        ls = font.render(slbl, True, sclr if sdone else SUBTEXT_CLR)
+        screen.blit(ls, (sx + (mini_w - 2) // 2 - ls.get_width() // 2, e91_pipe_y + 2))
+        bs = font.render(f"{ssize}b", True, TEXT_CLR if sdone else SUBTEXT_CLR)
+        screen.blit(bs, (sx + (mini_w - 2) // 2 - bs.get_width() // 2, e91_pipe_y + 15))
+
+    if e91.pa_done and e91.final_key:
+        fk_y = e91_pipe_y + 30
+        fk_txt = font.render(f"Key: {e91.final_key[:16]}...", True, GREEN)
+        screen.blit(fk_txt, (right_x, fk_y))
+
     # ── 하단 비교 요약 패널 ──
     panel_y = max(graph_y + 108, 340)
     pygame.draw.rect(screen, PANEL_BG, (20, panel_y, WIDTH - 40, 170), border_radius=8)
@@ -1167,6 +1192,9 @@ def run_simulation():
     eve_chance = 0.0
 
     show_shortcuts = False
+    show_fps = False
+    auto_speed = 1.0  # 0.5x, 1x, 2x, 4x
+    _AUTO_SPEEDS = [0.5, 1.0, 2.0, 4.0]
 
     help_overlay = HelpOverlay("qkd_advanced")
     tutorial = TutorialOverlay("qkd_advanced")
@@ -1223,6 +1251,8 @@ def run_simulation():
                             compute_bell_S(e91_cmp)
                     except Exception as exc:
                         _engine_error = str(exc)
+                    else:
+                        snd.play("preset_change")
                 elif event.key == pygame.K_s:
                     _engine_error = None
                     try:
@@ -1243,6 +1273,8 @@ def run_simulation():
                                 bb84_privacy_amplification(bb84_cmp)
                     except Exception as exc:
                         _engine_error = str(exc)
+                    else:
+                        snd.play("achievement")
                 elif event.key == pygame.K_r:
                     reset_e91(e91)
                     reset_ghz(ghz)
@@ -1253,12 +1285,21 @@ def run_simulation():
                     paused = not paused
                 elif event.key == pygame.K_a:
                     auto_run = not auto_run
+                elif event.key == pygame.K_RIGHTBRACKET:
+                    idx = _AUTO_SPEEDS.index(auto_speed) if auto_speed in _AUTO_SPEEDS else 1
+                    auto_speed = _AUTO_SPEEDS[min(idx + 1, len(_AUTO_SPEEDS) - 1)]
+                elif event.key == pygame.K_LEFTBRACKET:
+                    idx = _AUTO_SPEEDS.index(auto_speed) if auto_speed in _AUTO_SPEEDS else 1
+                    auto_speed = _AUTO_SPEEDS[max(idx - 1, 0)]
+                elif event.key == pygame.K_F10:
+                    show_fps = not show_fps
                 elif event.key == pygame.K_e:
                     # Eve 단계별 순환: 0→10→30→50→80→100→0%
                     _EVE_LEVELS = [0.0, 0.1, 0.3, 0.5, 0.8, 1.0]
                     _cur = min(range(len(_EVE_LEVELS)),
                                key=lambda i: abs(_EVE_LEVELS[i] - eve_chance))
                     eve_chance = _EVE_LEVELS[(_cur + 1) % len(_EVE_LEVELS)]
+                    snd.play("eve_detected" if eve_chance > 0 else "channel_open")
                 elif event.key == pygame.K_UP and mode == MODE_GHZ:
                     if ghz.n_parties < GHZ_MAX_PARTIES:
                         resize_ghz(ghz, ghz.n_parties + 1)
@@ -1299,7 +1340,7 @@ def run_simulation():
         # 자동 실행
         if auto_run and not paused:
             auto_timer += dt
-            if auto_timer >= 0.05:
+            if auto_timer >= 0.05 / auto_speed:
                 auto_timer = 0.0
                 try:
                     if mode == MODE_E91:
@@ -1488,6 +1529,31 @@ def run_simulation():
             surf = font.render(h, True, TEXT_CLR)
             screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 36 + i * 16))
 
+        # 자동 실행 속도 표시 (1x 이외일 때)
+        if auto_speed != 1.0:
+            spd_txt = font.render(t("qa_auto_speed", speed=auto_speed), True, PEACH)
+            screen.blit(spd_txt, (10, HEIGHT - 14))
+
+        # FPS 카운터
+        if show_fps:
+            fps_val = int(clock.get_fps())
+            fps_surf = font.render(t("qa_fps_counter", fps=fps_val), True, SUBTEXT_CLR)
+            screen.blit(fps_surf, (WIDTH - fps_surf.get_width() - 10, HEIGHT - 14))
+
+        # 일시정지 오버레이
+        if paused:
+            pause_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            pause_overlay.fill((0, 0, 0, 80))
+            screen.blit(pause_overlay, (0, 0))
+            pause_txt = big_font.render(t("qa_paused_banner"), True, ACCENT)
+            ptx = WIDTH // 2 - pause_txt.get_width() // 2
+            pty = HEIGHT // 2 - 10
+            pause_bg = pygame.Rect(ptx - 16, pty - 4,
+                                   pause_txt.get_width() + 32, 24)
+            pygame.draw.rect(screen, PANEL_BG, pause_bg, border_radius=6)
+            pygame.draw.rect(screen, ACCENT, pause_bg, 2, border_radius=6)
+            screen.blit(pause_txt, (ptx, pty))
+
         # 엔진 오류 배너
         if _engine_error:
             err_surf = font.render(f"Engine error: {_engine_error[:60]}", True, BG)
@@ -1510,7 +1576,9 @@ def run_simulation():
                 f"Tab     {t('qa_sc_tab')}",
                 f"L       {t('qa_sc_locale')}",
                 f"Up/Down {t('qa_sc_updown')}",
+                f"[ / ]   {t('qa_sc_speed')}",
                 f"F1      {t('qa_sc_help')}",
+                f"F10     {t('qa_sc_fps')}",
                 f"?       {t('qa_sc_shortcuts')}",
                 f"Ctrl+X  {t('qa_sc_export')}",
                 f"ESC     {t('qa_sc_exit')}",
