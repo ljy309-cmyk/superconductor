@@ -458,11 +458,12 @@ def privacy_amplification(state: E91State) -> str:
     # Toeplitz 해시 적용
     hashed_bits, _seed = _toeplitz_hash(key_source, output_bits)
 
-    # 비트 → 16진수 문자열 변환
+    # 비트 → 16진수 문자열 변환 (나머지 비트 패딩)
     hex_chars = []
-    for i in range(0, len(hashed_bits) - 3, 4):
-        nibble = (hashed_bits[i] << 3 | hashed_bits[i + 1] << 2 |
-                  hashed_bits[i + 2] << 1 | hashed_bits[i + 3])
+    padded = hashed_bits + [0] * ((4 - len(hashed_bits) % 4) % 4)
+    for i in range(0, len(padded), 4):
+        nibble = (padded[i] << 3 | padded[i + 1] << 2 |
+                  padded[i + 2] << 1 | padded[i + 3])
         hex_chars.append(f"{nibble:x}")
     final = "".join(hex_chars)
 
@@ -680,9 +681,10 @@ def ghz_privacy_amplification(state: GHZState) -> str:
     hashed_bits, _seed = _toeplitz_hash(state.sifted_key, output_bits)
 
     hex_chars = []
-    for i in range(0, len(hashed_bits) - 3, 4):
-        nibble = (hashed_bits[i] << 3 | hashed_bits[i + 1] << 2 |
-                  hashed_bits[i + 2] << 1 | hashed_bits[i + 3])
+    padded = hashed_bits + [0] * ((4 - len(hashed_bits) % 4) % 4)
+    for i in range(0, len(padded), 4):
+        nibble = (padded[i] << 3 | padded[i + 1] << 2 |
+                  padded[i + 2] << 1 | padded[i + 3])
         hex_chars.append(f"{nibble:x}")
     final = "".join(hex_chars)
 

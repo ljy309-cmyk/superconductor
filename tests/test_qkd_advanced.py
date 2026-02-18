@@ -502,7 +502,7 @@ class TestGHZProtocol(unittest.TestCase):
         self.assertEqual(state.n_parties, 5)
         self.assertEqual(len(state.party_names), 5)
         self.assertEqual(len(state.raw_keys), 5)
-        for _ in range(100):
+        for _ in range(500):
             ghz_round(state)
         self.assertGreater(state.key_rounds, 0)
 
@@ -1136,7 +1136,7 @@ class TestCompareModePA(unittest.TestCase):
         )
         bb84 = BB84State()
         e91 = E91State()
-        for _ in range(300):
+        for _ in range(500):
             bb84_round(bb84, eve_chance=0.3)
             e91_round(e91, eve_chance=0.3)
         compute_bell_S(e91)
@@ -1508,6 +1508,67 @@ class TestGHZConsistencyHistoryResize(unittest.TestCase):
         resize_ghz(state, 4)
         self.assertEqual(len(state.consistency_history), 0)
         self.assertEqual(state.n_parties, 4)
+
+
+class TestNibbleConversionRemainder(unittest.TestCase):
+    """PA 닙블 변환에서 나머지 비트 패딩 처리 테스트."""
+
+    def test_pa_handles_non_multiple_of_4(self):
+        """비트 수가 4의 배수가 아닌 경우에도 최종 키가 생성됨."""
+        from security.qkd_advanced_engine import E91State, e91_round, compute_bell_S, \
+            key_sift, privacy_amplification
+        state = E91State()
+        for _ in range(200):
+            e91_round(state, 0.0)
+        compute_bell_S(state)
+        key_sift(state)
+        result = privacy_amplification(state)
+        self.assertTrue(len(result) > 0)
+        # 16진수 문자열인지 확인
+        int(result, 16)
+
+    def test_ghz_pa_handles_non_multiple_of_4(self):
+        """GHZ PA도 나머지 비트 패딩 처리."""
+        from security.qkd_advanced_engine import GHZState, ghz_round, \
+            ghz_key_sift, ghz_privacy_amplification
+        state = GHZState()
+        for _ in range(200):
+            ghz_round(state, 0.0)
+        ghz_key_sift(state)
+        if state.sifted_key:
+            result = ghz_privacy_amplification(state)
+            if result:
+                int(result, 16)
+
+
+class TestLocaleRound10Keys(unittest.TestCase):
+    """Round 10 로케일 키 존재 확인."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_new_round10_keys(self):
+        """라운드 10 신규 키가 양쪽 로케일에 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        keys = ["qa_tag_mix", "qa_stage_rounds", "qa_stage_ec",
+                "qa_stage_pa", "qa_stage_done"]
+        for key in keys:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_en_ko_keys_still_match(self):
+        """en.json과 ko.json의 키가 여전히 일치."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        self.assertEqual(en_keys - ko_keys, set())
+        self.assertEqual(ko_keys - en_keys, set())
 
 
 if __name__ == "__main__":

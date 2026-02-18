@@ -57,6 +57,7 @@
   "qa_tag_key": "KEY",
   "qa_tag_bell": "BELL",
   "qa_tag_chk": "CHK",
+  "qa_tag_mix": "MIX",
   "qa_tag_eve": "EVE",
   "qa_cmp_bb84_title": "BB84 — QBER Detection",
   "qa_cmp_e91_title": "E91 — Bell Test Detection",
@@ -273,6 +274,10 @@
   "shield_off": "",
   "auto_on": "ON",
   "auto_off": "OFF",
+  "qa_stage_rounds": "Collecting",
+  "qa_stage_ec": "Error Corr.",
+  "qa_stage_pa": "Privacy Amp.",
+  "qa_stage_done": "Complete",
   "sound_on": "ON",
   "sound_off": "OFF",
 

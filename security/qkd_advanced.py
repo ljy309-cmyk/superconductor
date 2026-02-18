@@ -521,8 +521,10 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
 
     if ghz.consistency_checks > 0:
         pass_rate = ghz.consistency_pass / ghz.consistency_checks
+        c_sym = "OK" if pass_rate > 0.85 else "!!"
         stats.append((t("qa_ghz_consistency", **{"pass": ghz.consistency_pass},
-                        total=ghz.consistency_checks, pct=pass_rate * 100),
+                        total=ghz.consistency_checks, pct=pass_rate * 100)
+                       + f" [{c_sym}]",
                        GREEN if pass_rate > 0.85 else RED))
 
     if ghz.sift_done:
@@ -556,7 +558,7 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
         is_key = rd.all_same_basis and rd.bases[0] == "Z"
         is_chk = rd.all_same_basis and rd.bases[0] == "X"
         tag = t("qa_tag_key") if is_key else \
-              t("qa_tag_chk") if is_chk else "---"
+              t("qa_tag_chk") if is_chk else t("qa_tag_mix")
         eve = f" [{t('qa_tag_eve')}]" if rd.eve_present else ""
 
         if rd.eve_present:
@@ -716,8 +718,9 @@ def _draw_qber_meter(screen, qber, x, y, w, font, big_font):
     if fill_w > 0:
         pygame.draw.rect(screen, fill_clr, (x, y, fill_w, h))
     pygame.draw.rect(screen, TEXT_CLR, (x, y, w, h), 1)
-    # 값 표시
-    val = big_font.render(f"QBER {qber * 100:.1f}%", True, TEXT_CLR)
+    # 값 표시 + 색각 보조 마커
+    status_sym = "!!" if qber > 0.11 else "OK"
+    val = big_font.render(f"QBER {qber * 100:.1f}% [{status_sym}]", True, TEXT_CLR)
     screen.blit(val, (x + w + 8, y))
 
 
@@ -737,8 +740,9 @@ def _draw_bell_meter(screen, bell_s, x, y, w, font, big_font):
     if fill_w > 0:
         pygame.draw.rect(screen, fill_clr, (x, y, fill_w, h))
     pygame.draw.rect(screen, TEXT_CLR, (x, y, w, h), 1)
-    # 값 표시
-    val = big_font.render(f"S = {abs(bell_s):.3f}", True, TEXT_CLR)
+    # 값 표시 + 색각 보조 마커
+    status_sym = "OK" if abs(bell_s) > CHSH_CLASSICAL_BOUND else "!!"
+    val = big_font.render(f"S = {abs(bell_s):.3f} [{status_sym}]", True, TEXT_CLR)
     screen.blit(val, (x + w + 8, y))
 
 
@@ -1255,14 +1259,26 @@ def run_simulation():
         eve_surf = font.render(eve_txt, True, RED if eve_chance > 0 else SUBTEXT_CLR)
         eve_tx = WIDTH - eve_surf.get_width() - 10
         screen.blit(eve_surf, (eve_tx, 36))
-        # 레벨 스텝 인디케이터 (E 키 순환 가이드)
+        # 레벨 스텝 인디케이터 (E 키 순환 가이드 + 호버 툴팁)
         _eve_steps = [0.0, 0.1, 0.3, 0.5, 0.8, 1.0]
+        _eve_labels = ["0%", "10%", "30%", "50%", "80%", "100%"]
         step_x = eve_tx - len(_eve_steps) * 8 - 6
+        mx, my = pygame.mouse.get_pos()
+        eve_tooltip = None
         for si, sv in enumerate(_eve_steps):
             sx = step_x + si * 8
             active = abs(eve_chance - sv) < 0.01
-            clr = RED if active else OVERLAY
+            hovered = sx <= mx <= sx + 6 and 34 <= my <= 52
+            clr = RED if active else (TEXT_CLR if hovered else OVERLAY)
             pygame.draw.rect(screen, clr, (sx, 40, 6, 6), 0 if active else 1)
+            if hovered:
+                eve_tooltip = (sx, _eve_labels[si])
+        if eve_tooltip:
+            tip_surf = font.render(f"Eve {eve_tooltip[1]}", True, TEXT_CLR)
+            tip_bg = pygame.Rect(eve_tooltip[0] - 4, 50, tip_surf.get_width() + 8, 14)
+            pygame.draw.rect(screen, PANEL_BG, tip_bg, border_radius=3)
+            pygame.draw.rect(screen, OVERLAY, tip_bg, 1, border_radius=3)
+            screen.blit(tip_surf, (eve_tooltip[0], 51))
 
         # 모드별 렌더링
         if mode == MODE_E91:
@@ -1274,10 +1290,45 @@ def run_simulation():
         elif mode == MODE_COMPARE:
             _draw_compare_mode(screen, bb84_cmp, e91_cmp, font, big_font)
 
+        # 자동 실행 단계 표시
+        auto_stage = ""
+        if auto_run and not paused:
+            if mode == MODE_SIFT:
+                if e91.pa_done:
+                    auto_stage = t("qa_stage_done")
+                elif e91.correction_done:
+                    auto_stage = t("qa_stage_pa")
+                elif e91.qber_done:
+                    auto_stage = t("qa_stage_ec")
+                else:
+                    auto_stage = t("qa_stage_rounds")
+            elif mode == MODE_GHZ:
+                if ghz.pa_done:
+                    auto_stage = t("qa_stage_done")
+                elif ghz.sift_done:
+                    auto_stage = t("qa_stage_pa")
+                else:
+                    auto_stage = t("qa_stage_rounds")
+            elif mode == MODE_COMPARE:
+                if e91_cmp.pa_done:
+                    auto_stage = t("qa_stage_done")
+                elif e91_cmp.correction_done:
+                    auto_stage = t("qa_stage_pa")
+                elif e91_cmp.qber_done:
+                    auto_stage = t("qa_stage_ec")
+                else:
+                    auto_stage = t("qa_stage_rounds")
+            else:
+                auto_stage = t("qa_stage_rounds")
+
+        auto_label = t("auto_on") if auto_run else t("auto_off")
+        if auto_stage:
+            auto_label = f"{auto_label} [{auto_stage}]"
+
         # 안내
         hints = [
             t("qa_hint_line1",
-              auto=t("auto_on") if auto_run else t("auto_off"),
+              auto=auto_label,
               pause=t("paused") if paused else t("running_state")),
             t("qa_hint_line2"),
         ]
