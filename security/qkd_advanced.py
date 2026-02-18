@@ -61,7 +61,7 @@ YELLOW = (249, 226, 175)
 OVERLAY = (69, 71, 90)
 PANEL_BG = (24, 24, 37)
 WHITE = (255, 255, 255)
-TEAL = (148, 226, 213)
+
 
 _COLOR_MAP = {
     "BG": "BG", "TEXT_CLR": "TEXT", "SUBTEXT_CLR": "SUBTEXT",
@@ -101,12 +101,14 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     sub = font.render("|Φ+⟩", True, SUBTEXT_CLR)
     screen.blit(sub, (EPR_POS[0] - sub.get_width() // 2, EPR_POS[1] + 26))
 
-    # 얽힘 링크 (물결)
+    # 얽힘 링크 (물결 — 중점을 사인파로 이동하여 곡선 효과)
     for pos, clr in [(ALICE_POS, BLUE), (BOB_POS, GREEN)]:
         wave = math.sin(anim_t * 3) * 4
-        mid_y = (EPR_POS[1] + pos[1]) // 2 + wave
-        pygame.draw.line(screen, clr, (EPR_POS[0], EPR_POS[1] + 22),
-                         (pos[0], pos[1] - 32), 1)
+        sx, sy_ = EPR_POS[0], EPR_POS[1] + 22
+        ex, ey = pos[0], pos[1] - 32
+        mid_x = (sx + ex) // 2
+        mid_y = (sy_ + ey) // 2 + int(wave)
+        pygame.draw.lines(screen, clr, False, [(sx, sy_), (mid_x, mid_y), (ex, ey)], 1)
 
     # Alice
     pygame.draw.circle(screen, BLUE, ALICE_POS, 28)
@@ -374,11 +376,12 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
     ghz_lbl = big_font.render("GHZ", True, MAUVE)
     screen.blit(ghz_lbl, (cx - ghz_lbl.get_width() // 2, cy - 8))
 
-    # 얽힘 링크
+    # 얽힘 링크 (물결)
     for pos in positions:
         wave = math.sin(anim_t * 3) * 3
-        pygame.draw.line(screen, MAUVE, (cx, cy),
-                         (pos[0], pos[1]), 1)
+        mid_x = (cx + pos[0]) // 2 + int(wave)
+        mid_y = (cy + pos[1]) // 2 + int(wave)
+        pygame.draw.lines(screen, MAUVE, False, [(cx, cy), (mid_x, mid_y), pos], 1)
 
     # 노드
     for i, (pos, name, clr) in enumerate(zip(positions, ghz.party_names, colors)):
