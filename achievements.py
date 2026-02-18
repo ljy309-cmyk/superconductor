@@ -9,11 +9,30 @@
 import json
 import os
 
+from config_loader import cfg
 from logger import get_module_logger
 
 _log = get_module_logger("achievements")
 
 _SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "achievements.json")
+
+# ── 업적 임계값 (config.json에서 로드) ────────────────────────
+_T = {
+    "qc_survive_short":     cfg("achievements", "qc_survive_short", 30),
+    "qc_survive_long":      cfg("achievements", "qc_survive_long", 60),
+    "qc_shield_uses":       cfg("achievements", "qc_shield_uses", 5),
+    "qc_no_collapse_time":  cfg("achievements", "qc_no_collapse_time", 30),
+    "tn_tunnel_streak":     cfg("achievements", "tn_tunnel_streak", 10),
+    "tn_rate_threshold":    cfg("achievements", "tn_rate_threshold", 0.5),
+    "tn_rate_min_attempts": cfg("achievements", "tn_rate_min_attempts", 10),
+    "qec_survive_time":     cfg("achievements", "qec_survive_time", 60),
+    "qec_efficient_max":    cfg("achievements", "qec_efficient_max_uses", 3),
+    "qec_efficient_time":   cfg("achievements", "qec_efficient_time", 60),
+    "bb84_score":           cfg("achievements", "bb84_score_target", 500),
+    "bb84_manual":          cfg("achievements", "bb84_manual_blocks", 5),
+    "bb84_decoy":           cfg("achievements", "bb84_decoy_trapped", 3),
+    "all_modules":          cfg("achievements", "all_modules_count", 5),
+}
 
 # ── 업적 정의 ───────────────────────────────────────────────
 ACHIEVEMENTS = [
@@ -23,16 +42,16 @@ ACHIEVEMENTS = [
      "condition": lambda d: True},
     {"id": "qc_survivor_30", "module": "qubit_chain", "title": "30s Survivor",
      "desc": "30초 이상 생존했습니다.", "icon": "T",
-     "condition": lambda d: d.get("survival_time", 0) >= 30},
+     "condition": lambda d: d.get("survival_time", 0) >= _T["qc_survive_short"]},
     {"id": "qc_survivor_60", "module": "qubit_chain", "title": "1min Survivor",
      "desc": "1분 이상 생존했습니다!", "icon": "S",
-     "condition": lambda d: d.get("survival_time", 0) >= 60},
+     "condition": lambda d: d.get("survival_time", 0) >= _T["qc_survive_long"]},
     {"id": "qc_shield_master", "module": "qubit_chain", "title": "Shield Master",
      "desc": "QEC 방어막을 5회 이상 사용했습니다.", "icon": "D",
-     "condition": lambda d: d.get("shield_uses", 0) >= 5},
+     "condition": lambda d: d.get("shield_uses", 0) >= _T["qc_shield_uses"]},
     {"id": "qc_no_collapse", "module": "qubit_chain", "title": "Perfect Defense",
      "desc": "큐비트 붕괴 없이 30초 생존!", "icon": "P",
-     "condition": lambda d: d.get("collapsed_count", 1) == 0 and d.get("survival_time", 0) >= 30},
+     "condition": lambda d: d.get("collapsed_count", 1) == 0 and d.get("survival_time", 0) >= _T["qc_no_collapse_time"]},
 
     # 터널링
     {"id": "tn_first_tunnel", "module": "tunneling", "title": "First Tunnel",
@@ -40,18 +59,18 @@ ACHIEVEMENTS = [
      "condition": lambda d: d.get("tunnel_count", 0) >= 1},
     {"id": "tn_lucky_10", "module": "tunneling", "title": "Lucky Streak",
      "desc": "터널링 10회 성공!", "icon": "L",
-     "condition": lambda d: d.get("tunnel_count", 0) >= 10},
+     "condition": lambda d: d.get("tunnel_count", 0) >= _T["tn_tunnel_streak"]},
     {"id": "tn_rate_50", "module": "tunneling", "title": "Probability Bender",
      "desc": "터널링 성공률 50% 달성!", "icon": "B",
-     "condition": lambda d: d.get("tunnel_rate", 0) >= 0.5 and d.get("total_attempts", 0) >= 10},
+     "condition": lambda d: d.get("tunnel_rate", 0) >= _T["tn_rate_threshold"] and d.get("total_attempts", 0) >= _T["tn_rate_min_attempts"]},
 
     # QEC 방어막
     {"id": "qec_survivor_60", "module": "qec_shield", "title": "QEC Master",
      "desc": "QEC 모드에서 60초 이상 생존!", "icon": "M",
-     "condition": lambda d: d.get("survival_time", 0) >= 60},
+     "condition": lambda d: d.get("survival_time", 0) >= _T["qec_survive_time"]},
     {"id": "qec_efficient", "module": "qec_shield", "title": "Efficient Shielding",
      "desc": "QEC 3회 이하로 60초 생존!", "icon": "E",
-     "condition": lambda d: d.get("qec_uses", 99) <= 3 and d.get("survival_time", 0) >= 60},
+     "condition": lambda d: d.get("qec_uses", 99) <= _T["qec_efficient_max"] and d.get("survival_time", 0) >= _T["qec_efficient_time"]},
 
     # BB84
     {"id": "bb84_first_play", "module": "bb84_defense", "title": "Protocol Initiator",
@@ -59,13 +78,13 @@ ACHIEVEMENTS = [
      "condition": lambda d: True},
     {"id": "bb84_score_500", "module": "bb84_defense", "title": "Score 500",
      "desc": "BB84에서 500점 달성!", "icon": "H",
-     "condition": lambda d: d.get("score", 0) >= 500},
+     "condition": lambda d: d.get("score", 0) >= _T["bb84_score"]},
     {"id": "bb84_manual_5", "module": "bb84_defense", "title": "Quick Hands",
      "desc": "수동 차단을 5회 이상 실행!", "icon": "F",
-     "condition": lambda d: d.get("manual_blocks", 0) >= 5},
+     "condition": lambda d: d.get("manual_blocks", 0) >= _T["bb84_manual"]},
     {"id": "bb84_trap_3", "module": "bb84_defense", "title": "Decoy Expert",
      "desc": "디코이 트랩 3회 이상 발동!", "icon": "X",
-     "condition": lambda d: d.get("decoy_trapped", 0) >= 3},
+     "condition": lambda d: d.get("decoy_trapped", 0) >= _T["bb84_decoy"]},
 
     # SQUID 지뢰찾기
     {"id": "sq_first_win", "module": "squid_mines", "title": "Mine Sweeper",
@@ -83,7 +102,7 @@ ACHIEVEMENTS = [
     # 범용
     {"id": "all_modules", "module": "_global", "title": "Explorer",
      "desc": "모든 5개 게임 모듈을 플레이했습니다!", "icon": "A",
-     "condition": lambda d: len(d.get("modules_played", [])) >= 5},
+     "condition": lambda d: len(d.get("modules_played", [])) >= _T["all_modules"]},
 ]
 
 

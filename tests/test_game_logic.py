@@ -162,23 +162,27 @@ class TestAchievementConditions(unittest.TestCase):
         self.assertTrue(ach["condition"]({}))
 
     def test_qc_survivor_30_boundary(self):
-        from achievements import ACHIEVEMENTS
+        from achievements import ACHIEVEMENTS, _T
         ach = next(a for a in ACHIEVEMENTS if a["id"] == "qc_survivor_30")
-        self.assertFalse(ach["condition"]({"survival_time": 29.9}))
-        self.assertTrue(ach["condition"]({"survival_time": 30.0}))
+        threshold = _T["qc_survive_short"]
+        self.assertFalse(ach["condition"]({"survival_time": threshold - 0.1}))
+        self.assertTrue(ach["condition"]({"survival_time": threshold}))
 
     def test_qc_no_collapse_condition(self):
-        from achievements import ACHIEVEMENTS
+        from achievements import ACHIEVEMENTS, _T
         ach = next(a for a in ACHIEVEMENTS if a["id"] == "qc_no_collapse")
-        self.assertTrue(ach["condition"]({"collapsed_count": 0, "survival_time": 30}))
-        self.assertFalse(ach["condition"]({"collapsed_count": 1, "survival_time": 30}))
-        self.assertFalse(ach["condition"]({"collapsed_count": 0, "survival_time": 20}))
+        t = _T["qc_no_collapse_time"]
+        self.assertTrue(ach["condition"]({"collapsed_count": 0, "survival_time": t}))
+        self.assertFalse(ach["condition"]({"collapsed_count": 1, "survival_time": t}))
+        self.assertFalse(ach["condition"]({"collapsed_count": 0, "survival_time": t - 10}))
 
     def test_tn_rate_50_needs_min_attempts(self):
-        from achievements import ACHIEVEMENTS
+        from achievements import ACHIEVEMENTS, _T
         ach = next(a for a in ACHIEVEMENTS if a["id"] == "tn_rate_50")
-        self.assertFalse(ach["condition"]({"tunnel_rate": 0.8, "total_attempts": 5}))
-        self.assertTrue(ach["condition"]({"tunnel_rate": 0.5, "total_attempts": 10}))
+        rate = _T["tn_rate_threshold"]
+        min_att = _T["tn_rate_min_attempts"]
+        self.assertFalse(ach["condition"]({"tunnel_rate": rate + 0.3, "total_attempts": min_att - 5}))
+        self.assertTrue(ach["condition"]({"tunnel_rate": rate, "total_attempts": min_att}))
 
     def test_sq_perfect_needs_win_and_zero_wrong(self):
         from achievements import ACHIEVEMENTS

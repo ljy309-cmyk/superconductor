@@ -88,6 +88,22 @@
     "levitation_freq": 2.0,
     "gravity": 480.0
   },
+  "achievements": {
+    "qc_survive_short": 30,
+    "qc_survive_long": 60,
+    "qc_shield_uses": 5,
+    "qc_no_collapse_time": 30,
+    "tn_tunnel_streak": 10,
+    "tn_rate_threshold": 0.5,
+    "tn_rate_min_attempts": 10,
+    "qec_survive_time": 60,
+    "qec_efficient_max_uses": 3,
+    "qec_efficient_time": 60,
+    "bb84_score_target": 500,
+    "bb84_manual_blocks": 5,
+    "bb84_decoy_trapped": 3,
+    "all_modules_count": 5
+  },
   "phase_transition": {
     "t_range_min": -275,
     "t_range_max": 50,
