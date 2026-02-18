@@ -546,6 +546,8 @@ class GHZState:
     consistency_pass: int = 0
     eve_rounds: int = 0
     error_rate: float = 0.0
+    # 일관성 패스율 히스토리 (수렴 그래프용)
+    consistency_history: list[tuple[int, float]] = field(default_factory=list)
 
     # 상태
     sift_done: bool = False
@@ -620,6 +622,12 @@ def ghz_round(state: GHZState, eve_chance: float = 0.0) -> GHZRound:
         state.consistency_checks += 1
         if parity == 0:
             state.consistency_pass += 1
+        # 일관성 패스율 히스토리 기록 (10회 검증마다)
+        if state.consistency_checks % 10 == 0 and state.consistency_checks > 0:
+            pass_rate = state.consistency_pass / state.consistency_checks
+            state.consistency_history.append((state.total_rounds, pass_rate))
+            if len(state.consistency_history) > 200:
+                state.consistency_history.pop(0)
 
     rd = GHZRound(
         round_id=rid,
@@ -639,6 +647,7 @@ def ghz_round(state: GHZState, eve_chance: float = 0.0) -> GHZRound:
 def ghz_key_sift(state: GHZState) -> list[int]:
     """GHZ 키 시프팅: 모든 파티의 키가 일치하는 비트만 추출."""
     if not state.raw_keys[0]:
+        state.sift_done = True
         return []
 
     sifted = []
@@ -824,6 +833,7 @@ def reset_ghz(state: GHZState):
     state.consistency_pass = 0
     state.eve_rounds = 0
     state.error_rate = 0.0
+    state.consistency_history.clear()
     state.sift_done = False
     state.pa_done = False
 

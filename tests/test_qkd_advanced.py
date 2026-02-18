@@ -1295,5 +1295,104 @@ class TestCompareAutoSiftPA(unittest.TestCase):
         self.assertGreater(len(final), 0)
 
 
+class TestGHZConsistencyHistory(unittest.TestCase):
+    """GHZ 일관성 패스율 히스토리 테스트."""
+
+    def test_consistency_history_recorded(self):
+        """일관성 히스토리가 검증 10회마다 기록."""
+        from security.qkd_advanced_engine import GHZState, ghz_round
+        state = GHZState()
+        for _ in range(1000):
+            ghz_round(state, eve_chance=0.0)
+        # 약 1/4 확률로 XXX → 250개 중 10회마다 기록 → 다수 기록
+        if state.consistency_checks >= 10:
+            self.assertGreater(len(state.consistency_history), 0)
+            rd, pr = state.consistency_history[-1]
+            self.assertIsInstance(rd, int)
+            self.assertIsInstance(pr, float)
+            self.assertGreaterEqual(pr, 0.0)
+            self.assertLessEqual(pr, 1.0)
+
+    def test_consistency_history_bounded(self):
+        """히스토리가 200개로 제한."""
+        from security.qkd_advanced_engine import GHZState, ghz_round
+        state = GHZState()
+        for _ in range(10000):
+            ghz_round(state)
+        self.assertLessEqual(len(state.consistency_history), 200)
+
+    def test_consistency_history_reset(self):
+        """리셋 시 히스토리 초기화."""
+        from security.qkd_advanced_engine import GHZState, ghz_round, reset_ghz
+        state = GHZState()
+        for _ in range(500):
+            ghz_round(state)
+        reset_ghz(state)
+        self.assertEqual(len(state.consistency_history), 0)
+
+    def test_consistency_high_without_eve(self):
+        """Eve 없을 때 일관성 패스율이 높아야 함."""
+        from security.qkd_advanced_engine import GHZState, ghz_round
+        state = GHZState()
+        for _ in range(1000):
+            ghz_round(state, eve_chance=0.0)
+        if state.consistency_history:
+            _, last_rate = state.consistency_history[-1]
+            self.assertGreater(last_rate, 0.9)
+
+    def test_consistency_drops_with_eve(self):
+        """Eve 도청 시 일관성 패스율 하락."""
+        from security.qkd_advanced_engine import GHZState, ghz_round
+        state = GHZState()
+        for _ in range(1000):
+            ghz_round(state, eve_chance=0.8)
+        if state.consistency_history:
+            _, last_rate = state.consistency_history[-1]
+            self.assertLess(last_rate, 0.95)
+
+
+class TestGHZSiftEmptyKey(unittest.TestCase):
+    """GHZ 빈 키 시프팅 테스트."""
+
+    def test_sift_empty_sets_done(self):
+        """빈 키로 시프팅 시 sift_done이 True여야 함."""
+        from security.qkd_advanced_engine import GHZState, ghz_key_sift
+        state = GHZState()
+        result = ghz_key_sift(state)
+        self.assertEqual(result, [])
+        self.assertTrue(state.sift_done)
+
+
+class TestLocaleNewKeys(unittest.TestCase):
+    """새로 추가된 로케일 키 존재 확인."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_new_keys_in_en(self):
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        new_keys = [
+            "qa_ghz_consistency_graph",
+            "qa_ghz_consistency_nodata",
+            "qa_cmp_no_data",
+        ]
+        for key in new_keys:
+            self.assertIn(key, en, f"Missing key in en.json: {key}")
+
+    def test_new_keys_in_ko(self):
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        new_keys = [
+            "qa_ghz_consistency_graph",
+            "qa_ghz_consistency_nodata",
+            "qa_cmp_no_data",
+        ]
+        for key in new_keys:
+            self.assertIn(key, ko, f"Missing key in ko.json: {key}")
+
+
 if __name__ == "__main__":
     unittest.main()

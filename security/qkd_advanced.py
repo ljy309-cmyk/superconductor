@@ -522,6 +522,11 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
     if ghz.pa_done and ghz.final_key:
         _draw_otp_demo(screen, ghz.final_key, 460, sy, font, big_font)
 
+    # GHZ 일관성 수렴 그래프 (오른쪽)
+    if not (ghz.pa_done and ghz.final_key):
+        _draw_consistency_graph(screen, ghz.consistency_history,
+                                460, sy, 400, 140, font, big_font)
+
     # 라운드 로그
     log_y = sy + len(stats) * 16 + 20
     header = big_font.render(t("qa_round_log"), True, ACCENT)
@@ -572,10 +577,12 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
 
     # ── BB84 (왼쪽) ──
     by = 84
+    bb84_key_rate = (bb84.basis_match_rounds / bb84.total_rounds * 100) if bb84.total_rounds > 0 else 0.0
     bb84_stats = [
         (t("qa_cmp_bb84_rounds", total=bb84.total_rounds), TEXT_CLR),
         (t("qa_cmp_bb84_basis", match=bb84.basis_match_rounds, pct=bb84.basis_match_rounds / max(bb84.total_rounds, 1) * 100), TEXT_CLR),
         (t("qa_cmp_bb84_rawkey", bits=bb84.raw_key_bits), BLUE),
+        (t("qa_key_rate", rate=bb84_key_rate, bits=bb84.basis_match_rounds, rounds=bb84.total_rounds), PEACH),
         (t("qa_cmp_bb84_eve", count=bb84.eve_rounds), RED if bb84.eve_rounds > 0 else SUBTEXT_CLR),
         ("", TEXT_CLR),
         (t("qa_cmp_detection"), ACCENT),
@@ -601,10 +608,12 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
                      left_x, bb84_graph_y, half_w, 100, font, big_font)
 
     # ── E91 (오른쪽) ──
+    e91_key_rate = (e91.key_rounds / e91.total_rounds * 100) if e91.total_rounds > 0 else 0.0
     e91_stats = [
         (t("qa_cmp_e91_rounds", total=e91.total_rounds, key=e91.key_rounds, bell=e91.bell_rounds), TEXT_CLR),
         (t("qa_cmp_e91_keypairs", key=e91.key_rounds, pct=e91.key_rounds / max(e91.total_rounds, 1) * 100), TEXT_CLR),
         (t("qa_cmp_e91_rawkey", bits=len(e91.raw_key_alice)), MAUVE),
+        (t("qa_key_rate", rate=e91_key_rate, bits=e91.key_rounds, rounds=e91.total_rounds), PEACH),
         (t("qa_cmp_e91_eve", count=e91.eve_rounds), RED if e91.eve_rounds > 0 else SUBTEXT_CLR),
         ("", TEXT_CLR),
         (t("qa_cmp_detection"), ACCENT),
@@ -647,7 +656,7 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
         (t("qa_cmp_row_result"),
          t("qa_cmp_eve_detected") if bb84.eve_detected else t("qa_cmp_secure"),
          t("qa_cmp_bell_secure") if e91.bell_violated else (
-             t("qa_cmp_bell_warning") if e91.bell_rounds > 20 else "---")),
+             t("qa_cmp_bell_warning") if e91.bell_rounds > 20 else t("qa_cmp_no_data"))),
         (t("qa_cmp_row_keybits"),
          f"{bb84.raw_key_bits}",
          f"{len(e91.raw_key_alice)}"),
@@ -885,6 +894,91 @@ def _draw_bell_s_graph(screen, history, x, y, w, h, font, big_font):
         pygame.draw.circle(screen, WHITE, last, 3)
 
     # X축 라벨 (첫/마지막 라운드)
+    first_rd = history[0][0]
+    last_rd = history[-1][0]
+    fl = font.render(f"R{first_rd}", True, SUBTEXT_CLR)
+    screen.blit(fl, (gx, gy + gh + 3))
+    ll = font.render(f"R{last_rd}", True, SUBTEXT_CLR)
+    screen.blit(ll, (gx + gw - ll.get_width(), gy + gh + 3))
+
+
+def _draw_consistency_graph(screen, history, x, y, w, h, font, big_font):
+    """GHZ 일관성 패스율 시계열 수렴 그래프.
+
+    Args:
+        history: list of (round_number, pass_rate) tuples.
+    """
+    # 패널 배경
+    pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=6)
+    pygame.draw.rect(screen, OVERLAY, (x, y, w, h), 1, border_radius=6)
+
+    # 제목
+    title = big_font.render(t("qa_ghz_consistency_graph"), True, ACCENT)
+    screen.blit(title, (x + 6, y + 4))
+
+    # 그래프 영역
+    pad_l, pad_r, pad_t, pad_b = 38, 8, 22, 18
+    gx = x + pad_l
+    gy = y + pad_t
+    gw = w - pad_l - pad_r
+    gh = h - pad_t - pad_b
+
+    if gw < 10 or gh < 10:
+        return
+
+    # Y축 범위: 0 ~ 1.0 (100%)
+    y_min, y_max = 0.0, 1.0
+
+    def _val_to_py(val):
+        ratio = (val - y_min) / (y_max - y_min)
+        return gy + gh - int(ratio * gh)
+
+    def _round_to_px(rd_idx, total):
+        if total <= 1:
+            return gx + gw // 2
+        return gx + int(rd_idx / (total - 1) * gw)
+
+    # Y축 그리드 & 라벨
+    for val in (0.0, 0.25, 0.5, 0.75, 1.0):
+        py = _val_to_py(val)
+        pygame.draw.line(screen, OVERLAY, (gx, py), (gx + gw, py), 1)
+        lbl = font.render(f"{val * 100:.0f}%", True, SUBTEXT_CLR)
+        screen.blit(lbl, (gx - lbl.get_width() - 3, py - 5))
+
+    # 85% 임계선 (안전 기준)
+    thresh_py = _val_to_py(0.85)
+    for dx in range(0, gw, 8):
+        x1 = gx + dx
+        x2 = min(gx + dx + 4, gx + gw)
+        pygame.draw.line(screen, YELLOW, (x1, thresh_py), (x2, thresh_py), 1)
+    lbl = font.render("85%", True, YELLOW)
+    screen.blit(lbl, (gx + gw - lbl.get_width(), thresh_py - 12))
+
+    # 데이터가 없으면 안내
+    if not history:
+        msg = font.render(t("qa_ghz_consistency_nodata"), True, SUBTEXT_CLR)
+        screen.blit(msg, (gx + gw // 2 - msg.get_width() // 2,
+                          gy + gh // 2 - 5))
+        return
+
+    # 데이터 포인트를 픽셀로 변환
+    n = len(history)
+    points = []
+    for i, (_rd, p_val) in enumerate(history):
+        px = _round_to_px(i, n)
+        py = _val_to_py(min(p_val, y_max))
+        points.append((px, py))
+
+    # 라인 플롯
+    if len(points) >= 2:
+        pygame.draw.lines(screen, GREEN, False, points, 2)
+
+    # 최신 포인트 강조
+    if points:
+        last = points[-1]
+        pygame.draw.circle(screen, WHITE, last, 3)
+
+    # X축 라벨
     first_rd = history[0][0]
     last_rd = history[-1][0]
     fl = font.render(f"R{first_rd}", True, SUBTEXT_CLR)
