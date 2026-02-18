@@ -90,8 +90,10 @@ def _check_rate_limit(ip: str) -> bool:
         _rate_limit_map[ip] = now
         # 오래된 항목 정리 (100개 초과 시)
         if len(_rate_limit_map) > 100:
-            now - 60
-            _rate_limit_map.clear()
+            cutoff = now - 60
+            stale = [k for k, v in _rate_limit_map.items() if v < cutoff]
+            for k in stale:
+                del _rate_limit_map[k]
     return True
 
 
