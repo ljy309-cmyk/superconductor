@@ -69,6 +69,8 @@
   "qa_cmp_note_e91": "E91: Physics-based detection via Bell inequality violation (CHSH)",
   "qa_bell_s_graph": "Bell S Convergence",
   "qa_bell_s_nodata": "Run rounds to see S convergence",
+  "qa_qber_graph": "QBER Convergence",
+  "qa_qber_nodata": "Run rounds to see QBER convergence",
   "qa_ghz_parties": "Parties",
   "qa_ghz_updown": "Up/Down: change",
   "qa_otp_title": "OTP Encryption Demo",
@@ -453,6 +455,7 @@
   "fp_hint_line2_v2": "{state}  |  {temp}K  |  [/]: Speed ({speed})  |  ESC: Exit",
   "fp_state_pinned": "PINNED (Locked)",
 
+  "tutorial_nav_hint": "Enter/Right: Next  |  Left: Previous  |  ESC: Skip",
   "help_f1_hint": "F1: Help",
   "help_close": "Press F1 or ESC to close",
 

@@ -23,6 +23,7 @@ except ImportError:
 import json
 import os
 
+from i18n import t
 from logger import get_module_logger
 
 _log = get_module_logger("tutorial")
@@ -308,6 +309,6 @@ class TutorialOverlay:
             screen.blit(line_surf, (box_x + 16, box_y + 36 + i * 18))
 
         # 네비게이션 힌트
-        nav = "Enter/Right: Next  |  Left: Previous  |  ESC: Skip"
+        nav = t("tutorial_nav_hint")
         nav_surf = font.render(nav, True, (88, 91, 112))
         screen.blit(nav_surf, (box_x + box_w // 2 - nav_surf.get_width() // 2, box_y + box_h - 22))

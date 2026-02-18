@@ -591,8 +591,14 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
         screen.blit(surf, (left_x, by + i * 16))
 
     # QBER 미터 (BB84)
-    _draw_qber_meter(screen, bb84.qber, left_x, by + len(bb84_stats) * 16 + 8,
+    bb84_meter_y = by + len(bb84_stats) * 16 + 8
+    _draw_qber_meter(screen, bb84.qber, left_x, bb84_meter_y,
                      half_w, font, big_font)
+
+    # QBER 수렴 그래프 (BB84 왼쪽 패널 하단)
+    bb84_graph_y = bb84_meter_y + 28
+    _draw_qber_graph(screen, bb84.qber_history,
+                     left_x, bb84_graph_y, half_w, 100, font, big_font)
 
     # ── E91 (오른쪽) ──
     e91_stats = [
@@ -704,6 +710,91 @@ def _draw_bell_meter(screen, bell_s, x, y, w, font, big_font):
     # 값 표시
     val = big_font.render(f"S = {abs(bell_s):.3f}", True, TEXT_CLR)
     screen.blit(val, (x + w + 8, y))
+
+
+def _draw_qber_graph(screen, history, x, y, w, h, font, big_font):
+    """BB84 QBER 시계열 수렴 그래프.
+
+    Args:
+        history: list of (round_number, qber_value) tuples.
+    """
+    # 패널 배경
+    pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=6)
+    pygame.draw.rect(screen, OVERLAY, (x, y, w, h), 1, border_radius=6)
+
+    # 제목
+    title = big_font.render(t("qa_qber_graph"), True, ACCENT)
+    screen.blit(title, (x + 6, y + 4))
+
+    # 그래프 영역
+    pad_l, pad_r, pad_t, pad_b = 38, 8, 22, 18
+    gx = x + pad_l
+    gy = y + pad_t
+    gw = w - pad_l - pad_r
+    gh = h - pad_t - pad_b
+
+    if gw < 10 or gh < 10:
+        return
+
+    # Y축 범위: 0 ~ 0.5 (50%)
+    y_min, y_max = 0.0, 0.5
+
+    def _val_to_py(val):
+        ratio = (val - y_min) / (y_max - y_min)
+        return gy + gh - int(ratio * gh)
+
+    def _round_to_px(rd_idx, total):
+        if total <= 1:
+            return gx + gw // 2
+        return gx + int(rd_idx / (total - 1) * gw)
+
+    # Y축 그리드 & 라벨
+    for val in (0.0, 0.1, 0.2, 0.3, 0.5):
+        py = _val_to_py(val)
+        pygame.draw.line(screen, OVERLAY, (gx, py), (gx + gw, py), 1)
+        lbl = font.render(f"{val * 100:.0f}%", True, SUBTEXT_CLR)
+        screen.blit(lbl, (gx - lbl.get_width() - 3, py - 5))
+
+    # 11% 임계선 (빨강 점선)
+    thresh_py = _val_to_py(0.11)
+    for dx in range(0, gw, 8):
+        x1 = gx + dx
+        x2 = min(gx + dx + 4, gx + gw)
+        pygame.draw.line(screen, YELLOW, (x1, thresh_py), (x2, thresh_py), 1)
+    lbl = font.render("11%", True, YELLOW)
+    screen.blit(lbl, (gx + gw - lbl.get_width(), thresh_py - 12))
+
+    # 데이터가 없으면 안내
+    if not history:
+        msg = font.render(t("qa_qber_nodata"), True, SUBTEXT_CLR)
+        screen.blit(msg, (gx + gw // 2 - msg.get_width() // 2,
+                          gy + gh // 2 - 5))
+        return
+
+    # 데이터 포인트를 픽셀로 변환
+    n = len(history)
+    points = []
+    for i, (_rd, q_val) in enumerate(history):
+        px = _round_to_px(i, n)
+        py = _val_to_py(min(q_val, y_max))
+        points.append((px, py))
+
+    # 라인 플롯
+    if len(points) >= 2:
+        pygame.draw.lines(screen, BLUE, False, points, 2)
+
+    # 최신 포인트 강조
+    if points:
+        last = points[-1]
+        pygame.draw.circle(screen, WHITE, last, 3)
+
+    # X축 라벨
+    first_rd = history[0][0]
+    last_rd = history[-1][0]
+    fl = font.render(f"R{first_rd}", True, SUBTEXT_CLR)
+    screen.blit(fl, (gx, gy + gh + 3))
+    ll = font.render(f"R{last_rd}", True, SUBTEXT_CLR)
+    screen.blit(ll, (gx + gw - ll.get_width(), gy + gh + 3))
 
 
 def _draw_bell_s_graph(screen, history, x, y, w, h, font, big_font):
@@ -983,6 +1074,16 @@ def run_simulation():
                     e91_round(e91_cmp, eve_chance)
                     if e91_cmp.total_rounds % 10 == 0:
                         compute_bell_S(e91_cmp)
+                    # 자동 파이프라인: E91 측 시프팅→PA
+                    if (e91_cmp.total_rounds > 0
+                            and e91_cmp.total_rounds % CHSH_SHOTS == 0
+                            and not e91_cmp.pa_done):
+                        if not e91_cmp.qber_done:
+                            estimate_qber(e91_cmp)
+                        elif not e91_cmp.correction_done:
+                            error_correct(e91_cmp)
+                        elif not e91_cmp.pa_done:
+                            privacy_amplification(e91_cmp)
 
         # 리플레이 기록
         if not paused:
@@ -996,8 +1097,10 @@ def run_simulation():
             if mode == MODE_COMPARE:
                 frame["bb84_rounds"] = bb84_cmp.total_rounds
                 frame["bb84_qber"] = bb84_cmp.qber
+                frame["bb84_eve_detected"] = bb84_cmp.eve_detected
                 frame["e91_cmp_rounds"] = e91_cmp.total_rounds
                 frame["e91_cmp_bell_S"] = e91_cmp.bell_S
+                frame["e91_cmp_bell_violated"] = e91_cmp.bell_violated
             recorder.record(frame)
 
         # ── 렌더링 ───────────────────────────────────
@@ -1023,10 +1126,19 @@ def run_simulation():
             tab_lbl = big_font.render(name, True, clr)
             screen.blit(tab_lbl, (tx + tab_w // 2 - tab_lbl.get_width() // 2, tab_y + 3))
 
-        # Eve 상태
+        # Eve 상태 + 레벨 표시
         eve_txt = t("qa_eve_on", pct=eve_chance * 100) if eve_chance > 0 else t("qa_eve_off")
         eve_surf = font.render(eve_txt, True, RED if eve_chance > 0 else SUBTEXT_CLR)
-        screen.blit(eve_surf, (WIDTH - eve_surf.get_width() - 10, 36))
+        eve_tx = WIDTH - eve_surf.get_width() - 10
+        screen.blit(eve_surf, (eve_tx, 36))
+        # 레벨 스텝 인디케이터 (E 키 순환 가이드)
+        _eve_steps = [0.0, 0.1, 0.3, 0.5, 0.8, 1.0]
+        step_x = eve_tx - len(_eve_steps) * 8 - 6
+        for si, sv in enumerate(_eve_steps):
+            sx = step_x + si * 8
+            active = abs(eve_chance - sv) < 0.01
+            clr = RED if active else OVERLAY
+            pygame.draw.rect(screen, clr, (sx, 40, 6, 6), 0 if active else 1)
 
         # 모드별 렌더링
         if mode == MODE_E91:

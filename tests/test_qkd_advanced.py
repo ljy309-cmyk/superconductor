@@ -1213,10 +1213,86 @@ class TestLocaleKeysComplete(unittest.TestCase):
             "qa_cmp_bb84_rawkey", "qa_cmp_bb84_eve", "qa_cmp_bb84_qber",
             "qa_cmp_e91_rounds", "qa_cmp_e91_keypairs", "qa_cmp_e91_rawkey",
             "qa_cmp_e91_eve", "qa_cmp_e91_bell", "qa_key_rate",
-            "qa_sift_bell_stat",
+            "qa_sift_bell_stat", "qa_qber_graph", "qa_qber_nodata",
+            "tutorial_nav_hint",
         ]
         for key in required_keys:
             self.assertIn(key, en, f"Missing key in en.json: {key}")
+
+
+class TestBB84QBERHistory(unittest.TestCase):
+    """BB84 QBER 히스토리 테스트."""
+
+    def test_qber_history_recorded(self):
+        """QBER 히스토리가 10 라운드마다 기록."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(100):
+            bb84_round(state, eve_chance=0.5)
+        # 100 라운드 → 10 라운드마다 기록 → ~10개
+        self.assertGreater(len(state.qber_history), 0)
+        # (round_number, qber_value) 튜플 형식 확인
+        rd, qv = state.qber_history[-1]
+        self.assertIsInstance(rd, int)
+        self.assertIsInstance(qv, float)
+
+    def test_qber_history_bounded(self):
+        """히스토리가 200개로 제한."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(3000):
+            bb84_round(state)
+        self.assertLessEqual(len(state.qber_history), 200)
+
+    def test_qber_history_reset(self):
+        """리셋 시 히스토리 초기화."""
+        from security.qkd_advanced_engine import BB84State, bb84_round, reset_bb84
+        state = BB84State()
+        for _ in range(100):
+            bb84_round(state)
+        self.assertGreater(len(state.qber_history), 0)
+        reset_bb84(state)
+        self.assertEqual(len(state.qber_history), 0)
+
+    def test_qber_history_convergence_with_eve(self):
+        """Eve 있을 때 QBER 히스토리에 > 0 값 존재."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(200):
+            bb84_round(state, eve_chance=1.0)
+        self.assertGreater(len(state.qber_history), 0)
+        # 마지막 QBER 값이 0보다 큰지 확인
+        _, last_qber = state.qber_history[-1]
+        self.assertGreater(last_qber, 0.0)
+
+
+class TestCompareAutoSiftPA(unittest.TestCase):
+    """Compare 모드 자동 시프팅/PA 테스트."""
+
+    def test_e91_cmp_sift_pa_pipeline(self):
+        """Compare 모드 E91 측 전체 파이프라인 완료."""
+        from security.qkd_advanced_engine import (
+            E91State,
+            compute_bell_S,
+            e91_round,
+            error_correct,
+            estimate_qber,
+            privacy_amplification,
+        )
+        e91_cmp = E91State()
+        for _ in range(300):
+            e91_round(e91_cmp, eve_chance=0.0)
+        compute_bell_S(e91_cmp)
+
+        estimate_qber(e91_cmp)
+        self.assertTrue(e91_cmp.qber_done)
+
+        error_correct(e91_cmp)
+        self.assertTrue(e91_cmp.correction_done)
+
+        final = privacy_amplification(e91_cmp)
+        self.assertTrue(e91_cmp.pa_done)
+        self.assertGreater(len(final), 0)
 
 
 if __name__ == "__main__":

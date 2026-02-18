@@ -704,6 +704,8 @@ class BB84State:
     # 슬라이딩 QBER
     _recent_matches: list[bool] = field(default_factory=list)
     _recent_errors: list[bool] = field(default_factory=list)
+    # QBER 히스토리 (수렴 그래프용)
+    qber_history: list[tuple[int, float]] = field(default_factory=list)
 
 
 def bb84_round(state: BB84State, eve_chance: float = 0.0) -> dict:
@@ -754,6 +756,12 @@ def bb84_round(state: BB84State, eve_chance: float = 0.0) -> dict:
         state.qber = n_err / n_match if n_match > 0 else 0.0
     state.eve_detected = state.qber > 0.11 and state.basis_match_rounds > 10
 
+    # QBER 히스토리 기록 (10 라운드마다)
+    if state.total_rounds % 10 == 0 and state.basis_match_rounds > 0:
+        state.qber_history.append((state.total_rounds, state.qber))
+        if len(state.qber_history) > 200:
+            state.qber_history.pop(0)
+
     return {"basis_match": basis_match, "has_error": has_error, "eve_present": eve_present}
 
 
@@ -768,6 +776,7 @@ def reset_bb84(state: BB84State):
     state.eve_detected = False
     state._recent_matches.clear()
     state._recent_errors.clear()
+    state.qber_history.clear()
 
 
 # ── 리셋 ─────────────────────────────────────────────
