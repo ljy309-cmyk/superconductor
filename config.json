@@ -104,6 +104,14 @@
     "bb84_decoy_trapped": 3,
     "all_modules_count": 5
   },
+  "josephson_junction": {
+    "ic_default": 1.0,
+    "bias_max": 3.0,
+    "r_normal": 1.0,
+    "capacitance": 0.5,
+    "phase_damping": 0.3,
+    "time_scale": 5.0
+  },
   "cooper_pair": {
     "tc_kelvin": 77.0,
     "temp_min": 4.0,
