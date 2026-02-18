@@ -16,7 +16,7 @@ import pygame
 from config_loader import cfg
 from quantum.qubit_physics import QubitState
 from i18n import t, toggle_locale
-from theme import load_pg_colors, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
@@ -29,6 +29,7 @@ from quit_dialog import confirm_quit
 from tutorial import TutorialOverlay
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from perf_monitor import PerfMonitor
+from game_base import finalize_session, choose_difficulty_or_quit
 from logger import get_module_logger
 
 _log = get_module_logger("qubit_chain")
@@ -346,13 +347,8 @@ def run_simulation():
     perf = PerfMonitor(target_fps=FPS)
 
     # ── 시작 시 난이도 선택 ──
-    from difficulty_dialog import choose_difficulty
-    chosen = choose_difficulty(screen, font)
-    if chosen is None:
-        off_theme_change(_load_theme_colors)
-        pygame.quit()
+    if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
-    preset_hud._apply_preset(chosen)
 
     running = True
     while running:
@@ -650,72 +646,36 @@ def run_simulation():
 
     perf.log_summary()
 
-    # 최종미션: 플레이 기록 저장
-    try:
-        from data_ai.play_logger import get_logger
-        get_logger().log_session("qubit_chain", {
-            "total_qubits": len(nodes),
-            "collapsed_count": sum(1 for n in nodes if n.collapsed),
-            "alive_count": sum(1 for n in nodes if not n.collapsed),
-            "noise_rate": noise_rate,
-            "cascade_damage": cascade_damage,
-            "shield_uses": gs.qec_uses,
-            "max_stress": max((n.stress for n in nodes), default=0),
-            "survival_time": round(gs.survival_time, 2),
-        })
-    except Exception as e:
-        _log.error("플레이 기록 실패: %s", e)
+    session_data = {
+        "total_qubits": len(nodes),
+        "collapsed_count": sum(1 for n in nodes if n.collapsed),
+        "alive_count": sum(1 for n in nodes if not n.collapsed),
+        "noise_rate": noise_rate,
+        "cascade_damage": cascade_damage,
+        "shield_uses": gs.qec_uses,
+        "max_stress": max((n.stress for n in nodes), default=0),
+        "survival_time": round(gs.survival_time, 2),
+    }
 
-    # 보고서 생성
-    try:
-        from report import generate_report
-        generate_report("qubit_chain", {
-            "total_qubits": len(nodes),
-            "collapsed_count": sum(1 for n in nodes if n.collapsed),
-            "survival_time": round(gs.survival_time, 2),
-            "shield_uses": gs.qec_uses,
-            "noise_rate": noise_rate,
-            "cascade_damage": cascade_damage,
-        })
-    except Exception as e:
-        _log.error("보고서 생성 실패: %s", e)
-
-    # 업적 확인
-    try:
-        new_ach = check_achievements("qubit_chain", {
-            "survival_time": gs.survival_time,
-            "collapsed_count": sum(1 for n in nodes if n.collapsed),
-            "shield_uses": gs.qec_uses,
-        })
-        for ach in new_ach:
-            _log.info("Achievement unlocked: %s — %s", ach["title"], ach["desc"])
-    except Exception as e:
-        _log.error("업적 확인 실패: %s", e)
-
-    # 최종보스미션 (5-3): 랭킹 서버에 생존 시간 POST
-    if gs.survival_time > 0:
-        try:
+    def _post_ranking():
+        if gs.survival_time > 0:
             import requests
             from data_ai.ranking_server import get_base_url, start_server
             from score_integrity import sign_score
             start_server()
             _score = round(gs.survival_time, 2)
-            _name = "Player"
-            _mode = "Entanglement Cascade"
+            _name, _mode = "Player", "Entanglement Cascade"
             payload = {
-                "name": _name,
-                "score": _score,
-                "mode": _mode,
+                "name": _name, "score": _score, "mode": _mode,
                 "token": sign_score(_name, _score, _mode),
             }
             requests.post(f"{get_base_url()}/ranking", json=payload, timeout=3)
-        except Exception as e:
-            _log.error("랭킹 등록 실패: %s", e)
 
-    recorder.save({"survival_time": round(gs.survival_time, 2)})
-    snd.quit()
-    off_theme_change(_load_theme_colors)
-    pygame.quit()
+    finalize_session("qubit_chain", session_data,
+                     recorder=recorder,
+                     recorder_meta={"survival_time": round(gs.survival_time, 2)},
+                     snd=snd, theme_callback=_load_theme_colors,
+                     extra_cleanup=_post_ranking)
 
 
 def open_qubit_chain():

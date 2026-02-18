@@ -13,14 +13,14 @@ import pygame
 
 from config_loader import cfg
 from i18n import t, toggle_locale
-from theme import load_pg_colors, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
-from achievements import check_achievements
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
+from game_base import finalize_session, choose_difficulty_or_quit
 from logger import get_module_logger
 
 _log = get_module_logger("bb84_defense")
@@ -536,13 +536,8 @@ def run_simulation():
     recorder = ReplayRecorder("bb84_defense")
 
     # ── 시작 시 난이도 선택 ──
-    from difficulty_dialog import choose_difficulty
-    chosen = choose_difficulty(screen, font)
-    if chosen is None:
-        off_theme_change(_load_theme_colors)
-        pygame.quit()
+    if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
-    preset_hud._apply_preset(chosen)
 
     running = True
     while running:
@@ -678,8 +673,7 @@ def run_simulation():
 
         pygame.display.flip()
 
-    # 최종미션: 플레이 기록 저장 + 보고서 생성
-    session_data = {
+    finalize_session("bb84_defense", {
         "score": game.score,
         "total_sent": game.total_sent,
         "total_errors": game.total_errors,
@@ -690,28 +684,7 @@ def run_simulation():
         "decoy_sent": game.decoy_sent,
         "decoy_trapped": game.decoy_trapped,
         "qrng_bits_used": game.qrng_bits_used,
-    }
-    try:
-        from data_ai.play_logger import get_logger
-        get_logger().log_session("bb84_defense", session_data)
-    except Exception as e:
-        _log.error("플레이 기록 저장 실패: %s", e)
-
-    try:
-        check_achievements("bb84_defense", session_data)
-    except Exception as e:
-        _log.error("업적 확인 실패: %s", e)
-
-    try:
-        from report import generate_report
-        generate_report("bb84_defense", session_data)
-    except Exception as e:
-        _log.error("보고서 생성 실패: %s", e)
-
-    recorder.save()
-    snd.quit()
-    off_theme_change(_load_theme_colors)
-    pygame.quit()
+    }, recorder=recorder, snd=snd, theme_callback=_load_theme_colors)
 
 
 def open_bb84_defense():

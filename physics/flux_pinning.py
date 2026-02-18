@@ -9,13 +9,13 @@ import pygame
 
 from config_loader import cfg
 from i18n import t, toggle_locale
-from theme import load_pg_colors, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
-from achievements import check_achievements
 from replay import ReplayRecorder
 from quit_dialog import confirm_quit
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
+from game_base import finalize_session
 from logger import get_module_logger
 
 _log = get_module_logger("flux_pinning")
@@ -250,35 +250,13 @@ def run_simulation():
 
         pygame.display.flip()
 
-    # ── 종료: 플레이 기록 + 보고서 + 업적 ──
     play_time = round(time.time() - gs.start_time, 1)
-    session_data = {
+    finalize_session("flux_pinning", {
         "play_time": play_time,
         "superconducting": gs.superconducting,
         "flipped": gs.flipped,
-    }
-
-    try:
-        from data_ai.play_logger import get_logger
-        get_logger().log_session("flux_pinning", session_data)
-    except Exception as e:
-        _log.error("플레이 기록 실패: %s", e)
-
-    try:
-        from report import generate_report
-        generate_report("flux_pinning", session_data)
-    except Exception as e:
-        _log.error("보고서 생성 실패: %s", e)
-
-    try:
-        check_achievements("flux_pinning", session_data)
-    except Exception as e:
-        _log.error("업적 확인 실패: %s", e)
-
-    recorder.save({"play_time": play_time})
-    snd.quit()
-    off_theme_change(_load_theme_colors)
-    pygame.quit()
+    }, recorder=recorder, recorder_meta={"play_time": play_time},
+       snd=snd, theme_callback=_load_theme_colors)
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────

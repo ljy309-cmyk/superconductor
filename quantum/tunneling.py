@@ -11,14 +11,14 @@ import pygame
 
 from config_loader import cfg
 from i18n import t, toggle_locale
-from theme import load_pg_colors, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
-from achievements import check_achievements
 from replay import ReplayRecorder
 from quit_dialog import confirm_quit
+from game_base import finalize_session, choose_difficulty_or_quit
 from logger import get_module_logger
 
 _log = get_module_logger("tunneling")
@@ -309,13 +309,8 @@ def run_simulation():
     tunnel_prob = _calc_tunnel_prob(barrier_width)
 
     # ── 시작 시 난이도 선택 ──
-    from difficulty_dialog import choose_difficulty
-    chosen = choose_difficulty(screen, font)
-    if chosen is None:
-        off_theme_change(_load_theme_colors)
-        pygame.quit()
+    if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
-    preset_hud._apply_preset(chosen)
 
     running = True
     while running:
@@ -417,47 +412,15 @@ def run_simulation():
 
         pygame.display.flip()
 
-    # 최종미션: 플레이 기록 저장
-    try:
-        from data_ai.play_logger import get_logger
-        rate = particle.tunnel_count / max(particle.total_attempts, 1)
-        get_logger().log_session("tunneling", {
-            "total_attempts": particle.total_attempts,
-            "tunnel_count": particle.tunnel_count,
-            "reflect_count": particle.reflect_count,
-            "tunnel_rate": round(rate, 3),
-            "barrier_width": barrier_width,
-            "tunnel_prob": round(tunnel_prob, 3),
-        })
-    except Exception as e:
-        _log.error("플레이 기록 실패: %s", e)
-
-    try:
-        from report import generate_report
-        generate_report("tunneling", {
-            "total_attempts": particle.total_attempts,
-            "tunnel_count": particle.tunnel_count,
-            "reflect_count": particle.reflect_count,
-            "tunnel_rate": round(rate, 3),
-            "barrier_width": barrier_width,
-        })
-    except Exception as e:
-        _log.error("보고서 생성 실패: %s", e)
-
-    try:
-        check_achievements("tunneling", {
-            "tunnel_count": particle.tunnel_count,
-            "tunnel_rate": round(rate, 3),
-            "total_attempts": particle.total_attempts,
-        })
-    except Exception as e:
-        _log.error("업적 확인 실패: %s", e)
-
-    recorder.save()
-    snd.quit()
-    off_theme_change(_load_theme_colors)
-
-    pygame.quit()
+    rate = particle.tunnel_count / max(particle.total_attempts, 1)
+    finalize_session("tunneling", {
+        "total_attempts": particle.total_attempts,
+        "tunnel_count": particle.tunnel_count,
+        "reflect_count": particle.reflect_count,
+        "tunnel_rate": round(rate, 3),
+        "barrier_width": barrier_width,
+        "tunnel_prob": round(tunnel_prob, 3),
+    }, recorder=recorder, snd=snd, theme_callback=_load_theme_colors)
 
 
 def open_tunneling():
