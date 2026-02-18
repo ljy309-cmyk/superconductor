@@ -471,6 +471,41 @@ def privacy_amplification(state: E91State) -> str:
     return final
 
 
+# ── OTP 암호화 데모 (QKD 키 활용) ─────────────────────
+#
+# QKD로 생성된 키를 One-Time Pad (XOR)로 사용하여
+# 메시지를 암호화/복호화하는 교육용 데모.
+# OTP는 키 길이 ≥ 메시지 길이일 때 정보이론적으로 안전합니다.
+
+_DEMO_PLAINTEXT = "QUANTUM OK"
+
+
+def xor_encrypt(plaintext: str, key_hex: str) -> str:
+    """OTP(XOR) 암호화 — 평문 + 키(hex) → 암호문(hex).
+
+    키가 평문보다 짧으면 사용 가능한 길이만큼만 암호화합니다.
+    """
+    if not key_hex:
+        return ""
+    key_bytes = bytes.fromhex(key_hex.ljust(len(key_hex) + len(key_hex) % 2, "0"))
+    plain_bytes = plaintext.encode("utf-8")
+    # 키 길이 제한
+    n = min(len(plain_bytes), len(key_bytes))
+    cipher = bytes(p ^ k for p, k in zip(plain_bytes[:n], key_bytes[:n]))
+    return cipher.hex()
+
+
+def xor_decrypt(ciphertext_hex: str, key_hex: str) -> str:
+    """OTP(XOR) 복호화 — 암호문(hex) + 키(hex) → 평문."""
+    if not ciphertext_hex or not key_hex:
+        return ""
+    cipher_bytes = bytes.fromhex(ciphertext_hex)
+    key_bytes = bytes.fromhex(key_hex.ljust(len(key_hex) + len(key_hex) % 2, "0"))
+    n = min(len(cipher_bytes), len(key_bytes))
+    plain = bytes(c ^ k for c, k in zip(cipher_bytes[:n], key_bytes[:n]))
+    return plain.decode("utf-8", errors="replace")
+
+
 # ── 다자간 QKD (GHZ 기반) ────────────────────────────
 
 

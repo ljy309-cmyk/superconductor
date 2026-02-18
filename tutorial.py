@@ -86,6 +86,11 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "none",
         },
         {
+            "title": "OTP Encryption Demo",
+            "text": "PA 완료 후 최종 키로 XOR 암호화 시연!\nQKD → 실용 암호(One-Time Pad) 연결을 확인하세요.",
+            "highlight": "none",
+        },
+        {
             "title": "Multi-Party GHZ (3~5)",
             "text": "GHZ 모드에서 Up/Down 키로 파티 수를 변경합니다.\n3→4→5자간 얽힘 네트워크를 확장할 수 있습니다!",
             "highlight": "none",

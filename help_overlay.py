@@ -144,6 +144,8 @@ _HELP_TEXTS: dict[str, list[str]] = {
         "  3. 프라이버시 증폭: Toeplitz 범용 해시로 키 압축",
         "     (2-universal hash → Leftover Hash Lemma로 보안 보장)",
         "     → Eve의 부분 정보를 정보이론적으로 제거!",
+        "  4. OTP 암호화 데모: 최종 키로 XOR 암호화/복호화 시연",
+        "     (One-Time Pad: 키 ≥ 메시지 → 정보이론적 보안)",
         "",
         "[다자간 QKD (GHZ) — 3~5자간 확장]",
         "  |GHZ⟩ = (|00…0⟩+|11…1⟩)/√2 (N자간 얽힘)",

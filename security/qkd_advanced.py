@@ -26,6 +26,7 @@ from security.qkd_advanced_engine import (
     GHZ_MAX_PARTIES,
     GHZ_MIN_PARTIES,
     GHZState,
+    _DEMO_PLAINTEXT,
     bb84_round,
     compute_bell_S,
     e91_round,
@@ -40,6 +41,8 @@ from security.qkd_advanced_engine import (
     reset_e91,
     reset_ghz,
     resize_ghz,
+    xor_decrypt,
+    xor_encrypt,
 )
 from sound_manager import get_sound_manager
 from theme import load_pg_colors, on_theme_change
@@ -338,6 +341,9 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
             chunk = key[i:i + 32]
             screen.blit(font.render(chunk, True, MAUVE), (40, fy + 16 + (i // 32) * 14))
 
+        # OTP 암호화 데모
+        _draw_otp_demo(screen, e91.final_key, 460, ky + 68, font, big_font)
+
     # 통계
     stats_y = 420
     raw_n = len(e91.raw_key_alice)
@@ -365,6 +371,59 @@ def _draw_key_bits(screen, label, bits, color, x, y, font, big_font):
         clr = color if bit == 1 else OVERLAY
         pygame.draw.rect(screen, clr, (bx, y + 2, 6, 12))
         bx += 8
+
+
+def _draw_otp_demo(screen, final_key, x, y, font, big_font):
+    """OTP(XOR) 암호화 데모 패널."""
+    w, h = 400, 150
+    pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=8)
+    pygame.draw.rect(screen, ACCENT, (x, y, w, h), 1, border_radius=8)
+
+    # 제목
+    title = big_font.render(t("qa_otp_title"), True, ACCENT)
+    screen.blit(title, (x + 8, y + 6))
+
+    # 평문
+    py = y + 26
+    pt_lbl = font.render(t("qa_otp_plain"), True, TEXT_CLR)
+    screen.blit(pt_lbl, (x + 8, py))
+    pt_val = big_font.render(f'"{_DEMO_PLAINTEXT}"', True, GREEN)
+    screen.blit(pt_val, (x + 8 + pt_lbl.get_width() + 6, py))
+
+    # 키 (사용 부분)
+    key_len_needed = len(_DEMO_PLAINTEXT.encode("utf-8")) * 2  # hex chars
+    used_key = final_key[:key_len_needed] if len(final_key) >= key_len_needed else final_key
+    ky = py + 16
+    k_lbl = font.render(t("qa_otp_key"), True, TEXT_CLR)
+    screen.blit(k_lbl, (x + 8, ky))
+    k_val = font.render(used_key, True, MAUVE)
+    screen.blit(k_val, (x + 8 + k_lbl.get_width() + 6, ky))
+
+    # 암호화
+    ciphertext = xor_encrypt(_DEMO_PLAINTEXT, final_key)
+    cy = ky + 16
+    c_lbl = font.render(t("qa_otp_cipher"), True, TEXT_CLR)
+    screen.blit(c_lbl, (x + 8, cy))
+    c_val = font.render(ciphertext if ciphertext else "---", True, RED)
+    screen.blit(c_val, (x + 8 + c_lbl.get_width() + 6, cy))
+
+    # 복호화
+    decrypted = xor_decrypt(ciphertext, final_key)
+    dy = cy + 16
+    d_lbl = font.render(t("qa_otp_decrypt"), True, TEXT_CLR)
+    screen.blit(d_lbl, (x + 8, dy))
+    d_val = big_font.render(f'"{decrypted}"', True, GREEN)
+    screen.blit(d_val, (x + 8 + d_lbl.get_width() + 6, dy))
+
+    # XOR 수식 표시
+    fy = dy + 20
+    formula = font.render("plaintext XOR key = cipher  |  cipher XOR key = plaintext", True, SUBTEXT_CLR)
+    screen.blit(formula, (x + 8, fy))
+
+    # OTP 보안 노트
+    ny = fy + 14
+    note = font.render(t("qa_otp_note"), True, SUBTEXT_CLR)
+    screen.blit(note, (x + 8, ny))
 
 
 # ── GHZ Multi-Party 모드 ────────────────────────────

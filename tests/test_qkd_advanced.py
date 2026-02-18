@@ -560,6 +560,73 @@ class TestGHZProtocol(unittest.TestCase):
             self.assertLessEqual(len(sifted), len(state.raw_keys[0]))
 
 
+class TestOTPEncryption(unittest.TestCase):
+    """OTP(XOR) 암호화 데모 테스트."""
+
+    def test_encrypt_decrypt_roundtrip(self):
+        """암호화 후 복호화하면 원문 복원."""
+        from security.qkd_advanced_engine import xor_decrypt, xor_encrypt
+        plaintext = "QUANTUM OK"
+        key = "abcdef0123456789abcd"  # 10 bytes = 20 hex chars
+        cipher = xor_encrypt(plaintext, key)
+        self.assertGreater(len(cipher), 0)
+        decrypted = xor_decrypt(cipher, key)
+        self.assertEqual(decrypted, plaintext)
+
+    def test_encrypt_produces_hex(self):
+        from security.qkd_advanced_engine import xor_encrypt
+        cipher = xor_encrypt("Hello", "deadbeef00")
+        # 유효한 hex 문자열
+        int(cipher, 16)
+        # "Hello" = 5 bytes = 10 hex chars
+        self.assertEqual(len(cipher), 10)
+
+    def test_different_keys_different_cipher(self):
+        from security.qkd_advanced_engine import xor_encrypt
+        c1 = xor_encrypt("TEST", "aaaa0000")
+        c2 = xor_encrypt("TEST", "bbbb1111")
+        self.assertNotEqual(c1, c2)
+
+    def test_empty_key_returns_empty(self):
+        from security.qkd_advanced_engine import xor_encrypt
+        self.assertEqual(xor_encrypt("msg", ""), "")
+
+    def test_empty_cipher_returns_empty(self):
+        from security.qkd_advanced_engine import xor_decrypt
+        self.assertEqual(xor_decrypt("", "abcd"), "")
+
+    def test_short_key_partial_encrypt(self):
+        """키가 짧으면 가능한 만큼만 암호화."""
+        from security.qkd_advanced_engine import xor_decrypt, xor_encrypt
+        plaintext = "ABCDEFGH"  # 8 bytes
+        key = "ff"  # 1 byte
+        cipher = xor_encrypt(plaintext, key)
+        # 1 바이트만 암호화
+        self.assertEqual(len(cipher), 2)
+        decrypted = xor_decrypt(cipher, key)
+        self.assertEqual(decrypted, "A")  # 첫 글자만
+
+    def test_with_real_pa_key(self):
+        """실제 PA 파이프라인 키로 암호화/복호화."""
+        from security.qkd_advanced_engine import (
+            E91State,
+            e91_round,
+            key_sift,
+            privacy_amplification,
+            xor_decrypt,
+            xor_encrypt,
+        )
+        state = E91State()
+        for _ in range(300):
+            e91_round(state, eve_chance=0.0)
+        key_sift(state)
+        final = privacy_amplification(state)
+        if final:
+            cipher = xor_encrypt("QKD", final)
+            decrypted = xor_decrypt(cipher, final)
+            self.assertEqual(decrypted, "QKD")
+
+
 class TestE91Constants(unittest.TestCase):
     """E91 상수 검증."""
 
