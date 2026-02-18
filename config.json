@@ -124,6 +124,19 @@
     "measure_batch": 50,
     "teleport_anim_speed": 1.5
   },
+  "scada_security": {
+    "target_temp": -196.0,
+    "heat_leak": 0.3,
+    "cooling_power": -0.8,
+    "sensor_noise": 0.2,
+    "mitm_spoof_offset": 8.0,
+    "mitm_ramp_speed": 0.5,
+    "qber_normal": 0.03,
+    "qber_attack": 0.28,
+    "qber_detect_threshold": 0.11,
+    "critical_temp": -188.0,
+    "recovery_cooling": -2.0
+  },
   "gate_builder": {
     "num_qubits": 2
   },

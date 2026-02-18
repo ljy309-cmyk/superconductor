@@ -98,6 +98,23 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "none",
         },
     ],
+    "scada_security": [
+        {
+            "title": "SCADA Security Scenario",
+            "text": "SCADA 시스템이 MITM(중간자) 공격을 받습니다.\n공격자가 센서 데이터를 조작하여 시스템을 속입니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "BB84 QKD Defense",
+            "text": "BB84 양자 키 분배로 QBER을 모니터링합니다.\nQBER > 11% → 공격 탐지 → 양자 인증 채널 구축!",
+            "highlight": "none",
+        },
+        {
+            "title": "Controls",
+            "text": "SPACE: 수동 공격/방어  |  A: 자동 시나리오 토글\nQ: QKD 토글  |  P: 일시정지  |  R: 리셋",
+            "highlight": "none",
+        },
+    ],
     "entanglement": [
         {
             "title": "Quantum Entanglement",
