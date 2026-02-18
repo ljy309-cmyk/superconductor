@@ -135,6 +135,31 @@ class E91State:
     key_accumulation: list[tuple[int, int]] = field(default_factory=list)
 
 
+# ── 양자 노이즈 모델 ─────────────────────────────────
+NOISE_MODELS = ["depolarizing", "dephasing", "amplitude_damping"]
+_noise_model = "depolarizing"
+
+
+def set_noise_model(model: str):
+    """노이즈 모델 설정."""
+    global _noise_model
+    if model in NOISE_MODELS:
+        _noise_model = model
+
+
+def get_noise_model() -> str:
+    """현재 노이즈 모델 반환."""
+    return _noise_model
+
+
+def cycle_noise_model() -> str:
+    """노이즈 모델을 다음으로 순환. 새 모델 반환."""
+    global _noise_model
+    idx = NOISE_MODELS.index(_noise_model)
+    _noise_model = NOISE_MODELS[(idx + 1) % len(NOISE_MODELS)]
+    return _noise_model
+
+
 def _measure_entangled(angle_a: float, angle_b: float,
                        eve_present: bool = False) -> tuple[int, int]:
     """얽힘 쌍의 측정 시뮬레이션 (광자 편광 모델).
@@ -145,14 +170,28 @@ def _measure_entangled(angle_a: float, angle_b: float,
 
     상관 함수 E(a,b) = cos(2(a-b)) → CHSH S = 2√2 도달 가능.
     Eve가 있으면 상관관계가 약해짐.
+
+    노이즈 모델:
+      - depolarizing: 균일 각도 노이즈 (Gaussian σ=0.3)
+      - dephasing: 위상 노이즈만 (cos²에 감쇠, 비트 보존)
+      - amplitude_damping: |0⟩ 편향 (비대칭 감쇠)
     """
     diff = angle_a - angle_b
 
     if eve_present:
-        # Eve 도청 → 얽힘 파괴 → 고전적 상관관계로 전락
-        # 노이즈 추가로 벨 부등식 위반이 줄어듦
-        noise = random.gauss(0, 0.3)
-        diff += noise
+        if _noise_model == "depolarizing":
+            # 균일 각도 노이즈 — 얽힘 파괴
+            noise = random.gauss(0, 0.3)
+            diff += noise
+        elif _noise_model == "dephasing":
+            # 위상 노이즈 — Z기저 상관 보존, X/Y 기저 파괴
+            # 각도 차이에 이산적 π 위상 킥 확률적으로 추가
+            if random.random() < 0.35:
+                diff += math.pi * random.choice([-0.5, 0.5])
+        elif _noise_model == "amplitude_damping":
+            # 진폭 감쇠 — |1⟩→|0⟩ 전이 확률 (비대칭)
+            noise = random.gauss(0, 0.2)
+            diff += noise
 
     # 상관 확률 (광자 편광: cos²(θ))
     p_same = math.cos(diff) ** 2
@@ -165,6 +204,13 @@ def _measure_entangled(angle_a: float, angle_b: float,
         bob = alice  # 같은 결과
     else:
         bob = -alice  # 다른 결과
+
+    # 진폭 감쇠 모델: |1⟩→|0⟩ 확률적 전이
+    if eve_present and _noise_model == "amplitude_damping":
+        if alice == -1 and random.random() < 0.25:
+            alice = +1
+        if bob == -1 and random.random() < 0.25:
+            bob = +1
 
     return alice, bob
 
@@ -576,10 +622,21 @@ def _ghz_measure(bases: list[str], eve_present: bool = False) -> list[int]:
         bit = random.randint(0, 1)
         results = [bit] * n
         if eve_present:
-            # Eve 도청 → 상관관계 파괴
-            for i in range(n):
-                if random.random() < 0.3:
-                    results[i] = 1 - results[i]
+            # 노이즈 모델별 Eve 효과
+            if _noise_model == "depolarizing":
+                for i in range(n):
+                    if random.random() < 0.3:
+                        results[i] = 1 - results[i]
+            elif _noise_model == "dephasing":
+                # 위상만 영향 — Z기저 상관 일부 보존
+                for i in range(n):
+                    if random.random() < 0.15:
+                        results[i] = 1 - results[i]
+            elif _noise_model == "amplitude_damping":
+                # |1⟩→|0⟩ 편향
+                for i in range(n):
+                    if results[i] == 1 and random.random() < 0.35:
+                        results[i] = 0
     elif all_x:
         # X 기저: GHZ 상관관계 (짝수 패리티)
         results = [random.randint(0, 1) for _ in range(n)]
@@ -589,10 +646,19 @@ def _ghz_measure(bases: list[str], eve_present: bool = False) -> list[int]:
             idx = random.randint(0, n - 1)
             results[idx] = 1 - results[idx]
         if eve_present:
-            # Eve → 패리티 깨짐
-            if random.random() < 0.4:
-                idx = random.randint(0, n - 1)
-                results[idx] = 1 - results[idx]
+            if _noise_model == "depolarizing":
+                if random.random() < 0.4:
+                    idx = random.randint(0, n - 1)
+                    results[idx] = 1 - results[idx]
+            elif _noise_model == "dephasing":
+                # 위상 노이즈가 X기저에 강하게 영향
+                if random.random() < 0.55:
+                    idx = random.randint(0, n - 1)
+                    results[idx] = 1 - results[idx]
+            elif _noise_model == "amplitude_damping":
+                if random.random() < 0.4:
+                    idx = random.randint(0, n - 1)
+                    results[idx] = 1 - results[idx]
     else:
         # 혼합 기저: 무작위 (키에 사용 불가)
         results = [random.randint(0, 1) for _ in range(n)]

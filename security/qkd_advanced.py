@@ -46,9 +46,12 @@ from security.qkd_advanced_engine import (
     resize_ghz,
     xor_decrypt,
     xor_encrypt,
+    NOISE_MODELS,
+    cycle_noise_model,
+    get_noise_model,
 )
 from sound_manager import get_sound_manager
-from theme import load_pg_colors, on_theme_change
+from theme import load_pg_colors, on_theme_change, toggle_theme
 from tutorial import TutorialOverlay
 
 _log = get_module_logger("qkd_advanced")
@@ -180,6 +183,23 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     screen.blit(lbl, (BOB_POS[0] - lbl.get_width() // 2, BOB_POS[1] + 32))
     bases_b = font.render("π/8, π/4, 3π/8", True, SUBTEXT_CLR)
     screen.blit(bases_b, (BOB_POS[0] - bases_b.get_width() // 2, BOB_POS[1] + 48))
+
+    # 기저 각도 아크 시각화 (최근 라운드 기반)
+    if e91.rounds:
+        last = e91.rounds[-1]
+        arc_r = 36
+        for pos, angle, clr in [
+            (ALICE_POS, last.alice_angle, BLUE),
+            (BOB_POS, last.bob_angle, GREEN),
+        ]:
+            rect = pygame.Rect(pos[0] - arc_r, pos[1] - arc_r,
+                               arc_r * 2, arc_r * 2)
+            pygame.draw.arc(screen, clr, rect,
+                            -0.1, angle + 0.1, 2)
+            # 각도 끝점에 작은 원
+            end_x = pos[0] + int(arc_r * math.cos(angle))
+            end_y = pos[1] - int(arc_r * math.sin(angle))
+            pygame.draw.circle(screen, clr, (end_x, end_y), 3)
 
     # Eve (도청 표시)
     eve_alpha = 80
@@ -549,7 +569,8 @@ def _draw_otp_demo(screen, final_key, x, y, font, big_font):
 
 # ── GHZ Multi-Party 모드 ────────────────────────────
 
-def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
+def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font,
+                   flash_timer: float = 0.0):
     """GHZ N자간 QKD 시각화."""
     n = ghz.n_parties
     node_colors = [BLUE, GREEN, PEACH, YELLOW, RED]
@@ -593,12 +614,22 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
     ghz_lbl = _tcache.render(big_font, "GHZ", MAUVE)
     screen.blit(ghz_lbl, (cx - ghz_lbl.get_width() // 2, cy - 8))
 
-    # 얽힘 링크 (물결)
+    # 얽힘 링크 (물결 — Eve 비율에 따라 MAUVE→RED)
+    if ghz.total_rounds > 0:
+        eve_ratio = ghz.eve_rounds / ghz.total_rounds
+        link_r = int(MAUVE[0] + (RED[0] - MAUVE[0]) * eve_ratio)
+        link_g = int(MAUVE[1] + (RED[1] - MAUVE[1]) * eve_ratio)
+        link_b = int(MAUVE[2] + (RED[2] - MAUVE[2]) * eve_ratio)
+        link_clr = (max(0, min(255, link_r)),
+                    max(0, min(255, link_g)),
+                    max(0, min(255, link_b)))
+    else:
+        link_clr = MAUVE
     for pos in positions:
         wave = math.sin(anim_t * 3) * 3
         mid_x = (cx + pos[0]) // 2 + int(wave)
         mid_y = (cy + pos[1]) // 2 + int(wave)
-        pygame.draw.lines(screen, MAUVE, False, [(cx, cy), (mid_x, mid_y), pos], 1)
+        pygame.draw.lines(screen, link_clr, False, [(cx, cy), (mid_x, mid_y), pos], 1)
 
     # 노드 (활성 파티 펄스 효과)
     pulse = (math.sin(anim_t * 4) + 1) * 0.5  # 0~1 oscillation
@@ -613,6 +644,20 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
             screen.blit(glow_surf, (pos[0] - glow_r - 2, pos[1] - glow_r - 2))
         pygame.draw.circle(screen, clr, pos, 24)
         pygame.draw.circle(screen, TEXT_CLR, pos, 24, 2)
+        # 측정 플래시 효과
+        if flash_timer > 0 and ghz.rounds:
+            last_rd = ghz.rounds[-1]
+            flash_alpha = int((flash_timer / 0.3) * 180)
+            result_bit = last_rd.results[i] if i < len(last_rd.results) else 0
+            flash_clr = WHITE if result_bit == 0 else YELLOW
+            flash_surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+            pygame.draw.circle(flash_surf, (*flash_clr[:3], flash_alpha),
+                               (28, 28), 28)
+            screen.blit(flash_surf, (pos[0] - 28, pos[1] - 28))
+            # 측정값 표시
+            bit_lbl = big_font.render(str(result_bit), True, BG)
+            screen.blit(bit_lbl, (pos[0] - bit_lbl.get_width() // 2,
+                                  pos[1] - 7))
         lbl = big_font.render(name, True, clr)
         screen.blit(lbl, (pos[0] - lbl.get_width() // 2, pos[1] + 28))
 
@@ -1367,6 +1412,9 @@ def run_simulation():
     auto_speed = 1.0  # 0.5x, 1x, 2x, 4x
     _AUTO_SPEEDS = [0.5, 1.0, 2.0, 4.0]
     _fade_timer = 0.0  # 모드 전환 페이드 (0=없음, >0=진행중)
+    _ghz_flash_timer = 0.0  # GHZ 측정 플래시 타이머
+    _ghz_prev_rounds = 0  # GHZ 라운드 변화 감지용
+    noise_model = "depolarizing"  # 양자 노이즈 모델
 
     help_overlay = HelpOverlay("qkd_advanced")
     tutorial = TutorialOverlay("qkd_advanced")
@@ -1478,6 +1526,9 @@ def run_simulation():
                                key=lambda i: abs(_EVE_LEVELS[i] - eve_chance))
                     eve_chance = _EVE_LEVELS[(_cur + 1) % len(_EVE_LEVELS)]
                     snd.play("eve_detected" if eve_chance > 0 else "channel_open")
+                elif event.key == pygame.K_n:
+                    noise_model = cycle_noise_model()
+                    _toasts.append([t("qa_noise_model", model=noise_model), PEACH, 2.0])
                 elif event.key == pygame.K_UP and mode == MODE_GHZ:
                     if ghz.n_parties < GHZ_MAX_PARTIES:
                         resize_ghz(ghz, ghz.n_parties + 1)
@@ -1486,6 +1537,10 @@ def run_simulation():
                         resize_ghz(ghz, ghz.n_parties - 1)
                 elif event.key == pygame.K_l:
                     toggle_locale()
+                    _tcache.clear()
+                elif event.key == pygame.K_t:
+                    toggle_theme()
+                    _load_theme_colors()
                     _tcache.clear()
                 elif event.key == pygame.K_SLASH or event.key == pygame.K_QUESTION:
                     show_shortcuts = not show_shortcuts
@@ -1576,6 +1631,13 @@ def run_simulation():
                 except Exception as exc:
                     _engine_error = str(exc)
                     auto_run = False
+
+        # GHZ 측정 플래시 타이머 갱신
+        if ghz.total_rounds != _ghz_prev_rounds:
+            _ghz_flash_timer = 0.3
+            _ghz_prev_rounds = ghz.total_rounds
+        if _ghz_flash_timer > 0:
+            _ghz_flash_timer = max(0, _ghz_flash_timer - dt)
 
         # 토스트 이벤트 감지
         _cur_state = e91 if mode in (MODE_E91, MODE_SIFT) else e91_cmp
@@ -1676,7 +1738,7 @@ def run_simulation():
         elif mode == MODE_SIFT:
             _draw_sift_mode(screen, e91, anim_t, font, big_font)
         elif mode == MODE_GHZ:
-            _draw_ghz_mode(screen, ghz, anim_t, font, big_font)
+            _draw_ghz_mode(screen, ghz, anim_t, font, big_font, _ghz_flash_timer)
         elif mode == MODE_COMPARE:
             _draw_compare_mode(screen, bb84_cmp, e91_cmp, font, big_font)
 
@@ -1762,6 +1824,11 @@ def run_simulation():
             spd_txt = font.render(t("qa_auto_speed", speed=auto_speed), True, PEACH)
             screen.blit(spd_txt, (10, HEIGHT - 14))
 
+        # 노이즈 모델 표시
+        nm = get_noise_model()
+        nm_txt = font.render(t("qa_noise_label", model=nm), True, PEACH)
+        screen.blit(nm_txt, (10, 10))
+
         # FPS 카운터
         if show_fps:
             fps_val = int(clock.get_fps())
@@ -1803,6 +1870,8 @@ def run_simulation():
                 f"R       {t('qa_sc_reset')}",
                 f"Tab     {t('qa_sc_tab')}",
                 f"L       {t('qa_sc_locale')}",
+                f"T       {t('qa_sc_theme')}",
+                f"N       {t('qa_sc_noise')}",
                 f"Up/Down {t('qa_sc_updown')}",
                 f"[ / ]   {t('qa_sc_speed')}",
                 f"F1      {t('qa_sc_help')}",

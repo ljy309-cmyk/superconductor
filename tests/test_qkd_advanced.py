@@ -1942,5 +1942,138 @@ class TestRound15Features(unittest.TestCase):
                          f"ko에만: {ko_keys - en_keys}")
 
 
+class TestRound16Features(unittest.TestCase):
+    """Round 16 신규 기능 테스트."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_round16_locale_keys(self):
+        """Round 16 로케일 키가 양쪽 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        keys = [
+            "qa_sc_theme", "qa_sc_noise",
+            "qa_noise_model", "qa_noise_label",
+        ]
+        for key in keys:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_noise_model_default(self):
+        """기본 노이즈 모델은 depolarizing."""
+        from security.qkd_advanced_engine import get_noise_model, set_noise_model
+        set_noise_model("depolarizing")  # ensure default
+        self.assertEqual(get_noise_model(), "depolarizing")
+
+    def test_noise_model_cycle(self):
+        """노이즈 모델 순환."""
+        from security.qkd_advanced_engine import (
+            NOISE_MODELS, cycle_noise_model, get_noise_model, set_noise_model,
+        )
+        set_noise_model("depolarizing")
+        result = cycle_noise_model()
+        self.assertEqual(result, "dephasing")
+        self.assertEqual(get_noise_model(), "dephasing")
+        result = cycle_noise_model()
+        self.assertEqual(result, "amplitude_damping")
+        result = cycle_noise_model()
+        self.assertEqual(result, "depolarizing")  # wraps around
+
+    def test_noise_model_set_invalid(self):
+        """잘못된 모델은 무시."""
+        from security.qkd_advanced_engine import get_noise_model, set_noise_model
+        set_noise_model("depolarizing")
+        set_noise_model("nonexistent")
+        self.assertEqual(get_noise_model(), "depolarizing")
+
+    def test_noise_models_list(self):
+        """3개 노이즈 모델이 정의됨."""
+        from security.qkd_advanced_engine import NOISE_MODELS
+        self.assertEqual(len(NOISE_MODELS), 3)
+        self.assertIn("depolarizing", NOISE_MODELS)
+        self.assertIn("dephasing", NOISE_MODELS)
+        self.assertIn("amplitude_damping", NOISE_MODELS)
+
+    def test_depolarizing_noise_with_eve(self):
+        """Depolarizing 노이즈에서 Eve 시 Bell S 감소."""
+        from security.qkd_advanced_engine import (
+            E91State, compute_bell_S, e91_round, set_noise_model,
+        )
+        set_noise_model("depolarizing")
+        state = E91State()
+        for _ in range(3000):
+            e91_round(state, eve_chance=0.8)
+        compute_bell_S(state)
+        # Eve가 강하면 S < 2.0 (고전 한계 이하)
+        self.assertLess(abs(state.bell_S), 2.5)
+
+    def test_dephasing_noise_with_eve(self):
+        """Dephasing 노이즈에서 Eve 시 상관관계 변화."""
+        from security.qkd_advanced_engine import (
+            E91State, compute_bell_S, e91_round, set_noise_model,
+        )
+        set_noise_model("dephasing")
+        state = E91State()
+        for _ in range(3000):
+            e91_round(state, eve_chance=0.8)
+        compute_bell_S(state)
+        # Dephasing 모델에서도 Eve 시 S 값이 양자 한계 이하
+        self.assertLess(abs(state.bell_S), 3.0)
+        set_noise_model("depolarizing")  # restore
+
+    def test_amplitude_damping_noise_with_eve(self):
+        """Amplitude damping 노이즈에서 Eve 시 비대칭 효과."""
+        from security.qkd_advanced_engine import (
+            E91State, e91_round, set_noise_model,
+        )
+        set_noise_model("amplitude_damping")
+        state = E91State()
+        for _ in range(2000):
+            e91_round(state, eve_chance=0.8)
+        # 키 비트가 생성됨
+        self.assertGreater(len(state.raw_key_alice), 0)
+        set_noise_model("depolarizing")  # restore
+
+    def test_ghz_noise_model_dephasing(self):
+        """GHZ에서 dephasing 노이즈 모델 적용."""
+        from security.qkd_advanced_engine import (
+            GHZState, ghz_round, set_noise_model,
+        )
+        set_noise_model("dephasing")
+        state = GHZState()
+        for _ in range(500):
+            ghz_round(state, eve_chance=0.5)
+        self.assertGreater(state.total_rounds, 0)
+        set_noise_model("depolarizing")  # restore
+
+    def test_ghz_noise_model_amplitude_damping(self):
+        """GHZ에서 amplitude_damping 모델 적용."""
+        from security.qkd_advanced_engine import (
+            GHZState, ghz_round, set_noise_model,
+        )
+        set_noise_model("amplitude_damping")
+        state = GHZState()
+        for _ in range(500):
+            ghz_round(state, eve_chance=0.5)
+        self.assertGreater(state.total_rounds, 0)
+        set_noise_model("depolarizing")  # restore
+
+    def test_en_ko_keys_match_round16(self):
+        """en.json과 ko.json 키 완전 일치."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        self.assertEqual(en_keys - ko_keys, set(),
+                         f"en에만: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(),
+                         f"ko에만: {ko_keys - en_keys}")
+
+
 if __name__ == "__main__":
     unittest.main()
