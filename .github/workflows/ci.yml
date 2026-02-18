@@ -31,7 +31,14 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           python -m pytest tests/ -v --tb=short --co -q 2>/dev/null || true
-          python -m pytest tests/ -v --tb=short -x
+          python -m pytest tests/ -v --tb=short -x --cov=. --cov-report=term-missing --cov-report=html:coverage_html
+
+      - name: Upload coverage report
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage_html/
 
       - name: Check imports
         run: |

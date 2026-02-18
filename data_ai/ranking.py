@@ -11,15 +11,7 @@ from tkinter import ttk, messagebox
 import requests
 
 from data_ai.ranking_server import start_server, get_base_url
-
-BG = "#1e1e2e"
-FG = "#cdd6f4"
-ACCENT = "#a6e3a1"
-GOLD = "#f9e2af"
-SILVER = "#bac2de"
-BRONZE = "#fab387"
-
-RANK_COLORS = {1: GOLD, 2: SILVER, 3: BRONZE}
+from theme import get_tk_theme, FONTS
 
 
 class RankingApp(tk.Toplevel):
@@ -27,8 +19,9 @@ class RankingApp(tk.Toplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
+        self._th = get_tk_theme()
         self.title("Global Qubit Survival Ranking")
-        self.configure(bg=BG)
+        self.configure(bg=self._th.BG)
         self.geometry("700x560")
         self.resizable(False, False)
 
@@ -45,102 +38,105 @@ class RankingApp(tk.Toplevel):
         self._refresh_ranking()
 
     def _build_ui(self):
+        th = self._th
+        RANK_COLORS = {1: th.GOLD, 2: th.SILVER, 3: th.BRONZE}
+
         # ── 타이틀 ───────────────────────────────────
         tk.Label(
-            self, text="Global Ranking", font=("Consolas", 18, "bold"),
-            bg=BG, fg=GOLD,
+            self, text="Global Ranking", font=FONTS.TITLE,
+            bg=th.BG, fg=th.GOLD,
         ).pack(pady=(14, 4))
         tk.Label(
-            self, text="Qubit Survival Time Leaderboard", font=("Consolas", 10),
-            bg=BG, fg=FG,
+            self, text="Qubit Survival Time Leaderboard", font=FONTS.BODY,
+            bg=th.BG, fg=th.TEXT,
         ).pack(pady=(0, 4))
 
         # 미션1: 서버 연결 상태 표시
         self.conn_var = tk.StringVar(value="Connecting...")
         self.conn_label = tk.Label(
-            self, textvariable=self.conn_var, font=("Consolas", 10, "bold"),
-            bg=BG, fg=FG,
+            self, textvariable=self.conn_var, font=FONTS.BODY_BOLD,
+            bg=th.BG, fg=th.TEXT,
         )
         self.conn_label.pack(pady=(0, 6))
 
         # ── 랭킹 보드 (상위 5위) ────────────────────
         board_frame = tk.LabelFrame(
-            self, text="  TOP 5  ", font=("Consolas", 12, "bold"),
-            bg=BG, fg=GOLD, padx=12, pady=8,
+            self, text="  TOP 5  ", font=FONTS.HEADING,
+            bg=th.BG, fg=th.GOLD, padx=12, pady=8,
         )
         board_frame.pack(fill=tk.X, padx=20, pady=(0, 8))
 
         self.rank_labels: list[tk.Label] = []
         for i in range(5):
-            color = RANK_COLORS.get(i + 1, FG)
+            color = RANK_COLORS.get(i + 1, th.TEXT)
             medal = {0: "1st", 1: "2nd", 2: "3rd"}.get(i, f"{i+1}th")
             lbl = tk.Label(
                 board_frame,
                 text=f"  {medal}   ---",
-                font=("Consolas", 13 if i < 3 else 11, "bold" if i < 3 else ""),
-                bg=BG, fg=color, anchor="w",
+                font=(FONTS.FAMILY, 13 if i < 3 else 11, "bold" if i < 3 else ""),
+                bg=th.BG, fg=color, anchor="w",
             )
             lbl.pack(fill=tk.X, pady=2)
             self.rank_labels.append(lbl)
 
         # ── 점수 등록 패널 ───────────────────────────
         submit_frame = tk.LabelFrame(
-            self, text="  Submit Score  ", font=("Consolas", 11, "bold"),
-            bg=BG, fg=ACCENT, padx=12, pady=10,
+            self, text="  Submit Score  ", font=FONTS.HEADING,
+            bg=th.BG, fg=th.ACCENT_GREEN, padx=12, pady=10,
         )
         submit_frame.pack(fill=tk.X, padx=20, pady=8)
 
-        row1 = tk.Frame(submit_frame, bg=BG)
+        row1 = tk.Frame(submit_frame, bg=th.BG)
         row1.pack(fill=tk.X, pady=2)
-        tk.Label(row1, text="Player Name:", font=("Consolas", 10), bg=BG, fg=FG, width=14, anchor="w").pack(side=tk.LEFT)
-        self.name_entry = tk.Entry(row1, font=("Consolas", 11), width=20)
+        tk.Label(row1, text="Player Name:", font=FONTS.BODY, bg=th.BG, fg=th.TEXT, width=14, anchor="w").pack(side=tk.LEFT)
+        self.name_entry = tk.Entry(row1, font=FONTS.MONO_11, width=20)
         self.name_entry.insert(0, "Player1")
         self.name_entry.pack(side=tk.LEFT, padx=4)
 
-        row2 = tk.Frame(submit_frame, bg=BG)
+        row2 = tk.Frame(submit_frame, bg=th.BG)
         row2.pack(fill=tk.X, pady=2)
-        tk.Label(row2, text="Survival (sec):", font=("Consolas", 10), bg=BG, fg=FG, width=14, anchor="w").pack(side=tk.LEFT)
-        self.score_entry = tk.Entry(row2, font=("Consolas", 11), width=20)
+        tk.Label(row2, text="Survival (sec):", font=FONTS.BODY, bg=th.BG, fg=th.TEXT, width=14, anchor="w").pack(side=tk.LEFT)
+        self.score_entry = tk.Entry(row2, font=FONTS.MONO_11, width=20)
         self.score_entry.insert(0, "0.0")
         self.score_entry.pack(side=tk.LEFT, padx=4)
 
-        row3 = tk.Frame(submit_frame, bg=BG)
+        row3 = tk.Frame(submit_frame, bg=th.BG)
         row3.pack(fill=tk.X, pady=2)
-        tk.Label(row3, text="Game Mode:", font=("Consolas", 10), bg=BG, fg=FG, width=14, anchor="w").pack(side=tk.LEFT)
+        tk.Label(row3, text="Game Mode:", font=FONTS.BODY, bg=th.BG, fg=th.TEXT, width=14, anchor="w").pack(side=tk.LEFT)
         self.mode_var = tk.StringVar(value="QEC Shield")
         modes = ["QEC Shield", "Entanglement Cascade", "Free Play"]
         ttk.Combobox(row3, textvariable=self.mode_var, values=modes, width=18, state="readonly").pack(side=tk.LEFT, padx=4)
 
-        btn_row = tk.Frame(submit_frame, bg=BG)
+        btn_row = tk.Frame(submit_frame, bg=th.BG)
         btn_row.pack(fill=tk.X, pady=(8, 0))
 
         tk.Button(
             btn_row, text="POST Score", command=self._submit_score,
-            font=("Consolas", 10, "bold"), width=14,
+            font=FONTS.BODY_BOLD, width=14,
         ).pack(side=tk.LEFT, padx=4)
 
         tk.Button(
             btn_row, text="GET Refresh", command=self._refresh_ranking,
-            font=("Consolas", 10), width=14,
+            font=FONTS.BODY, width=14,
         ).pack(side=tk.LEFT, padx=4)
 
         self.submit_status = tk.StringVar(value="")
         tk.Label(
-            btn_row, textvariable=self.submit_status, font=("Consolas", 9),
-            bg=BG, fg=ACCENT,
+            btn_row, textvariable=self.submit_status, font=FONTS.SMALL,
+            bg=th.BG, fg=th.ACCENT_GREEN,
         ).pack(side=tk.LEFT, padx=8)
 
         # 미션2: 점수 비교 결과 표시
         self.compare_var = tk.StringVar(value="")
         tk.Label(
-            submit_frame, textvariable=self.compare_var, font=("Consolas", 11, "bold"),
-            bg=BG, fg=GOLD, wraplength=620,
+            submit_frame, textvariable=self.compare_var, font=FONTS.MONO_11,
+            bg=th.BG, fg=th.GOLD, wraplength=620,
         ).pack(fill=tk.X, pady=(6, 0))
 
         # ── 전체 기록 테이블 ─────────────────────────
         log_frame = tk.LabelFrame(
-            self, text="  All Records  ", font=("Consolas", 11, "bold"),
-            bg=BG, fg=ACCENT, padx=8, pady=6,
+            self, text="  All Records  ", font=FONTS.HEADING,
+            bg=th.BG, fg=th.ACCENT_GREEN, padx=8, pady=6,
         )
         log_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(4, 14))
 
@@ -163,27 +159,27 @@ class RankingApp(tk.Toplevel):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # ── 하단 도구 버튼 ──────────────────────────────
-        tool_row = tk.Frame(self, bg=BG)
+        tool_row = tk.Frame(self, bg=th.BG)
         tool_row.pack(fill=tk.X, padx=20, pady=(0, 8))
 
         tk.Button(
             tool_row, text="Save Profile", command=self._save_profile,
-            font=("Consolas", 9), width=14,
+            font=FONTS.SMALL, width=14,
         ).pack(side=tk.LEFT, padx=4)
 
         tk.Button(
             tool_row, text="Load Profile", command=self._load_profile,
-            font=("Consolas", 9), width=14,
+            font=FONTS.SMALL, width=14,
         ).pack(side=tk.LEFT, padx=4)
 
         tk.Button(
             tool_row, text="Stats Dashboard", command=self._open_stats,
-            font=("Consolas", 9, "bold"), width=16, fg="#89b4fa",
+            font=(FONTS.FAMILY, 9, "bold"), width=16, fg=th.ACCENT_BLUE,
         ).pack(side=tk.LEFT, padx=4)
 
         tk.Button(
             tool_row, text="Achievements", command=self._open_achievements,
-            font=("Consolas", 9), width=14, fg="#f9e2af",
+            font=FONTS.SMALL, width=14, fg=th.GOLD,
         ).pack(side=tk.LEFT, padx=4)
 
     # ── 프로파일 관리 ─────────────────────────────────
@@ -208,16 +204,16 @@ class RankingApp(tk.Toplevel):
             messagebox.showinfo("Profile", "No saved profiles.", parent=self)
             return
 
-        # 간단한 선택 다이얼로그
+        th = self._th
         win = tk.Toplevel(self)
         win.title("Load Profile")
-        win.configure(bg=BG)
+        win.configure(bg=th.BG)
         win.geometry("300x200")
 
-        tk.Label(win, text="Select Profile:", font=("Consolas", 10, "bold"),
-                 bg=BG, fg=FG).pack(pady=8)
+        tk.Label(win, text="Select Profile:", font=FONTS.BODY_BOLD,
+                 bg=th.BG, fg=th.TEXT).pack(pady=8)
 
-        listbox = tk.Listbox(win, font=("Consolas", 10), height=5)
+        listbox = tk.Listbox(win, font=FONTS.BODY, height=5)
         for p in ranking_profiles:
             listbox.insert(tk.END, p)
         listbox.pack(fill=tk.X, padx=12)
@@ -235,7 +231,7 @@ class RankingApp(tk.Toplevel):
             win.destroy()
 
         tk.Button(win, text="Load", command=_apply,
-                  font=("Consolas", 10, "bold"), width=10).pack(pady=8)
+                  font=FONTS.BODY_BOLD, width=10).pack(pady=8)
 
     def _open_stats(self):
         """통계 대시보드 열기."""
@@ -252,21 +248,21 @@ class RankingApp(tk.Toplevel):
             unlocked, total = get_unlocked_count()
             achievements = get_all_achievements()
 
+            th = self._th
             win = tk.Toplevel(self)
             win.title(f"Achievements ({unlocked}/{total})")
-            win.configure(bg=BG)
+            win.configure(bg=th.BG)
             win.geometry("500x400")
 
             tk.Label(win, text=f"Achievements: {unlocked}/{total}",
-                     font=("Consolas", 14, "bold"), bg=BG, fg=GOLD).pack(pady=8)
+                     font=FONTS.HEADING, bg=th.BG, fg=th.GOLD).pack(pady=8)
 
-            text = tk.Text(win, bg="#181825", fg=FG, font=("Consolas", 10),
+            text = tk.Text(win, bg=th.SURFACE, fg=th.TEXT, font=FONTS.BODY,
                            state="normal", wrap="word", padx=8, pady=8)
             text.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 
             for ach in achievements:
                 status = "[*]" if ach["unlocked"] else "[ ]"
-                color = "#a6e3a1" if ach["unlocked"] else "#585b70"
                 text.insert(tk.END, f" {status} [{ach['icon']}] {ach['title']}\n")
                 text.insert(tk.END, f"      {ach['desc']}\n\n")
 
@@ -295,6 +291,7 @@ class RankingApp(tk.Toplevel):
             "mode": self.mode_var.get(),
         }
 
+        th = self._th
         # 미션1: try-except로 방어적 프로그래밍 (Defensive Programming)
         try:
             resp = requests.post(f"{self.base_url}/ranking", json=payload, timeout=5)
@@ -311,20 +308,21 @@ class RankingApp(tk.Toplevel):
             # 미션1: 인터넷 끊김 → 프로그램이 죽지 않고 안내 메시지 표시
             self.online = False
             self.conn_var.set("[OFFLINE] 인터넷 연결 실패! 오프라인 모드 가동")
-            self.conn_label.configure(fg="#f38ba8")
+            self.conn_label.configure(fg=th.RED)
             self.submit_status.set("전송 실패 -- 오프라인 모드 (점수 미등록)")
 
         self._refresh_ranking()
 
     def _refresh_ranking(self):
         """GET /ranking — 미션1: 오프라인 대비 방어적 프로그래밍."""
+        th = self._th
         # 상위 5위 (GET 요청)
         try:
             resp = requests.get(f"{self.base_url}/ranking", timeout=5)
             if resp.status_code == 200:
                 self.online = True
                 self.conn_var.set("[ONLINE] 서버 연결 성공")
-                self.conn_label.configure(fg="#a6e3a1")
+                self.conn_label.configure(fg=th.GREEN)
 
                 top5 = resp.json()
                 # 미션2: 1등 점수 저장 (비교용)
@@ -343,7 +341,7 @@ class RankingApp(tk.Toplevel):
             # 미션1: except 문이 작동하여 프로그램을 보호
             self.online = False
             self.conn_var.set("[OFFLINE] 인터넷 연결 실패! 오프라인 모드 가동")
-            self.conn_label.configure(fg="#f38ba8")
+            self.conn_label.configure(fg=th.RED)
 
         # 전체 기록 (GET 요청)
         try:

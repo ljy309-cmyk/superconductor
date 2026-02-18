@@ -15,12 +15,7 @@ from datetime import datetime
 
 import pandas as pd
 
-BG = "#1e1e2e"
-FG = "#cdd6f4"
-ACCENT = "#89b4fa"
-BIT_0_CLR = "#a6e3a1"
-BIT_1_CLR = "#f38ba8"
-KEY_CLR = "#f9e2af"
+from theme import get_tk_theme, FONTS
 
 # ── 미션3: QRNG 키 공유 저장소 (BB84 통합, 스레드 안전) ──
 import queue as _queue
@@ -98,8 +93,9 @@ class QRNGLoggerApp(tk.Toplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
+        self._th = get_tk_theme()
         self.title("QRNG — 양자 난수 생성 로그")
-        self.configure(bg=BG)
+        self.configure(bg=self._th.BG)
         self.geometry("820x620")
         self.resizable(False, False)
 
@@ -115,41 +111,42 @@ class QRNGLoggerApp(tk.Toplevel):
         self._build_ui()
 
     def _build_ui(self):
+        th = self._th
         # ── 상단: 큐비트 소스 표시 ───────────────────
         src_frame = tk.LabelFrame(
-            self, text="  Qubit Noise Sources  ", font=("Consolas", 10, "bold"),
-            bg=BG, fg=ACCENT, padx=8, pady=6,
+            self, text="  Qubit Noise Sources  ", font=FONTS.BODY_BOLD,
+            bg=th.BG, fg=th.ACCENT_BLUE, padx=8, pady=6,
         )
         src_frame.pack(fill=tk.X, padx=10, pady=(10, 4))
 
         self.source_labels: list[tk.Label] = []
-        row = tk.Frame(src_frame, bg=BG)
+        row = tk.Frame(src_frame, bg=th.BG)
         row.pack()
         for i in range(NOISE_SOURCES):
             lbl = tk.Label(
-                row, text=f"Q{i}: —", font=("Consolas", 9), bg=BG, fg=FG, width=18,
+                row, text=f"Q{i}: —", font=FONTS.SMALL, bg=th.BG, fg=th.TEXT, width=18,
             )
             lbl.pack(side=tk.LEFT, padx=4)
             self.source_labels.append(lbl)
 
         # ── 비트 스트림 표시 ─────────────────────────
         stream_frame = tk.LabelFrame(
-            self, text="  Bit Stream (Live)  ", font=("Consolas", 10, "bold"),
-            bg=BG, fg=ACCENT, padx=8, pady=6,
+            self, text="  Bit Stream (Live)  ", font=FONTS.BODY_BOLD,
+            bg=th.BG, fg=th.ACCENT_BLUE, padx=8, pady=6,
         )
         stream_frame.pack(fill=tk.X, padx=10, pady=4)
 
         self.stream_text = tk.Text(
-            stream_frame, height=5, width=96, font=("Consolas", 10),
-            bg="#181825", fg=FG, insertbackground=FG, state=tk.DISABLED,
+            stream_frame, height=5, width=96, font=FONTS.BODY,
+            bg=th.SURFACE, fg=th.TEXT, insertbackground=th.TEXT, state=tk.DISABLED,
             wrap=tk.WORD,
         )
         self.stream_text.pack()
-        self.stream_text.tag_configure("bit0", foreground=BIT_0_CLR)
-        self.stream_text.tag_configure("bit1", foreground=BIT_1_CLR)
+        self.stream_text.tag_configure("bit0", foreground=th.GREEN)
+        self.stream_text.tag_configure("bit1", foreground=th.RED)
 
         # 진행 바
-        prog_frame = tk.Frame(self, bg=BG)
+        prog_frame = tk.Frame(self, bg=th.BG)
         prog_frame.pack(fill=tk.X, padx=10, pady=2)
         self.progress_var = tk.IntVar(value=0)
         self.progress_bar = ttk.Progressbar(
@@ -157,41 +154,41 @@ class QRNGLoggerApp(tk.Toplevel):
         )
         self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.progress_label = tk.Label(
-            prog_frame, text=f"0 / {BITS_PER_KEY} bits", font=("Consolas", 9),
-            bg=BG, fg=FG,
+            prog_frame, text=f"0 / {BITS_PER_KEY} bits", font=FONTS.SMALL,
+            bg=th.BG, fg=th.TEXT,
         )
         self.progress_label.pack(side=tk.LEFT, padx=8)
 
         # ── 컨트롤 버튼 ─────────────────────────────
-        ctrl_frame = tk.Frame(self, bg=BG)
+        ctrl_frame = tk.Frame(self, bg=th.BG)
         ctrl_frame.pack(fill=tk.X, padx=10, pady=6)
 
         self.gen_btn = tk.Button(
             ctrl_frame, text="Generate Key", command=self._toggle_generate,
-            font=("Consolas", 10, "bold"), width=16,
+            font=FONTS.BODY_BOLD, width=16,
         )
         self.gen_btn.pack(side=tk.LEFT, padx=4)
 
         tk.Button(
             ctrl_frame, text="Save to Excel", command=self._save_excel,
-            font=("Consolas", 10), width=14,
+            font=FONTS.BODY, width=14,
         ).pack(side=tk.LEFT, padx=4)
 
         tk.Button(
             ctrl_frame, text="Clear All", command=self._clear_all,
-            font=("Consolas", 10), width=10,
+            font=FONTS.BODY, width=10,
         ).pack(side=tk.LEFT, padx=4)
 
         self.status_var = tk.StringVar(value="Ready")
         tk.Label(
-            ctrl_frame, textvariable=self.status_var, font=("Consolas", 10, "bold"),
-            bg=BG, fg=KEY_CLR,
+            ctrl_frame, textvariable=self.status_var, font=FONTS.BODY_BOLD,
+            bg=th.BG, fg=th.GOLD,
         ).pack(side=tk.RIGHT, padx=8)
 
         # ── 키 로그 테이블 ───────────────────────────
         log_frame = tk.LabelFrame(
-            self, text="  Generated Keys  ", font=("Consolas", 10, "bold"),
-            bg=BG, fg=ACCENT, padx=8, pady=6,
+            self, text="  Generated Keys  ", font=FONTS.BODY_BOLD,
+            bg=th.BG, fg=th.ACCENT_BLUE, padx=8, pady=6,
         )
         log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(4, 10))
 
@@ -234,6 +231,7 @@ class QRNGLoggerApp(tk.Toplevel):
         if not self.generating:
             return
 
+        th = self._th
         # 각 큐비트에서 1비트씩 추출 (라운드 로빈)
         bits_this_step = min(4, BITS_PER_KEY - len(self.bit_buffer))
         for _ in range(bits_this_step):
@@ -246,7 +244,7 @@ class QRNGLoggerApp(tk.Toplevel):
             bit_val, noise_val, digit_val = src.extract_bit_detail()
             self.source_labels[i].configure(
                 text=f"Q{i}: ×1M→d{digit_val}%2={bit_val}",
-                fg=BIT_0_CLR if bit_val == 0 else BIT_1_CLR,
+                fg=th.GREEN if bit_val == 0 else th.RED,
             )
 
         # 비트 스트림 업데이트

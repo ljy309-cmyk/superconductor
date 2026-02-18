@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 from logger import get_module_logger
+from theme import get_tk_theme
 
 _log = get_module_logger("report")
 
@@ -53,15 +54,17 @@ def generate_report(module_name: str, data: dict, output_dir: str | None = None)
     filename = f"report_{module_name}_{timestamp}.png"
     filepath = os.path.join(out_dir, filename)
 
+    th = get_tk_theme()
+
     # 보고서 레이아웃 생성
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5), facecolor="#1e1e2e")
-    fig.suptitle(f"Simulation Report — {title}", color="#cdd6f4", fontsize=14, fontweight="bold")
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), facecolor=th.BG)
+    fig.suptitle(f"Simulation Report — {title}", color=th.TEXT, fontsize=14, fontweight="bold")
 
     # 좌측: 데이터 요약 테이블
     ax_table = axes[0]
-    ax_table.set_facecolor("#181825")
+    ax_table.set_facecolor(th.SURFACE)
     ax_table.axis("off")
-    ax_table.set_title("Parameters & Results", color="#89b4fa", fontsize=11, pad=10)
+    ax_table.set_title("Parameters & Results", color=th.ACCENT_BLUE, fontsize=11, pad=10)
 
     # 테이블 데이터
     table_data = []
@@ -83,42 +86,43 @@ def generate_report(module_name: str, data: dict, output_dir: str | None = None)
         table.auto_set_font_size(False)
         table.set_fontsize(9)
         for cell in table.get_celld().values():
-            cell.set_facecolor("#2a2a3d")
-            cell.set_edgecolor("#585b70")
-            cell.set_text_props(color="#cdd6f4")
+            cell.set_facecolor(th.PANEL_BG)
+            cell.set_edgecolor(th.SUBTEXT)
+            cell.set_text_props(color=th.TEXT)
 
     # 우측: 핵심 지표 바 차트
     ax_bar = axes[1]
-    ax_bar.set_facecolor("#181825")
-    ax_bar.set_title("Key Metrics", color="#89b4fa", fontsize=11, pad=10)
+    ax_bar.set_facecolor(th.SURFACE)
+    ax_bar.set_title("Key Metrics", color=th.ACCENT_BLUE, fontsize=11, pad=10)
 
     numeric_items = {k: v for k, v in data.items() if isinstance(v, (int, float)) and not isinstance(v, bool)}
     if numeric_items:
         labels = list(numeric_items.keys())[:8]
         values = [numeric_items[k] for k in labels]
-        colors = ["#89b4fa", "#a6e3a1", "#f9e2af", "#cba6f7", "#f38ba8", "#fab387", "#74c7ec", "#94e2d5"]
+        colors = [th.ACCENT_BLUE, th.ACCENT_GREEN, th.ACCENT_YELLOW, th.ACCENT_PURPLE,
+                  th.RED, th.ACCENT_PEACH, th.ACCENT_BLUE, th.ACCENT_GREEN]
         bars = ax_bar.barh(labels, values, color=colors[:len(labels)])
-        ax_bar.tick_params(colors="#cdd6f4", labelsize=8)
+        ax_bar.tick_params(colors=th.TEXT, labelsize=8)
         for spine in ax_bar.spines.values():
-            spine.set_color("#585b70")
+            spine.set_color(th.SUBTEXT)
 
         # 값 레이블
         for bar, val in zip(bars, values):
             ax_bar.text(
                 bar.get_width(), bar.get_y() + bar.get_height() / 2,
                 f" {val:.1f}" if isinstance(val, float) else f" {val}",
-                va="center", color="#cdd6f4", fontsize=8,
+                va="center", color=th.TEXT, fontsize=8,
             )
     else:
         ax_bar.text(0.5, 0.5, "No numeric data", transform=ax_bar.transAxes,
-                    ha="center", va="center", color="#585b70", fontsize=12)
+                    ha="center", va="center", color=th.SUBTEXT, fontsize=12)
 
     # 타임스탬프
     fig.text(0.5, 0.02, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-             ha="center", color="#585b70", fontsize=8)
+             ha="center", color=th.SUBTEXT, fontsize=8)
 
     fig.tight_layout(rect=[0, 0.05, 1, 0.93])
-    fig.savefig(filepath, dpi=150, facecolor="#1e1e2e", bbox_inches="tight")
+    fig.savefig(filepath, dpi=150, facecolor=th.BG, bbox_inches="tight")
     plt.close(fig)
 
     _log.info("보고서 생성: %s", filepath)

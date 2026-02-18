@@ -78,6 +78,9 @@ class PlayLogger:
                 _log.error("기록 로드 실패: %s", e)
                 self.records = []
 
+    # 허용된 모듈 이름 (알려진 게임 모듈만 기록)
+    ALLOWED_MODULES = set(FIELDS.keys()) | {"phase_transition_sim"}
+
     def log_session(self, module_name: str, data: dict):
         """게임 세션 데이터 기록 (스레드 안전).
 
@@ -85,6 +88,10 @@ class PlayLogger:
             module_name: 모듈 이름 (예: "qubit_chain", "bb84_defense")
             data: 기록할 데이터 딕셔너리
         """
+        if module_name not in self.ALLOWED_MODULES:
+            _log.warning("알 수 없는 모듈 이름: %r (기록 거부)", module_name)
+            return None
+
         record = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "module": module_name,

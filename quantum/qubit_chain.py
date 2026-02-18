@@ -528,8 +528,8 @@ def run_simulation():
                             "shield_uses": qec_uses,
                         })
                         toast.show_many(new_ach)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        _log.debug("인게임 업적 표시 실패: %s", e)
 
         if all_collapsed:
             over_surf = title_font.render(

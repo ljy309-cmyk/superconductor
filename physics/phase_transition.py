@@ -9,6 +9,8 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+from theme import get_tk_theme, FONTS
+
 # ── 물질별 임계 온도 (°C) ────────────────────────────────
 MATERIALS = {
     "YBCO (Tc=77K)": -196.0,            # 77 K
@@ -57,6 +59,7 @@ class PhaseTransitionWindow(tk.Toplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
+        self._th = get_tk_theme()
         self.title("상전이 시각화 — 온도 vs 저항")
         self.geometry("780x600")
         self.resizable(False, False)
@@ -71,19 +74,20 @@ class PhaseTransitionWindow(tk.Toplevel):
     # ── UI 구성 ──────────────────────────────────────────
 
     def _build_ui(self):
+        th = self._th
         # matplotlib Figure
-        self._fig = Figure(figsize=(7.4, 4.2), dpi=100, facecolor="#1e1e2e")
+        self._fig = Figure(figsize=(7.4, 4.2), dpi=100, facecolor=th.BG)
         self._ax = self._fig.add_subplot(111)
         self._canvas = FigureCanvasTkAgg(self._fig, master=self)
         self._canvas.get_tk_widget().pack(fill="both", expand=True, padx=8, pady=(8, 0))
 
         # ── 상단 컨트롤: 물질 선택 + 노이즈 토글 ──
-        ctrl = tk.Frame(self, bg="#1e1e2e")
+        ctrl = tk.Frame(self, bg=th.BG)
         ctrl.pack(fill="x", padx=8, pady=4)
 
         tk.Label(
-            ctrl, text="물질:", font=("Consolas", 10, "bold"),
-            bg="#1e1e2e", fg="#cdd6f4",
+            ctrl, text="물질:", font=FONTS.BODY_BOLD,
+            bg=th.BG, fg=th.TEXT,
         ).pack(side="left")
 
         self._material_var = tk.StringVar(value=DEFAULT_MATERIAL)
@@ -99,19 +103,19 @@ class PhaseTransitionWindow(tk.Toplevel):
         noise_cb = tk.Checkbutton(
             ctrl, text="노이즈 추가", variable=self._noise_var,
             command=self._on_noise_toggle,
-            bg="#1e1e2e", fg="#cdd6f4", selectcolor="#45475a",
-            activebackground="#1e1e2e", activeforeground="#cdd6f4",
-            font=("Consolas", 10, "bold"),
+            bg=th.BG, fg=th.TEXT, selectcolor=th.OVERLAY,
+            activebackground=th.BG, activeforeground=th.TEXT,
+            font=FONTS.BODY_BOLD,
         )
         noise_cb.pack(side="left", padx=(0, 12))
 
         # ── 온도 슬라이더 ──
-        slider_frame = tk.Frame(self, bg="#1e1e2e")
+        slider_frame = tk.Frame(self, bg=th.BG)
         slider_frame.pack(fill="x", padx=8, pady=(0, 8))
 
         tk.Label(
-            slider_frame, text="온도 (°C):", font=("Consolas", 10, "bold"),
-            bg="#1e1e2e", fg="#cdd6f4",
+            slider_frame, text="온도 (°C):", font=FONTS.BODY_BOLD,
+            bg=th.BG, fg=th.TEXT,
         ).pack(side="left")
 
         self._slider = tk.Scale(
@@ -120,10 +124,10 @@ class PhaseTransitionWindow(tk.Toplevel):
             orient="horizontal",
             resolution=0.5,
             length=550,
-            bg="#1e1e2e", fg="#cdd6f4",
-            troughcolor="#45475a",
+            bg=th.BG, fg=th.TEXT,
+            troughcolor=th.OVERLAY,
             highlightthickness=0,
-            font=("Consolas", 9),
+            font=FONTS.SMALL,
             command=self._on_slider,
         )
         self._slider.set(self._current_temp)
@@ -132,36 +136,37 @@ class PhaseTransitionWindow(tk.Toplevel):
     # ── 그래프 렌더링 ────────────────────────────────────
 
     def _draw_graph(self):
+        th = self._th
         ax = self._ax
         ax.clear()
 
         # 스타일
-        ax.set_facecolor("#181825")
+        ax.set_facecolor(th.SURFACE)
         for spine in ax.spines.values():
-            spine.set_color("#585b70")
-        ax.tick_params(colors="#cdd6f4", labelsize=8)
-        ax.set_xlabel("Temperature (°C)", color="#cdd6f4", fontsize=10)
-        ax.set_ylabel("Resistance (a.u.)", color="#cdd6f4", fontsize=10)
+            spine.set_color(th.SUBTEXT)
+        ax.tick_params(colors=th.TEXT, labelsize=8)
+        ax.set_xlabel("Temperature (°C)", color=th.TEXT, fontsize=10)
+        ax.set_ylabel("Resistance (a.u.)", color=th.TEXT, fontsize=10)
         ax.set_title(
             "Superconducting Phase Transition",
-            color="#89b4fa", fontsize=12, fontweight="bold",
+            color=th.ACCENT_BLUE, fontsize=12, fontweight="bold",
         )
 
         # 전체 곡선
         t = np.linspace(T_RANGE[0], T_RANGE[1], 1000)
         r = resistance(t, self._tc, noise=self._noise)
-        ax.plot(t, r, color="#89b4fa", linewidth=2, label="R(T)")
+        ax.plot(t, r, color=th.ACCENT_BLUE, linewidth=2, label="R(T)")
 
         # T_c 수직선 (켈빈 병기)
         tc_k = _celsius_to_kelvin(self._tc)
         ax.axvline(
-            x=self._tc, color="#f38ba8", linestyle="--", linewidth=1,
+            x=self._tc, color=th.RED, linestyle="--", linewidth=1,
             alpha=0.7, label=f"Tc = {self._tc:.1f}°C ({tc_k:.1f}K)",
         )
 
         # 현재 온도 마커 (켈빈 병기)
         cur_r = resistance(np.array([self._current_temp]), self._tc)[0]
-        marker_color = "#a6e3a1" if self._current_temp <= self._tc else "#f9e2af"
+        marker_color = th.GREEN if self._current_temp <= self._tc else th.YELLOW
         cur_k = _celsius_to_kelvin(self._current_temp)
         ax.plot(self._current_temp, cur_r, "o", color=marker_color, markersize=10, zorder=5)
         ax.annotate(
@@ -171,12 +176,12 @@ class PhaseTransitionWindow(tk.Toplevel):
         )
 
         # 초전도 / 정상 영역 배경
-        ax.axvspan(T_RANGE[0], self._tc, alpha=0.08, color="#a6e3a1", label="초전도 영역")
-        ax.axvspan(self._tc, T_RANGE[1], alpha=0.08, color="#f38ba8", label="정상 영역")
+        ax.axvspan(T_RANGE[0], self._tc, alpha=0.08, color=th.GREEN, label="초전도 영역")
+        ax.axvspan(self._tc, T_RANGE[1], alpha=0.08, color=th.RED, label="정상 영역")
 
         ax.legend(
             loc="upper left", fontsize=8,
-            facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4",
+            facecolor=th.PANEL_BG, edgecolor=th.SUBTEXT, labelcolor=th.TEXT,
         )
 
         # ★ X축 반전: 오른쪽(고온 50°C) → 왼쪽(저온 -275°C)  냉각 방향
@@ -185,8 +190,8 @@ class PhaseTransitionWindow(tk.Toplevel):
 
         # ★ 상단에 켈빈 보조 축 표시
         ax2 = ax.secondary_xaxis("top", functions=(_celsius_to_kelvin, _kelvin_to_celsius))
-        ax2.set_xlabel("Temperature (K)", color="#cdd6f4", fontsize=9)
-        ax2.tick_params(colors="#cdd6f4", labelsize=8)
+        ax2.set_xlabel("Temperature (K)", color=th.TEXT, fontsize=9)
+        ax2.tick_params(colors=th.TEXT, labelsize=8)
 
         self._fig.tight_layout()
         self._canvas.draw()

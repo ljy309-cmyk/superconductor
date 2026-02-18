@@ -21,8 +21,10 @@ except ImportError:
     pygame = None  # type: ignore[assignment]
 
 import json
+import logging
 import os
 
+_log = logging.getLogger("superconductor.tutorial")
 _SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tutorial_state.json")
 
 # 모듈별 튜토리얼 스텝
@@ -80,8 +82,8 @@ def _load_seen() -> set[str]:
         try:
             with open(_SAVE_PATH, "r") as f:
                 return set(json.load(f))
-        except Exception:
-            pass
+        except Exception as e:
+            _log.warning("튜토리얼 상태 로드 실패: %s", e)
     return set()
 
 
@@ -89,8 +91,8 @@ def _save_seen(seen: set[str]):
     try:
         with open(_SAVE_PATH, "w") as f:
             json.dump(sorted(seen), f)
-    except OSError:
-        pass
+    except OSError as e:
+        _log.warning("튜토리얼 상태 저장 실패: %s", e)
 
 
 class TutorialOverlay:

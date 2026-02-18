@@ -11,6 +11,7 @@ Tc 이하에서 쿠퍼쌍(Cooper pair)이 형성되며 저항이 0으로 떨어�
     ESC: 종료
 """
 
+import logging
 import math
 import random
 import sys
@@ -278,8 +279,8 @@ def run_simulation():
             "play_time": play_time,
             "final_temp": round(temperature, 1),
         })
-    except Exception:
-        pass
+    except Exception as e:
+        logging.getLogger("superconductor.phase_transition_sim").debug("세션 기록 실패: %s", e)
 
     recorder.save({"play_time": play_time})
     snd.quit()

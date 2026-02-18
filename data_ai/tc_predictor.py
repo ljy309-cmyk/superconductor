@@ -22,10 +22,7 @@ from sklearn.metrics import r2_score, mean_absolute_error
 
 from config_loader import cfg
 from data_ai.generate_sample_data import generate as generate_data
-
-BG = "#1e1e2e"
-FG = "#cdd6f4"
-ACCENT = "#a6e3a1"
+from theme import get_tk_theme, FONTS
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.xlsx")
 CSV_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.csv")
@@ -39,8 +36,9 @@ class TcPredictorApp(tk.Toplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
+        self._th = get_tk_theme()
         self.title("AI 신소재 Tc 예측")
-        self.configure(bg=BG)
+        self.configure(bg=self._th.BG)
         self.geometry("1050x720")
         self.resizable(False, False)
 
@@ -85,17 +83,18 @@ class TcPredictorApp(tk.Toplevel):
     # ── UI 구성 ──────────────────────────────────────
 
     def _build_ui(self):
+        th = self._th
         # 상단: 차트 영역
-        chart_frame = tk.Frame(self, bg=BG)
+        chart_frame = tk.Frame(self, bg=th.BG)
         chart_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=(10, 0))
 
-        self.fig = Figure(figsize=(10, 4.2), dpi=100, facecolor="#1e1e2e")
+        self.fig = Figure(figsize=(10, 4.2), dpi=100, facecolor=th.BG)
         self.canvas = FigureCanvasTkAgg(self.fig, chart_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         self._draw_scatter_plots()
 
         # 하단: 입력 + 예측
-        bottom = tk.Frame(self, bg=BG)
+        bottom = tk.Frame(self, bg=th.BG)
         bottom.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
 
         self._build_input_panel(bottom)
@@ -103,34 +102,37 @@ class TcPredictorApp(tk.Toplevel):
 
     def _draw_scatter_plots(self):
         """멀티 서브플롯 산점도."""
+        th = self._th
         self.fig.clear()
 
-        colors = ["#89b4fa", "#cba6f7", "#f9e2af", "#a6e3a1", "#f38ba8", "#74c7ec"]
+        colors = [th.ACCENT_BLUE, th.ACCENT_PURPLE, th.ACCENT_YELLOW,
+                  th.ACCENT_GREEN, th.RED, th.ACCENT_BLUE]
         titles = ["Density", "Atomic Mass", "e- Affinity", "Thermal K", "Valence", "Electroneg."]
 
         for i, (feat, color, title) in enumerate(zip(FEATURES, colors, titles)):
             ax = self.fig.add_subplot(1, 6, i + 1)
-            ax.set_facecolor("#181825")
+            ax.set_facecolor(th.SURFACE)
             ax.scatter(
                 self.df[feat], self.df[TARGET],
                 c=color, s=8, alpha=0.6, edgecolors="none",
             )
-            ax.set_xlabel(title, fontsize=8, color="#cdd6f4")
+            ax.set_xlabel(title, fontsize=8, color=th.TEXT)
             if i == 0:
-                ax.set_ylabel("Tc (K)", fontsize=8, color="#cdd6f4")
-            ax.tick_params(colors="#6c7086", labelsize=6)
+                ax.set_ylabel("Tc (K)", fontsize=8, color=th.TEXT)
+            ax.tick_params(colors=th.SUBTEXT, labelsize=6)
             for spine in ax.spines.values():
-                spine.set_color("#45475a")
+                spine.set_color(th.OVERLAY)
 
-        self.fig.suptitle("Feature vs Critical Temperature (Tc)", color="#cdd6f4", fontsize=11)
+        self.fig.suptitle("Feature vs Critical Temperature (Tc)", color=th.TEXT, fontsize=11)
         self.fig.tight_layout(rect=[0, 0, 1, 0.93])
         self.canvas.draw()
 
     def _build_input_panel(self, parent):
         """성분비 입력 패널."""
+        th = self._th
         input_frame = tk.LabelFrame(
-            parent, text="  New Material — Predict Tc  ", font=("Consolas", 11, "bold"),
-            bg=BG, fg=ACCENT, padx=12, pady=8,
+            parent, text="  New Material — Predict Tc  ", font=FONTS.HEADING,
+            bg=th.BG, fg=th.ACCENT_GREEN, padx=12, pady=8,
         )
         input_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
 
@@ -139,35 +141,36 @@ class TcPredictorApp(tk.Toplevel):
                      "thermal_conductivity": "50.0", "valence": "3", "electronegativity": "1.8"}
 
         for feat in FEATURES:
-            row = tk.Frame(input_frame, bg=BG)
+            row = tk.Frame(input_frame, bg=th.BG)
             row.pack(fill=tk.X, pady=2)
             lbl = tk.Label(row, text=f"{feat}:", width=22, anchor="w",
-                           font=("Consolas", 9), bg=BG, fg=FG)
+                           font=FONTS.SMALL, bg=th.BG, fg=th.TEXT)
             lbl.pack(side=tk.LEFT)
-            entry = tk.Entry(row, width=10, font=("Consolas", 10))
+            entry = tk.Entry(row, width=10, font=FONTS.BODY)
             entry.insert(0, defaults.get(feat, "0"))
             entry.pack(side=tk.LEFT, padx=4)
             self.entries[feat] = entry
 
-        btn_frame = tk.Frame(input_frame, bg=BG)
+        btn_frame = tk.Frame(input_frame, bg=th.BG)
         btn_frame.pack(fill=tk.X, pady=(8, 0))
 
         tk.Button(
             btn_frame, text="Predict Tc", command=self._predict,
-            font=("Consolas", 10, "bold"), width=14,
+            font=FONTS.BODY_BOLD, width=14,
         ).pack(side=tk.LEFT)
 
         self.result_var = tk.StringVar(value="—")
         tk.Label(
-            btn_frame, textvariable=self.result_var, font=("Consolas", 12, "bold"),
-            bg=BG, fg=ACCENT,
+            btn_frame, textvariable=self.result_var, font=FONTS.MONO_12,
+            bg=th.BG, fg=th.ACCENT_GREEN,
         ).pack(side=tk.LEFT, padx=12)
 
     def _build_info_panel(self, parent):
         """모델 성능 정보."""
+        th = self._th
         info = tk.LabelFrame(
-            parent, text="  Model Performance  ", font=("Consolas", 11, "bold"),
-            bg=BG, fg="#89b4fa", padx=12, pady=8,
+            parent, text="  Model Performance  ", font=FONTS.HEADING,
+            bg=th.BG, fg=th.ACCENT_BLUE, padx=12, pady=8,
         )
         info.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -180,24 +183,25 @@ class TcPredictorApp(tk.Toplevel):
             f"Target:      critical_temp (Tc, K)",
         ]
         for line in lines:
-            tk.Label(info, text=line, font=("Consolas", 9), bg=BG, fg=FG, anchor="w").pack(
+            tk.Label(info, text=line, font=FONTS.SMALL, bg=th.BG, fg=th.TEXT, anchor="w").pack(
                 fill=tk.X, pady=1,
             )
 
         # Feature importance
         importances = self.model.feature_importances_
-        tk.Label(info, text="", bg=BG).pack()
-        tk.Label(info, text="Feature Importance:", font=("Consolas", 9, "bold"),
-                 bg=BG, fg="#f9e2af", anchor="w").pack(fill=tk.X)
+        tk.Label(info, text="", bg=th.BG).pack()
+        tk.Label(info, text="Feature Importance:", font=(FONTS.FAMILY, 9, "bold"),
+                 bg=th.BG, fg=th.GOLD, anchor="w").pack(fill=tk.X)
         for feat, imp in sorted(zip(FEATURES, importances), key=lambda x: -x[1]):
             bar_len = int(imp * 30)
             bar = "█" * bar_len + "░" * (30 - bar_len)
             tk.Label(info, text=f"  {feat:24s} {bar} {imp:.3f}",
-                     font=("Consolas", 8), bg=BG, fg=FG, anchor="w").pack(fill=tk.X)
+                     font=FONTS.TINY, bg=th.BG, fg=th.TEXT, anchor="w").pack(fill=tk.X)
 
     # ── 예측 ─────────────────────────────────────────
 
     def _predict(self):
+        th = self._th
         try:
             values = [float(self.entries[f].get()) for f in FEATURES]
         except (ValueError, TypeError):
@@ -221,8 +225,8 @@ class TcPredictorApp(tk.Toplevel):
         self._draw_scatter_plots()
         axes = self.fig.get_axes()
         for i, ax in enumerate(axes):
-            ax.axhline(y=tc_pred, color="#f38ba8", linewidth=0.8, linestyle="--", alpha=0.6)
-            ax.scatter([values[i]], [tc_pred], c="#f38ba8", s=60, marker="*", zorder=5)
+            ax.axhline(y=tc_pred, color=th.RED, linewidth=0.8, linestyle="--", alpha=0.6)
+            ax.scatter([values[i]], [tc_pred], c=th.RED, s=60, marker="*", zorder=5)
         self.canvas.draw()
 
 

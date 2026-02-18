@@ -63,7 +63,7 @@ class StatsDashboard(tk.Toplevel):
             from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
             from matplotlib.figure import Figure
 
-            self._fig = Figure(figsize=(5, 5), dpi=90, facecolor="#1e1e2e")
+            self._fig = Figure(figsize=(5, 5), dpi=90, facecolor=TK.BG)
             self._canvas = FigureCanvasTkAgg(self._fig, master=right)
             self._canvas.get_tk_widget().pack(fill="both", expand=True)
             self._has_matplotlib = True
@@ -93,6 +93,11 @@ class StatsDashboard(tk.Toplevel):
 
         tk.Button(
             ctrl_frame, text="Refresh", command=self._load_data,
+            font=FONTS.BUTTON, width=12,
+        ).pack(side="left", padx=4)
+
+        tk.Button(
+            ctrl_frame, text="Export PNG", command=self._export_png,
             font=FONTS.BUTTON, width=12,
         ).pack(side="left", padx=4)
 
@@ -172,47 +177,48 @@ class StatsDashboard(tk.Toplevel):
 
         # 상단: 모듈별 플레이 횟수 바 차트
         ax1 = self._fig.add_subplot(211)
-        ax1.set_facecolor("#181825")
+        ax1.set_facecolor(TK.SURFACE)
         for spine in ax1.spines.values():
-            spine.set_color("#585b70")
-        ax1.tick_params(colors="#cdd6f4", labelsize=7)
+            spine.set_color(TK.SUBTEXT)
+        ax1.tick_params(colors=TK.TEXT, labelsize=7)
 
         modules = list(per_module.keys())
         counts = list(per_module.values())
-        colors = ["#89b4fa", "#a6e3a1", "#f9e2af", "#cba6f7", "#f38ba8", "#fab387", "#74c7ec"]
+        colors = [TK.ACCENT_BLUE, TK.ACCENT_GREEN, TK.ACCENT_YELLOW,
+                  TK.ACCENT_PURPLE, TK.RED, TK.ACCENT_PEACH, TK.ACCENT_BLUE]
 
         ax1.barh(modules, counts, color=colors[:len(modules)])
-        ax1.set_title("Sessions per Module", color="#89b4fa", fontsize=10, fontweight="bold")
+        ax1.set_title("Sessions per Module", color=TK.ACCENT_BLUE, fontsize=10, fontweight="bold")
 
         for i, v in enumerate(counts):
-            ax1.text(v + 0.1, i, str(v), va="center", color="#cdd6f4", fontsize=8)
+            ax1.text(v + 0.1, i, str(v), va="center", color=TK.TEXT, fontsize=8)
 
         # 하단: 생존 시간 추이 (qubit_chain 또는 qec_shield)
         ax2 = self._fig.add_subplot(212)
-        ax2.set_facecolor("#181825")
+        ax2.set_facecolor(TK.SURFACE)
         for spine in ax2.spines.values():
-            spine.set_color("#585b70")
-        ax2.tick_params(colors="#cdd6f4", labelsize=7)
-        ax2.set_title("Survival Time Trend", color="#a6e3a1", fontsize=10, fontweight="bold")
+            spine.set_color(TK.SUBTEXT)
+        ax2.tick_params(colors=TK.TEXT, labelsize=7)
+        ax2.set_title("Survival Time Trend", color=TK.ACCENT_GREEN, fontsize=10, fontweight="bold")
 
         try:
             from data_ai.play_logger import get_logger
             import pandas as pd
             records = get_logger().records
             df = pd.DataFrame(records)
-            for mod_name, color in [("qubit_chain", "#89b4fa"), ("qec_shield", "#cba6f7")]:
+            for mod_name, color in [("qubit_chain", TK.ACCENT_BLUE), ("qec_shield", TK.ACCENT_PURPLE)]:
                 mod_df = df[df["module"] == mod_name]
                 if "survival_time" in mod_df.columns and not mod_df.empty:
                     times = pd.to_numeric(mod_df["survival_time"], errors="coerce").dropna().tolist()
                     if times:
                         ax2.plot(range(len(times)), times, color=color, linewidth=1.5,
                                  label=mod_name, marker="o", markersize=3)
-            ax2.legend(fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
-            ax2.set_xlabel("Session #", color="#cdd6f4", fontsize=8)
-            ax2.set_ylabel("Time (s)", color="#cdd6f4", fontsize=8)
+            ax2.legend(fontsize=7, facecolor=TK.PANEL_BG, edgecolor=TK.SUBTEXT, labelcolor=TK.TEXT)
+            ax2.set_xlabel("Session #", color=TK.TEXT, fontsize=8)
+            ax2.set_ylabel("Time (s)", color=TK.TEXT, fontsize=8)
         except Exception:
             ax2.text(0.5, 0.5, "No survival data", transform=ax2.transAxes,
-                     ha="center", va="center", color="#585b70", fontsize=11)
+                     ha="center", va="center", color=TK.SUBTEXT, fontsize=11)
 
         self._fig.tight_layout()
         self._canvas.draw()
@@ -238,6 +244,28 @@ class StatsDashboard(tk.Toplevel):
 
         self._ach_text.configure(state="disabled")
 
+
+    def _export_png(self):
+        """차트를 PNG 이미지로 내보내기."""
+        if not self._has_matplotlib:
+            from tkinter import messagebox
+            messagebox.showwarning("Export", "matplotlib가 없어 차트를 내보낼 수 없습니다.", parent=self)
+            return
+        import os
+        out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reports")
+        os.makedirs(out_dir, exist_ok=True)
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath = os.path.join(out_dir, f"stats_chart_{timestamp}.png")
+        try:
+            self._fig.savefig(filepath, dpi=150, facecolor=TK.BG, bbox_inches="tight")
+            from tkinter import messagebox
+            messagebox.showinfo("Export", f"차트 저장 완료:\n{filepath}", parent=self)
+            _log.info("차트 내보내기: %s", filepath)
+        except Exception as e:
+            _log.error("차트 내보내기 실패: %s", e)
+            from tkinter import messagebox
+            messagebox.showerror("Export", f"내보내기 실패: {e}", parent=self)
 
     def _toggle_auto_refresh(self):
         """자동 새로고침 ON/OFF."""

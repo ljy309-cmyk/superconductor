@@ -142,5 +142,33 @@
   "comparison_hint": "C: 비교 모드 | 같은 설정으로 QEC ON/OFF 비교",
 
   "theme_dark": "Dark",
-  "theme_light": "Light"
+  "theme_light": "Light",
+  "theme_colorblind": "Colorblind",
+
+  "stats_title": "플레이 통계 대시보드",
+  "stats_summary": " 요약 ",
+  "stats_charts": " 차트 ",
+  "stats_achievements": " 업적 ",
+  "stats_refresh": "새로고침",
+  "stats_auto_refresh": "자동 (10s)",
+  "stats_export_png": "PNG 내보내기",
+  "stats_no_matplotlib": "matplotlib 미설치\n차트를 표시할 수 없습니다.",
+
+  "replay_title": "리플레이 뷰어",
+  "replay_open_file": "파일 열기",
+  "replay_play": "재생",
+  "replay_pause": "일시정지",
+
+  "qrng_title": "QRNG — 양자 난수 생성 로그",
+  "qrng_sources": "  Qubit Noise Sources  ",
+  "qrng_stream": "  Bit Stream (Live)  ",
+  "qrng_generate": "Generate Key",
+  "qrng_save_excel": "Save to Excel",
+  "qrng_clear": "Clear All",
+  "qrng_keys": "  Generated Keys  ",
+
+  "tc_title": "AI 신소재 Tc 예측",
+  "tc_predict": "Predict Tc",
+  "tc_model_perf": "  Model Performance  ",
+  "tc_new_material": "  New Material — Predict Tc  "
 }

@@ -20,6 +20,9 @@ DATA_PATH = os.path.join(os.path.dirname(__file__), "ranking_data.json")
 HOST = cfg("server", "host", "127.0.0.1")
 PORT = cfg("server", "port", 18084)
 TOP_N = cfg("server", "top_n", 5)
+MAX_PAYLOAD = cfg("ranking", "max_payload_bytes", 10_000)
+NAME_MAX_LEN = cfg("ranking", "name_max_length", 50)
+SCORE_MAX = cfg("ranking", "score_max", 999999)
 
 
 def _load_data() -> list[dict]:
@@ -68,7 +71,7 @@ class RankingHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/ranking":
             length = int(self.headers.get("Content-Length", 0))
-            if length > 10_000:  # 최대 10KB
+            if length > MAX_PAYLOAD:
                 self._set_json_headers(413)
                 self.wfile.write(json.dumps({"error": "Payload too large"}).encode())
                 return
@@ -81,7 +84,7 @@ class RankingHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
                 return
 
-            name = str(data.get("name", "Anonymous"))[:50]  # 최대 50자
+            name = str(data.get("name", "Anonymous"))[:NAME_MAX_LEN]
             score = data.get("score", 0)
             mode = str(data.get("mode", "unknown"))[:30]
 
@@ -90,7 +93,7 @@ class RankingHandler(BaseHTTPRequestHandler):
                 self._set_json_headers(400)
                 self.wfile.write(json.dumps({"error": "score must be a number"}).encode())
                 return
-            score = max(0.0, min(float(score), 999999.0))  # 0 ~ 999999
+            score = max(0.0, min(float(score), float(SCORE_MAX)))
 
             record = {
                 "name": name,

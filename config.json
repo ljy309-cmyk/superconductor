@@ -109,5 +109,20 @@
     "warning_threshold": 0.10,
     "decoy_chance": 0.15,
     "decoy_error_mult": 2.0
+  },
+  "dashboard": {
+    "max_history": 100,
+    "update_interval_ms": 500,
+    "auto_refresh_interval_ms": 10000
+  },
+  "ranking": {
+    "max_payload_bytes": 10000,
+    "name_max_length": 50,
+    "score_max": 999999
+  },
+  "replay": {
+    "default_speed": 1.0,
+    "max_speed": 4.0,
+    "min_speed": 0.25
   }
 }

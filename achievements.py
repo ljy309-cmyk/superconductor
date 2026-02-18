@@ -93,8 +93,8 @@ def _load_unlocked() -> set[str]:
         try:
             with open(_SAVE_PATH, "r", encoding="utf-8") as f:
                 return set(json.load(f))
-        except Exception:
-            pass
+        except Exception as e:
+            _log.warning("업적 로드 실패: %s", e)
     return set()
 
 
@@ -122,8 +122,8 @@ def check_achievements(module_name: str, data: dict) -> list[dict]:
                 unlocked.add(ach["id"])
                 new_achievements.append(ach)
                 _log.info("업적 해금: %s — %s", ach["id"], ach["title"])
-        except Exception:
-            pass
+        except Exception as e:
+            _log.debug("업적 조건 평가 실패 (%s): %s", ach["id"], e)
 
     if new_achievements:
         _save_unlocked(unlocked)

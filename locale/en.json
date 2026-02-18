@@ -142,5 +142,33 @@
   "comparison_hint": "C: Comparison Mode | Compare QEC ON/OFF with same settings",
 
   "theme_dark": "Dark",
-  "theme_light": "Light"
+  "theme_light": "Light",
+  "theme_colorblind": "Colorblind",
+
+  "stats_title": "Play Statistics Dashboard",
+  "stats_summary": " Summary ",
+  "stats_charts": " Charts ",
+  "stats_achievements": " Achievements ",
+  "stats_refresh": "Refresh",
+  "stats_auto_refresh": "Auto (10s)",
+  "stats_export_png": "Export PNG",
+  "stats_no_matplotlib": "matplotlib not installed.\nCannot display charts.",
+
+  "replay_title": "Replay Viewer",
+  "replay_open_file": "Open File",
+  "replay_play": "Play",
+  "replay_pause": "Pause",
+
+  "qrng_title": "QRNG — Quantum Random Number Generator Log",
+  "qrng_sources": "  Qubit Noise Sources  ",
+  "qrng_stream": "  Bit Stream (Live)  ",
+  "qrng_generate": "Generate Key",
+  "qrng_save_excel": "Save to Excel",
+  "qrng_clear": "Clear All",
+  "qrng_keys": "  Generated Keys  ",
+
+  "tc_title": "AI New Material Tc Prediction",
+  "tc_predict": "Predict Tc",
+  "tc_model_perf": "  Model Performance  ",
+  "tc_new_material": "  New Material — Predict Tc  "
 }

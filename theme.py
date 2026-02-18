@@ -159,8 +159,66 @@ class PG_LIGHT:
     DECOY       = (223, 142, 29)
 
 
+# ── 색각 이상 접근성 팔레트 (Deuteranopia-safe) ──────
+class TK_COLORBLIND:
+    """Tkinter 용 색각 이상 접근성 팔레트 (dark base)."""
+    BG          = "#1e1e2e"
+    PANEL_BG    = "#2a2a3d"
+    SURFACE     = "#181825"
+    OVERLAY     = "#45475a"
+    TEXT        = "#cdd6f4"
+    SUBTEXT     = "#585b70"
+    ACCENT_BLUE = "#6fa8dc"
+    ACCENT_PURPLE = "#b4a7d6"
+    ACCENT_GREEN  = "#93c47d"
+    ACCENT_YELLOW = "#ffd966"
+    ACCENT_PEACH  = "#e69138"
+    RED         = "#e06666"
+    GREEN       = "#93c47d"
+    YELLOW      = "#ffd966"
+    GOLD        = "#ffd966"
+    SILVER      = "#bac2de"
+    BRONZE      = "#e69138"
+    GAUGE_BG    = "#45475a"
+
+
+class PG_COLORBLIND:
+    """Pygame 용 색각 이상 접근성 팔레트."""
+    BG          = (30, 30, 46)
+    PANEL_BG    = (24, 24, 37)
+    SURFACE     = (24, 24, 37)
+    OVERLAY     = (69, 71, 90)
+    TEXT        = (205, 214, 244)
+    SUBTEXT     = (88, 91, 112)
+    ACCENT_BLUE = (111, 168, 220)
+    ACCENT_PURPLE = (180, 167, 214)
+    ACCENT_GREEN  = (147, 196, 125)
+    ACCENT_YELLOW = (255, 217, 102)
+    ACCENT_PEACH  = (230, 145, 56)
+    RED         = (224, 102, 102)
+    GREEN       = (147, 196, 125)
+    YELLOW      = (255, 217, 102)
+    SHIELD_CLR  = (111, 168, 220)
+    SHIELD_GLOW = (111, 168, 220)
+    SENSOR_CLR  = (111, 168, 220)
+    MAGNET_N    = (224, 102, 102)
+    MAGNET_S    = (111, 168, 220)
+    SC_COLOR    = (147, 196, 125)
+    SC_GLOW     = (111, 168, 220)
+    STABLE      = (147, 196, 125)
+    WARNING     = (255, 217, 102)
+    DANGER      = (230, 145, 56)
+    COLLAPSED   = (224, 102, 102)
+    ALICE       = (111, 168, 220)
+    BOB         = (147, 196, 125)
+    EVE         = (224, 102, 102)
+    QUBIT       = (180, 167, 214)
+    DECOY       = (255, 217, 102)
+
+
 # ── 테마 토글 ────────────────────────────────────────
 _current_theme = "dark"
+_colorblind_mode = False
 
 
 def get_theme() -> str:
@@ -181,11 +239,27 @@ def toggle_theme() -> str:
     return _current_theme
 
 
+def is_colorblind() -> bool:
+    """색각 이상 모드 활성화 여부."""
+    return _colorblind_mode
+
+
+def toggle_colorblind() -> bool:
+    """색각 이상 모드 토글. 새 상태 반환."""
+    global _colorblind_mode
+    _colorblind_mode = not _colorblind_mode
+    return _colorblind_mode
+
+
 def get_tk_theme():
     """현재 Tkinter 테마 클래스 반환."""
+    if _colorblind_mode:
+        return TK_COLORBLIND
     return TK_LIGHT if _current_theme == "light" else TK
 
 
 def get_pg_theme():
     """현재 Pygame 테마 클래스 반환."""
+    if _colorblind_mode:
+        return PG_COLORBLIND
     return PG_LIGHT if _current_theme == "light" else PG
