@@ -32,9 +32,6 @@ E91_BOB_BASES = [math.pi / 8, math.pi / 4, 3 * math.pi / 8]  # b1=π/8, b2=π/4,
 # Alice a3=π/4, Bob b2=π/4 → 같은 기저 → 키 생성
 E91_KEY_PAIRS = [(1, 0), (2, 1)]  # (Alice idx, Bob idx) 같은 기저 쌍
 
-# 벨 부등식 검증용 기저 쌍
-E91_BELL_PAIRS = [(0, 0), (0, 1), (1, 1), (2, 2)]  # 다른 기저 조합
-
 CHSH_CLASSICAL_BOUND = 2.0
 CHSH_QUANTUM_BOUND = 2.0 * math.sqrt(2)
 
@@ -93,12 +90,13 @@ class E91State:
 
 def _measure_entangled(angle_a: float, angle_b: float,
                        eve_present: bool = False) -> tuple[int, int]:
-    """얽힘 쌍의 측정 시뮬레이션.
+    """얽힘 쌍의 측정 시뮬레이션 (광자 편광 모델).
 
-    |Φ+⟩ 상태에서 각도 a, b로 측정 시:
-    P(같은 결과) = cos²((a-b)/2)
-    P(다른 결과) = sin²((a-b)/2)
+    |Φ+⟩ 상태에서 편광 각도 a, b로 측정 시:
+    P(같은 결과) = cos²(a - b)
+    P(다른 결과) = sin²(a - b)
 
+    상관 함수 E(a,b) = cos(2(a-b)) → CHSH S = 2√2 도달 가능.
     Eve가 있으면 상관관계가 약해짐.
     """
     diff = angle_a - angle_b
@@ -109,8 +107,8 @@ def _measure_entangled(angle_a: float, angle_b: float,
         noise = random.gauss(0, 0.3)
         diff += noise
 
-    # 상관 확률
-    p_same = math.cos(diff / 2) ** 2
+    # 상관 확률 (광자 편광: cos²(θ))
+    p_same = math.cos(diff) ** 2
 
     # Alice 결과
     alice = random.choice([+1, -1])
@@ -184,11 +182,12 @@ def e91_round(state: E91State, eve_chance: float = 0.0) -> E91Round:
 def compute_bell_S(state: E91State) -> float:
     """CHSH 파라미터 S 계산.
 
-    S = E(a1,b1) - E(a1,b2) + E(a2,b1) + E(a2,b2)
-    여기서 E(a,b) = <A⊗B> (상관 함수)
+    S = E(a1,b1) - E(a1,b3) + E(a3,b1) + E(a3,b3)
 
     E91 기저: a1=0, a2=π/8, a3=π/4, b1=π/8, b2=π/4, b3=3π/8
-    CHSH 조합: E(a1,b1) - E(a1,b2) + E(a2,b1) + E(a2,b2)
+    키 쌍: (a2,b1)=(1,0), (a3,b2)=(2,1) → 이 쌍은 correlators에 없음
+    CHSH 쌍: (a1,b1)=(0,0), (a1,b3)=(0,2), (a3,b1)=(2,0), (a3,b3)=(2,2)
+    양자 이론: S = 2√2 ≈ 2.828 (광자 편광 모델)
     """
     def _avg(pair):
         data = state.correlators.get(pair, [])
@@ -196,22 +195,12 @@ def compute_bell_S(state: E91State) -> float:
             return 0.0
         return sum(data) / len(data)
 
-    # E(a1=0, b1=π/8)  → pair (0,0)
-    # E(a1=0, b2=π/4)  → pair (0,1)
-    # E(a2=π/8, b1=π/8) → pair (1,0) ← 이건 키 쌍이라 bell에 없을 수 있음
-    # E(a2=π/8, b2=π/4) → pair (1,1) ← 키 쌍
-    # E(a3=π/4, b3=3π/8) → pair (2,2)
+    # CHSH 4개 상관 함수 (모두 키 쌍이 아니므로 correlators에 데이터 존재)
+    e00 = _avg((0, 0))  # E(a1=0°, b1=π/8)
+    e02 = _avg((0, 2))  # E(a1=0°, b3=3π/8)
+    e20 = _avg((2, 0))  # E(a3=π/4, b1=π/8)
+    e22 = _avg((2, 2))  # E(a3=π/4, b3=3π/8)
 
-    # 사용 가능한 벨 쌍으로 S 계산
-    e00 = _avg((0, 0))  # E(a1, b1)
-    e01 = _avg((0, 1))  # E(a1, b2)
-    e02 = _avg((0, 2))  # E(a1, b3)
-    e10 = _avg((1, 0))  # E(a2, b1) - 키 쌍이므로 데이터 적음
-    e20 = _avg((2, 0))  # E(a3, b1) - 키 쌍이므로 데이터 적음
-    e22 = _avg((2, 2))  # E(a3, b3)
-
-    # CHSH: S = E(a1,b1) - E(a1,b3) + E(a3,b1) + E(a3,b3)
-    # 최적 조합: a1=0, a3=π/4, b1=π/8, b3=3π/8
     S = e00 - e02 + e20 + e22
 
     state.bell_S = S

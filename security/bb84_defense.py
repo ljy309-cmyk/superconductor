@@ -92,7 +92,7 @@ def _load_theme_colors():
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
 
-def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
+def _draw_actors(screen, game: BB84Game, anim_t: float, font, big_font):
     """Alice, Bob, Eve 캐릭터."""
     # Alice
     pygame.draw.circle(screen, ALICE_CLR, (ALICE_X, ALICE_Y), 30)
@@ -114,7 +114,7 @@ def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     eve_alpha = 255 if game.eve_active else 80
     if game.eve_flash > 0:
         # 플래시 글로우
-        glow_r = int(40 + 20 * math.sin(t * 10))
+        glow_r = int(40 + 20 * math.sin(anim_t * 10))
         glow = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
         pygame.draw.circle(glow, (*EVE_CLR, int(100 * game.eve_flash)), (glow_r, glow_r), glow_r)
         screen.blit(glow, (EVE_X - glow_r, EVE_Y - glow_r))
@@ -275,7 +275,7 @@ def _draw_log(screen, game: BB84Game, font):
         screen.blit(surf, (lx, ly + 18 + i * 15))
 
 
-def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
+def _draw_shutdown_banner(screen, game: BB84Game, big_font, anim_t: float):
     """통신망 폐쇄 배너."""
     if game.shutdown_flash > 0:
         alpha = int(200 * min(game.shutdown_flash, 1.0))
@@ -283,7 +283,7 @@ def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
         banner.fill((*DANGER_CLR, alpha // 3))
         screen.blit(banner, (0, CHANNEL_Y - 25))
 
-        blink = int(t * 4) % 2 == 0
+        blink = int(anim_t * 4) % 2 == 0
         if blink:
             msg = t("bb84_channel_shutdown_msg") if game.auto_shutdown else t("bb84_manual_shutdown_msg")
             reason = t("bb84_error_exceeded") if game.auto_shutdown else ""

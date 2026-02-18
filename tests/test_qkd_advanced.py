@@ -353,12 +353,12 @@ class TestMeasureEntangled(unittest.TestCase):
         self.assertGreater(same / n, 0.9)
 
     def test_orthogonal_angles_anticorrelation(self):
-        """직교 각도로 측정하면 반상관."""
+        """직교 편광(90°)으로 측정하면 반상관."""
         from security.qkd_advanced_engine import _measure_entangled
         diff = 0
         n = 200
         for _ in range(n):
-            a, b = _measure_entangled(0.0, math.pi, eve_present=False)
+            a, b = _measure_entangled(0.0, math.pi / 2, eve_present=False)
             if a != b:
                 diff += 1
         self.assertGreater(diff / n, 0.7)
