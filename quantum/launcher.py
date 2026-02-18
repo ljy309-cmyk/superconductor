@@ -1,5 +1,6 @@
 """양자 역학 시뮬레이터 — 서브 메뉴 런처."""
 
+from quantum.entanglement import open_entanglement
 from quantum.gate_builder import open_gate_builder
 from quantum.qec_shield import open_qec_shield
 from quantum.qubit_chain import open_qubit_chain
@@ -15,6 +16,7 @@ class QuantumLauncher(BaseLauncher):
         ("btn_tunneling", lambda self: self._launch_pygame(open_tunneling)),
         ("btn_qec_shield", lambda self: self._launch_pygame(open_qec_shield)),
         ("btn_gate_builder", lambda self: self._launch_pygame(open_gate_builder)),
+        ("btn_entanglement", lambda self: self._launch_pygame(open_entanglement)),
     ]
 
 

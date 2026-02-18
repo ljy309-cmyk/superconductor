@@ -119,6 +119,11 @@
     "bb84_decoy_trapped": 3,
     "all_modules_count": 5
   },
+  "entanglement": {
+    "chsh_shots": 200,
+    "measure_batch": 50,
+    "teleport_anim_speed": 1.5
+  },
   "gate_builder": {
     "num_qubits": 2
   },

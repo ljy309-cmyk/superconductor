@@ -98,6 +98,23 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "none",
         },
     ],
+    "entanglement": [
+        {
+            "title": "Quantum Entanglement",
+            "text": "벨 상태, CHSH 부등식, 양자 텔레포테이션을\n직접 실험해 볼 수 있습니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "3 Modes",
+            "text": "Tab 키로 모드를 전환합니다:\n1) Bell States  2) CHSH  3) Teleportation",
+            "highlight": "none",
+        },
+        {
+            "title": "Bell States",
+            "text": "1-4 키로 4종 벨 상태를 선택하고\nSPACE로 측정하여 상관관계를 확인하세요!",
+            "highlight": "none",
+        },
+    ],
 }
 
 
