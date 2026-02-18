@@ -157,9 +157,9 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
         (f"Bell S = {e91.bell_S:.3f}  (Classical ≤ {CHSH_CLASSICAL_BOUND}, Quantum ≤ {CHSH_QUANTUM_BOUND:.3f})", ACCENT),
     ]
     if e91.bell_violated:
-        stats.append(("Bell Inequality VIOLATED — Quantum Secure!", GREEN))
+        stats.append((t("qa_bell_violated"), GREEN))
     elif e91.bell_rounds > 20:
-        stats.append(("Bell Inequality NOT violated — Possible Eavesdropping!", RED))
+        stats.append((t("qa_bell_not_violated"), RED))
 
     for i, (txt, clr) in enumerate(stats):
         surf = font.render(txt, True, clr)
@@ -267,13 +267,13 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
     # 4단계 파이프라인
     corrected_bits = len(e91.corrected_key)
     stages = [
-        ("Raw Key", len(e91.raw_key_alice), BLUE,
+        (t("qa_sift_raw_key"), len(e91.raw_key_alice), BLUE,
          len(e91.raw_key_alice) > 0),
-        ("QBER Est.", e91.qber_sample_size, YELLOW,
+        (t("qa_sift_qber_est"), e91.qber_sample_size, YELLOW,
          e91.qber_done),
-        ("Error Corr.", corrected_bits, GREEN,
+        (t("qa_sift_err_corr"), corrected_bits, GREEN,
          e91.correction_done),
-        ("Privacy Amp", len(e91.final_key) * 4, MAUVE,
+        (t("qa_sift_priv_amp"), len(e91.final_key) * 4, MAUVE,
          e91.pa_done),
     ]
 
@@ -306,8 +306,8 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
 
     # 원시 키 비트 시각화
     ky = 140
-    _draw_key_bits(screen, "Alice Raw", e91.raw_key_alice[:64], BLUE, 40, ky, font, big_font)
-    _draw_key_bits(screen, "Bob Raw", e91.raw_key_bob[:64], GREEN, 40, ky + 30, font, big_font)
+    _draw_key_bits(screen, t("qa_sift_alice_raw"), e91.raw_key_alice[:64], BLUE, 40, ky, font, big_font)
+    _draw_key_bits(screen, t("qa_sift_bob_raw"), e91.raw_key_bob[:64], GREEN, 40, ky + 30, font, big_font)
 
     # QBER 추정 결과
     if e91.qber_done:
@@ -318,23 +318,23 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
         screen.blit(font.render(qber_txt, True, qber_clr), (40, qber_y))
         # QBER 해석
         if e91.qber_value > 0.11:
-            warn = font.render("QBER > 11% — Eve suspected! Key may be compromised.", True, RED)
+            warn = font.render(t("qa_qber_warning"), True, RED)
             screen.blit(warn, (40, qber_y + 14))
         else:
-            safe = font.render("QBER < 11% — Channel secure, proceeding.", True, GREEN)
+            safe = font.render(t("qa_qber_safe"), True, GREEN)
             screen.blit(safe, (40, qber_y + 14))
 
     # 에러 정정 결과
     if e91.correction_done:
         ec_y = ky + 100
-        _draw_key_bits(screen, "Corrected", e91.corrected_key[:64], GREEN, 40, ec_y, font, big_font)
+        _draw_key_bits(screen, t("qa_sift_corrected"), e91.corrected_key[:64], GREEN, 40, ec_y, font, big_font)
         ec_txt = f"Error correction: {e91.correction_flips} bits flipped (block parity)"
         screen.blit(font.render(ec_txt, True, TEXT_CLR), (40, ec_y + 18))
 
     # 최종 키
     if e91.pa_done and e91.final_key:
         fy = ky + 140
-        header = big_font.render("Final Key (Toeplitz universal hash):", True, ACCENT)
+        header = big_font.render(t("qa_final_key_hdr"), True, ACCENT)
         screen.blit(header, (40, fy))
         key = e91.final_key
         for i in range(0, len(key), 32):
@@ -926,13 +926,19 @@ def run_simulation():
 
         # 리플레이 기록
         if not paused:
-            recorder.record({
+            frame = {
                 "mode": mode,
                 "e91_rounds": e91.total_rounds,
                 "e91_bell_S": e91.bell_S,
                 "ghz_rounds": ghz.total_rounds,
                 "eve_chance": eve_chance,
-            })
+            }
+            if mode == MODE_COMPARE:
+                frame["bb84_rounds"] = bb84_cmp.total_rounds
+                frame["bb84_qber"] = bb84_cmp.qber
+                frame["e91_cmp_rounds"] = e91_cmp.total_rounds
+                frame["e91_cmp_bell_S"] = e91_cmp.bell_S
+            recorder.record(frame)
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -1001,6 +1007,9 @@ def run_simulation():
             "ghz_rounds": ghz.total_rounds,
             "ghz_key_bits": len(ghz.raw_keys[0]),
             "ghz_consistency_rate": round(ghz_cons_rate, 3),
+            "bb84_cmp_rounds": bb84_cmp.total_rounds,
+            "bb84_cmp_qber": round(bb84_cmp.qber, 3),
+            "bb84_cmp_eve_detected": bb84_cmp.eve_detected,
         },
         recorder=recorder,
         snd=snd,

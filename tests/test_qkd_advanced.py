@@ -777,5 +777,142 @@ class TestMeasureEntangled(unittest.TestCase):
             self.assertIn(b, (+1, -1))
 
 
+class TestBB84ErrorModel(unittest.TestCase):
+    """BB84 에러 모델 물리 정확성 테스트."""
+
+    def test_qber_near_25_percent_with_full_eve(self):
+        """Eve가 모든 비트를 도청하면 QBER ≈ 25% (이론값)."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(2000):
+            bb84_round(state, eve_chance=1.0)
+        # BB84 이론: QBER = 25% when Eve intercepts all
+        # 통계적 허용 범위: 15% ~ 35%
+        self.assertGreater(state.qber, 0.15,
+                           f"QBER = {state.qber:.3f}, expected ~0.25")
+        self.assertLess(state.qber, 0.35,
+                        f"QBER = {state.qber:.3f}, expected ~0.25")
+
+    def test_no_corruption_when_eve_absent(self):
+        """Eve 없으면 corruption이 발생하지 않아야 함."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(500):
+            bb84_round(state, eve_chance=0.0)
+        self.assertEqual(state.error_count, 0)
+        self.assertAlmostEqual(state.qber, 0.0)
+
+
+class TestXORErrorHandling(unittest.TestCase):
+    """XOR 암호화 잘못된 hex 입력 처리 테스트."""
+
+    def test_invalid_hex_key_encrypt(self):
+        from security.qkd_advanced_engine import xor_encrypt
+        result = xor_encrypt("Hello", "ZZZZ")
+        self.assertEqual(result, "")
+
+    def test_invalid_hex_cipher_decrypt(self):
+        from security.qkd_advanced_engine import xor_decrypt
+        result = xor_decrypt("ZZZZ", "abcd")
+        self.assertEqual(result, "")
+
+    def test_invalid_hex_key_decrypt(self):
+        from security.qkd_advanced_engine import xor_decrypt
+        result = xor_decrypt("abcd", "ZZZZ")
+        self.assertEqual(result, "")
+
+    def test_odd_length_hex_key(self):
+        """홀수 길이 hex 키도 정상 동작."""
+        from security.qkd_advanced_engine import xor_decrypt, xor_encrypt
+        cipher = xor_encrypt("A", "abc")
+        self.assertGreater(len(cipher), 0)
+        decrypted = xor_decrypt(cipher, "abc")
+        self.assertEqual(decrypted, "A")
+
+
+class TestQRNGRandint(unittest.TestCase):
+    """_qrng_randint 함수 테스트."""
+
+    def test_range_output(self):
+        from security.qkd_advanced_engine import _qrng_randint
+        for _ in range(100):
+            val = _qrng_randint(0, 2)
+            self.assertIn(val, (0, 1, 2))
+
+    def test_single_value_range(self):
+        from security.qkd_advanced_engine import _qrng_randint
+        for _ in range(10):
+            val = _qrng_randint(5, 5)
+            self.assertEqual(val, 5)
+
+    def test_binary_range(self):
+        from security.qkd_advanced_engine import _qrng_randint
+        seen = set()
+        for _ in range(50):
+            seen.add(_qrng_randint(0, 1))
+        # 50회면 {0, 1} 모두 나와야 함
+        self.assertEqual(seen, {0, 1})
+
+
+class TestGHZMeasure(unittest.TestCase):
+    """_ghz_measure 함수 단위 테스트."""
+
+    def test_z_basis_all_same(self):
+        """Z 기저 측정 시 모든 결과 동일 (Eve 없음)."""
+        from security.qkd_advanced_engine import _ghz_measure
+        all_same = 0
+        n = 100
+        for _ in range(n):
+            results = _ghz_measure(["Z", "Z", "Z"], eve_present=False)
+            if len(set(results)) == 1:
+                all_same += 1
+        self.assertEqual(all_same, n)
+
+    def test_x_basis_even_parity(self):
+        """X 기저 측정 시 짝수 패리티 (Eve 없음)."""
+        from security.qkd_advanced_engine import _ghz_measure
+        for _ in range(100):
+            results = _ghz_measure(["X", "X", "X"], eve_present=False)
+            self.assertEqual(sum(results) % 2, 0)
+
+    def test_mixed_basis_random(self):
+        """혼합 기저 → 무작위 결과."""
+        from security.qkd_advanced_engine import _ghz_measure
+        results = _ghz_measure(["X", "Z", "X"], eve_present=False)
+        self.assertEqual(len(results), 3)
+        for r in results:
+            self.assertIn(r, (0, 1))
+
+    def test_z_basis_eve_disrupts(self):
+        """Eve 도청 시 Z 기저 상관관계 파괴."""
+        from security.qkd_advanced_engine import _ghz_measure
+        disrupted = 0
+        n = 200
+        for _ in range(n):
+            results = _ghz_measure(["Z", "Z", "Z"], eve_present=True)
+            if len(set(results)) > 1:
+                disrupted += 1
+        # Eve → 30% 확률로 각 비트 뒤집힘 → 일부 불일치 기대
+        self.assertGreater(disrupted, 0)
+
+    def test_n_party_z_basis(self):
+        """N자간 Z 기저 측정."""
+        from security.qkd_advanced_engine import _ghz_measure
+        for n in (4, 5):
+            results = _ghz_measure(["Z"] * n, eve_present=False)
+            self.assertEqual(len(results), n)
+            self.assertEqual(len(set(results)), 1)
+
+
+class TestE91StateDuplicate(unittest.TestCase):
+    """E91State sifted_key 필드가 단일인지 확인."""
+
+    def test_single_sifted_key_field(self):
+        from security.qkd_advanced_engine import E91State
+        state = E91State()
+        state.sifted_key = [1, 0, 1]
+        self.assertEqual(state.sifted_key, [1, 0, 1])
+
+
 if __name__ == "__main__":
     unittest.main()

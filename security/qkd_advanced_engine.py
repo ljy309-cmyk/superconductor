@@ -97,7 +97,6 @@ class E91State:
     rounds: list[E91Round] = field(default_factory=list)
     raw_key_alice: list[int] = field(default_factory=list)
     raw_key_bob: list[int] = field(default_factory=list)
-    sifted_key: list[int] = field(default_factory=list)
     final_key: str = ""
 
     # 벨 부등식 검증
@@ -487,7 +486,10 @@ def xor_encrypt(plaintext: str, key_hex: str) -> str:
     """
     if not key_hex:
         return ""
-    key_bytes = bytes.fromhex(key_hex.ljust(len(key_hex) + len(key_hex) % 2, "0"))
+    try:
+        key_bytes = bytes.fromhex(key_hex.ljust(len(key_hex) + len(key_hex) % 2, "0"))
+    except ValueError:
+        return ""
     plain_bytes = plaintext.encode("utf-8")
     # 키 길이 제한
     n = min(len(plain_bytes), len(key_bytes))
@@ -499,8 +501,11 @@ def xor_decrypt(ciphertext_hex: str, key_hex: str) -> str:
     """OTP(XOR) 복호화 — 암호문(hex) + 키(hex) → 평문."""
     if not ciphertext_hex or not key_hex:
         return ""
-    cipher_bytes = bytes.fromhex(ciphertext_hex)
-    key_bytes = bytes.fromhex(key_hex.ljust(len(key_hex) + len(key_hex) % 2, "0"))
+    try:
+        cipher_bytes = bytes.fromhex(ciphertext_hex)
+        key_bytes = bytes.fromhex(key_hex.ljust(len(key_hex) + len(key_hex) % 2, "0"))
+    except ValueError:
+        return ""
     n = min(len(cipher_bytes), len(key_bytes))
     plain = bytes(c ^ k for c, k in zip(cipher_bytes[:n], key_bytes[:n]))
     return plain.decode("utf-8", errors="replace")
@@ -715,11 +720,12 @@ def bb84_round(state: BB84State, eve_chance: float = 0.0) -> dict:
     if eve_present:
         state.eve_rounds += 1
 
-    # Eve 도청: 랜덤 기저로 측정 → 50% 확률로 비트 오염
+    # Eve 도청: 랜덤 기저로 측정 → 기저 불일치 시 50% 확률로 비트 오염
+    # BB84 QBER 이론값: Eve 도청 시 25% (기저 불일치 50% × 비트 오류 50%)
     corrupted = False
     if eve_present:
         eve_basis = random.choice(BB84_BASES)
-        if eve_basis != alice_basis or random.random() < 0.5:
+        if eve_basis != alice_basis and random.random() < 0.5:
             corrupted = True
 
     basis_match = alice_basis == bob_basis
