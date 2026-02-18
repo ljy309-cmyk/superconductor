@@ -11,11 +11,18 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 # ── 물질별 임계 온도 (°C) ────────────────────────────────
+# 대표적 초전도 물질 — 원소 금속, 합금, 산화물 고온 초전도체
 MATERIALS = {
-    "YBCO (Tc=77K)": -196.0,  # 77 K
-    "Mercury / Hg (Tc=4.2K)": -268.95,  # 4.2 K
+    "Mercury / Hg (Tc≈4.2K)": -268.95,       # 4.15 K — 최초 발견 (1911, Onnes)
+    "Aluminium / Al (Tc≈1.2K)": -271.97,      # 1.18 K
+    "Niobium / Nb (Tc≈9.3K)": -263.90,        # 9.25 K — 원소 최고
+    "Lead / Pb (Tc≈7.2K)": -265.96,           # 7.19 K
+    "Nb₃Sn (Tc≈18K)": -255.15,               # 18.0 K — A15 합금
+    "MgB₂ (Tc≈39K)": -234.15,                 # 39.0 K — 이원소 최고
+    "YBCO / YBa₂Cu₃O₇ (Tc≈92K)": -181.15,   # 92.0 K — 액체 질소 냉각 가능
+    "BSCCO / Bi₂Sr₂Ca₂Cu₃O₁₀ (Tc≈110K)": -163.15,  # 110 K — 고온 초전도체
 }
-DEFAULT_MATERIAL = "YBCO (Tc=77K)"
+DEFAULT_MATERIAL = "YBCO / YBa₂Cu₃O₇ (Tc≈92K)"
 
 from config_loader import cfg
 from theme import get_tk_theme
@@ -83,9 +90,11 @@ class PhaseTransitionWindow(tk.Toplevel):
         ctrl = tk.Frame(self, bg="#1e1e2e")
         ctrl.pack(fill="x", padx=8, pady=4)
 
+        from i18n import t as _t
+
         tk.Label(
             ctrl,
-            text="물질:",
+            text=_t("material_label"),
             font=("Consolas", 10, "bold"),
             bg="#1e1e2e",
             fg="#cdd6f4",
@@ -97,7 +106,7 @@ class PhaseTransitionWindow(tk.Toplevel):
             textvariable=self._material_var,
             values=list(MATERIALS.keys()),
             state="readonly",
-            width=24,
+            width=36,
         )
         material_combo.pack(side="left", padx=(4, 12))
         material_combo.bind("<<ComboboxSelected>>", self._on_material_change)

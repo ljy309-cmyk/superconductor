@@ -6,8 +6,10 @@ Tc 이하에서 쿠퍼쌍(Cooper pair)이 형성되며 저항이 0으로 떨어�
 
 조작:
     Up/Down: 온도 조절
+    Tab: 물질 변경
     SPACE: 자동 냉각/가열 토글
     R: 리셋
+    L: 언어 전환
     ESC: 종료
 """
 
@@ -19,6 +21,7 @@ import pygame
 
 from config_loader import cfg
 from help_overlay import HelpOverlay
+from i18n import t, toggle_locale
 from logger import get_module_logger
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
@@ -35,9 +38,17 @@ BG = (30, 30, 46)
 TEXT_CLR = (205, 214, 244)
 ACCENT = (137, 180, 250)
 
-# 물리 파라미터
-TC_KELVIN = 77.0  # YBCO 임계 온도 (K)
-TC_CELSIUS = TC_KELVIN - 273.15
+# ── 물질 목록 (이름, Tc(K)) — Tab 키로 순환 ─────────
+MATERIAL_LIST = [
+    ("YBCO", 92.0),
+    ("BSCCO", 110.0),
+    ("MgB\u2082", 39.0),
+    ("Nb\u2083Sn", 18.0),
+    ("Nb", 9.25),
+    ("Pb", 7.19),
+    ("Hg", 4.15),
+    ("Al", 1.18),
+]
 
 # 격자 설정
 GRID_COLS, GRID_ROWS = 12, 8
@@ -100,13 +111,13 @@ def run_simulation():
     on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Phase Transition — Lattice Vibration & Cooper Pairs")
+    pygame.display.set_caption(t("game_title_phase_transition_sim"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
     big_font = pygame.font.SysFont("Consolas", 28, bold=True)
 
-    help_overlay = HelpOverlay("flux_pinning")  # flux_pinning 도움말 재사용
+    help_overlay = HelpOverlay("phase_transition_sim")
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("phase_transition_sim")
@@ -132,16 +143,18 @@ def run_simulation():
                 cooper_pairs.append(CooperPair(atoms[idx], atoms[idx + GRID_COLS]))
 
     # 상태
+    mat_idx = 0  # 현재 물질 인덱스
+    mat_name, tc_kelvin = MATERIAL_LIST[mat_idx]
     temperature = 300.0  # 현재 온도 (K)
     auto_cool = False
     auto_direction = -1  # -1: 냉각, +1: 가열
-    t = 0.0
+    sim_t = 0.0
     start_time = time.time()
 
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
-        t += dt
+        sim_t += dt
 
         for event in pygame.event.get():
             help_overlay.handle_event(event)
@@ -156,15 +169,20 @@ def run_simulation():
                     temperature = min(temperature + 5, 400)
                 elif event.key == pygame.K_DOWN:
                     temperature = max(temperature - 5, 1)
+                elif event.key == pygame.K_TAB:
+                    mat_idx = (mat_idx + 1) % len(MATERIAL_LIST)
+                    mat_name, tc_kelvin = MATERIAL_LIST[mat_idx]
                 elif event.key == pygame.K_SPACE:
                     auto_cool = not auto_cool
-                    if auto_cool and temperature <= TC_KELVIN:
+                    if auto_cool and temperature <= tc_kelvin:
                         auto_direction = 1
                     else:
                         auto_direction = -1
                 elif event.key == pygame.K_r:
                     temperature = 300.0
                     auto_cool = False
+                elif event.key == pygame.K_l:
+                    toggle_locale()
 
         # 자동 냉각/가열
         if auto_cool:
@@ -176,15 +194,16 @@ def run_simulation():
                 auto_direction = -1
 
         # 물리 계산
-        is_superconducting = temperature <= TC_KELVIN
+        tc_celsius = tc_kelvin - 273.15
+        is_superconducting = temperature <= tc_kelvin
         vibration_amp = max(0.0, (temperature / 300.0)) * 12  # 온도 비례 진동
-        resistance_val = 0.0 if is_superconducting else min(1.0, (temperature - TC_KELVIN) / 200.0)
+        resistance_val = 0.0 if is_superconducting else min(1.0, (temperature - tc_kelvin) / 200.0)
 
         # 원자 진동 업데이트
         for atom in atoms:
             if vibration_amp > 0.1:
-                atom.x = atom.base_x + vibration_amp * math.sin(t * 8 + atom.phase)
-                atom.y = atom.base_y + vibration_amp * math.cos(t * 6 + atom.phase * 1.3)
+                atom.x = atom.base_x + vibration_amp * math.sin(sim_t * 8 + atom.phase)
+                atom.y = atom.base_y + vibration_amp * math.cos(sim_t * 6 + atom.phase * 1.3)
             else:
                 atom.x = atom.base_x
                 atom.y = atom.base_y
@@ -198,6 +217,8 @@ def run_simulation():
         recorder.record_frame(
             {
                 "temperature": round(temperature, 1),
+                "material": mat_name,
+                "tc": tc_kelvin,
                 "superconducting": is_superconducting,
                 "resistance": round(resistance_val, 3),
             }
@@ -207,7 +228,7 @@ def run_simulation():
         screen.fill(BG)
 
         # 타이틀
-        title_surf = title_font.render("Superconducting Phase Transition", True, ACCENT)
+        title_surf = title_font.render(t("game_title_phase_transition_sim"), True, ACCENT)
         screen.blit(title_surf, (WIDTH // 2 - title_surf.get_width() // 2, 12))
 
         # 쿠퍼쌍 연결선
@@ -224,7 +245,7 @@ def run_simulation():
         for atom in atoms:
             # 글로우 (초전도 상태)
             if is_superconducting:
-                glow_r = atom_radius + 4 + int(2 * math.sin(t * 3 + atom.phase))
+                glow_r = atom_radius + 4 + int(2 * math.sin(sim_t * 3 + atom.phase))
                 glow_surf = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
                 pygame.draw.circle(glow_surf, (*ATOM_SC, 40), (glow_r, glow_r), glow_r)
                 screen.blit(glow_surf, (int(atom.x) - glow_r, int(atom.y) - glow_r))
@@ -233,17 +254,18 @@ def run_simulation():
         # 온도 표시
         temp_c = temperature - 273.15
         temp_color = ATOM_SC if is_superconducting else RESISTANCE_CLR
-        temp_surf = big_font.render(f"{temperature:.0f} K  ({temp_c:.0f} °C)", True, temp_color)
+        temp_surf = big_font.render(f"{temperature:.0f} K  ({temp_c:.0f} \u00b0C)", True, temp_color)
         screen.blit(temp_surf, (WIDTH // 2 - temp_surf.get_width() // 2, HEIGHT - 160))
 
         # 상태 표시
-        state_text = "SUPERCONDUCTING (R = 0)" if is_superconducting else f"NORMAL (R = {resistance_val:.2f})"
+        state_text = t("pt_state_sc") if is_superconducting else t("pt_state_normal", r=resistance_val)
         state_color = ATOM_SC if is_superconducting else RESISTANCE_CLR
         state_surf = title_font.render(state_text, True, state_color)
         screen.blit(state_surf, (WIDTH // 2 - state_surf.get_width() // 2, HEIGHT - 125))
 
-        # Tc 표시
-        tc_surf = font.render(f"Tc = {TC_KELVIN:.0f} K ({TC_CELSIUS:.0f} °C)  |  Material: YBCO", True, TEXT_CLR)
+        # 물질 & Tc 표시
+        mat_info = f"Tc = {tc_kelvin:.1f} K ({tc_celsius:.0f} \u00b0C)  |  {t('pt_material')}: {mat_name}"
+        tc_surf = font.render(mat_info, True, TEXT_CLR)
         screen.blit(tc_surf, (WIDTH // 2 - tc_surf.get_width() // 2, HEIGHT - 100))
 
         # 저항 바
@@ -261,7 +283,7 @@ def run_simulation():
         tbar_x = WIDTH - 80
         pygame.draw.rect(screen, OVERLAY_CLR, (tbar_x, bar_y, bar_w, bar_h))
         t_fill = int(bar_h * min(temperature / 400.0, 1.0))
-        t_color = RESISTANCE_CLR if temperature > TC_KELVIN else ATOM_SC
+        t_color = RESISTANCE_CLR if temperature > tc_kelvin else ATOM_SC
         if t_fill > 0:
             pygame.draw.rect(screen, t_color, (tbar_x, bar_y + bar_h - t_fill, bar_w, t_fill))
         pygame.draw.rect(screen, TEXT_CLR, (tbar_x, bar_y, bar_w, bar_h), 1)
@@ -269,7 +291,7 @@ def run_simulation():
         screen.blit(t_label, (tbar_x + bar_w // 2 - t_label.get_width() // 2, bar_y - 16))
 
         # Tc 마크
-        tc_ratio = TC_KELVIN / 400.0
+        tc_ratio = tc_kelvin / 400.0
         tc_mark_y = bar_y + bar_h - int(bar_h * tc_ratio)
         pygame.draw.line(screen, RESISTANCE_CLR, (tbar_x - 5, tc_mark_y), (tbar_x + bar_w + 5, tc_mark_y), 2)
         tc_mark_label = font.render("Tc", True, RESISTANCE_CLR)
@@ -278,7 +300,8 @@ def run_simulation():
         # 조작법
         auto_txt = "ON" if auto_cool else "OFF"
         hints = [
-            f"Up/Down: Temp  |  SPACE: Auto ({auto_txt})  |  R: Reset  |  ESC: Exit",
+            t("pt_hint_line1", auto=auto_txt),
+            t("pt_hint_line2"),
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
@@ -286,9 +309,9 @@ def run_simulation():
 
         # 물리 설명
         if is_superconducting:
-            desc = "Cooper pairs formed — zero resistance — Meissner effect active"
+            desc = t("pt_desc_sc")
         else:
-            desc = "Lattice vibrations scatter electrons — finite resistance"
+            desc = t("pt_desc_normal")
         desc_surf = font.render(desc, True, SUBTEXT_CLR)
         screen.blit(desc_surf, (WIDTH // 2 - desc_surf.get_width() // 2, 48))
 
@@ -305,6 +328,7 @@ def run_simulation():
             {
                 "play_time": play_time,
                 "final_temp": round(temperature, 1),
+                "material": mat_name,
             },
         )
     except (ImportError, OSError, ValueError, TypeError) as e:
