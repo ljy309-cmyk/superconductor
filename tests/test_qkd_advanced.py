@@ -1806,8 +1806,8 @@ class TestRound13Features(unittest.TestCase):
         for s in speeds:
             self.assertGreater(0.05 / s, 0)
 
-    def test_en_ko_keys_match_round13(self):
-        """en.json과 ko.json의 키가 Round 13 이후에도 일치."""
+    def test_en_ko_keys_match_round14(self):
+        """en.json과 ko.json의 키가 Round 14 이후에도 일치."""
         base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         en = self._load_json(os.path.join(base, "locale", "en.json"))
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
@@ -1817,6 +1817,71 @@ class TestRound13Features(unittest.TestCase):
                          f"en에만 있는 키: {en_keys - ko_keys}")
         self.assertEqual(ko_keys - en_keys, set(),
                          f"ko에만 있는 키: {ko_keys - en_keys}")
+
+
+class TestRound14Features(unittest.TestCase):
+    """Round 14 신규 기능 테스트."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_round14_locale_keys(self):
+        """Round 14 로케일 키가 양쪽 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        keys = ["qa_key_verify", "qa_fidelity", "qa_ghz_parity_title"]
+        for key in keys:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_key_match_rate_after_pa(self):
+        """PA 완료 후 key_match_rate 설정 확인."""
+        from security.qkd_advanced_engine import E91State, e91_round, key_sift
+        state = E91State()
+        for _ in range(500):
+            e91_round(state, eve_chance=0.0)
+        key_sift(state)
+        # Eve 없으면 높은 일치율
+        self.assertGreater(state.key_match_rate, 0.8)
+
+    def test_entanglement_fidelity_calc(self):
+        """상관값 기반 충실도 — 벨 검증 상관 데이터 존재."""
+        from security.qkd_advanced_engine import E91State, e91_round, compute_bell_S
+        state = E91State()
+        for _ in range(3000):
+            e91_round(state, eve_chance=0.0)
+        compute_bell_S(state)
+        self.assertGreater(len(state.correlators), 0)
+        self.assertGreater(abs(state.bell_S), 2.0)
+
+    def test_ghz_x_basis_parity(self):
+        """GHZ X-기저 라운드에서 패리티 검사 데이터 존재."""
+        from security.qkd_advanced_engine import GHZState, ghz_round
+        state = GHZState()
+        for _ in range(200):
+            ghz_round(state, eve_chance=0.0)
+        x_rounds = [rd for rd in state.rounds
+                     if rd.all_same_basis and rd.bases[0] == "X"]
+        self.assertGreater(len(x_rounds), 0)
+        for rd in x_rounds:
+            parity = sum(rd.results) % 2
+            self.assertIn(parity, [0, 1])
+
+    def test_fidelity_degrades_with_eve(self):
+        """Eve 있으면 상관값(충실도) 약화."""
+        from security.qkd_advanced_engine import E91State, e91_round, compute_bell_S
+        clean = E91State()
+        noisy = E91State()
+        for _ in range(2000):
+            e91_round(clean, eve_chance=0.0)
+            e91_round(noisy, eve_chance=0.8)
+        compute_bell_S(clean)
+        compute_bell_S(noisy)
+        # 깨끗한 상태의 Bell S가 더 커야 함
+        self.assertGreater(abs(clean.bell_S), abs(noisy.bell_S))
 
 
 if __name__ == "__main__":

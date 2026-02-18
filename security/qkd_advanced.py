@@ -302,6 +302,28 @@ def _draw_correlator_table(screen, e91: E91State, font, big_font):
     leg = font.render(t("qa_key_pair_legend"), True, YELLOW)
     screen.blit(leg, (tx, leg_y))
 
+    # 얽힘 충실도 미터 (키 쌍 상관값 기반)
+    fid_y = leg_y + 18
+    key_corr_data = []
+    for kp in [(1, 0), (2, 1)]:
+        vals = e91.correlators.get(kp, [])
+        if vals:
+            key_corr_data.append(abs(sum(vals) / len(vals)))
+    if key_corr_data:
+        avg_corr = sum(key_corr_data) / len(key_corr_data)
+        fidelity = min(avg_corr / 0.707, 1.0) * 100  # 이상적 |E|≈0.707
+        fid_clr = GREEN if fidelity > 85 else (YELLOW if fidelity > 60 else RED)
+        fid_txt = font.render(t("qa_fidelity", f=fidelity), True, fid_clr)
+        screen.blit(fid_txt, (tx, fid_y))
+        # 바
+        bar_x, bar_w, bar_h = tx, 180, 5
+        pygame.draw.rect(screen, OVERLAY, (bar_x, fid_y + 14, bar_w, bar_h),
+                         border_radius=2)
+        fill_w = int(bar_w * fidelity / 100)
+        if fill_w > 0:
+            pygame.draw.rect(screen, fid_clr, (bar_x, fid_y + 14, fill_w, bar_h),
+                             border_radius=2)
+
 
 # ── Key Sift & PA 모드 ──────────────────────────────
 
@@ -395,7 +417,7 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
         ec_txt = t("qa_sift_ec_msg", flips=e91.correction_flips)
         screen.blit(font.render(ec_txt, True, TEXT_CLR), (40, ec_y + 18))
 
-    # 최종 키
+    # 최종 키 + 키 합의 검증
     if e91.pa_done and e91.final_key:
         fy = ky + 140
         header = big_font.render(t("qa_final_key_hdr"), True, ACCENT)
@@ -404,6 +426,14 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
         for i in range(0, len(key), 32):
             chunk = key[i:i + 32]
             screen.blit(font.render(chunk, True, MAUVE), (40, fy + 16 + (i // 32) * 14))
+
+        # 키 합의 검증 패널
+        vfy = fy + 16 + ((len(key) - 1) // 32 + 1) * 14 + 4
+        match_pct = e91.key_match_rate * 100
+        match_clr = GREEN if match_pct > 95 else (YELLOW if match_pct > 80 else RED)
+        vfy_txt = t("qa_key_verify", pct=match_pct)
+        vfy_badge = "[OK]" if match_pct > 95 else "[!!]"
+        screen.blit(font.render(f"{vfy_txt} {vfy_badge}", True, match_clr), (40, vfy))
 
         # OTP 암호화 데모
         _draw_otp_demo(screen, e91.final_key, 460, ky + 68, font, big_font)
@@ -629,6 +659,25 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
                 tag=tag, eve=eve)
         surf = font.render(txt, True, clr)
         screen.blit(surf, (40, log_y + 18 + i * 14))
+
+    # X-기저 패리티 검사 시각화 블록
+    if ghz.consistency_checks > 0:
+        parity_y = log_y + 18 + min(len(ghz.rounds), 14) * 14 + 8
+        p_hdr = font.render(t("qa_ghz_parity_title"), True, ACCENT)
+        screen.blit(p_hdr, (40, parity_y))
+        blk_x = 40
+        blk_size = 8
+        blk_gap = 2
+        # X-기저 라운드의 패리티 결과 (최근 60개)
+        x_rounds = [rd for rd in ghz.rounds if rd.all_same_basis and rd.bases[0] == "X"]
+        for bi, rd in enumerate(x_rounds[-60:]):
+            parity = sum(rd.results) % 2
+            blk_clr = GREEN if parity == 0 else RED
+            bx = blk_x + bi * (blk_size + blk_gap)
+            by = parity_y + 14
+            if bx + blk_size > WIDTH - 40:
+                break
+            pygame.draw.rect(screen, blk_clr, (bx, by, blk_size, blk_size))
 
 
 # ── BB84 vs E91 비교 모드 ──────────────────────────
@@ -1195,6 +1244,7 @@ def run_simulation():
     show_fps = False
     auto_speed = 1.0  # 0.5x, 1x, 2x, 4x
     _AUTO_SPEEDS = [0.5, 1.0, 2.0, 4.0]
+    _fade_timer = 0.0  # 모드 전환 페이드 (0=없음, >0=진행중)
 
     help_overlay = HelpOverlay("qkd_advanced")
     tutorial = TutorialOverlay("qkd_advanced")
@@ -1221,6 +1271,7 @@ def run_simulation():
                         running = False
                 elif event.key == pygame.K_TAB:
                     mode = (mode + 1) % NUM_MODES
+                    _fade_timer = 0.15
                 elif event.key == pygame.K_SPACE:
                     _engine_error = None
                     try:
@@ -1324,6 +1375,7 @@ def run_simulation():
                         tx_ = 20 + i * (tab_w_ + tab_gap_)
                         if tx_ <= mx <= tx_ + tab_w_:
                             mode = i
+                            _fade_timer = 0.15
                             break
                 if mode == MODE_GHZ:
                     # GHZ 파티 수 버튼 클릭 처리
@@ -1483,6 +1535,14 @@ def run_simulation():
         elif mode == MODE_COMPARE:
             _draw_compare_mode(screen, bb84_cmp, e91_cmp, font, big_font)
 
+        # 모드 전환 페이드
+        if _fade_timer > 0:
+            _fade_timer = max(0, _fade_timer - dt)
+            alpha = int((_fade_timer / 0.15) * 120)
+            fade_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            fade_surf.fill((0, 0, 0, alpha))
+            screen.blit(fade_surf, (0, 0))
+
         # 자동 실행 단계 표시
         auto_stage = ""
         if auto_run and not paused:
@@ -1517,6 +1577,29 @@ def run_simulation():
         auto_label = t("auto_on") if auto_run else t("auto_off")
         if auto_stage:
             auto_label = f"{auto_label} [{auto_stage}]"
+
+        # 자동 파이프라인 진행 바
+        if auto_run and not paused and mode in (MODE_SIFT, MODE_GHZ, MODE_COMPARE):
+            bar_w, bar_h = 200, 6
+            bar_x = WIDTH // 2 - bar_w // 2
+            bar_y = HEIGHT - 52
+            pygame.draw.rect(screen, OVERLAY, (bar_x, bar_y, bar_w, bar_h), border_radius=3)
+            seg_w = bar_w // 4
+            if mode == MODE_SIFT:
+                _steps = [len(e91.raw_key_alice) > 0, e91.qber_done,
+                          e91.correction_done, e91.pa_done]
+            elif mode == MODE_GHZ:
+                _steps = [len(ghz.raw_keys[0]) > 0, ghz.sift_done,
+                          ghz.pa_done, ghz.pa_done]
+            else:
+                _steps = [len(e91_cmp.raw_key_alice) > 0, e91_cmp.qber_done,
+                          e91_cmp.correction_done, e91_cmp.pa_done]
+            _seg_clrs = [BLUE, YELLOW, GREEN, MAUVE]
+            for si, (done, clr) in enumerate(zip(_steps, _seg_clrs)):
+                if done:
+                    sx = bar_x + si * seg_w
+                    pygame.draw.rect(screen, clr,
+                                     (sx, bar_y, seg_w - 2, bar_h), border_radius=3)
 
         # 안내
         hints = [
