@@ -316,5 +316,12 @@
   "sound_keys_hint": "M: 음소거  |  +/-: 볼륨",
 
   "lang_switched": "언어: 한국어",
-  "lang_hint": "L: 언어 전환"
+  "lang_hint": "L: 언어 전환",
+
+  "app_title": "Superconductor",
+  "lang_ko": "한국어",
+  "lang_en": "English",
+  "theme_toggle": "테마: {theme}",
+  "font_decrease": "A-",
+  "font_increase": "A+"
 }

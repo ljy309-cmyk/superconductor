@@ -18,7 +18,7 @@ from theme import (TK, FONTS, get_theme, toggle_theme, get_tk_theme,
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Superconductor")
+        self.title(t("app_title"))
         self.resizable(False, False)
 
         # config.json에서 테마/색맹 모드 설정 로드
@@ -53,17 +53,17 @@ class App(tk.Tk):
         option_frame = tk.Frame(frame, bg=get_tk_theme().BG)
         option_frame.pack(pady=(10, 0))
         tk.Button(
-            option_frame, text="한국어", font=FONTS.SMALL,
+            option_frame, text=t("lang_ko"), font=FONTS.SMALL,
             command=lambda: self._switch_locale("ko"), width=8,
         ).pack(side="left", padx=2)
         tk.Button(
-            option_frame, text="English", font=FONTS.SMALL,
+            option_frame, text=t("lang_en"), font=FONTS.SMALL,
             command=lambda: self._switch_locale("en"), width=8,
         ).pack(side="left", padx=2)
 
-        theme_icon = "Light" if get_theme() == "dark" else "Dark"
+        theme_name = t("theme_light") if get_theme() == "dark" else t("theme_dark")
         tk.Button(
-            option_frame, text=f"Theme: {theme_icon}", font=FONTS.SMALL,
+            option_frame, text=t("theme_toggle", theme=theme_name), font=FONTS.SMALL,
             command=self._switch_theme, width=12,
         ).pack(side="left", padx=(10, 2))
 
@@ -77,7 +77,7 @@ class App(tk.Tk):
         font_frame = tk.Frame(frame, bg=get_tk_theme().BG)
         font_frame.pack(pady=(4, 0))
         tk.Button(
-            font_frame, text="A-", font=FONTS.SMALL,
+            font_frame, text=t("font_decrease"), font=FONTS.SMALL,
             command=self._decrease_font, width=4,
         ).pack(side="left", padx=2)
         tk.Label(
@@ -85,7 +85,7 @@ class App(tk.Tk):
             font=FONTS.SMALL, bg=get_tk_theme().BG, fg=get_tk_theme().TEXT,
         ).pack(side="left", padx=4)
         tk.Button(
-            font_frame, text="A+", font=FONTS.SMALL,
+            font_frame, text=t("font_increase"), font=FONTS.SMALL,
             command=self._increase_font, width=4,
         ).pack(side="left", padx=2)
 
@@ -99,6 +99,7 @@ class App(tk.Tk):
     def _switch_locale(self, locale: str):
         """언어 전환 후 UI 재구성."""
         set_locale(locale)
+        self.title(t("app_title"))
         for widget in self.winfo_children():
             widget.destroy()
         self._create_widgets()
