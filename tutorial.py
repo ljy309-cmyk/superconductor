@@ -74,6 +74,23 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "none",
         },
     ],
+    "qkd_advanced": [
+        {
+            "title": "Advanced QKD Protocols",
+            "text": "E91(얽힘 기반), 키 시프팅/프라이버시 증폭,\n다자간 QKD(GHZ) 세 가지 프로토콜을 실험합니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "E91 Protocol",
+            "text": "EPR 벨 쌍으로 양자 키를 분배합니다.\n벨 부등식(S>2)으로 도청 여부를 검증합니다!",
+            "highlight": "none",
+        },
+        {
+            "title": "Controls",
+            "text": "SPACE: 배치 실행  |  Tab: 모드 전환  |  E: Eve 토글\nS: 키 시프팅  |  A: 자동  |  R: 리셋",
+            "highlight": "none",
+        },
+    ],
     "bb84_defense": [
         {
             "title": "BB84 Quantum Key Distribution",

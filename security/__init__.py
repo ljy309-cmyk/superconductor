@@ -4,4 +4,5 @@ __all__ = [
     "open_squid_mines",
     "open_bb84_defense",
     "open_scada_security",
+    "open_qkd_advanced",
 ]

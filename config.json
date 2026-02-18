@@ -124,6 +124,11 @@
     "measure_batch": 50,
     "teleport_anim_speed": 1.5
   },
+  "qkd_advanced": {
+    "pa_compression": 0.5,
+    "e91_batch_size": 50,
+    "ghz_batch_size": 50
+  },
   "scada_security": {
     "target_temp": -196.0,
     "heat_leak": 0.3,
