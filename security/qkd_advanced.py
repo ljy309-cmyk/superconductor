@@ -91,8 +91,8 @@ MODE_E91 = 0
 MODE_SIFT = 1
 MODE_GHZ = 2
 MODE_COMPARE = 3
-MODE_NAMES = ["E91", "Key Sift & PA", "Multi-Party (GHZ)", "BB84 vs E91"]
-NUM_MODES = len(MODE_NAMES)
+_MODE_KEYS = ["qa_mode_e91", "qa_mode_sift", "qa_mode_ghz", "qa_mode_compare"]
+NUM_MODES = len(_MODE_KEYS)
 
 # ── 노드 위치 ────────────────────────────────────────
 ALICE_POS = (140, 140)
@@ -151,9 +151,11 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
 
     # 통계 패널
     sy = 200
+    key_rate = (e91.key_rounds / e91.total_rounds * 100) if e91.total_rounds > 0 else 0.0
     stats = [
         (f"Rounds: {e91.total_rounds}  (Key: {e91.key_rounds}  Bell: {e91.bell_rounds})", TEXT_CLR),
         (f"Raw Key Length: {len(e91.raw_key_alice)} bits", BLUE),
+        (t("qa_key_rate", rate=key_rate, bits=e91.key_rounds, rounds=e91.total_rounds), PEACH),
         (f"Bell S = {e91.bell_S:.3f}  (Classical ≤ {CHSH_CLASSICAL_BOUND}, Quantum ≤ {CHSH_QUANTUM_BOUND:.3f})", ACCENT),
     ]
     if e91.bell_violated:
@@ -492,9 +494,11 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
 
     # 통계
     sy = 300
+    ghz_key_rate = (ghz.key_rounds / ghz.total_rounds * 100) if ghz.total_rounds > 0 else 0.0
     stats = [
         (f"Rounds: {ghz.total_rounds}  (Key: {ghz.key_rounds}  Check: {ghz.consistency_checks})", TEXT_CLR),
         (f"Raw Key Length: {len(ghz.raw_keys[0])} bits", BLUE),
+        (t("qa_key_rate", rate=ghz_key_rate, bits=ghz.key_rounds, rounds=ghz.total_rounds), PEACH),
     ]
 
     if ghz.consistency_checks > 0:
@@ -512,6 +516,10 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
     for i, (txt, clr) in enumerate(stats):
         surf = font.render(txt, True, clr)
         screen.blit(surf, (40, sy + i * 16))
+
+    # GHZ OTP 암호화 데모 (PA 완료 후)
+    if ghz.pa_done and ghz.final_key:
+        _draw_otp_demo(screen, ghz.final_key, 460, sy, font, big_font)
 
     # 라운드 로그
     log_y = sy + len(stats) * 16 + 20
@@ -626,7 +634,7 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
 
     # 비교 행
     rows = [
-        (t("qa_cmp_row_method"), "QBER Sampling", "Bell Inequality (CHSH)"),
+        (t("qa_cmp_row_method"), t("qa_cmp_bb84_method"), t("qa_cmp_e91_method")),
         (t("qa_cmp_row_resource"), t("qa_cmp_bb84_resource"), t("qa_cmp_e91_resource")),
         (t("qa_cmp_row_detect"),
          f"QBER = {bb84.qber * 100:.1f}%  {'> 11% !' if bb84.qber > 0.11 else '< 11%'}",
@@ -906,6 +914,18 @@ def run_simulation():
                         resize_ghz(ghz, ghz.n_parties - 1)
                 elif event.key == pygame.K_l:
                     toggle_locale()
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if mode == MODE_GHZ:
+                    # GHZ 파티 수 버튼 클릭 처리
+                    mx, my = event.pos
+                    btn_x0 = WIDTH - 180
+                    btn_y0 = 62 + 18
+                    for pn in range(GHZ_MIN_PARTIES, GHZ_MAX_PARTIES + 1):
+                        bx = btn_x0 + (pn - GHZ_MIN_PARTIES) * 36
+                        if bx <= mx <= bx + 30 and btn_y0 <= my <= btn_y0 + 20:
+                            if pn != ghz.n_parties:
+                                resize_ghz(ghz, pn)
+                            break
 
         # 자동 실행
         if auto_run and not paused:
@@ -965,7 +985,8 @@ def run_simulation():
         tab_y = 32
         tab_w = min(180, (WIDTH - 60) // NUM_MODES - 8)
         tab_gap = (WIDTH - 40 - tab_w * NUM_MODES) // max(NUM_MODES - 1, 1)
-        for i, name in enumerate(MODE_NAMES):
+        for i, mk in enumerate(_MODE_KEYS):
+            name = t(mk)
             tx = 20 + i * (tab_w + tab_gap)
             active = i == mode
             clr = ACCENT if active else SUBTEXT_CLR
@@ -977,7 +998,7 @@ def run_simulation():
             screen.blit(tab_lbl, (tx + tab_w // 2 - tab_lbl.get_width() // 2, tab_y + 3))
 
         # Eve 상태
-        eve_txt = f"Eve: {'ON ({:.0f}%)'.format(eve_chance * 100) if eve_chance > 0 else 'OFF'}"
+        eve_txt = t("qa_eve_on", pct=eve_chance * 100) if eve_chance > 0 else t("qa_eve_off")
         eve_surf = font.render(eve_txt, True, RED if eve_chance > 0 else SUBTEXT_CLR)
         screen.blit(eve_surf, (WIDTH - eve_surf.get_width() - 10, 36))
 
