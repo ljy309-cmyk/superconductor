@@ -128,6 +128,22 @@ EPR_POS = (450, 90)
 EVE_POS = (450, 40)
 
 
+def _draw_key_ticker(screen, bits: list[int], x, y, width, font, anim_t):
+    """최근 키 비트 스크롤링 티커."""
+    if not bits:
+        return
+    last = bits[-32:]
+    # 비트를 문자열로 연결, 색상 번갈아
+    tx = x
+    for i, b in enumerate(last):
+        clr = GREEN if b == 0 else BLUE
+        ch = font.render(str(b), True, clr)
+        if tx + 8 > x + width:
+            break
+        screen.blit(ch, (tx, y))
+        tx += 8
+
+
 # ── E91 모드 ─────────────────────────────────────────
 
 def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
@@ -237,6 +253,12 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
         bt = font.render(badge_txt, True, BG)
         screen.blit(bt, (badge_x + 25 - bt.get_width() // 2, meter_y + 1))
 
+    # 키 비트 티커
+    if len(e91.raw_key_alice) > 0:
+        ticker_hdr = font.render("Key bits:", True, SUBTEXT_CLR)
+        screen.blit(ticker_hdr, (40, 304))
+        _draw_key_ticker(screen, e91.raw_key_alice, 108, 304, 200, font, anim_t)
+
     # 최근 라운드 로그
     log_y = 320
     header = big_font.render(t("qa_round_log"), True, ACCENT)
@@ -323,6 +345,11 @@ def _draw_correlator_table(screen, e91: E91State, font, big_font):
         if fill_w > 0:
             pygame.draw.rect(screen, fid_clr, (bar_x, fid_y + 14, fill_w, bar_h),
                              border_radius=2)
+
+    # 누적 키 생성 차트 (E91 우하단)
+    if len(e91.key_accumulation) >= 2:
+        _draw_key_accumulation(screen, e91.key_accumulation,
+                               500, 340, 380, 80, font, big_font)
 
 
 # ── Key Sift & PA 모드 ──────────────────────────────
@@ -855,6 +882,24 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
     for i, note in enumerate(notes):
         screen.blit(font.render(note, True, SUBTEXT_CLR), (30, note_y + i * 14))
 
+    # 프로토콜 승자 하이라이트 (충분한 라운드 후)
+    min_rounds = 100
+    if e91.total_rounds > min_rounds and bb84.total_rounds > min_rounds:
+        if e91.bell_violated and not bb84.eve_detected:
+            winner_txt = t("qa_toast_winner_e91")
+            winner_clr = MAUVE
+        else:
+            winner_txt = t("qa_toast_winner_tie")
+            winner_clr = GREEN
+        win_y = note_y + len(notes) * 14 + 6
+        win_surf = big_font.render(winner_txt, True, winner_clr)
+        wx = WIDTH // 2 - win_surf.get_width() // 2
+        pygame.draw.rect(screen, PANEL_BG, (wx - 8, win_y - 2,
+                         win_surf.get_width() + 16, 20), border_radius=4)
+        pygame.draw.rect(screen, winner_clr, (wx - 8, win_y - 2,
+                         win_surf.get_width() + 16, 20), 2, border_radius=4)
+        screen.blit(win_surf, (wx, win_y))
+
 
 def _draw_qber_meter(screen, qber, x, y, w, font, big_font):
     """QBER 바 미터."""
@@ -1165,6 +1210,35 @@ def _draw_consistency_graph(screen, history, x, y, w, h, font, big_font):
     screen.blit(ll, (gx + gw - ll.get_width(), gy + gh + 3))
 
 
+def _draw_key_accumulation(screen, history, x, y, w, h, font, big_font):
+    """누적 키 생성 차트."""
+    title = _tcache.render(font, "Key Accumulation", ACCENT)
+    screen.blit(title, (x, y))
+    gx, gy = x, y + 16
+    gw, gh = w, h - 16
+    pygame.draw.rect(screen, PANEL_BG, (gx, gy, gw, gh), border_radius=4)
+    pygame.draw.rect(screen, OVERLAY, (gx, gy, gw, gh), 1, border_radius=4)
+
+    if len(history) < 2:
+        return
+
+    max_bits = max(h[1] for h in history)
+    if max_bits == 0:
+        return
+
+    points = []
+    for rd, bits in history:
+        px = gx + int((rd - history[0][0]) / max(history[-1][0] - history[0][0], 1) * gw)
+        py = gy + gh - int(bits / max_bits * (gh - 4)) - 2
+        points.append((px, py))
+
+    if len(points) >= 2:
+        pygame.draw.lines(screen, GREEN, False, points, 2)
+
+    cnt = font.render(f"{max_bits}b", True, GREEN)
+    screen.blit(cnt, (gx + gw - cnt.get_width() - 4, gy + 2))
+
+
 # ── 통계 내보내기 ─────────────────────────────────────
 
 def _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp):
@@ -1216,6 +1290,54 @@ def _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def _show_session_summary(screen, font, big_font, mode, e91, ghz, bb84_cmp, e91_cmp):
+    """세션 요약 표시. True=종료, False=계속."""
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 160))
+    screen.blit(overlay, (0, 0))
+
+    pw, ph = 340, 200
+    px = WIDTH // 2 - pw // 2
+    py = HEIGHT // 2 - ph // 2
+    pygame.draw.rect(screen, PANEL_BG, (px, py, pw, ph), border_radius=8)
+    pygame.draw.rect(screen, ACCENT, (px, py, pw, ph), 2, border_radius=8)
+
+    title = big_font.render(t("qa_summary_title"), True, ACCENT)
+    screen.blit(title, (px + pw // 2 - title.get_width() // 2, py + 10))
+
+    mode_name = t(_MODE_KEYS[mode])
+    cur_e91 = e91 if mode in (MODE_E91, MODE_SIFT) else e91_cmp
+    lines = [
+        (f"Mode: {mode_name}", TEXT_CLR),
+        (t("qa_summary_rounds", n=cur_e91.total_rounds + (ghz.total_rounds if mode == MODE_GHZ else 0)), TEXT_CLR),
+        (t("qa_summary_keybits", n=len(cur_e91.raw_key_alice) if mode != MODE_GHZ else len(ghz.raw_keys[0])), BLUE),
+        (t("qa_summary_bells", s=cur_e91.bell_S), GREEN if cur_e91.bell_violated else RED),
+        (t("qa_summary_qber", pct=cur_e91.qber_value * 100), GREEN if cur_e91.qber_value < 0.11 else RED),
+    ]
+    if cur_e91.final_key:
+        lines.append((f"Final Key: {cur_e91.final_key[:20]}...", MAUVE))
+
+    for i, (txt, clr) in enumerate(lines):
+        s = font.render(txt, True, clr)
+        screen.blit(s, (px + 20, py + 36 + i * 18))
+
+    hint = font.render(t("qa_summary_exit"), True, SUBTEXT_CLR)
+    screen.blit(hint, (px + pw // 2 - hint.get_width() // 2, py + ph - 22))
+
+    pygame.display.flip()
+
+    while True:
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                return True
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_RETURN:
+                    return True
+                if ev.key == pygame.K_ESCAPE:
+                    return False
+        pygame.time.wait(30)
+
+
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 def run_simulation():
@@ -1252,6 +1374,10 @@ def run_simulation():
     snd.init()
     recorder = ReplayRecorder("qkd_advanced")
     _engine_error: str | None = None  # 엔진 오류 표시용
+    _toasts: list[list] = []  # [[text, color, timer], ...]
+    _prev_bell_violated = False
+    _prev_pa_done = False
+    _prev_eve_detected = False
 
     running = True
     while running:
@@ -1267,7 +1393,8 @@ def run_simulation():
             elif event.type == pygame.KEYDOWN:
                 snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE:
-                    if confirm_quit(screen, font):
+                    if _show_session_summary(screen, font, big_font,
+                                             mode, e91, ghz, bb84_cmp, e91_cmp):
                         running = False
                 elif event.key == pygame.K_TAB:
                     mode = (mode + 1) % NUM_MODES
@@ -1449,6 +1576,24 @@ def run_simulation():
                 except Exception as exc:
                     _engine_error = str(exc)
                     auto_run = False
+
+        # 토스트 이벤트 감지
+        _cur_state = e91 if mode in (MODE_E91, MODE_SIFT) else e91_cmp
+        _cur_bb84 = bb84_cmp
+        if _cur_state.bell_violated and not _prev_bell_violated:
+            _toasts.append([t("qa_toast_bell"), GREEN, 2.0])
+        _prev_bell_violated = _cur_state.bell_violated
+        if _cur_state.pa_done and not _prev_pa_done:
+            _toasts.append([t("qa_toast_pa"), MAUVE, 2.0])
+        _prev_pa_done = _cur_state.pa_done
+        if mode == MODE_COMPARE and _cur_bb84.eve_detected and not _prev_eve_detected:
+            _toasts.append([t("qa_toast_eve"), RED, 2.0])
+        _prev_eve_detected = _cur_bb84.eve_detected if mode == MODE_COMPARE else False
+
+        # 토스트 타이머 감소
+        for toast in _toasts:
+            toast[2] -= dt
+        _toasts = [t_ for t_ in _toasts if t_[2] > 0]
 
         # 리플레이 기록
         if not paused:
@@ -1677,6 +1822,20 @@ def run_simulation():
                 clr = ACCENT if si == 0 else TEXT_CLR
                 ls = font.render(line, True, clr)
                 screen.blit(ls, (sc_x + 12, sc_y + 8 + si * 15))
+
+        # 토스트 알림 렌더링 (우하단)
+        for ti, toast in enumerate(_toasts):
+            t_txt, t_clr, t_time = toast
+            alpha = min(int(t_time / 0.3 * 255), 255)
+            t_surf = font.render(t_txt, True, t_clr)
+            t_bg = pygame.Surface((t_surf.get_width() + 16, 18), pygame.SRCALPHA)
+            t_bg.fill((*PANEL_BG, min(alpha, 200)))
+            tx = WIDTH - t_surf.get_width() - 26
+            ty = HEIGHT - 80 - ti * 22
+            screen.blit(t_bg, (tx - 4, ty - 2))
+            pygame.draw.rect(screen, t_clr, (tx - 4, ty - 2,
+                             t_surf.get_width() + 16, 18), 1, border_radius=3)
+            screen.blit(t_surf, (tx + 4, ty))
 
         help_overlay.draw(screen, font)
         tutorial.draw(screen, font)

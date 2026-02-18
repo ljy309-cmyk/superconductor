@@ -1884,5 +1884,63 @@ class TestRound14Features(unittest.TestCase):
         self.assertGreater(abs(clean.bell_S), abs(noisy.bell_S))
 
 
+class TestRound15Features(unittest.TestCase):
+    """Round 15 신규 기능 테스트."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_round15_locale_keys(self):
+        """Round 15 로케일 키가 양쪽 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        keys = [
+            "qa_toast_bell", "qa_toast_pa", "qa_toast_eve",
+            "qa_toast_winner_e91", "qa_toast_winner_tie",
+            "qa_summary_title", "qa_summary_rounds", "qa_summary_keybits",
+            "qa_summary_bells", "qa_summary_qber", "qa_summary_exit",
+        ]
+        for key in keys:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_key_accumulation_history(self):
+        """누적 키 생성 히스토리가 기록됨."""
+        from security.qkd_advanced_engine import E91State, e91_round
+        state = E91State()
+        for _ in range(500):
+            e91_round(state, eve_chance=0.0)
+        self.assertGreater(len(state.key_accumulation), 0)
+        # 튜플 형식 (round, bits) 확인
+        for rd, bits in state.key_accumulation:
+            self.assertIsInstance(rd, int)
+            self.assertIsInstance(bits, int)
+
+    def test_key_accumulation_cleared_on_reset(self):
+        """리셋 시 히스토리 클리어."""
+        from security.qkd_advanced_engine import E91State, e91_round, reset_e91
+        state = E91State()
+        for _ in range(100):
+            e91_round(state, eve_chance=0.0)
+        self.assertGreater(len(state.key_accumulation), 0)
+        reset_e91(state)
+        self.assertEqual(len(state.key_accumulation), 0)
+
+    def test_en_ko_keys_match_round15(self):
+        """en.json과 ko.json 키 완전 일치."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        self.assertEqual(en_keys - ko_keys, set(),
+                         f"en에만: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(),
+                         f"ko에만: {ko_keys - en_keys}")
+
+
 if __name__ == "__main__":
     unittest.main()

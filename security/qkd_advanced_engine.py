@@ -131,6 +131,8 @@ class E91State:
     pa_done: bool = False
     error_rate: float = 0.0
     key_match_rate: float = 0.0
+    # 누적 키 생성 히스토리 (차트용)
+    key_accumulation: list[tuple[int, int]] = field(default_factory=list)
 
 
 def _measure_entangled(angle_a: float, angle_b: float,
@@ -197,6 +199,10 @@ def e91_round(state: E91State, eve_chance: float = 0.0) -> E91Round:
         state.raw_key_alice.append(key_bit)
         state.raw_key_bob.append(bob_key)
         state.key_rounds += 1
+        if state.total_rounds % 10 == 0:
+            state.key_accumulation.append((state.total_rounds, len(state.raw_key_alice)))
+            if len(state.key_accumulation) > 200:
+                state.key_accumulation.pop(0)
     else:
         # 벨 부등식 검증용 데이터 수집
         pair = (a_idx, b_idx)
@@ -880,6 +886,7 @@ def reset_e91(state: E91State):
     state.error_rate = 0.0
     state.key_match_rate = 0.0
     state.bob_remaining.clear()
+    state.key_accumulation.clear()
 
 
 def reset_ghz(state: GHZState):
