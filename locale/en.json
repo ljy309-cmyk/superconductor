@@ -159,6 +159,7 @@
   "qa_sc_help": "Help overlay",
   "qa_sc_shortcuts": "Toggle this panel",
   "qa_sc_exit": "Exit to menu",
+  "qa_sc_export": "Export stats (JSON)",
   "game_title_scada_security": "SCADA Security — MITM Attack & Quantum Defense",
   "ss_sensor": "Sensor",
   "ss_temp_sensor": "Temp Sensor",

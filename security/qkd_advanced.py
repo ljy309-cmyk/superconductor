@@ -27,6 +27,9 @@ from security.qkd_advanced_engine import (
     GHZ_MIN_PARTIES,
     GHZState,
     _DEMO_PLAINTEXT,
+    bb84_error_correct,
+    bb84_estimate_qber,
+    bb84_privacy_amplification,
     bb84_round,
     compute_bell_S,
     e91_round,
@@ -540,8 +543,17 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
         mid_y = (cy + pos[1]) // 2 + int(wave)
         pygame.draw.lines(screen, MAUVE, False, [(cx, cy), (mid_x, mid_y), pos], 1)
 
-    # 노드
+    # 노드 (활성 파티 펄스 효과)
+    pulse = (math.sin(anim_t * 4) + 1) * 0.5  # 0~1 oscillation
     for i, (pos, name, clr) in enumerate(zip(positions, ghz.party_names, colors)):
+        # Z-basis 라운드 가장 최근 측정 기저가 Z면 빛나기
+        is_active = ghz.total_rounds > 0 and (ghz.total_rounds % n == i)
+        if is_active:
+            glow_r = int(24 + 6 * pulse)
+            glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4), pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (*clr, int(60 * pulse)),
+                               (glow_r + 2, glow_r + 2), glow_r + 2)
+            screen.blit(glow_surf, (pos[0] - glow_r - 2, pos[1] - glow_r - 2))
         pygame.draw.circle(screen, clr, pos, 24)
         pygame.draw.circle(screen, TEXT_CLR, pos, 24, 2)
         lbl = big_font.render(name, True, clr)
@@ -670,6 +682,30 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
     bb84_graph_y = bb84_meter_y + 28
     _draw_qber_graph(screen, bb84.qber_history,
                      left_x, bb84_graph_y, half_w, 100, font, big_font)
+
+    # BB84 미니 파이프라인 (Compare 모드)
+    bb84_pipe_y = bb84_graph_y + 108
+    bb84_stages = [
+        (t("qa_sift_raw_key"), len(bb84.raw_key), BLUE, len(bb84.raw_key) > 0),
+        (t("qa_sift_qber_est"), bb84.qber_sample_size, YELLOW, bb84.qber_done),
+        (t("qa_sift_err_corr"), len(bb84.corrected_key), GREEN, bb84.correction_done),
+        (t("qa_sift_priv_amp"), len(bb84.final_key) * 4, MAUVE, bb84.pa_done),
+    ]
+    mini_w = (half_w - 16) // 4
+    for si, (slbl, ssize, sclr, sdone) in enumerate(bb84_stages):
+        sx = left_x + si * (mini_w + 2)
+        pygame.draw.rect(screen, PANEL_BG, (sx, bb84_pipe_y, mini_w - 2, 28), border_radius=4)
+        bdr = sclr if sdone else OVERLAY
+        pygame.draw.rect(screen, bdr, (sx, bb84_pipe_y, mini_w - 2, 28), 1, border_radius=4)
+        ls = font.render(slbl, True, sclr if sdone else SUBTEXT_CLR)
+        screen.blit(ls, (sx + (mini_w - 2) // 2 - ls.get_width() // 2, bb84_pipe_y + 2))
+        bs = font.render(f"{ssize}b", True, TEXT_CLR if sdone else SUBTEXT_CLR)
+        screen.blit(bs, (sx + (mini_w - 2) // 2 - bs.get_width() // 2, bb84_pipe_y + 15))
+
+    if bb84.pa_done and bb84.final_key:
+        fk_y = bb84_pipe_y + 30
+        fk_txt = font.render(f"Key: {bb84.final_key[:16]}...", True, GREEN)
+        screen.blit(fk_txt, (left_x, fk_y))
 
     # ── E91 (오른쪽) ──
     e91_key_rate = (e91.key_rounds / e91.total_rounds * 100) if e91.total_rounds > 0 else 0.0
@@ -1055,6 +1091,57 @@ def _draw_consistency_graph(screen, history, x, y, w, h, font, big_font):
     screen.blit(ll, (gx + gw - ll.get_width(), gy + gh + 3))
 
 
+# ── 통계 내보내기 ─────────────────────────────────────
+
+def _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp):
+    """현재 시뮬레이션 통계를 JSON 파일로 내보내기."""
+    import json
+    import os
+    from datetime import datetime
+
+    data = {
+        "timestamp": datetime.now().isoformat(),
+        "mode": ["E91", "Sift", "GHZ", "Compare"][mode],
+        "e91": {
+            "total_rounds": e91.total_rounds,
+            "key_rounds": e91.key_rounds,
+            "bell_rounds": e91.bell_rounds,
+            "bell_S": round(e91.bell_S, 4),
+            "raw_key_len": len(e91.raw_key_alice),
+            "final_key": e91.final_key[:32] if e91.final_key else "",
+            "qber_value": round(e91.qber_value, 4),
+            "pa_done": e91.pa_done,
+        },
+        "ghz": {
+            "n_parties": ghz.n_parties,
+            "total_rounds": ghz.total_rounds,
+            "consistency_rate": round(ghz.consistency_pass / max(ghz.consistency_checks, 1), 4),
+            "final_key": ghz.final_key[:32] if ghz.final_key else "",
+            "pa_done": ghz.pa_done,
+        },
+        "compare_bb84": {
+            "total_rounds": bb84_cmp.total_rounds,
+            "raw_key_bits": bb84_cmp.raw_key_bits,
+            "qber": round(bb84_cmp.qber, 4),
+            "final_key": bb84_cmp.final_key[:32] if bb84_cmp.final_key else "",
+            "pa_done": bb84_cmp.pa_done,
+        },
+        "compare_e91": {
+            "total_rounds": e91_cmp.total_rounds,
+            "bell_S": round(e91_cmp.bell_S, 4),
+            "raw_key_len": len(e91_cmp.raw_key_alice),
+            "final_key": e91_cmp.final_key[:32] if e91_cmp.final_key else "",
+            "pa_done": e91_cmp.pa_done,
+        },
+    }
+    export_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "exports")
+    os.makedirs(export_dir, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(export_dir, f"qkd_stats_{ts}.json")
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 def run_simulation():
@@ -1150,6 +1237,10 @@ def run_simulation():
                             if len(e91_cmp.raw_key_alice) > 0:
                                 key_sift(e91_cmp)
                                 privacy_amplification(e91_cmp)
+                            if len(bb84_cmp.raw_key) > 0:
+                                bb84_estimate_qber(bb84_cmp)
+                                bb84_error_correct(bb84_cmp)
+                                bb84_privacy_amplification(bb84_cmp)
                     except Exception as exc:
                         _engine_error = str(exc)
                 elif event.key == pygame.K_r:
@@ -1179,6 +1270,8 @@ def run_simulation():
                     _tcache.clear()
                 elif event.key == pygame.K_SLASH or event.key == pygame.K_QUESTION:
                     show_shortcuts = not show_shortcuts
+                elif event.key == pygame.K_x and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp)
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 # 모드 탭 클릭 처리
                 mx, my = event.pos
@@ -1240,6 +1333,7 @@ def run_simulation():
                         e91_round(e91_cmp, eve_chance)
                         if e91_cmp.total_rounds % 10 == 0:
                             compute_bell_S(e91_cmp)
+                        # E91 자동 파이프라인
                         if (e91_cmp.total_rounds > 0
                                 and e91_cmp.total_rounds % CHSH_SHOTS == 0
                                 and not e91_cmp.pa_done):
@@ -1249,6 +1343,16 @@ def run_simulation():
                                 error_correct(e91_cmp)
                             elif not e91_cmp.pa_done:
                                 privacy_amplification(e91_cmp)
+                        # BB84 자동 파이프라인
+                        if (bb84_cmp.total_rounds > 0
+                                and bb84_cmp.total_rounds % CHSH_SHOTS == 0
+                                and not bb84_cmp.pa_done):
+                            if not bb84_cmp.qber_done:
+                                bb84_estimate_qber(bb84_cmp)
+                            elif not bb84_cmp.correction_done:
+                                bb84_error_correct(bb84_cmp)
+                            elif not bb84_cmp.pa_done:
+                                bb84_privacy_amplification(bb84_cmp)
                 except Exception as exc:
                     _engine_error = str(exc)
                     auto_run = False
@@ -1408,6 +1512,7 @@ def run_simulation():
                 f"Up/Down {t('qa_sc_updown')}",
                 f"F1      {t('qa_sc_help')}",
                 f"?       {t('qa_sc_shortcuts')}",
+                f"Ctrl+X  {t('qa_sc_export')}",
                 f"ESC     {t('qa_sc_exit')}",
             ]
             sc_w, sc_h = 280, len(_sc_lines) * 15 + 16

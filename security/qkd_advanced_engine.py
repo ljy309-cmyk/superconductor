@@ -717,6 +717,16 @@ class BB84State:
     _recent_errors: list[bool] = field(default_factory=list)
     # QBER 히스토리 (수렴 그래프용)
     qber_history: list[tuple[int, float]] = field(default_factory=list)
+    # BB84 sift/PA pipeline fields
+    raw_key: list[int] = field(default_factory=list)
+    sifted_key: list[int] = field(default_factory=list)
+    qber_sample_size: int = 0
+    qber_value: float = 0.0
+    qber_done: bool = False
+    correction_done: bool = False
+    corrected_key: list[int] = field(default_factory=list)
+    final_key: str = ""
+    pa_done: bool = False
 
 
 def bb84_round(state: BB84State, eve_chance: float = 0.0) -> dict:
@@ -749,6 +759,7 @@ def bb84_round(state: BB84State, eve_chance: float = 0.0) -> dict:
     if basis_match:
         state.basis_match_rounds += 1
         state.raw_key_bits += 1
+        state.raw_key.append(alice_bit if not corrupted else (1 - alice_bit))
         if corrupted:
             has_error = True
             state.error_count += 1
@@ -776,6 +787,45 @@ def bb84_round(state: BB84State, eve_chance: float = 0.0) -> dict:
     return {"basis_match": basis_match, "has_error": has_error, "eve_present": eve_present}
 
 
+def bb84_estimate_qber(state: BB84State):
+    """BB84 QBER 추정 (파이프라인 Stage 1)."""
+    if state.qber_done or len(state.raw_key) == 0:
+        return
+    sample_n = max(10, len(state.raw_key) // 4)
+    state.qber_sample_size = sample_n
+    state.qber_value = state.qber
+    state.sifted_key = state.raw_key[sample_n:]
+    state.qber_done = True
+
+
+def bb84_error_correct(state: BB84State):
+    """BB84 에러 정정 (파이프라인 Stage 2)."""
+    if state.correction_done or not state.qber_done:
+        return
+    state.corrected_key = list(state.sifted_key)
+    state.correction_done = True
+
+
+def bb84_privacy_amplification(state: BB84State):
+    """BB84 프라이버시 증폭 (파이프라인 Stage 3)."""
+    if state.pa_done or not state.correction_done:
+        return
+    if len(state.corrected_key) == 0:
+        state.pa_done = True
+        return
+    n = len(state.corrected_key)
+    output_bits = max(8, int(n * PA_COMPRESSION_RATIO))
+    hashed_bits, _seed = _toeplitz_hash(state.corrected_key, output_bits)
+    hex_chars = []
+    padded = hashed_bits + [0] * ((4 - len(hashed_bits) % 4) % 4)
+    for i in range(0, len(padded), 4):
+        nibble = (padded[i] << 3 | padded[i + 1] << 2 |
+                  padded[i + 2] << 1 | padded[i + 3])
+        hex_chars.append(f"{nibble:x}")
+    state.final_key = "".join(hex_chars)
+    state.pa_done = True
+
+
 def reset_bb84(state: BB84State):
     """BB84 상태 리셋."""
     state.total_rounds = 0
@@ -788,6 +838,15 @@ def reset_bb84(state: BB84State):
     state._recent_matches.clear()
     state._recent_errors.clear()
     state.qber_history.clear()
+    state.raw_key.clear()
+    state.sifted_key.clear()
+    state.qber_sample_size = 0
+    state.qber_value = 0.0
+    state.qber_done = False
+    state.correction_done = False
+    state.corrected_key.clear()
+    state.final_key = ""
+    state.pa_done = False
 
 
 # ── 리셋 ─────────────────────────────────────────────

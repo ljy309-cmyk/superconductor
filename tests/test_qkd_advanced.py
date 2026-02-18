@@ -1649,5 +1649,132 @@ class TestLocaleRound11Keys(unittest.TestCase):
         self.assertEqual(ko_keys - en_keys, set())
 
 
+class TestBB84Pipeline(unittest.TestCase):
+    """BB84 sift/PA 파이프라인 테스트."""
+
+    def test_bb84_estimate_qber(self):
+        from security.qkd_advanced_engine import (
+            BB84State, bb84_round, bb84_estimate_qber,
+        )
+        state = BB84State()
+        for _ in range(200):
+            bb84_round(state, eve_chance=0.0)
+        self.assertGreater(len(state.raw_key), 0)
+        bb84_estimate_qber(state)
+        self.assertTrue(state.qber_done)
+        self.assertGreater(state.qber_sample_size, 0)
+        self.assertGreater(len(state.sifted_key), 0)
+
+    def test_bb84_full_pipeline(self):
+        from security.qkd_advanced_engine import (
+            BB84State, bb84_round, bb84_estimate_qber,
+            bb84_error_correct, bb84_privacy_amplification,
+        )
+        state = BB84State()
+        for _ in range(500):
+            bb84_round(state, eve_chance=0.0)
+        bb84_estimate_qber(state)
+        bb84_error_correct(state)
+        self.assertTrue(state.correction_done)
+        bb84_privacy_amplification(state)
+        self.assertTrue(state.pa_done)
+        self.assertGreater(len(state.final_key), 0)
+
+    def test_bb84_pipeline_idempotent(self):
+        """이미 완료된 단계 재호출 시 상태 변경 없음."""
+        from security.qkd_advanced_engine import (
+            BB84State, bb84_round, bb84_estimate_qber,
+            bb84_error_correct, bb84_privacy_amplification,
+        )
+        state = BB84State()
+        for _ in range(300):
+            bb84_round(state, eve_chance=0.0)
+        bb84_estimate_qber(state)
+        bb84_error_correct(state)
+        bb84_privacy_amplification(state)
+        key1 = state.final_key
+        # 재호출
+        bb84_estimate_qber(state)
+        bb84_error_correct(state)
+        bb84_privacy_amplification(state)
+        self.assertEqual(state.final_key, key1)
+
+    def test_bb84_reset_clears_pipeline(self):
+        from security.qkd_advanced_engine import (
+            BB84State, bb84_round, bb84_estimate_qber,
+            bb84_error_correct, bb84_privacy_amplification, reset_bb84,
+        )
+        state = BB84State()
+        for _ in range(300):
+            bb84_round(state, eve_chance=0.0)
+        bb84_estimate_qber(state)
+        bb84_error_correct(state)
+        bb84_privacy_amplification(state)
+        self.assertTrue(state.pa_done)
+        reset_bb84(state)
+        self.assertFalse(state.pa_done)
+        self.assertFalse(state.qber_done)
+        self.assertEqual(state.final_key, "")
+        self.assertEqual(len(state.raw_key), 0)
+
+    def test_bb84_raw_key_tracks_bits(self):
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(100):
+            bb84_round(state, eve_chance=0.0)
+        self.assertEqual(len(state.raw_key), state.raw_key_bits)
+
+
+class TestStatsExport(unittest.TestCase):
+    """통계 내보내기 테스트."""
+
+    def test_export_creates_file(self):
+        import json
+        import tempfile
+        from security.qkd_advanced_engine import E91State, GHZState, BB84State
+        from security.qkd_advanced import _export_stats
+
+        e91 = E91State()
+        ghz = GHZState()
+        bb84 = BB84State()
+        e91_cmp = E91State()
+
+        # 임시 디렉토리로 export 경로 변경하지 않고 실제 호출
+        _export_stats(0, e91, ghz, bb84, e91_cmp)
+
+        # exports 디렉토리에 파일이 생겼는지 확인
+        import os
+        export_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "exports"
+        )
+        files = [f for f in os.listdir(export_dir) if f.startswith("qkd_stats_")]
+        self.assertGreater(len(files), 0)
+
+        # 파일 내용 확인
+        latest = sorted(files)[-1]
+        with open(os.path.join(export_dir, latest)) as f:
+            data = json.load(f)
+        self.assertIn("e91", data)
+        self.assertIn("ghz", data)
+        self.assertEqual(data["mode"], "E91")
+
+
+class TestLocaleExportKey(unittest.TestCase):
+    """내보내기 로케일 키 확인."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_export_key_exists(self):
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        self.assertIn("qa_sc_export", en)
+        self.assertIn("qa_sc_export", ko)
+
+
 if __name__ == "__main__":
     unittest.main()

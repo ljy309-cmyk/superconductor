@@ -159,6 +159,7 @@
   "qa_sc_help": "도움말 오버레이",
   "qa_sc_shortcuts": "이 패널 전환",
   "qa_sc_exit": "메뉴로 돌아가기",
+  "qa_sc_export": "통계 내보내기 (JSON)",
   "game_title_scada_security": "SCADA 보안 — MITM 공격 & 양자 방어",
   "ss_sensor": "센서",
   "ss_temp_sensor": "온도 센서",
