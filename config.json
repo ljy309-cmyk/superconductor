@@ -19,7 +19,12 @@
   "ml": {
     "n_estimators": 100,
     "test_size": 0.2,
-    "random_state": 42
+    "random_state": 42,
+    "gbr_max_depth": 4,
+    "gbr_learning_rate": 0.1,
+    "svr_c": 100.0,
+    "svr_epsilon": 0.1,
+    "perm_importance_repeats": 10
   },
   "data_gen": {
     "sample_size": 200

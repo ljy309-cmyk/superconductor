@@ -32,7 +32,7 @@
   "btn_qec_shield": "3-3. Quantum Error Correction (QEC Shield)",
   "btn_squid_mines": "4-1. SQUID Minesweeper (Magnetic Flux Sensor)",
   "btn_bb84": "4-2. BB84 Quantum Key Distribution Defense",
-  "btn_tc_predictor": "5-1. AI New Material Tc Prediction (RandomForest)",
+  "btn_tc_predictor": "5-1. AI New Material Tc Prediction (Multi-Model)",
   "btn_qrng": "5-2. QRNG Quantum Random Number Generator",
   "btn_ranking": "5-3. Global Multiplayer Ranking",
   "btn_stats": "5-4. Play Statistics Dashboard",

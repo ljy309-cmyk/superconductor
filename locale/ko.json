@@ -32,7 +32,7 @@
   "btn_qec_shield": "3-3. 양자 오류 정정 (QEC Shield)",
   "btn_squid_mines": "4-1. SQUID 지뢰찾기 (Magnetic Flux Sensor)",
   "btn_bb84": "4-2. BB84 양자 암호 통신 방어전",
-  "btn_tc_predictor": "5-1. AI 신소재 Tc 예측 (RandomForest)",
+  "btn_tc_predictor": "5-1. AI 신소재 Tc 예측 (Multi-Model)",
   "btn_qrng": "5-2. QRNG 양자 난수 생성 로그",
   "btn_ranking": "5-3. 글로벌 멀티플레이어 랭킹",
   "btn_stats": "5-4. 플레이 통계 대시보드 (Stats)",
