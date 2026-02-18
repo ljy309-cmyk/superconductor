@@ -576,5 +576,19 @@
 
   "volume_label": "Vol: {vol}%",
   "volume_muted": "Muted",
-  "mute_toggle": "Mute"
+  "mute_toggle": "Mute",
+
+  "qa_channel_cap": "Channel Capacity",
+  "qa_secure_rate": "Secure Rate: {r:.2f} bit/round",
+  "qa_bloch_title": "Bloch Sphere",
+  "qa_entropy_title": "Entropy & Privacy",
+  "qa_entropy_raw": "Raw H(K)={h:.3f} ({n} bits)",
+  "qa_entropy_eve": "Eve H(E)={h:.3f}",
+  "qa_entropy_final": "Final: {bits}b ({pct:.0f}% of raw)",
+  "qa_entropy_pending": "Final: awaiting PA...",
+  "qa_agreement_title": "Key Agreement",
+  "qa_bench_title": "Benchmark — BB84 vs E91",
+  "qa_bench_done": "Benchmark complete!",
+  "qa_bench_close": "Press B to close",
+  "qa_sc_bench": "Benchmark"
 }

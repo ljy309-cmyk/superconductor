@@ -2197,5 +2197,145 @@ class TestRound17Features(unittest.TestCase):
                          f"ko에만: {ko_keys - en_keys}")
 
 
+class TestRound18Features(unittest.TestCase):
+    """R18: channel capacity, bloch sphere, entropy, agreement, benchmark."""
+
+    @staticmethod
+    def _load_json(path):
+        import json as _json
+        with open(path, encoding="utf-8") as f:
+            return _json.load(f)
+
+    def test_round18_locale_keys(self):
+        """R18 로캘 키가 en/ko 모두 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        r18_keys = [
+            "qa_channel_cap", "qa_secure_rate", "qa_bloch_title",
+            "qa_entropy_title", "qa_entropy_raw", "qa_entropy_eve",
+            "qa_entropy_final", "qa_entropy_pending",
+            "qa_agreement_title", "qa_bench_title", "qa_bench_done",
+            "qa_bench_close", "qa_sc_bench",
+        ]
+        for key in r18_keys:
+            self.assertIn(key, en, f"en missing {key}")
+            self.assertIn(key, ko, f"ko missing {key}")
+
+    def test_channel_capacity_no_eve(self):
+        """Eve 없이 채널 용량 계산 — I(A;B) 높고, I(E;B) 낮아야."""
+        from security.qkd_advanced_engine import (
+            E91State, e91_round, compute_bell_S,
+        )
+        state = E91State()
+        for _ in range(500):
+            e91_round(state, eve_chance=0.0)
+        compute_bell_S(state)
+        # Eve 없으면 I(A;B) 높음
+        self.assertGreater(state.mutual_info, 0.5)
+        self.assertLess(state.eve_info, 0.5)
+        self.assertGreater(state.secure_key_rate, 0.0)
+
+    def test_channel_capacity_with_eve(self):
+        """Eve 있으면 채널 용량 감소."""
+        from security.qkd_advanced_engine import (
+            E91State, e91_round, compute_bell_S,
+        )
+        state = E91State()
+        for _ in range(500):
+            e91_round(state, eve_chance=1.0)
+        compute_bell_S(state)
+        # Eve가 있으면 secure_key_rate 감소
+        self.assertLess(state.secure_key_rate, 0.8)
+
+    def test_channel_history_recorded(self):
+        """채널 히스토리가 20 라운드마다 기록."""
+        from security.qkd_advanced_engine import (
+            E91State, e91_round, compute_bell_S,
+        )
+        state = E91State()
+        for _ in range(100):
+            e91_round(state, eve_chance=0.0)
+        compute_bell_S(state)
+        self.assertGreater(len(state.channel_history), 0)
+        # 각 항목은 (round, I_AB, I_EB) 튜플
+        entry = state.channel_history[0]
+        self.assertEqual(len(entry), 3)
+
+    def test_agreement_history_recorded(self):
+        """키 합의율 히스토리가 기록."""
+        from security.qkd_advanced_engine import (
+            E91State, e91_round, compute_bell_S,
+        )
+        state = E91State()
+        for _ in range(200):
+            e91_round(state, eve_chance=0.0)
+        compute_bell_S(state)
+        # 키 라운드가 있으면 히스토리 존재
+        if state.key_rounds > 0:
+            self.assertGreater(len(state.agreement_history), 0)
+            # 값이 0~1 범위
+            _, rate = state.agreement_history[-1]
+            self.assertGreaterEqual(rate, 0.0)
+            self.assertLessEqual(rate, 1.0)
+
+    def test_binary_entropy_function(self):
+        """이진 엔트로피 함수 검증."""
+        from security.qkd_advanced_engine import _binary_entropy
+        # h(0) = 0, h(1) = 0
+        self.assertAlmostEqual(_binary_entropy(0.0), 0.0)
+        self.assertAlmostEqual(_binary_entropy(1.0), 0.0)
+        # h(0.5) = 1.0
+        self.assertAlmostEqual(_binary_entropy(0.5), 1.0, places=5)
+        # h(0.11) ≈ 0.5
+        h_011 = _binary_entropy(0.11)
+        self.assertGreater(h_011, 0.3)
+        self.assertLess(h_011, 0.7)
+
+    def test_channel_capacity_reset(self):
+        """리셋 시 채널 용량 필드 클리어."""
+        from security.qkd_advanced_engine import (
+            E91State, e91_round, compute_bell_S, reset_e91,
+        )
+        state = E91State()
+        for _ in range(100):
+            e91_round(state, eve_chance=0.0)
+        compute_bell_S(state)
+        reset_e91(state)
+        self.assertEqual(state.mutual_info, 0.0)
+        self.assertEqual(state.eve_info, 0.0)
+        self.assertEqual(state.secure_key_rate, 0.0)
+        self.assertEqual(len(state.channel_history), 0)
+        self.assertEqual(len(state.agreement_history), 0)
+
+    def test_benchmark_runs(self):
+        """벤치마크 함수가 올바른 결과 반환."""
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from security.qkd_advanced import _run_benchmark
+        results = _run_benchmark()
+        self.assertEqual(len(results), 4)  # 4 Eve levels
+        for r in results:
+            self.assertIn("eve", r)
+            self.assertIn("bb84_qber", r)
+            self.assertIn("e91_bell_S", r)
+            self.assertIn("bb84_final", r)
+            self.assertIn("e91_final", r)
+            self.assertGreaterEqual(r["bb84_key"], 0)
+            self.assertGreaterEqual(r["e91_key"], 0)
+
+    def test_en_ko_keys_match_round18(self):
+        """en.json과 ko.json 키 완전 일치 (R18 포함)."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        self.assertEqual(en_keys - ko_keys, set(),
+                         f"en에만: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(),
+                         f"ko에만: {ko_keys - en_keys}")
+
+
 if __name__ == "__main__":
     unittest.main()

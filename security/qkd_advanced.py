@@ -50,6 +50,7 @@ from security.qkd_advanced_engine import (
     NOISE_MODELS,
     cycle_noise_model,
     get_noise_model,
+    _binary_entropy,
 )
 from sound_manager import get_sound_manager
 from theme import load_pg_colors, on_theme_change, toggle_theme
@@ -304,6 +305,9 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     # 얽힘 증인 게이지
     _draw_witness_gauge(screen, e91, font, big_font)
 
+    # 블로흐 구 시각화 (E91 측정 축)
+    _draw_bloch_sphere(screen, e91, font, big_font)
+
     # Bell S 시계열 수렴 그래프
     _draw_bell_s_graph(screen, e91.bell_S_history, 480, 340, 390, 170,
                        font, big_font)
@@ -355,6 +359,97 @@ def _draw_witness_gauge(screen, e91: E91State, font, big_font):
     # 라벨
     lbl = font.render(t("qa_witness_title"), True, SUBTEXT_CLR)
     screen.blit(lbl, (gx - lbl.get_width() // 2, gy - gr - 14))
+
+
+def _draw_bloch_sphere(screen, e91: E91State, font, big_font):
+    """2D 블로흐 구 — Alice/Bob 측정 축 시각화."""
+    if not e91.rounds:
+        return
+    cx, cy = 660, 120
+    radius = 36
+
+    # 원 (적도)
+    pygame.draw.circle(screen, OVERLAY, (cx, cy), radius, 1)
+    # 십자 축 (Z, X)
+    pygame.draw.line(screen, OVERLAY, (cx, cy - radius - 4), (cx, cy + radius + 4), 1)
+    pygame.draw.line(screen, OVERLAY, (cx - radius - 4, cy), (cx + radius + 4, cy), 1)
+
+    # 축 라벨
+    z_lbl = font.render("|0⟩", True, SUBTEXT_CLR)
+    screen.blit(z_lbl, (cx - z_lbl.get_width() // 2, cy - radius - 16))
+    z1_lbl = font.render("|1⟩", True, SUBTEXT_CLR)
+    screen.blit(z1_lbl, (cx - z1_lbl.get_width() // 2, cy + radius + 4))
+
+    last = e91.rounds[-1]
+
+    # Alice 측정 축 (파란 화살표)
+    a_angle = last.alice_angle
+    ax = cx + int(radius * math.cos(-a_angle + math.pi / 2))
+    ay = cy - int(radius * math.sin(-a_angle + math.pi / 2))
+    pygame.draw.line(screen, BLUE, (cx, cy), (ax, ay), 2)
+    pygame.draw.circle(screen, BLUE, (ax, ay), 3)
+
+    # Bob 측정 축 (초록 화살표)
+    b_angle = last.bob_angle
+    bx = cx + int(radius * math.cos(-b_angle + math.pi / 2))
+    by = cy - int(radius * math.sin(-b_angle + math.pi / 2))
+    pygame.draw.line(screen, GREEN, (cx, cy), (bx, by), 2)
+    pygame.draw.circle(screen, GREEN, (bx, by), 3)
+
+    # 각도 차이 표시
+    diff = abs(a_angle - b_angle)
+    diff_deg = math.degrees(diff)
+    d_lbl = font.render(f"Δ={diff_deg:.0f}°", True, YELLOW)
+    screen.blit(d_lbl, (cx - d_lbl.get_width() // 2, cy + radius + 16))
+
+    # 라벨
+    hdr = font.render(t("qa_bloch_title"), True, SUBTEXT_CLR)
+    screen.blit(hdr, (cx - hdr.get_width() // 2, cy - radius - 28))
+
+    # 범례
+    a_leg = font.render("A", True, BLUE)
+    screen.blit(a_leg, (cx - radius - 14, cy - 5))
+    b_leg = font.render("B", True, GREEN)
+    screen.blit(b_leg, (cx + radius + 6, cy - 5))
+
+
+def _draw_channel_capacity(screen, e91: E91State, font, big_font):
+    """양자 채널 용량 미터 — I(A;B), I(E;B), secure key rate."""
+    if e91.total_rounds < 10:
+        return
+    cx, cy = 660, 200
+    w, h = 210, 90
+    pygame.draw.rect(screen, PANEL_BG, (cx, cy, w, h), border_radius=6)
+    pygame.draw.rect(screen, OVERLAY, (cx, cy, w, h), 1, border_radius=6)
+
+    hdr = big_font.render(t("qa_channel_cap"), True, ACCENT)
+    screen.blit(hdr, (cx + 6, cy + 4))
+
+    bar_x, bar_w, bar_h = cx + 6, w - 12, 8
+    # I(A;B) bar (green)
+    iab_y = cy + 22
+    lbl = font.render(f"I(A;B)={e91.mutual_info:.2f}", True, GREEN)
+    screen.blit(lbl, (bar_x, iab_y))
+    pygame.draw.rect(screen, OVERLAY, (bar_x, iab_y + 12, bar_w, bar_h), border_radius=2)
+    fill = int(bar_w * min(e91.mutual_info, 1.0))
+    if fill > 0:
+        pygame.draw.rect(screen, GREEN, (bar_x, iab_y + 12, fill, bar_h), border_radius=2)
+
+    # I(E;B) bar (red)
+    ieb_y = iab_y + 24
+    lbl = font.render(f"I(E;B)={e91.eve_info:.2f}", True, RED)
+    screen.blit(lbl, (bar_x, ieb_y))
+    pygame.draw.rect(screen, OVERLAY, (bar_x, ieb_y + 12, bar_w, bar_h), border_radius=2)
+    fill = int(bar_w * min(e91.eve_info, 1.0))
+    if fill > 0:
+        pygame.draw.rect(screen, RED, (bar_x, ieb_y + 12, fill, bar_h), border_radius=2)
+
+    # Secure key rate
+    rate_y = ieb_y + 24
+    r = e91.secure_key_rate
+    r_clr = GREEN if r > 0.5 else (YELLOW if r > 0.1 else RED)
+    rate_txt = font.render(t("qa_secure_rate", r=r), True, r_clr)
+    screen.blit(rate_txt, (bar_x, rate_y))
 
 
 def _draw_correlator_table(screen, e91: E91State, font, big_font):
@@ -417,6 +512,9 @@ def _draw_correlator_table(screen, e91: E91State, font, big_font):
         if fill_w > 0:
             pygame.draw.rect(screen, fid_clr, (bar_x, fid_y + 14, fill_w, bar_h),
                              border_radius=2)
+
+    # 양자 채널 용량 미터 (E91 우상단)
+    _draw_channel_capacity(screen, e91, font, big_font)
 
     # 누적 키 생성 차트 (E91 우하단)
     if len(e91.key_accumulation) >= 2:
@@ -541,6 +639,14 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
         # OTP 암호화 데모
         _draw_otp_demo(screen, e91.final_key, 460, ky + 68, font, big_font)
 
+    # 키 합의 타임라인 (충분한 데이터 후)
+    if len(e91.agreement_history) >= 2:
+        _draw_agreement_timeline(screen, e91.agreement_history,
+                                  460, 300, 400, 70, font, big_font)
+
+    # 엔트로피 & 프라이버시 대시보드
+    _draw_entropy_dashboard(screen, e91, 460, 380, font, big_font)
+
     # 통계
     stats_y = 420
     raw_n = len(e91.raw_key_alice)
@@ -597,6 +703,107 @@ def _draw_error_heatmap(screen, e91: E91State, x, y, font, big_font):
     leg_txt = font.render(t("qa_error_legend", n=len(e91.error_positions),
                              total=key_len), True, SUBTEXT_CLR)
     screen.blit(leg_txt, (x, hy + cell_h + 3))
+
+
+def _draw_agreement_timeline(screen, history, x, y, w, h, font, big_font):
+    """키 합의율 타임라인 — Alice-Bob 일치율 추이."""
+    pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=6)
+    pygame.draw.rect(screen, OVERLAY, (x, y, w, h), 1, border_radius=6)
+
+    hdr = big_font.render(t("qa_agreement_title"), True, ACCENT)
+    screen.blit(hdr, (x + 6, y + 4))
+
+    pad_l, pad_r, pad_t, pad_b = 38, 8, 22, 14
+    gx = x + pad_l
+    gy = y + pad_t
+    gw = w - pad_l - pad_r
+    gh = h - pad_t - pad_b
+    if gw < 10 or gh < 10:
+        return
+
+    # Y: 0.5 ~ 1.0
+    y_min, y_max = 0.5, 1.0
+
+    # 100% 라인 (점선)
+    top_py = gy
+    for dx in range(0, gw, 8):
+        x1 = gx + dx
+        x2 = min(gx + dx + 4, gx + gw)
+        pygame.draw.line(screen, GREEN, (x1, top_py), (x2, top_py), 1)
+
+    # Y축 라벨
+    for val in (0.5, 0.75, 1.0):
+        py = gy + gh - int((val - y_min) / (y_max - y_min) * gh)
+        lbl = font.render(f"{val * 100:.0f}%", True, SUBTEXT_CLR)
+        screen.blit(lbl, (gx - lbl.get_width() - 3, py - 5))
+
+    n = len(history)
+    points = []
+    for i, (_rd, agree) in enumerate(history):
+        px = gx + int(i / max(n - 1, 1) * gw)
+        clamped = max(y_min, min(agree, y_max))
+        py = gy + gh - int((clamped - y_min) / (y_max - y_min) * gh)
+        points.append((px, py))
+
+    if len(points) >= 2:
+        pygame.draw.lines(screen, PEACH, False, points, 2)
+    if points:
+        pygame.draw.circle(screen, WHITE, points[-1], 3)
+        # 현재 값 표시
+        cur_val = history[-1][1]
+        v_lbl = font.render(f"{cur_val * 100:.1f}%", True, PEACH)
+        screen.blit(v_lbl, (gx + gw - v_lbl.get_width(), gy + 2))
+
+
+def _draw_entropy_dashboard(screen, e91: E91State, x, y, font, big_font):
+    """엔트로피 & 프라이버시 대시보드 — Shannon 엔트로피 시각화."""
+    if not e91.qber_done and len(e91.raw_key_alice) == 0:
+        return
+    w, h = 400, 90
+    pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=6)
+    pygame.draw.rect(screen, OVERLAY, (x, y, w, h), 1, border_radius=6)
+
+    hdr = big_font.render(t("qa_entropy_title"), True, ACCENT)
+    screen.blit(hdr, (x + 6, y + 4))
+
+    bar_x, bar_w, bar_h = x + 6, w - 12, 10
+    raw_n = len(e91.raw_key_alice)
+    corr_n = len(e91.corrected_key)
+    final_n = len(e91.final_key) * 4  # hex to bits
+
+    # Raw key entropy
+    ry = y + 22
+    if raw_n > 0:
+        ones = sum(e91.raw_key_alice)
+        p = ones / raw_n if raw_n > 0 else 0.5
+        h_raw = _binary_entropy(p)
+    else:
+        h_raw = 0.0
+    lbl = font.render(t("qa_entropy_raw", h=h_raw, n=raw_n), True, BLUE)
+    screen.blit(lbl, (bar_x, ry))
+    pygame.draw.rect(screen, OVERLAY, (bar_x, ry + 12, bar_w, bar_h), border_radius=2)
+    fill = int(bar_w * min(h_raw, 1.0))
+    if fill > 0:
+        pygame.draw.rect(screen, BLUE, (bar_x, ry + 12, fill, bar_h), border_radius=2)
+
+    # Eve info (red)
+    ey = ry + 24
+    h_eve = _binary_entropy(e91.qber_value) if e91.qber_done else 0.0
+    lbl = font.render(t("qa_entropy_eve", h=h_eve), True, RED)
+    screen.blit(lbl, (bar_x, ey))
+    pygame.draw.rect(screen, OVERLAY, (bar_x, ey + 12, bar_w, bar_h), border_radius=2)
+    fill = int(bar_w * min(h_eve, 1.0))
+    if fill > 0:
+        pygame.draw.rect(screen, RED, (bar_x, ey + 12, fill, bar_h), border_radius=2)
+
+    # Final key entropy (after PA)
+    fy = ey + 24
+    if final_n > 0 and raw_n > 0:
+        compression = final_n / raw_n
+        lbl = font.render(t("qa_entropy_final", bits=final_n, pct=compression * 100), True, MAUVE)
+    else:
+        lbl = font.render(t("qa_entropy_pending"), True, SUBTEXT_CLR)
+    screen.blit(lbl, (bar_x, fy))
 
 
 def _draw_key_bits(screen, label, bits, color, x, y, font, big_font):
@@ -1468,6 +1675,108 @@ def _draw_key_accumulation(screen, history, x, y, w, h, font, big_font):
 
 # ── 통계 내보내기 ─────────────────────────────────────
 
+def _run_benchmark() -> list[dict]:
+    """자동 벤치마크 — 다양한 Eve 조건에서 BB84/E91 비교.
+
+    Returns:
+        list of dicts with benchmark results per scenario.
+    """
+    results = []
+    eve_levels = [0.0, 0.3, 0.5, 1.0]
+    rounds_per = 200
+
+    for eve in eve_levels:
+        # BB84
+        bb = BB84State()
+        for _ in range(rounds_per):
+            bb84_round(bb, eve)
+        bb84_estimate_qber(bb)
+        bb84_error_correct(bb)
+        bb84_privacy_amplification(bb)
+
+        # E91
+        es = E91State()
+        for _ in range(rounds_per):
+            e91_round(es, eve)
+        compute_bell_S(es)
+        key_sift(es)
+        privacy_amplification(es)
+
+        results.append({
+            "eve": eve,
+            "bb84_qber": round(bb.qber, 3),
+            "bb84_key": bb.raw_key_bits,
+            "bb84_final": len(bb.final_key) * 4,
+            "bb84_detected": bb.eve_detected,
+            "e91_bell_S": round(abs(es.bell_S), 3),
+            "e91_key": es.key_rounds,
+            "e91_final": len(es.final_key) * 4,
+            "e91_secure": es.bell_violated,
+        })
+    return results
+
+
+def _draw_benchmark_overlay(screen, results: list[dict], font, big_font):
+    """벤치마크 결과 오버레이."""
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))
+    screen.blit(overlay, (0, 0))
+
+    pw, ph = 700, 280
+    px = WIDTH // 2 - pw // 2
+    py = HEIGHT // 2 - ph // 2
+    pygame.draw.rect(screen, PANEL_BG, (px, py, pw, ph), border_radius=8)
+    pygame.draw.rect(screen, ACCENT, (px, py, pw, ph), 2, border_radius=8)
+
+    title = big_font.render(t("qa_bench_title"), True, ACCENT)
+    screen.blit(title, (px + pw // 2 - title.get_width() // 2, py + 8))
+
+    # 헤더
+    headers = ["Eve %", "BB84 QBER", "BB84 Key", "BB84 Det", "E91 |S|", "E91 Key", "E91 Sec"]
+    col_w = (pw - 40) // len(headers)
+    hy = py + 32
+    for i, h in enumerate(headers):
+        s = font.render(h, True, ACCENT)
+        screen.blit(s, (px + 20 + i * col_w, hy))
+
+    # 행
+    for ri, r in enumerate(results):
+        ry = hy + 18 + ri * 40
+        vals = [
+            (f"{r['eve'] * 100:.0f}%", TEXT_CLR),
+            (f"{r['bb84_qber'] * 100:.1f}%", RED if r['bb84_qber'] > 0.11 else GREEN),
+            (f"{r['bb84_key']}→{r['bb84_final']}b", BLUE),
+            ("YES" if r['bb84_detected'] else "NO", RED if r['bb84_detected'] else GREEN),
+            (f"{r['e91_bell_S']:.2f}", GREEN if r['e91_secure'] else RED),
+            (f"{r['e91_key']}→{r['e91_final']}b", MAUVE),
+            ("OK" if r['e91_secure'] else "!!", GREEN if r['e91_secure'] else RED),
+        ]
+        for ci, (v, clr) in enumerate(vals):
+            s = font.render(v, True, clr)
+            screen.blit(s, (px + 20 + ci * col_w, ry))
+
+        # BB84/E91 비교 바 (작은 시각화)
+        bar_y = ry + 14
+        bar_w = col_w * len(headers) - 10
+        bar_h = 4
+        # BB84 final (blue)
+        bb_ratio = min(r['bb84_final'] / max(r['bb84_key'], 1), 1.0)
+        e91_ratio = min(r['e91_final'] / max(r['e91_key'], 1), 1.0)
+        half = bar_w // 2
+        pygame.draw.rect(screen, OVERLAY, (px + 20, bar_y, half - 2, bar_h), border_radius=1)
+        bb_fill = int((half - 2) * bb_ratio)
+        if bb_fill > 0:
+            pygame.draw.rect(screen, BLUE, (px + 20, bar_y, bb_fill, bar_h), border_radius=1)
+        pygame.draw.rect(screen, OVERLAY, (px + 20 + half, bar_y, half - 2, bar_h), border_radius=1)
+        e91_fill = int((half - 2) * e91_ratio)
+        if e91_fill > 0:
+            pygame.draw.rect(screen, MAUVE, (px + 20 + half, bar_y, e91_fill, bar_h), border_radius=1)
+
+    # 닫기 힌트
+    hint = font.render(t("qa_bench_close"), True, SUBTEXT_CLR)
+    screen.blit(hint, (px + pw // 2 - hint.get_width() // 2, py + ph - 18))
+
+
 def _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp):
     """현재 시뮬레이션 통계를 JSON 파일로 내보내기."""
     import json
@@ -1600,6 +1909,7 @@ def run_simulation():
     step_mode = False  # 단계별 학습 모드
     _step_milestone = 0  # 현재 마일스톤 인덱스
     _step_waiting = False  # 마일스톤 도달 → 일시정지 대기
+    _benchmark_results: list[dict] | None = None  # 벤치마크 결과
 
     help_overlay = HelpOverlay("qkd_advanced")
     tutorial = TutorialOverlay("qkd_advanced")
@@ -1735,6 +2045,12 @@ def run_simulation():
                 elif event.key == pygame.K_n:
                     noise_model = cycle_noise_model()
                     _toasts.append([t("qa_noise_model", model=noise_model), PEACH, 2.0])
+                elif event.key == pygame.K_b:
+                    if _benchmark_results is not None:
+                        _benchmark_results = None
+                    else:
+                        _benchmark_results = _run_benchmark()
+                        _toasts.append([t("qa_bench_done"), ACCENT, 2.0])
                 elif event.key == pygame.K_UP and mode == MODE_GHZ:
                     if ghz.n_parties < GHZ_MAX_PARTIES:
                         resize_ghz(ghz, ghz.n_parties + 1)
@@ -2104,6 +2420,7 @@ def run_simulation():
                 f"T       {t('qa_sc_theme')}",
                 f"N       {t('qa_sc_noise')}",
                 f"H       {t('qa_sc_step')}",
+                f"B       {t('qa_sc_bench')}",
                 f"Up/Down {t('qa_sc_updown')}",
                 f"[ / ]   {t('qa_sc_speed')}",
                 f"F1      {t('qa_sc_help')}",
@@ -2138,6 +2455,10 @@ def run_simulation():
             pygame.draw.rect(screen, t_clr, (tx - 4, ty - 2,
                              t_surf.get_width() + 16, 18), 1, border_radius=3)
             screen.blit(t_surf, (tx + 4, ty))
+
+        # 벤치마크 결과 오버레이
+        if _benchmark_results is not None:
+            _draw_benchmark_overlay(screen, _benchmark_results, font, big_font)
 
         help_overlay.draw(screen, font)
         tutorial.draw(screen, font)

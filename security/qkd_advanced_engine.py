@@ -137,6 +137,14 @@ class E91State:
     # 누적 키 생성 히스토리 (차트용)
     key_accumulation: list[tuple[int, int]] = field(default_factory=list)
 
+    # R18: 채널 용량 & 엔트로피 추적
+    mutual_info: float = 0.0  # I(A;B) 상호 정보량
+    eve_info: float = 0.0  # I(E;B) Eve 정보량 추정
+    secure_key_rate: float = 0.0  # r = I(A;B) - I(E;B)
+    channel_history: list[tuple[int, float, float]] = field(default_factory=list)  # (round, I_AB, I_EB)
+    # 키 합의 추적 (라운드별 Alice-Bob 일치율)
+    agreement_history: list[tuple[int, float]] = field(default_factory=list)
+
 
 # ── 양자 노이즈 모델 ─────────────────────────────────
 NOISE_MODELS = ["depolarizing", "dephasing", "amplitude_damping"]
@@ -325,7 +333,54 @@ def compute_bell_S(state: E91State) -> float:
     if len(state.witness_history) > 200:
         state.witness_history.pop(0)
 
+    # R18: 채널 용량 계산 — I(A;B), I(E;B), secure key rate
+    _compute_channel_capacity(state)
+
     return S
+
+
+def _compute_channel_capacity(state: E91State):
+    """양자 채널 용량 계산.
+
+    I(A;B) = 1 - h(QBER)  (binary Shannon entropy)
+    I(E;B) = h(QBER)      (Eve's information estimate from QBER)
+    Secure key rate r = max(0, I(A;B) - I(E;B))
+    """
+    # QBER 기반 추정 (실시간)
+    if state.key_rounds > 0 and len(state.raw_key_alice) > 0:
+        n = min(len(state.raw_key_alice), len(state.raw_key_bob))
+        errors = sum(1 for i in range(n) if state.raw_key_alice[i] != state.raw_key_bob[i])
+        qber_est = errors / n if n > 0 else 0.0
+    else:
+        qber_est = 0.0
+
+    h_q = _binary_entropy(qber_est)
+    state.mutual_info = max(0.0, 1.0 - h_q)  # I(A;B)
+    state.eve_info = h_q  # I(E;B) simplified estimate
+    state.secure_key_rate = max(0.0, state.mutual_info - state.eve_info)
+
+    # 히스토리 기록 (20 라운드마다)
+    if state.total_rounds % 20 == 0 and state.total_rounds > 0:
+        state.channel_history.append(
+            (state.total_rounds, state.mutual_info, state.eve_info))
+        if len(state.channel_history) > 200:
+            state.channel_history.pop(0)
+
+    # 키 합의율 히스토리
+    if state.key_rounds > 0 and state.total_rounds % 20 == 0:
+        n = min(len(state.raw_key_alice), len(state.raw_key_bob))
+        if n > 0:
+            agree = sum(1 for i in range(n) if state.raw_key_alice[i] == state.raw_key_bob[i])
+            state.agreement_history.append((state.total_rounds, agree / n))
+            if len(state.agreement_history) > 200:
+                state.agreement_history.pop(0)
+
+
+def _binary_entropy(p: float) -> float:
+    """이진 Shannon 엔트로피 h(p) = -p*log2(p) - (1-p)*log2(1-p)."""
+    if p <= 0.0 or p >= 1.0:
+        return 0.0
+    return -p * math.log2(p) - (1 - p) * math.log2(1 - p)
 
 
 # ── QKD 후처리 파이프라인 ─────────────────────────────
@@ -975,6 +1030,11 @@ def reset_e91(state: E91State):
     state.witness_value = 0.0
     state.witness_history.clear()
     state.error_positions.clear()
+    state.mutual_info = 0.0
+    state.eve_info = 0.0
+    state.secure_key_rate = 0.0
+    state.channel_history.clear()
+    state.agreement_history.clear()
 
 
 def reset_ghz(state: GHZState):

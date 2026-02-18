@@ -576,5 +576,19 @@
 
   "volume_label": "볼륨: {vol}%",
   "volume_muted": "음소거",
-  "mute_toggle": "음소거"
+  "mute_toggle": "음소거",
+
+  "qa_channel_cap": "채널 용량",
+  "qa_secure_rate": "보안 키율: {r:.2f} bit/round",
+  "qa_bloch_title": "블로흐 구",
+  "qa_entropy_title": "엔트로피 & 프라이버시",
+  "qa_entropy_raw": "원시 H(K)={h:.3f} ({n} bits)",
+  "qa_entropy_eve": "Eve H(E)={h:.3f}",
+  "qa_entropy_final": "최종: {bits}b (원시의 {pct:.0f}%)",
+  "qa_entropy_pending": "최종: PA 대기 중...",
+  "qa_agreement_title": "키 합의율",
+  "qa_bench_title": "벤치마크 — BB84 vs E91",
+  "qa_bench_done": "벤치마크 완료!",
+  "qa_bench_close": "B 키로 닫기",
+  "qa_sc_bench": "벤치마크"
 }
