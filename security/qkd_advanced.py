@@ -24,6 +24,8 @@ from security.qkd_advanced_engine import (
     GHZState,
     compute_bell_S,
     e91_round,
+    error_correct,
+    estimate_qber,
     ghz_key_sift,
     ghz_privacy_amplification,
     ghz_round,
@@ -238,89 +240,99 @@ def _draw_correlator_table(screen, e91: E91State, font, big_font):
 # ── Key Sift & PA 모드 ──────────────────────────────
 
 def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
-    """키 시프팅 & 프라이버시 증폭 시각화."""
-    sy = 80
+    """QKD 후처리 파이프라인 시각화 (4단계)."""
+    sy = 68
 
-    # 파이프라인 다이어그램
+    # 4단계 파이프라인
+    corrected_bits = len(e91.corrected_key)
     stages = [
-        ("Raw Key", len(e91.raw_key_alice), BLUE),
-        ("Key Sift", len(e91.sifted_key), GREEN),
-        ("Privacy Amp", len(e91.final_key) * 4, MAUVE),  # hex → bits
+        ("Raw Key", len(e91.raw_key_alice), BLUE,
+         len(e91.raw_key_alice) > 0),
+        ("QBER Est.", e91.qber_sample_size, YELLOW,
+         e91.qber_done),
+        ("Error Corr.", corrected_bits, GREEN,
+         e91.correction_done),
+        ("Privacy Amp", len(e91.final_key) * 4, MAUVE,
+         e91.pa_done),
     ]
 
-    box_w = 160
+    box_w = 130
     box_h = 50
-    gap = 60
-    start_x = (WIDTH - (box_w * 3 + gap * 2)) // 2
+    gap = 32
+    start_x = (WIDTH - (box_w * 4 + gap * 3)) // 2
 
-    for i, (label, size, clr) in enumerate(stages):
+    for i, (label, size, clr, done) in enumerate(stages):
         bx = start_x + i * (box_w + gap)
         by = sy
 
-        # 박스
         pygame.draw.rect(screen, PANEL_BG, (bx, by, box_w, box_h), border_radius=8)
-        done = (i == 0 and len(e91.raw_key_alice) > 0) or \
-               (i == 1 and e91.sift_done) or \
-               (i == 2 and e91.pa_done)
         border_clr = clr if done else OVERLAY
         pygame.draw.rect(screen, border_clr, (bx, by, box_w, box_h), 2, border_radius=8)
 
-        # 라벨
         lbl = big_font.render(label, True, clr if done else SUBTEXT_CLR)
         screen.blit(lbl, (bx + box_w // 2 - lbl.get_width() // 2, by + 8))
 
-        # 크기
         size_txt = font.render(f"{size} bits", True, TEXT_CLR if done else SUBTEXT_CLR)
         screen.blit(size_txt, (bx + box_w // 2 - size_txt.get_width() // 2, by + 30))
 
         # 화살표
-        if i < 2:
-            ax = bx + box_w + 5
+        if i < 3:
+            ax = bx + box_w + 3
             ay = by + box_h // 2
-            pygame.draw.line(screen, SUBTEXT_CLR, (ax, ay), (ax + gap - 10, ay), 2)
+            pygame.draw.line(screen, SUBTEXT_CLR, (ax, ay), (ax + gap - 8, ay), 2)
             pygame.draw.polygon(screen, SUBTEXT_CLR,
-                                [(ax + gap - 10, ay - 4), (ax + gap - 2, ay), (ax + gap - 10, ay + 4)])
+                                [(ax + gap - 8, ay - 3), (ax + gap - 2, ay), (ax + gap - 8, ay + 3)])
 
     # 원시 키 비트 시각화
-    ky = 160
-    _draw_key_bits(screen, "Alice Raw Key", e91.raw_key_alice[:64], BLUE, 40, ky, font, big_font)
-    _draw_key_bits(screen, "Bob Raw Key", e91.raw_key_bob[:64], GREEN, 40, ky + 40, font, big_font)
+    ky = 140
+    _draw_key_bits(screen, "Alice Raw", e91.raw_key_alice[:64], BLUE, 40, ky, font, big_font)
+    _draw_key_bits(screen, "Bob Raw", e91.raw_key_bob[:64], GREEN, 40, ky + 30, font, big_font)
 
-    # 시프트 키
-    if e91.sift_done:
-        _draw_key_bits(screen, "Sifted Key", e91.sifted_key[:64], MAUVE, 40, ky + 90, font, big_font)
+    # QBER 추정 결과
+    if e91.qber_done:
+        qber_y = ky + 65
+        qber_pct = e91.qber_value * 100
+        qber_clr = RED if e91.qber_value > 0.11 else GREEN
+        qber_txt = f"QBER = {qber_pct:.1f}%  (sampled {e91.qber_sample_size} bits)"
+        screen.blit(font.render(qber_txt, True, qber_clr), (40, qber_y))
+        # QBER 해석
+        if e91.qber_value > 0.11:
+            warn = font.render("QBER > 11% — Eve suspected! Key may be compromised.", True, RED)
+            screen.blit(warn, (40, qber_y + 14))
+        else:
+            safe = font.render("QBER < 11% — Channel secure, proceeding.", True, GREEN)
+            screen.blit(safe, (40, qber_y + 14))
 
-        # 에러율
-        err_txt = f"Error Rate: {e91.error_rate * 100:.1f}%  |  Match Rate: {e91.key_match_rate * 100:.1f}%"
-        err_clr = RED if e91.error_rate > 0.11 else GREEN
-        err_surf = font.render(err_txt, True, err_clr)
-        screen.blit(err_surf, (40, ky + 130))
+    # 에러 정정 결과
+    if e91.correction_done:
+        ec_y = ky + 100
+        _draw_key_bits(screen, "Corrected", e91.corrected_key[:64], GREEN, 40, ec_y, font, big_font)
+        ec_txt = f"Error correction: {e91.correction_flips} bits flipped (block parity)"
+        screen.blit(font.render(ec_txt, True, TEXT_CLR), (40, ec_y + 18))
 
     # 최종 키
     if e91.pa_done and e91.final_key:
-        fy = ky + 160
-        header = big_font.render("Final Secure Key (SHA-256 compressed):", True, ACCENT)
+        fy = ky + 140
+        header = big_font.render("Final Key (SHA-256, simplified PA):", True, ACCENT)
         screen.blit(header, (40, fy))
-
-        # 키를 청크로 나누어 표시
         key = e91.final_key
-        chunk_size = 32
-        for i in range(0, len(key), chunk_size):
-            chunk = key[i:i + chunk_size]
-            surf = font.render(chunk, True, MAUVE)
-            screen.blit(surf, (40, fy + 18 + (i // chunk_size) * 14))
+        for i in range(0, len(key), 32):
+            chunk = key[i:i + 32]
+            screen.blit(font.render(chunk, True, MAUVE), (40, fy + 16 + (i // 32) * 14))
 
     # 통계
     stats_y = 420
+    raw_n = len(e91.raw_key_alice)
+    corr_n = len(e91.corrected_key)
+    final_n = len(e91.final_key) * 4
     stats = [
-        (f"Total E91 Rounds: {e91.total_rounds}", TEXT_CLR),
-        (f"Key Rounds: {e91.key_rounds}  |  Bell Test Rounds: {e91.bell_rounds}", TEXT_CLR),
-        (f"Raw Key: {len(e91.raw_key_alice)} bits  →  Sifted: {len(e91.sifted_key)} bits  →  Final: {len(e91.final_key) * 4} bits", ACCENT),
+        (f"E91 Rounds: {e91.total_rounds}  (Key: {e91.key_rounds}  Bell: {e91.bell_rounds})", TEXT_CLR),
+        (f"Pipeline: Raw {raw_n} → QBER sample {e91.qber_sample_size} → Corrected {corr_n} → Final {final_n} bits", ACCENT),
+        (f"QBER: {e91.qber_value * 100:.1f}%  |  Corrected flips: {e91.correction_flips}", TEXT_CLR),
         (f"Bell S = {e91.bell_S:.3f}  {'SECURE' if e91.bell_violated else 'WARNING'}", GREEN if e91.bell_violated else RED),
     ]
     for i, (txt, clr) in enumerate(stats):
-        surf = font.render(txt, True, clr)
-        screen.blit(surf, (40, stats_y + i * 16))
+        screen.blit(font.render(txt, True, clr), (40, stats_y + i * 16))
 
 
 def _draw_key_bits(screen, label, bits, color, x, y, font, big_font):
@@ -478,26 +490,33 @@ def run_simulation():
                             e91_round(e91, eve_chance)
                         compute_bell_S(e91)
                     elif mode == MODE_SIFT:
-                        # 키 시프팅 → PA 순차 실행
-                        if not e91.sift_done and len(e91.raw_key_alice) > 0:
-                            key_sift(e91)
-                        elif e91.sift_done and not e91.pa_done:
-                            privacy_amplification(e91)
-                        else:
-                            # 새 라운드 + 시프팅 + PA
-                            reset_e91(e91)
+                        # 4단계 파이프라인 순차 실행
+                        if len(e91.raw_key_alice) == 0:
+                            # Stage 0: 라운드 생성
                             for _ in range(200):
                                 e91_round(e91, eve_chance)
                             compute_bell_S(e91)
-                            key_sift(e91)
+                        elif not e91.qber_done:
+                            # Stage 1: QBER 추정
+                            estimate_qber(e91)
+                        elif not e91.correction_done:
+                            # Stage 2: 에러 정정
+                            error_correct(e91)
+                        elif not e91.pa_done:
+                            # Stage 3: 프라이버시 증폭
                             privacy_amplification(e91)
+                        else:
+                            # 리셋 후 새 파이프라인
+                            reset_e91(e91)
                     elif mode == MODE_GHZ:
                         for _ in range(50):
                             ghz_round(ghz, eve_chance)
                 elif event.key == pygame.K_s:
-                    # 키 시프팅 실행
+                    # 전체 파이프라인 한번에 실행
                     if mode in (MODE_E91, MODE_SIFT):
-                        key_sift(e91)
+                        if len(e91.raw_key_alice) > 0:
+                            key_sift(e91)
+                            privacy_amplification(e91)
                     elif mode == MODE_GHZ:
                         ghz_key_sift(ghz)
                         ghz_privacy_amplification(ghz)

@@ -81,7 +81,19 @@ class E91State:
     eve_detected: bool = False
     eve_rounds: int = 0
 
-    # 키 시프팅/PA 단계
+    # ── QKD 후처리 파이프라인 상태 ──
+    # Stage 1: QBER 추정 (원시 키의 일부를 샘플링하여 에러율 추정)
+    qber_sample_size: int = 0        # 샘플링한 비트 수
+    qber_value: float = 0.0          # 추정된 QBER
+    qber_done: bool = False
+
+    # Stage 2: 에러 정정 (블록 패리티 기반)
+    corrected_key: list[int] = field(default_factory=list)
+    correction_done: bool = False
+    correction_flips: int = 0        # 정정된 비트 수
+
+    # Stage 3: 프라이버시 증폭
+    sifted_key: list[int] = field(default_factory=list)   # 최종 시프트 키 (호환용)
     sift_done: bool = False
     pa_done: bool = False
     error_rate: float = 0.0
@@ -210,53 +222,159 @@ def compute_bell_S(state: E91State) -> float:
     return S
 
 
-# ── 키 시프팅 ────────────────────────────────────────
+# ── QKD 후처리 파이프라인 ─────────────────────────────
+#
+# 실제 QKD 후처리 단계:
+#   1. 기저 시프팅   — e91_round에서 이미 수행 (같은 기저만 raw_key에 추가)
+#   2. QBER 추정    — 원시 키의 일부를 공개 비교하여 에러율 추정
+#   3. 에러 정정    — 블록 패리티 기반으로 나머지 비트의 에러 수정
+#   4. 프라이버시 증폭 — 해시 압축으로 Eve의 부분 정보 제거
+#
+# 주의: 교육용 단순화 시뮬레이션입니다. 실제 구현은 Cascade/LDPC
+#       에러 정정과 Toeplitz 범용 해시를 사용합니다.
+
+
+# QBER 추정에 사용할 샘플 비율 (공개 후 폐기)
+_QBER_SAMPLE_RATIO = 0.2
+
+
+def estimate_qber(state: E91State) -> float:
+    """Stage 1: QBER 추정 — 원시 키의 일부를 공개 비교.
+
+    실제 프로토콜에서는 Alice와 Bob이 원시 키의 무작위 부분집합을
+    공개 채널로 비교하여 QBER(양자 비트 에러율)을 추정합니다.
+    공개된 비트는 보안이 깨지므로 폐기합니다.
+
+    QBER > 11%이면 도청이 의심되어 키를 폐기해야 합니다.
+    """
+    if not state.raw_key_alice:
+        state.qber_done = True
+        return 0.0
+
+    n = len(state.raw_key_alice)
+    sample_n = max(2, int(n * _QBER_SAMPLE_RATIO))
+
+    # 무작위 인덱스 샘플링
+    indices = list(range(n))
+    random.shuffle(indices)
+    sample_indices = set(indices[:sample_n])
+    remaining_indices = [i for i in range(n) if i not in sample_indices]
+
+    # 샘플 비교 → QBER 추정
+    errors = sum(
+        1 for i in sample_indices
+        if state.raw_key_alice[i] != state.raw_key_bob[i]
+    )
+    state.qber_sample_size = sample_n
+    state.qber_value = errors / sample_n if sample_n > 0 else 0.0
+    state.qber_done = True
+
+    # 샘플 제외한 나머지를 sifted_key로 보존 (아직 에러 포함)
+    state.sifted_key = [state.raw_key_alice[i] for i in remaining_indices]
+    # Bob 측 키도 에러 정정용으로 보관
+    state._bob_remaining = [state.raw_key_bob[i] for i in remaining_indices]
+
+    state.error_rate = state.qber_value
+    state.key_match_rate = 1.0 - state.qber_value
+
+    return state.qber_value
+
+
+def error_correct(state: E91State) -> list[int]:
+    """Stage 2: 에러 정정 — 블록 패리티 기반 (교육용 단순화).
+
+    실제 프로토콜: Cascade 또는 LDPC 코드를 사용하여
+    Alice/Bob 키의 불일치 비트를 수정합니다.
+    여기서는 교육 목적으로 블록 단위 패리티 검사를 시뮬레이션합니다:
+      1. 키를 4비트 블록으로 분할
+      2. 각 블록의 패리티를 공개 비교
+      3. 패리티 불일치 블록에서 이진 탐색으로 에러 비트 특정
+    """
+    if not state.qber_done:
+        return []
+
+    alice_key = state.sifted_key
+    bob_key = getattr(state, '_bob_remaining', [])
+
+    if not alice_key or not bob_key:
+        state.corrected_key = list(alice_key)
+        state.correction_done = True
+        state.correction_flips = 0
+        return state.corrected_key
+
+    corrected = list(alice_key)
+    flips = 0
+    block_size = 4
+
+    for start in range(0, len(corrected), block_size):
+        end = min(start + block_size, len(corrected))
+        a_parity = sum(corrected[start:end]) % 2
+        b_parity = sum(bob_key[start:end]) % 2
+
+        if a_parity != b_parity:
+            # 블록 내 이진 탐색으로 에러 비트 찾기
+            lo, hi = start, end
+            while hi - lo > 1:
+                mid = (lo + hi) // 2
+                a_sub = sum(corrected[lo:mid]) % 2
+                b_sub = sum(bob_key[lo:mid]) % 2
+                if a_sub != b_sub:
+                    hi = mid
+                else:
+                    lo = mid
+            # lo 위치의 비트 수정
+            corrected[lo] = bob_key[lo]
+            flips += 1
+
+    state.corrected_key = corrected
+    state.correction_done = True
+    state.correction_flips = flips
+    state.sift_done = True
+
+    return corrected
 
 
 def key_sift(state: E91State) -> list[int]:
-    """키 시프팅: 기저 일치 라운드만 추출.
+    """전체 키 시프팅 파이프라인 실행 (QBER 추정 + 에러 정정).
 
-    Alice와 Bob의 원시 키에서 일치하는 비트만 남김.
+    편의 함수: estimate_qber → error_correct 를 순차 실행합니다.
     """
     if not state.raw_key_alice:
+        state.sift_done = True
         return []
 
-    sifted = []
-    errors = 0
-    for a_bit, b_bit in zip(state.raw_key_alice, state.raw_key_bob):
-        if a_bit == b_bit:
-            sifted.append(a_bit)
-        else:
-            errors += 1
+    estimate_qber(state)
+    error_correct(state)
 
-    state.sifted_key = sifted
-    state.sift_done = True
-
-    total = len(state.raw_key_alice)
-    state.error_rate = errors / total if total > 0 else 0.0
-    state.key_match_rate = len(sifted) / total if total > 0 else 0.0
-
-    return sifted
+    return state.corrected_key
 
 
 def privacy_amplification(state: E91State) -> str:
-    """프라이버시 증폭: 시프트 키를 해시하여 최종 보안 키 생성.
+    """Stage 3: 프라이버시 증폭 — 해시 압축으로 최종 보안 키 생성.
 
-    Eve가 부분 정보를 가질 수 있으므로, 범용 해시 함수로
-    키를 압축하여 Eve의 정보를 제거합니다.
+    Eve가 QBER 추정/에러 정정 과정에서 노출된 패리티 정보를 통해
+    부분 키 정보를 가질 수 있습니다. 해시 함수로 키를 압축하여
+    Eve의 정보를 정보이론적으로 제거합니다.
+
+    교육용 단순화: 실제는 Toeplitz 행렬 등 범용 해시를 사용하지만,
+    여기서는 SHA-256을 사용합니다. SHA-256은 암호학적 해시이므로
+    범용 해시의 보안 속성을 근사적으로 만족합니다.
     """
-    if not state.sifted_key:
+    # 에러 정정된 키 또는 시프트 키 사용
+    key_source = state.corrected_key if state.corrected_key else state.sifted_key
+
+    if not key_source:
         state.final_key = ""
         state.pa_done = True
         return ""
 
-    # 시프트 키를 바이트열로 변환
-    key_bits = "".join(str(b) for b in state.sifted_key)
+    # 키를 바이트열로 변환
+    key_bits = "".join(str(b) for b in key_source)
 
-    # SHA-256 해시로 압축 (프라이버시 증폭)
+    # SHA-256 해시로 압축 (교육용 단순화 — 실제는 Toeplitz 범용 해시)
     h = hashlib.sha256(key_bits.encode()).hexdigest()
 
-    # 압축 비율에 따라 잘라냄
+    # 압축 비율에 따라 잘라냄 — Eve의 정보량만큼 키 길이 단축
     target_len = max(4, int(len(h) * PA_COMPRESSION_RATIO))
     final = h[:target_len]
 
@@ -438,6 +556,7 @@ def reset_e91(state: E91State):
     state.raw_key_alice.clear()
     state.raw_key_bob.clear()
     state.sifted_key.clear()
+    state.corrected_key.clear()
     state.final_key = ""
     state.correlators.clear()
     state.bell_S = 0.0
@@ -447,10 +566,18 @@ def reset_e91(state: E91State):
     state.bell_rounds = 0
     state.eve_detected = False
     state.eve_rounds = 0
+    # 파이프라인 상태
+    state.qber_sample_size = 0
+    state.qber_value = 0.0
+    state.qber_done = False
+    state.correction_done = False
+    state.correction_flips = 0
     state.sift_done = False
     state.pa_done = False
     state.error_rate = 0.0
     state.key_match_rate = 0.0
+    if hasattr(state, '_bob_remaining'):
+        del state._bob_remaining
 
 
 def reset_ghz(state: GHZState):

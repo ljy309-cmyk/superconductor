@@ -101,24 +101,114 @@ class TestE91Protocol(unittest.TestCase):
         self.assertEqual(len(state.rounds), 0)
 
 
+class TestQBEREstimation(unittest.TestCase):
+    """QBER 추정 테스트."""
+
+    def test_qber_no_data(self):
+        from security.qkd_advanced_engine import E91State, estimate_qber
+        state = E91State()
+        result = estimate_qber(state)
+        self.assertEqual(result, 0.0)
+        self.assertTrue(state.qber_done)
+
+    def test_qber_low_without_eve(self):
+        """Eve 없으면 QBER이 낮아야 함."""
+        from security.qkd_advanced_engine import E91State, e91_round, estimate_qber
+        state = E91State()
+        for _ in range(500):
+            e91_round(state, eve_chance=0.0)
+        estimate_qber(state)
+        self.assertTrue(state.qber_done)
+        self.assertLess(state.qber_value, 0.1)
+        self.assertGreater(state.qber_sample_size, 0)
+
+    def test_qber_high_with_eve(self):
+        """Eve 있으면 QBER이 상승해야 함."""
+        from security.qkd_advanced_engine import E91State, e91_round, estimate_qber
+        state = E91State()
+        for _ in range(500):
+            e91_round(state, eve_chance=0.8)
+        estimate_qber(state)
+        self.assertGreater(state.qber_value, 0.0)
+
+    def test_qber_discards_sample(self):
+        """QBER 샘플은 sifted_key에서 제외되어야 함."""
+        from security.qkd_advanced_engine import E91State, e91_round, estimate_qber
+        state = E91State()
+        for _ in range(200):
+            e91_round(state, eve_chance=0.0)
+        raw_n = len(state.raw_key_alice)
+        estimate_qber(state)
+        # sifted = raw - sample
+        self.assertEqual(len(state.sifted_key), raw_n - state.qber_sample_size)
+
+
+class TestErrorCorrection(unittest.TestCase):
+    """에러 정정 테스트."""
+
+    def test_correction_no_data(self):
+        from security.qkd_advanced_engine import E91State, error_correct
+        state = E91State()
+        state.qber_done = True
+        result = error_correct(state)
+        self.assertEqual(result, [])
+        self.assertTrue(state.correction_done)
+
+    def test_correction_fixes_errors(self):
+        """에러 정정 후 일치율이 올라야 함."""
+        from security.qkd_advanced_engine import (
+            E91State,
+            e91_round,
+            error_correct,
+            estimate_qber,
+        )
+        state = E91State()
+        for _ in range(500):
+            e91_round(state, eve_chance=0.3)
+        estimate_qber(state)
+        error_correct(state)
+        self.assertTrue(state.correction_done)
+        # 정정된 키가 존재해야 함
+        self.assertGreater(len(state.corrected_key), 0)
+
+    def test_correction_no_flips_without_eve(self):
+        """Eve 없으면 정정할 비트가 거의 없어야 함."""
+        from security.qkd_advanced_engine import (
+            E91State,
+            e91_round,
+            error_correct,
+            estimate_qber,
+        )
+        state = E91State()
+        for _ in range(500):
+            e91_round(state, eve_chance=0.0)
+        estimate_qber(state)
+        error_correct(state)
+        # 대부분 0 또는 매우 적은 flip
+        self.assertLessEqual(state.correction_flips, 3)
+
+
 class TestKeySifting(unittest.TestCase):
-    """키 시프팅 테스트."""
+    """통합 키 시프팅 파이프라인 테스트."""
 
     def test_sift_no_data(self):
         from security.qkd_advanced_engine import E91State, key_sift
         state = E91State()
         result = key_sift(state)
         self.assertEqual(result, [])
+        self.assertTrue(state.sift_done)
 
-    def test_sift_produces_shorter_key(self):
-        """시프팅 후 키 길이는 원시 키보다 같거나 짧아야 함."""
+    def test_sift_runs_full_pipeline(self):
+        """key_sift가 QBER 추정 + 에러 정정을 순차 실행."""
         from security.qkd_advanced_engine import E91State, e91_round, key_sift
         state = E91State()
         for _ in range(200):
             e91_round(state, eve_chance=0.0)
-        sifted = key_sift(state)
-        self.assertLessEqual(len(sifted), len(state.raw_key_alice))
+        result = key_sift(state)
+        self.assertTrue(state.qber_done)
+        self.assertTrue(state.correction_done)
         self.assertTrue(state.sift_done)
+        self.assertGreater(len(result), 0)
 
     def test_sift_high_match_no_eve(self):
         """Eve 없으면 매칭률이 높아야 함."""
@@ -127,7 +217,6 @@ class TestKeySifting(unittest.TestCase):
         for _ in range(500):
             e91_round(state, eve_chance=0.0)
         key_sift(state)
-        # Eve 없으면 거의 100% 매칭
         self.assertGreater(state.key_match_rate, 0.7)
 
     def test_sift_lower_match_with_eve(self):
