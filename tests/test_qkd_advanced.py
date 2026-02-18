@@ -1048,5 +1048,95 @@ class TestFullPipeline(unittest.TestCase):
         self.assertGreater(state.error_rate, 0.0)
 
 
+class TestGHZFullPipeline(unittest.TestCase):
+    """GHZ 전체 파이프라인 (라운드→시프팅→PA→OTP) 통합 테스트."""
+
+    def test_ghz_3party_full_pipeline(self):
+        """3자간 GHZ 전체 파이프라인 완료."""
+        from security.qkd_advanced_engine import (
+            GHZState,
+            ghz_key_sift,
+            ghz_privacy_amplification,
+            ghz_round,
+            xor_decrypt,
+            xor_encrypt,
+        )
+        state = GHZState()
+        for _ in range(300):
+            ghz_round(state, eve_chance=0.0)
+        sifted = ghz_key_sift(state)
+        self.assertTrue(state.sift_done)
+        self.assertGreater(len(sifted), 0)
+
+        final = ghz_privacy_amplification(state)
+        self.assertTrue(state.pa_done)
+        self.assertGreater(len(final), 0)
+
+        # OTP roundtrip
+        if len(final) >= 6:
+            cipher = xor_encrypt("GHZ", final)
+            decrypted = xor_decrypt(cipher, final)
+            self.assertEqual(decrypted, "GHZ")
+
+    def test_ghz_4party_pipeline_with_eve(self):
+        """4자간 GHZ Eve 있을 때 파이프라인 완료 + 에러율 확인."""
+        from security.qkd_advanced_engine import (
+            GHZState,
+            ghz_key_sift,
+            ghz_privacy_amplification,
+            ghz_round,
+            resize_ghz,
+        )
+        state = GHZState()
+        resize_ghz(state, 4)
+        for _ in range(500):
+            ghz_round(state, eve_chance=0.5)
+        ghz_key_sift(state)
+        self.assertTrue(state.sift_done)
+        self.assertGreater(state.error_rate, 0.0)
+
+        final = ghz_privacy_amplification(state)
+        self.assertTrue(state.pa_done)
+
+
+class TestLocaleKeysComplete(unittest.TestCase):
+    """로케일 파일 키 완전성 테스트."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_en_ko_keys_match(self):
+        """en.json과 ko.json의 키가 완전히 일치."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        missing_in_ko = en_keys - ko_keys
+        missing_in_en = ko_keys - en_keys
+        self.assertEqual(missing_in_ko, set(),
+                         f"Keys in en.json but not in ko.json: {missing_in_ko}")
+        self.assertEqual(missing_in_en, set(),
+                         f"Keys in ko.json but not in en.json: {missing_in_en}")
+
+    def test_qa_keys_present(self):
+        """QKD 관련 모든 키가 en.json에 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        required_keys = [
+            "qa_e91_rounds", "qa_raw_key_len", "qa_bell_s_detail",
+            "qa_qber_display", "qa_sift_pipeline", "qa_sift_qber_stat",
+            "qa_ghz_rounds", "qa_ghz_consistency", "qa_ghz_sifted",
+            "qa_ghz_final_key", "qa_cmp_bb84_rounds", "qa_cmp_bb84_basis",
+            "qa_cmp_bb84_rawkey", "qa_cmp_bb84_eve", "qa_cmp_bb84_qber",
+            "qa_cmp_e91_rounds", "qa_cmp_e91_keypairs", "qa_cmp_e91_rawkey",
+            "qa_cmp_e91_eve", "qa_cmp_e91_bell", "qa_key_rate",
+        ]
+        for key in required_keys:
+            self.assertIn(key, en, f"Missing key in en.json: {key}")
+
+
 if __name__ == "__main__":
     unittest.main()

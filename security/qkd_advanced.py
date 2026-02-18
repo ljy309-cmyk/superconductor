@@ -153,10 +153,10 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     sy = 200
     key_rate = (e91.key_rounds / e91.total_rounds * 100) if e91.total_rounds > 0 else 0.0
     stats = [
-        (f"Rounds: {e91.total_rounds}  (Key: {e91.key_rounds}  Bell: {e91.bell_rounds})", TEXT_CLR),
-        (f"Raw Key Length: {len(e91.raw_key_alice)} bits", BLUE),
+        (t("qa_e91_rounds", total=e91.total_rounds, key=e91.key_rounds, bell=e91.bell_rounds), TEXT_CLR),
+        (t("qa_raw_key_len", bits=len(e91.raw_key_alice)), BLUE),
         (t("qa_key_rate", rate=key_rate, bits=e91.key_rounds, rounds=e91.total_rounds), PEACH),
-        (f"Bell S = {e91.bell_S:.3f}  (Classical ≤ {CHSH_CLASSICAL_BOUND}, Quantum ≤ {CHSH_QUANTUM_BOUND:.3f})", ACCENT),
+        (t("qa_bell_s_detail", s=e91.bell_S, cl=CHSH_CLASSICAL_BOUND, ql=CHSH_QUANTUM_BOUND), ACCENT),
     ]
     if e91.bell_violated:
         stats.append((t("qa_bell_violated"), GREEN))
@@ -316,7 +316,7 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
         qber_y = ky + 65
         qber_pct = e91.qber_value * 100
         qber_clr = RED if e91.qber_value > 0.11 else GREEN
-        qber_txt = f"QBER = {qber_pct:.1f}%  (sampled {e91.qber_sample_size} bits)"
+        qber_txt = t("qa_qber_display", pct=qber_pct, n=e91.qber_sample_size)
         screen.blit(font.render(qber_txt, True, qber_clr), (40, qber_y))
         # QBER 해석
         if e91.qber_value > 0.11:
@@ -352,9 +352,9 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
     corr_n = len(e91.corrected_key)
     final_n = len(e91.final_key) * 4
     stats = [
-        (f"E91 Rounds: {e91.total_rounds}  (Key: {e91.key_rounds}  Bell: {e91.bell_rounds})", TEXT_CLR),
-        (f"Pipeline: Raw {raw_n} → QBER sample {e91.qber_sample_size} → Corrected {corr_n} → Final {final_n} bits", ACCENT),
-        (f"QBER: {e91.qber_value * 100:.1f}%  |  Corrected flips: {e91.correction_flips}", TEXT_CLR),
+        (t("qa_e91_rounds", total=e91.total_rounds, key=e91.key_rounds, bell=e91.bell_rounds), TEXT_CLR),
+        (t("qa_sift_pipeline", raw=raw_n, sample=e91.qber_sample_size, corr=corr_n, final=final_n), ACCENT),
+        (t("qa_sift_qber_stat", pct=e91.qber_value * 100, flips=e91.correction_flips), TEXT_CLR),
         (f"Bell S = {e91.bell_S:.3f}  {t('qa_sift_stat_secure') if e91.bell_violated else t('qa_sift_stat_warning')}", GREEN if e91.bell_violated else RED),
     ]
     for i, (txt, clr) in enumerate(stats):
@@ -496,22 +496,23 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
     sy = 300
     ghz_key_rate = (ghz.key_rounds / ghz.total_rounds * 100) if ghz.total_rounds > 0 else 0.0
     stats = [
-        (f"Rounds: {ghz.total_rounds}  (Key: {ghz.key_rounds}  Check: {ghz.consistency_checks})", TEXT_CLR),
-        (f"Raw Key Length: {len(ghz.raw_keys[0])} bits", BLUE),
+        (t("qa_ghz_rounds", total=ghz.total_rounds, key=ghz.key_rounds, chk=ghz.consistency_checks), TEXT_CLR),
+        (t("qa_raw_key_len", bits=len(ghz.raw_keys[0])), BLUE),
         (t("qa_key_rate", rate=ghz_key_rate, bits=ghz.key_rounds, rounds=ghz.total_rounds), PEACH),
     ]
 
     if ghz.consistency_checks > 0:
         pass_rate = ghz.consistency_pass / ghz.consistency_checks
-        stats.append((f"Consistency: {ghz.consistency_pass}/{ghz.consistency_checks} ({pass_rate * 100:.1f}%)",
+        stats.append((t("qa_ghz_consistency", **{"pass": ghz.consistency_pass},
+                        total=ghz.consistency_checks, pct=pass_rate * 100),
                        GREEN if pass_rate > 0.85 else RED))
 
     if ghz.sift_done:
-        stats.append((f"Sifted Key: {len(ghz.sifted_key)} bits  |  Error: {ghz.error_rate * 100:.1f}%",
+        stats.append((t("qa_ghz_sifted", bits=len(ghz.sifted_key), err=ghz.error_rate * 100),
                        MAUVE))
 
     if ghz.pa_done and ghz.final_key:
-        stats.append((f"Final Key: {ghz.final_key[:40]}...", ACCENT))
+        stats.append((t("qa_ghz_final_key", key=ghz.final_key[:40]), ACCENT))
 
     for i, (txt, clr) in enumerate(stats):
         surf = font.render(txt, True, clr)
@@ -574,13 +575,13 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
     # ── BB84 (왼쪽) ──
     by = 84
     bb84_stats = [
-        (f"Rounds: {bb84.total_rounds}", TEXT_CLR),
-        (f"Basis Match: {bb84.basis_match_rounds}  ({bb84.basis_match_rounds / max(bb84.total_rounds, 1) * 100:.0f}%)", TEXT_CLR),
-        (f"Raw Key: {bb84.raw_key_bits} bits", BLUE),
-        (f"Eve Intercepts: {bb84.eve_rounds}", RED if bb84.eve_rounds > 0 else SUBTEXT_CLR),
+        (t("qa_cmp_bb84_rounds", total=bb84.total_rounds), TEXT_CLR),
+        (t("qa_cmp_bb84_basis", match=bb84.basis_match_rounds, pct=bb84.basis_match_rounds / max(bb84.total_rounds, 1) * 100), TEXT_CLR),
+        (t("qa_cmp_bb84_rawkey", bits=bb84.raw_key_bits), BLUE),
+        (t("qa_cmp_bb84_eve", count=bb84.eve_rounds), RED if bb84.eve_rounds > 0 else SUBTEXT_CLR),
         ("", TEXT_CLR),
         (t("qa_cmp_detection"), ACCENT),
-        (f"  QBER = {bb84.qber * 100:.1f}%", RED if bb84.qber > 0.11 else GREEN),
+        (t("qa_cmp_bb84_qber", pct=bb84.qber * 100), RED if bb84.qber > 0.11 else GREEN),
     ]
     if bb84.eve_detected:
         bb84_stats.append((t("qa_cmp_eve_detected"), RED))
@@ -597,13 +598,13 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
 
     # ── E91 (오른쪽) ──
     e91_stats = [
-        (f"Rounds: {e91.total_rounds}  (Key: {e91.key_rounds}  Bell: {e91.bell_rounds})", TEXT_CLR),
-        (f"Key Pairs: {e91.key_rounds}  ({e91.key_rounds / max(e91.total_rounds, 1) * 100:.0f}%)", TEXT_CLR),
-        (f"Raw Key: {len(e91.raw_key_alice)} bits", MAUVE),
-        (f"Eve Rounds: {e91.eve_rounds}", RED if e91.eve_rounds > 0 else SUBTEXT_CLR),
+        (t("qa_cmp_e91_rounds", total=e91.total_rounds, key=e91.key_rounds, bell=e91.bell_rounds), TEXT_CLR),
+        (t("qa_cmp_e91_keypairs", key=e91.key_rounds, pct=e91.key_rounds / max(e91.total_rounds, 1) * 100), TEXT_CLR),
+        (t("qa_cmp_e91_rawkey", bits=len(e91.raw_key_alice)), MAUVE),
+        (t("qa_cmp_e91_eve", count=e91.eve_rounds), RED if e91.eve_rounds > 0 else SUBTEXT_CLR),
         ("", TEXT_CLR),
         (t("qa_cmp_detection"), ACCENT),
-        (f"  Bell S = {e91.bell_S:.3f}  (bound: {CHSH_CLASSICAL_BOUND})", GREEN if e91.bell_violated else RED),
+        (t("qa_cmp_e91_bell", s=e91.bell_S, bound=CHSH_CLASSICAL_BOUND), GREEN if e91.bell_violated else RED),
     ]
     if e91.bell_violated:
         e91_stats.append((t("qa_cmp_bell_secure"), GREEN))
@@ -637,15 +638,15 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
         (t("qa_cmp_row_method"), t("qa_cmp_bb84_method"), t("qa_cmp_e91_method")),
         (t("qa_cmp_row_resource"), t("qa_cmp_bb84_resource"), t("qa_cmp_e91_resource")),
         (t("qa_cmp_row_detect"),
-         f"QBER = {bb84.qber * 100:.1f}%  {'> 11% !' if bb84.qber > 0.11 else '< 11%'}",
-         f"S = {e91.bell_S:.3f}  {'> 2.0 !' if e91.bell_violated else '≤ 2.0'}"),
+         t("qa_cmp_qber_thresh", pct=bb84.qber * 100, warn="> 11% !" if bb84.qber > 0.11 else "< 11%"),
+         t("qa_cmp_bell_thresh", s=e91.bell_S, warn="> 2.0 !" if e91.bell_violated else "≤ 2.0")),
         (t("qa_cmp_row_result"),
          t("qa_cmp_eve_detected") if bb84.eve_detected else t("qa_cmp_secure"),
          t("qa_cmp_bell_secure") if e91.bell_violated else (
              t("qa_cmp_bell_warning") if e91.bell_rounds > 20 else "---")),
         (t("qa_cmp_row_keybits"),
-         f"{bb84.raw_key_bits} bits",
-         f"{len(e91.raw_key_alice)} bits"),
+         f"{bb84.raw_key_bits}",
+         f"{len(e91.raw_key_alice)}"),
     ]
 
     col_w = (WIDTH - 60) // 3
@@ -915,6 +916,17 @@ def run_simulation():
                 elif event.key == pygame.K_l:
                     toggle_locale()
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # 모드 탭 클릭 처리
+                mx, my = event.pos
+                tab_y_ = 32
+                tab_w_ = min(180, (WIDTH - 60) // NUM_MODES - 8)
+                tab_gap_ = (WIDTH - 40 - tab_w_ * NUM_MODES) // max(NUM_MODES - 1, 1)
+                if tab_y_ <= my <= tab_y_ + 22:
+                    for i in range(NUM_MODES):
+                        tx_ = 20 + i * (tab_w_ + tab_gap_)
+                        if tx_ <= mx <= tx_ + tab_w_:
+                            mode = i
+                            break
                 if mode == MODE_GHZ:
                     # GHZ 파티 수 버튼 클릭 처리
                     mx, my = event.pos
@@ -952,6 +964,14 @@ def run_simulation():
                             privacy_amplification(e91)
                 elif mode == MODE_GHZ:
                     ghz_round(ghz, eve_chance)
+                    # 자동 파이프라인: 충분한 키가 쌓이면 시프팅→PA
+                    if (ghz.total_rounds > 0
+                            and ghz.total_rounds % GHZ_BATCH == 0
+                            and not ghz.pa_done):
+                        if not ghz.sift_done:
+                            ghz_key_sift(ghz)
+                        elif not ghz.pa_done:
+                            ghz_privacy_amplification(ghz)
                 elif mode == MODE_COMPARE:
                     bb84_round(bb84_cmp, eve_chance)
                     e91_round(e91_cmp, eve_chance)
