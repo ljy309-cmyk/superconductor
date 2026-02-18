@@ -259,7 +259,7 @@ class TestKeySifting(unittest.TestCase):
         """Eve 있으면 에러율 상승."""
         from security.qkd_advanced_engine import E91State, e91_round, key_sift
         state = E91State()
-        for _ in range(500):
+        for _ in range(2000):
             e91_round(state, eve_chance=0.8)
         key_sift(state)
         self.assertGreater(state.error_rate, 0.0)
@@ -1557,6 +1557,84 @@ class TestLocaleRound10Keys(unittest.TestCase):
         keys = ["qa_tag_mix", "qa_stage_rounds", "qa_stage_ec",
                 "qa_stage_pa", "qa_stage_done"]
         for key in keys:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_en_ko_keys_still_match(self):
+        """en.json과 ko.json의 키가 여전히 일치."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        self.assertEqual(en_keys - ko_keys, set())
+        self.assertEqual(ko_keys - en_keys, set())
+
+
+class TestTextCacheRoundTrip(unittest.TestCase):
+    """텍스트 캐시 round-trip 테스트."""
+
+    def test_cache_returns_same_surface(self):
+        """동일 키에 대해 동일 객체 반환."""
+        import sys
+        sys.modules.setdefault("pygame", type(sys)("pygame"))
+        from security.qkd_advanced import _TextCache
+        cache = _TextCache(max_size=4)
+
+        class FakeFont:
+            def render(self, text, aa, color):
+                return (text, color)
+        f = FakeFont()
+        s1 = cache.render(f, "hello", (1, 2, 3))
+        s2 = cache.render(f, "hello", (1, 2, 3))
+        self.assertIs(s1, s2)
+
+    def test_cache_evicts_when_full(self):
+        """캐시가 꽉 차면 가장 오래된 항목 제거."""
+        import sys
+        sys.modules.setdefault("pygame", type(sys)("pygame"))
+        from security.qkd_advanced import _TextCache
+        cache = _TextCache(max_size=2)
+
+        class FakeFont:
+            def render(self, text, aa, color):
+                return (text, color)
+        f = FakeFont()
+        cache.render(f, "a", (0,))
+        cache.render(f, "b", (0,))
+        cache.render(f, "c", (0,))  # evicts "a"
+        self.assertEqual(len(cache._cache), 2)
+
+
+class TestLocaleRound11Keys(unittest.TestCase):
+    """Round 11 로케일 키 존재 확인."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_shortcut_keys(self):
+        """단축키 패널 키가 양쪽 로케일에 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        keys = [
+            "qa_sc_title", "qa_sc_space", "qa_sc_sift", "qa_sc_auto",
+            "qa_sc_eve", "qa_sc_pause", "qa_sc_reset", "qa_sc_tab",
+            "qa_sc_locale", "qa_sc_updown", "qa_sc_help", "qa_sc_shortcuts",
+            "qa_sc_exit",
+        ]
+        for key in keys:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_pipeline_tip_keys(self):
+        """파이프라인 툴팁 키가 양쪽 로케일에 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        for key in ["qa_tip_raw_key", "qa_tip_qber", "qa_tip_ec", "qa_tip_pa"]:
             self.assertIn(key, en, f"Missing in en.json: {key}")
             self.assertIn(key, ko, f"Missing in ko.json: {key}")
 

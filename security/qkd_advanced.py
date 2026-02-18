@@ -94,6 +94,30 @@ MODE_COMPARE = 3
 _MODE_KEYS = ["qa_mode_e91", "qa_mode_sift", "qa_mode_ghz", "qa_mode_compare"]
 NUM_MODES = len(_MODE_KEYS)
 
+
+class _TextCache:
+    """정적 텍스트 렌더링 캐시 (동일 텍스트/색상 재사용)."""
+
+    def __init__(self, max_size: int = 256):
+        self._cache: dict[tuple, "pygame.Surface"] = {}
+        self._max = max_size
+
+    def render(self, font, text: str, color: tuple) -> "pygame.Surface":
+        key = (id(font), text, color)
+        surf = self._cache.get(key)
+        if surf is None:
+            if len(self._cache) >= self._max:
+                self._cache.pop(next(iter(self._cache)))
+            surf = font.render(text, True, color)
+            self._cache[key] = surf
+        return surf
+
+    def clear(self):
+        self._cache.clear()
+
+
+_tcache = _TextCache()
+
 # ── 노드 위치 ────────────────────────────────────────
 ALICE_POS = (140, 140)
 BOB_POS = (760, 140)
@@ -108,9 +132,9 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     # EPR 소스
     pygame.draw.circle(screen, MAUVE, EPR_POS, 22)
     pygame.draw.circle(screen, TEXT_CLR, EPR_POS, 22, 2)
-    lbl = big_font.render("EPR", True, MAUVE)
+    lbl = _tcache.render(big_font, "EPR", MAUVE)
     screen.blit(lbl, (EPR_POS[0] - lbl.get_width() // 2, EPR_POS[1] - 8))
-    sub = font.render("|Φ+⟩", True, SUBTEXT_CLR)
+    sub = _tcache.render(font, "|Φ+⟩", SUBTEXT_CLR)
     screen.blit(sub, (EPR_POS[0] - sub.get_width() // 2, EPR_POS[1] + 26))
 
     # 얽힘 링크 (물결 — 중점을 사인파로 이동하여 곡선 효과)
@@ -245,27 +269,27 @@ def _draw_correlator_table(screen, e91: E91State, font, big_font):
     base_labels_a = ["0°", "π/8", "π/4"]
     base_labels_b = ["π/8", "π/4", "3π/8"]
 
-    # 헤더
+    # 헤더 (캐시 사용)
     for j, bl in enumerate(base_labels_b):
-        surf = font.render(bl, True, GREEN)
+        surf = _tcache.render(font, bl, GREEN)
         screen.blit(surf, (tx + 60 + j * 70, ty + 18))
 
     for i, al in enumerate(base_labels_a):
         y = ty + 36 + i * 18
-        surf = font.render(al, True, BLUE)
+        surf = _tcache.render(font, al, BLUE)
         screen.blit(surf, (tx, y))
 
         for j in range(3):
             pair = (i, j)
             data = e91.correlators.get(pair, [])
-            if data:
+            if len(data) > 0:
                 avg = sum(data) / len(data)
                 val_txt = f"{avg:+.2f}"
                 # 키 쌍은 하이라이트
                 is_key = pair in [(1, 0), (2, 1)]
                 clr = YELLOW if is_key else TEXT_CLR
             else:
-                val_txt = "  —"
+                val_txt = t("qa_cmp_no_data")
                 clr = SUBTEXT_CLR
             surf = font.render(val_txt, True, clr)
             screen.blit(surf, (tx + 60 + j * 70, y))
@@ -284,6 +308,10 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
 
     # 4단계 파이프라인
     corrected_bits = len(e91.corrected_key)
+    _stage_tips = [
+        t("qa_tip_raw_key"), t("qa_tip_qber"),
+        t("qa_tip_ec"), t("qa_tip_pa"),
+    ]
     stages = [
         (t("qa_sift_raw_key"), len(e91.raw_key_alice), BLUE,
          len(e91.raw_key_alice) > 0),
@@ -299,13 +327,16 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
     box_h = 50
     gap = 32
     start_x = (WIDTH - (box_w * 4 + gap * 3)) // 2
+    mx, my = pygame.mouse.get_pos()
+    stage_tooltip = None
 
     for i, (label, size, clr, done) in enumerate(stages):
         bx = start_x + i * (box_w + gap)
         by = sy
+        hovered = bx <= mx <= bx + box_w and by <= my <= by + box_h
 
         pygame.draw.rect(screen, PANEL_BG, (bx, by, box_w, box_h), border_radius=8)
-        border_clr = clr if done else OVERLAY
+        border_clr = clr if done else (TEXT_CLR if hovered else OVERLAY)
         pygame.draw.rect(screen, border_clr, (bx, by, box_w, box_h), 2, border_radius=8)
 
         lbl = big_font.render(label, True, clr if done else SUBTEXT_CLR)
@@ -314,6 +345,9 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
         size_txt = font.render(f"{size} bits", True, TEXT_CLR if done else SUBTEXT_CLR)
         screen.blit(size_txt, (bx + box_w // 2 - size_txt.get_width() // 2, by + 30))
 
+        if hovered:
+            stage_tooltip = (bx, by + box_h + 4, _stage_tips[i])
+
         # 화살표
         if i < 3:
             ax = bx + box_w + 3
@@ -321,6 +355,15 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
             pygame.draw.line(screen, SUBTEXT_CLR, (ax, ay), (ax + gap - 8, ay), 2)
             pygame.draw.polygon(screen, SUBTEXT_CLR,
                                 [(ax + gap - 8, ay - 3), (ax + gap - 2, ay), (ax + gap - 8, ay + 3)])
+
+    # 파이프라인 스테이지 툴팁
+    if stage_tooltip:
+        tip_x, tip_y, tip_text = stage_tooltip
+        tip_surf = font.render(tip_text, True, TEXT_CLR)
+        tip_bg = pygame.Rect(tip_x - 2, tip_y, tip_surf.get_width() + 8, 14)
+        pygame.draw.rect(screen, PANEL_BG, tip_bg, border_radius=3)
+        pygame.draw.rect(screen, OVERLAY, tip_bg, 1, border_radius=3)
+        screen.blit(tip_surf, (tip_x + 2, tip_y + 1))
 
     # 원시 키 비트 시각화
     ky = 140
@@ -487,7 +530,7 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
     # GHZ 소스 (중앙)
     pygame.draw.circle(screen, MAUVE, (cx, cy), 20)
     pygame.draw.circle(screen, TEXT_CLR, (cx, cy), 20, 2)
-    ghz_lbl = big_font.render("GHZ", True, MAUVE)
+    ghz_lbl = _tcache.render(big_font, "GHZ", MAUVE)
     screen.blit(ghz_lbl, (cx - ghz_lbl.get_width() // 2, cy - 8))
 
     # 얽힘 링크 (물결)
@@ -1036,11 +1079,14 @@ def run_simulation():
     auto_timer = 0.0
     eve_chance = 0.0
 
+    show_shortcuts = False
+
     help_overlay = HelpOverlay("qkd_advanced")
     tutorial = TutorialOverlay("qkd_advanced")
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("qkd_advanced")
+    _engine_error: str | None = None  # 엔진 오류 표시용
 
     running = True
     while running:
@@ -1061,53 +1107,51 @@ def run_simulation():
                 elif event.key == pygame.K_TAB:
                     mode = (mode + 1) % NUM_MODES
                 elif event.key == pygame.K_SPACE:
-                    if mode == MODE_E91:
-                        # 배치 실행 (config: e91_batch_size)
-                        for _ in range(E91_BATCH):
-                            e91_round(e91, eve_chance)
-                        compute_bell_S(e91)
-                    elif mode == MODE_SIFT:
-                        # 4단계 파이프라인 순차 실행
-                        if len(e91.raw_key_alice) == 0:
-                            # Stage 0: 라운드 생성 (config: chsh_shots)
-                            for _ in range(CHSH_SHOTS):
+                    _engine_error = None
+                    try:
+                        if mode == MODE_E91:
+                            for _ in range(E91_BATCH):
                                 e91_round(e91, eve_chance)
                             compute_bell_S(e91)
-                        elif not e91.qber_done:
-                            # Stage 1: QBER 추정
-                            estimate_qber(e91)
-                        elif not e91.correction_done:
-                            # Stage 2: 에러 정정
-                            error_correct(e91)
-                        elif not e91.pa_done:
-                            # Stage 3: 프라이버시 증폭
-                            privacy_amplification(e91)
-                        else:
-                            # 리셋 후 새 파이프라인
-                            reset_e91(e91)
-                    elif mode == MODE_GHZ:
-                        for _ in range(GHZ_BATCH):
-                            ghz_round(ghz, eve_chance)
-                    elif mode == MODE_COMPARE:
-                        # 두 프로토콜 동시 실행 (동일 Eve 조건)
-                        for _ in range(E91_BATCH):
-                            bb84_round(bb84_cmp, eve_chance)
-                            e91_round(e91_cmp, eve_chance)
-                        compute_bell_S(e91_cmp)
+                        elif mode == MODE_SIFT:
+                            if len(e91.raw_key_alice) == 0:
+                                for _ in range(CHSH_SHOTS):
+                                    e91_round(e91, eve_chance)
+                                compute_bell_S(e91)
+                            elif not e91.qber_done:
+                                estimate_qber(e91)
+                            elif not e91.correction_done:
+                                error_correct(e91)
+                            elif not e91.pa_done:
+                                privacy_amplification(e91)
+                            else:
+                                reset_e91(e91)
+                        elif mode == MODE_GHZ:
+                            for _ in range(GHZ_BATCH):
+                                ghz_round(ghz, eve_chance)
+                        elif mode == MODE_COMPARE:
+                            for _ in range(E91_BATCH):
+                                bb84_round(bb84_cmp, eve_chance)
+                                e91_round(e91_cmp, eve_chance)
+                            compute_bell_S(e91_cmp)
+                    except Exception as exc:
+                        _engine_error = str(exc)
                 elif event.key == pygame.K_s:
-                    # 전체 파이프라인 한번에 실행
-                    if mode in (MODE_E91, MODE_SIFT):
-                        if len(e91.raw_key_alice) > 0:
-                            key_sift(e91)
-                            privacy_amplification(e91)
-                    elif mode == MODE_GHZ:
-                        ghz_key_sift(ghz)
-                        ghz_privacy_amplification(ghz)
-                    elif mode == MODE_COMPARE:
-                        # Compare 모드 양쪽 파이프라인 실행
-                        if len(e91_cmp.raw_key_alice) > 0:
-                            key_sift(e91_cmp)
-                            privacy_amplification(e91_cmp)
+                    _engine_error = None
+                    try:
+                        if mode in (MODE_E91, MODE_SIFT):
+                            if len(e91.raw_key_alice) > 0:
+                                key_sift(e91)
+                                privacy_amplification(e91)
+                        elif mode == MODE_GHZ:
+                            ghz_key_sift(ghz)
+                            ghz_privacy_amplification(ghz)
+                        elif mode == MODE_COMPARE:
+                            if len(e91_cmp.raw_key_alice) > 0:
+                                key_sift(e91_cmp)
+                                privacy_amplification(e91_cmp)
+                    except Exception as exc:
+                        _engine_error = str(exc)
                 elif event.key == pygame.K_r:
                     reset_e91(e91)
                     reset_ghz(ghz)
@@ -1132,6 +1176,9 @@ def run_simulation():
                         resize_ghz(ghz, ghz.n_parties - 1)
                 elif event.key == pygame.K_l:
                     toggle_locale()
+                    _tcache.clear()
+                elif event.key == pygame.K_SLASH or event.key == pygame.K_QUESTION:
+                    show_shortcuts = not show_shortcuts
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 # 모드 탭 클릭 처리
                 mx, my = event.pos
@@ -1161,49 +1208,50 @@ def run_simulation():
             auto_timer += dt
             if auto_timer >= 0.05:
                 auto_timer = 0.0
-                if mode == MODE_E91:
-                    e91_round(e91, eve_chance)
-                    if e91.total_rounds % 10 == 0:
-                        compute_bell_S(e91)
-                elif mode == MODE_SIFT:
-                    e91_round(e91, eve_chance)
-                    if e91.total_rounds % 10 == 0:
-                        compute_bell_S(e91)
-                    # 자동 파이프라인: 충분한 키가 쌓이면 순차 실행
-                    if (e91.total_rounds > 0
-                            and e91.total_rounds % CHSH_SHOTS == 0
-                            and not e91.pa_done):
-                        if not e91.qber_done:
-                            estimate_qber(e91)
-                        elif not e91.correction_done:
-                            error_correct(e91)
-                        elif not e91.pa_done:
-                            privacy_amplification(e91)
-                elif mode == MODE_GHZ:
-                    ghz_round(ghz, eve_chance)
-                    # 자동 파이프라인: 충분한 키가 쌓이면 시프팅→PA
-                    if (ghz.total_rounds > 0
-                            and ghz.total_rounds % GHZ_BATCH == 0
-                            and not ghz.pa_done):
-                        if not ghz.sift_done:
-                            ghz_key_sift(ghz)
-                        elif not ghz.pa_done:
-                            ghz_privacy_amplification(ghz)
-                elif mode == MODE_COMPARE:
-                    bb84_round(bb84_cmp, eve_chance)
-                    e91_round(e91_cmp, eve_chance)
-                    if e91_cmp.total_rounds % 10 == 0:
-                        compute_bell_S(e91_cmp)
-                    # 자동 파이프라인: E91 측 시프팅→PA
-                    if (e91_cmp.total_rounds > 0
-                            and e91_cmp.total_rounds % CHSH_SHOTS == 0
-                            and not e91_cmp.pa_done):
-                        if not e91_cmp.qber_done:
-                            estimate_qber(e91_cmp)
-                        elif not e91_cmp.correction_done:
-                            error_correct(e91_cmp)
-                        elif not e91_cmp.pa_done:
-                            privacy_amplification(e91_cmp)
+                try:
+                    if mode == MODE_E91:
+                        e91_round(e91, eve_chance)
+                        if e91.total_rounds % 10 == 0:
+                            compute_bell_S(e91)
+                    elif mode == MODE_SIFT:
+                        e91_round(e91, eve_chance)
+                        if e91.total_rounds % 10 == 0:
+                            compute_bell_S(e91)
+                        if (e91.total_rounds > 0
+                                and e91.total_rounds % CHSH_SHOTS == 0
+                                and not e91.pa_done):
+                            if not e91.qber_done:
+                                estimate_qber(e91)
+                            elif not e91.correction_done:
+                                error_correct(e91)
+                            elif not e91.pa_done:
+                                privacy_amplification(e91)
+                    elif mode == MODE_GHZ:
+                        ghz_round(ghz, eve_chance)
+                        if (ghz.total_rounds > 0
+                                and ghz.total_rounds % GHZ_BATCH == 0
+                                and not ghz.pa_done):
+                            if not ghz.sift_done:
+                                ghz_key_sift(ghz)
+                            elif not ghz.pa_done:
+                                ghz_privacy_amplification(ghz)
+                    elif mode == MODE_COMPARE:
+                        bb84_round(bb84_cmp, eve_chance)
+                        e91_round(e91_cmp, eve_chance)
+                        if e91_cmp.total_rounds % 10 == 0:
+                            compute_bell_S(e91_cmp)
+                        if (e91_cmp.total_rounds > 0
+                                and e91_cmp.total_rounds % CHSH_SHOTS == 0
+                                and not e91_cmp.pa_done):
+                            if not e91_cmp.qber_done:
+                                estimate_qber(e91_cmp)
+                            elif not e91_cmp.correction_done:
+                                error_correct(e91_cmp)
+                            elif not e91_cmp.pa_done:
+                                privacy_amplification(e91_cmp)
+                except Exception as exc:
+                    _engine_error = str(exc)
+                    auto_run = False
 
         # 리플레이 기록
         if not paused:
@@ -1335,6 +1383,44 @@ def run_simulation():
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
             screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 36 + i * 16))
+
+        # 엔진 오류 배너
+        if _engine_error:
+            err_surf = font.render(f"Engine error: {_engine_error[:60]}", True, BG)
+            err_bg = pygame.Rect(WIDTH // 2 - err_surf.get_width() // 2 - 6,
+                                 HEIGHT // 2 - 12, err_surf.get_width() + 12, 20)
+            pygame.draw.rect(screen, RED, err_bg, border_radius=4)
+            screen.blit(err_surf, (err_bg.x + 6, err_bg.y + 3))
+
+        # 키보드 단축키 치트시트 (? 토글)
+        if show_shortcuts:
+            _sc_lines = [
+                t("qa_sc_title"),
+                "",
+                f"SPACE   {t('qa_sc_space')}",
+                f"S       {t('qa_sc_sift')}",
+                f"A       {t('qa_sc_auto')}",
+                f"E       {t('qa_sc_eve')}",
+                f"P       {t('qa_sc_pause')}",
+                f"R       {t('qa_sc_reset')}",
+                f"Tab     {t('qa_sc_tab')}",
+                f"L       {t('qa_sc_locale')}",
+                f"Up/Down {t('qa_sc_updown')}",
+                f"F1      {t('qa_sc_help')}",
+                f"?       {t('qa_sc_shortcuts')}",
+                f"ESC     {t('qa_sc_exit')}",
+            ]
+            sc_w, sc_h = 280, len(_sc_lines) * 15 + 16
+            sc_x = WIDTH // 2 - sc_w // 2
+            sc_y = HEIGHT // 2 - sc_h // 2
+            overlay_bg = pygame.Surface((sc_w, sc_h), pygame.SRCALPHA)
+            overlay_bg.fill((*PANEL_BG, 230))
+            screen.blit(overlay_bg, (sc_x, sc_y))
+            pygame.draw.rect(screen, ACCENT, (sc_x, sc_y, sc_w, sc_h), 2, border_radius=6)
+            for si, line in enumerate(_sc_lines):
+                clr = ACCENT if si == 0 else TEXT_CLR
+                ls = font.render(line, True, clr)
+                screen.blit(ls, (sc_x + 12, sc_y + 8 + si * 15))
 
         help_overlay.draw(screen, font)
         tutorial.draw(screen, font)
