@@ -207,7 +207,7 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
         badge_x = meter_x + meter_w + 14 + s_lbl.get_width()
         pygame.draw.rect(screen, badge_clr,
                          (badge_x, meter_y + 1, 50, 14), border_radius=3)
-        bt = font.render(badge_txt, True, BG_CLR)
+        bt = font.render(badge_txt, True, BG)
         screen.blit(bt, (badge_x + 25 - bt.get_width() // 2, meter_y + 1))
 
     # 최근 라운드 로그
@@ -223,7 +223,8 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
         clr = GREEN if rd.same_basis else SUBTEXT_CLR
         if rd.eve_present:
             clr = RED
-        txt = f"R{rd.round_id:03d} A:{a_deg} B:{b_deg} [{basis_match}] A={rd.alice_result:+d} B={rd.bob_result:+d}{eve}"
+        txt = t("qa_e91_log_entry", rid=rd.round_id, a_angle=a_deg, b_angle=b_deg,
+                tag=basis_match, a_res=rd.alice_result, b_res=rd.bob_result, eve=eve)
         surf = font.render(txt, True, clr)
         screen.blit(surf, (40, log_y + 18 + i * 14))
 
@@ -454,15 +455,17 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
     slider_x, slider_y = WIDTH - 180, 62
     slider_lbl = big_font.render(t("qa_ghz_parties"), True, ACCENT)
     screen.blit(slider_lbl, (slider_x, slider_y))
-    # 버튼 스타일 숫자 표시
+    # 버튼 스타일 숫자 표시 (호버 하이라이트 포함)
+    mx, my = pygame.mouse.get_pos()
     for pn in range(GHZ_MIN_PARTIES, GHZ_MAX_PARTIES + 1):
         bx = slider_x + (pn - GHZ_MIN_PARTIES) * 36
         by = slider_y + 18
         active = pn == n
-        btn_clr = ACCENT if active else SUBTEXT_CLR
-        pygame.draw.rect(screen, PANEL_BG if active else BG,
-                         (bx, by, 30, 20), border_radius=4)
-        if active:
+        hovered = bx <= mx <= bx + 30 and by <= my <= by + 20
+        btn_clr = ACCENT if active else (TEXT_CLR if hovered else SUBTEXT_CLR)
+        bg_clr = PANEL_BG if active else (OVERLAY if hovered else BG)
+        pygame.draw.rect(screen, bg_clr, (bx, by, 30, 20), border_radius=4)
+        if active or hovered:
             pygame.draw.rect(screen, btn_clr, (bx, by, 30, 20), 2, border_radius=4)
         num = big_font.render(str(pn), True, btn_clr)
         screen.blit(num, (bx + 15 - num.get_width() // 2, by + 2))
@@ -565,7 +568,8 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
         else:
             clr = SUBTEXT_CLR
 
-        txt = f"R{rd.round_id:03d} Bases:{bases} Results:{results} [{tag}]{eve}"
+        txt = t("qa_ghz_log_entry", rid=rd.round_id, bases=bases, results=results,
+                tag=tag, eve=eve)
         surf = font.render(txt, True, clr)
         screen.blit(surf, (40, log_y + 18 + i * 14))
 
@@ -1203,16 +1207,24 @@ def run_simulation():
                 "mode": mode,
                 "e91_rounds": e91.total_rounds,
                 "e91_bell_S": e91.bell_S,
+                "e91_eve_rounds": e91.eve_rounds,
+                "e91_key_rounds": e91.key_rounds,
                 "ghz_rounds": ghz.total_rounds,
+                "ghz_sift_done": ghz.sift_done,
+                "ghz_pa_done": ghz.pa_done,
                 "eve_chance": eve_chance,
             }
             if mode == MODE_COMPARE:
                 frame["bb84_rounds"] = bb84_cmp.total_rounds
                 frame["bb84_qber"] = bb84_cmp.qber
                 frame["bb84_eve_detected"] = bb84_cmp.eve_detected
+                frame["bb84_basis_match"] = bb84_cmp.basis_match_rounds
+                frame["bb84_raw_key_bits"] = bb84_cmp.raw_key_bits
                 frame["e91_cmp_rounds"] = e91_cmp.total_rounds
                 frame["e91_cmp_bell_S"] = e91_cmp.bell_S
                 frame["e91_cmp_bell_violated"] = e91_cmp.bell_violated
+                frame["e91_cmp_key_rounds"] = e91_cmp.key_rounds
+                frame["e91_cmp_eve_rounds"] = e91_cmp.eve_rounds
             recorder.record(frame)
 
         # ── 렌더링 ───────────────────────────────────

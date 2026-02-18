@@ -49,6 +49,8 @@
   "qa_bell_badge_secure": "SECURE",
   "qa_bell_badge_caution": "WARN",
   "qa_bell_badge_danger": "DANGER",
+  "qa_e91_log_entry": "R{rid:03d} A:{a_angle} B:{b_angle} [{tag}] A={a_res:+d} B={b_res:+d}{eve}",
+  "qa_ghz_log_entry": "R{rid:03d} Bases:{bases} Results:{results} [{tag}]{eve}",
   "qa_round_log": "── Round Log ──",
   "qa_correlators": "── Correlators E(a,b) ──",
   "qa_key_pair_legend": "Yellow = Key generation pair",

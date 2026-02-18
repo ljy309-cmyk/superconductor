@@ -49,6 +49,8 @@
   "qa_bell_badge_secure": "안전",
   "qa_bell_badge_caution": "주의",
   "qa_bell_badge_danger": "위험",
+  "qa_e91_log_entry": "R{rid:03d} A:{a_angle} B:{b_angle} [{tag}] A={a_res:+d} B={b_res:+d}{eve}",
+  "qa_ghz_log_entry": "R{rid:03d} 기저:{bases} 결과:{results} [{tag}]{eve}",
   "qa_round_log": "── 라운드 로그 ──",
   "qa_correlators": "── 상관 함수 E(a,b) ──",
   "qa_key_pair_legend": "노란색 = 키 생성 쌍",

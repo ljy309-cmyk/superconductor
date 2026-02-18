@@ -1468,5 +1468,47 @@ class TestBellSBadgeLogic(unittest.TestCase):
         self.assertLess(abs_s, 2.8)
 
 
+class TestLocaleRound9Keys(unittest.TestCase):
+    """Round 9 로케일 키 존재 확인."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_round_log_keys(self):
+        """라운드 로그 항목 키가 양쪽 로케일에 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        for key in ["qa_e91_log_entry", "qa_ghz_log_entry"]:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_en_ko_keys_still_match(self):
+        """en.json과 ko.json의 키가 여전히 일치."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        self.assertEqual(en_keys - ko_keys, set())
+        self.assertEqual(ko_keys - en_keys, set())
+
+
+class TestGHZConsistencyHistoryResize(unittest.TestCase):
+    """리사이즈 시 일관성 히스토리 초기화 테스트."""
+
+    def test_resize_clears_consistency_history(self):
+        """리사이즈 시 consistency_history도 초기화."""
+        from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+        state = GHZState()
+        for _ in range(500):
+            ghz_round(state)
+        resize_ghz(state, 4)
+        self.assertEqual(len(state.consistency_history), 0)
+        self.assertEqual(state.n_parties, 4)
+
+
 if __name__ == "__main__":
     unittest.main()
