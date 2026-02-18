@@ -9,6 +9,7 @@ from security.launcher import open_security_launcher
 from data_ai.launcher import open_data_ai_launcher
 from config_loader import cfg
 from i18n import t, set_locale
+from sound_manager import get_sound_manager
 from theme import (TK, FONTS, get_theme, toggle_theme, get_tk_theme,
                    is_colorblind, set_colorblind, toggle_colorblind,
                    load_preferences, save_preferences,
@@ -96,6 +97,33 @@ class App(tk.Tk):
             width=14,
         ).pack(side="left", padx=(10, 2))
 
+        # 볼륨 조절
+        vol_frame = tk.Frame(frame, bg=get_tk_theme().BG)
+        vol_frame.pack(pady=(4, 0))
+        snd = get_sound_manager()
+
+        tk.Button(
+            vol_frame, text=t("mute_toggle"), font=FONTS.SMALL,
+            command=self._toggle_mute, width=6,
+        ).pack(side="left", padx=2)
+        tk.Button(
+            vol_frame, text="-", font=FONTS.SMALL,
+            command=self._volume_down, width=3,
+        ).pack(side="left", padx=2)
+        if snd.enabled:
+            vol_text = t("volume_label", vol=int(snd.volume * 100))
+        else:
+            vol_text = t("volume_muted")
+        tk.Label(
+            vol_frame, text=vol_text,
+            font=FONTS.SMALL, bg=get_tk_theme().BG, fg=get_tk_theme().TEXT,
+            width=12,
+        ).pack(side="left", padx=4)
+        tk.Button(
+            vol_frame, text="+", font=FONTS.SMALL,
+            command=self._volume_up, width=3,
+        ).pack(side="left", padx=2)
+
     def _switch_locale(self, locale: str):
         """언어 전환 후 UI 재구성."""
         set_locale(locale)
@@ -132,6 +160,33 @@ class App(tk.Tk):
         """폰트 크기 감소 후 UI 재구성."""
         decrease_font_scale()
         save_preferences()
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._create_widgets()
+
+    def _toggle_mute(self):
+        """음소거 토글 후 UI 재구성."""
+        snd = get_sound_manager()
+        snd.toggle()
+        snd.save_preferences()
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._create_widgets()
+
+    def _volume_up(self):
+        """볼륨 증가 후 UI 재구성."""
+        snd = get_sound_manager()
+        snd.volume_up()
+        snd.save_preferences()
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._create_widgets()
+
+    def _volume_down(self):
+        """볼륨 감소 후 UI 재구성."""
+        snd = get_sound_manager()
+        snd.volume_down()
+        snd.save_preferences()
         for widget in self.winfo_children():
             widget.destroy()
         self._create_widgets()

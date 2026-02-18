@@ -323,5 +323,9 @@
   "lang_en": "English",
   "theme_toggle": "테마: {theme}",
   "font_decrease": "A-",
-  "font_increase": "A+"
+  "font_increase": "A+",
+
+  "volume_label": "볼륨: {vol}%",
+  "volume_muted": "음소거",
+  "mute_toggle": "음소거"
 }

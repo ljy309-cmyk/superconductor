@@ -179,6 +179,39 @@ class SoundManager:
         self._sounds.clear()
         self._initialized = False
 
+    def load_preferences(self):
+        """config.json에서 볼륨/뮤트 설정 로드."""
+        import json
+        import os
+        cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            if isinstance(cfg.get("sound_volume"), (int, float)):
+                self._volume = max(0.0, min(1.0, round(float(cfg["sound_volume"]), 2)))
+            if isinstance(cfg.get("sound_enabled"), bool):
+                self.enabled = cfg["sound_enabled"]
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    def save_preferences(self):
+        """현재 볼륨/뮤트 설정을 config.json에 저장."""
+        import json
+        import os
+        cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+        cfg["sound_volume"] = self._volume
+        cfg["sound_enabled"] = self.enabled
+        try:
+            with open(cfg_path, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=2, ensure_ascii=False)
+        except OSError:
+            pass
+
 
 # 전역 싱글턴
 _instance: SoundManager | None = None
@@ -189,4 +222,5 @@ def get_sound_manager() -> SoundManager:
     global _instance
     if _instance is None:
         _instance = SoundManager()
+        _instance.load_preferences()
     return _instance
