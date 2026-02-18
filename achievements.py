@@ -31,7 +31,10 @@ _T = {
     "bb84_score": cfg("achievements", "bb84_score_target", 500),
     "bb84_manual": cfg("achievements", "bb84_manual_blocks", 5),
     "bb84_decoy": cfg("achievements", "bb84_decoy_trapped", 3),
-    "all_modules": cfg("achievements", "all_modules_count", 5),
+    "qa_e91_rounds": cfg("achievements", "qa_e91_rounds", 200),
+    "qa_ghz_consistency": cfg("achievements", "qa_ghz_consistency", 0.9),
+    "qa_ghz_rounds": cfg("achievements", "qa_ghz_rounds", 100),
+    "all_modules": cfg("achievements", "all_modules_count", 6),
 }
 
 # ── 업적 정의 ───────────────────────────────────────────────
@@ -176,6 +179,42 @@ ACHIEVEMENTS = [
         "icon": "V",
         "condition": lambda d: d.get("won", False) and d.get("wrong_marks", 1) == 0,
     },
+    # 고급 QKD
+    {
+        "id": "qa_first_play",
+        "module": "qkd_advanced",
+        "title": "Entangled Keys",
+        "desc": "고급 QKD(E91) 프로토콜을 처음 실행했습니다.",
+        "icon": "E",
+        "condition": lambda d: True,
+    },
+    {
+        "id": "qa_bell_violation",
+        "module": "qkd_advanced",
+        "title": "Bell Breaker",
+        "desc": "벨 부등식 위반을 확인하여 양자 보안을 검증했습니다!",
+        "icon": "B",
+        "condition": lambda d: d.get("e91_bell_violated", False),
+    },
+    {
+        "id": "qa_e91_200",
+        "module": "qkd_advanced",
+        "title": "E91 Veteran",
+        "desc": f"E91 프로토콜 {_T['qa_e91_rounds']}라운드 달성!",
+        "icon": "R",
+        "condition": lambda d: d.get("e91_rounds", 0) >= _T["qa_e91_rounds"],
+    },
+    {
+        "id": "qa_ghz_consistent",
+        "module": "qkd_advanced",
+        "title": "GHZ Harmony",
+        "desc": "GHZ 일관성 검증 통과율 90% 이상 달성!",
+        "icon": "G",
+        "condition": lambda d: (
+            d.get("ghz_consistency_rate", 0) >= _T["qa_ghz_consistency"]
+            and d.get("ghz_rounds", 0) >= _T["qa_ghz_rounds"]
+        ),
+    },
     # 플럭스 피닝
     {
         "id": "fp_first_play",
@@ -190,7 +229,7 @@ ACHIEVEMENTS = [
         "id": "all_modules",
         "module": "_global",
         "title": "Explorer",
-        "desc": "모든 5개 게임 모듈을 플레이했습니다!",
+        "desc": "모든 6개 게임 모듈을 플레이했습니다!",
         "icon": "A",
         "condition": lambda d: len(d.get("modules_played", [])) >= _T["all_modules"],
     },

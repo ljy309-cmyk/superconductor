@@ -117,7 +117,11 @@
     "bb84_score_target": 500,
     "bb84_manual_blocks": 5,
     "bb84_decoy_trapped": 3,
-    "all_modules_count": 5
+    "qa_e91_rounds": 200,
+    "qa_bell_violation": true,
+    "qa_ghz_consistency": 0.9,
+    "qa_ghz_rounds": 100,
+    "all_modules_count": 6
   },
   "entanglement": {
     "chsh_shots": 200,

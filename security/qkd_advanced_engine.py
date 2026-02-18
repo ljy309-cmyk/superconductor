@@ -22,6 +22,20 @@ from dataclasses import dataclass, field
 
 from config_loader import cfg
 
+# QRNG 키 통합 — 모듈이 있으면 양자 난수 사용
+try:
+    from data_ai.qrng_logger import pop_key_bit, shared_key_available
+
+    QRNG_AVAILABLE = True
+except ImportError:
+    QRNG_AVAILABLE = False
+
+    def pop_key_bit():  # noqa: E306
+        return None
+
+    def shared_key_available() -> int:  # noqa: E306
+        return 0
+
 # ── E91 설정 ──────────────────────────────────────────
 E91_ALICE_BASES = [0.0, math.pi / 8, math.pi / 4]  # a1=0, a2=π/8, a3=π/4
 E91_BOB_BASES = [math.pi / 8, math.pi / 4, 3 * math.pi / 8]  # b1=π/8, b2=π/4, b3=3π/8
@@ -39,6 +53,21 @@ PA_COMPRESSION_RATIO = cfg("qkd_advanced", "pa_compression", 0.5)
 
 # 다자간 QKD 설정
 GHZ_PARTIES = 3
+
+
+def _qrng_randint(lo: int, hi: int) -> int:
+    """QRNG 비트로 [lo, hi] 범위의 랜덤 정수 생성. 없으면 의사 난수."""
+    n = hi - lo + 1
+    bit = pop_key_bit()
+    if bit is not None:
+        # 추가 비트가 필요하면 폴백
+        if n <= 2:
+            return lo + (bit % n)
+        bit2 = pop_key_bit()
+        if bit2 is not None:
+            combined = (bit << 1) | bit2
+            return lo + (combined % n)
+    return random.randint(lo, hi)
 
 
 # ── E91 프로토콜 ──────────────────────────────────────
@@ -138,9 +167,9 @@ def e91_round(state: E91State, eve_chance: float = 0.0) -> E91Round:
     state.total_rounds += 1
     rid = state.total_rounds
 
-    # 기저 랜덤 선택
-    a_idx = random.randint(0, 2)
-    b_idx = random.randint(0, 2)
+    # 기저 랜덤 선택 (QRNG 가용 시 양자 난수 사용)
+    a_idx = _qrng_randint(0, 2)
+    b_idx = _qrng_randint(0, 2)
     a_angle = E91_ALICE_BASES[a_idx]
     b_angle = E91_BOB_BASES[b_idx]
 
@@ -516,8 +545,8 @@ def ghz_round(state: GHZState, eve_chance: float = 0.0) -> GHZRound:
     state.total_rounds += 1
     rid = state.total_rounds
 
-    # 각 파티 기저 랜덤 선택
-    bases = [random.choice(["X", "Z"]) for _ in range(state.n_parties)]
+    # 각 파티 기저 랜덤 선택 (QRNG 가용 시 양자 난수 사용)
+    bases = ["Z" if _qrng_randint(0, 1) == 0 else "X" for _ in range(state.n_parties)]
 
     eve_present = random.random() < eve_chance
     if eve_present:

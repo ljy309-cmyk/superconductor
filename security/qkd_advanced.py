@@ -43,6 +43,9 @@ _log = get_module_logger("qkd_advanced")
 WIDTH = cfg("display", "width", 900)
 HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
+E91_BATCH = cfg("qkd_advanced", "e91_batch_size", 50)
+GHZ_BATCH = cfg("qkd_advanced", "ghz_batch_size", 50)
+CHSH_SHOTS = cfg("entanglement", "chsh_shots", 200)
 
 # ── 색상 ─────────────────────────────────────────────
 BG = (30, 30, 46)
@@ -182,8 +185,8 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     screen.blit(header, (40, log_y))
 
     for i, rd in enumerate(e91.rounds[-12:]):
-        basis_match = "KEY" if rd.same_basis else "BELL"
-        eve = " [EVE]" if rd.eve_present else ""
+        basis_match = t("qa_tag_key") if rd.same_basis else t("qa_tag_bell")
+        eve = f" [{t('qa_tag_eve')}]" if rd.eve_present else ""
         a_deg = f"{math.degrees(rd.alice_angle):.0f}°"
         b_deg = f"{math.degrees(rd.bob_angle):.0f}°"
         clr = GREEN if rd.same_basis else SUBTEXT_CLR
@@ -419,15 +422,17 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
     for i, rd in enumerate(ghz.rounds[-14:]):
         bases = "/".join(rd.bases)
         results = "/".join(str(r) for r in rd.results)
-        tag = "KEY" if rd.all_same_basis and rd.bases[0] == "Z" else \
-              "CHK" if rd.all_same_basis and rd.bases[0] == "X" else "---"
-        eve = " [EVE]" if rd.eve_present else ""
+        is_key = rd.all_same_basis and rd.bases[0] == "Z"
+        is_chk = rd.all_same_basis and rd.bases[0] == "X"
+        tag = t("qa_tag_key") if is_key else \
+              t("qa_tag_chk") if is_chk else "---"
+        eve = f" [{t('qa_tag_eve')}]" if rd.eve_present else ""
 
         if rd.eve_present:
             clr = RED
-        elif tag == "KEY":
+        elif is_key:
             clr = GREEN
-        elif tag == "CHK":
+        elif is_chk:
             clr = YELLOW
         else:
             clr = SUBTEXT_CLR
@@ -485,15 +490,15 @@ def run_simulation():
                     mode = (mode + 1) % 3
                 elif event.key == pygame.K_SPACE:
                     if mode == MODE_E91:
-                        # 50 라운드 배치 실행
-                        for _ in range(50):
+                        # 배치 실행 (config: e91_batch_size)
+                        for _ in range(E91_BATCH):
                             e91_round(e91, eve_chance)
                         compute_bell_S(e91)
                     elif mode == MODE_SIFT:
                         # 4단계 파이프라인 순차 실행
                         if len(e91.raw_key_alice) == 0:
-                            # Stage 0: 라운드 생성
-                            for _ in range(200):
+                            # Stage 0: 라운드 생성 (config: chsh_shots)
+                            for _ in range(CHSH_SHOTS):
                                 e91_round(e91, eve_chance)
                             compute_bell_S(e91)
                         elif not e91.qber_done:
@@ -509,7 +514,7 @@ def run_simulation():
                             # 리셋 후 새 파이프라인
                             reset_e91(e91)
                     elif mode == MODE_GHZ:
-                        for _ in range(50):
+                        for _ in range(GHZ_BATCH):
                             ghz_round(ghz, eve_chance)
                 elif event.key == pygame.K_s:
                     # 전체 파이프라인 한번에 실행
@@ -604,14 +609,20 @@ def run_simulation():
 
         pygame.display.flip()
 
+    ghz_cons_rate = (
+        ghz.consistency_pass / ghz.consistency_checks
+        if ghz.consistency_checks > 0 else 0.0
+    )
     finalize_session(
         "qkd_advanced",
         {
             "e91_rounds": e91.total_rounds,
             "e91_bell_S": round(e91.bell_S, 3),
+            "e91_bell_violated": e91.bell_violated,
             "e91_key_bits": len(e91.raw_key_alice),
             "ghz_rounds": ghz.total_rounds,
             "ghz_key_bits": len(ghz.raw_keys[0]),
+            "ghz_consistency_rate": round(ghz_cons_rate, 3),
         },
         recorder=recorder,
         snd=snd,
