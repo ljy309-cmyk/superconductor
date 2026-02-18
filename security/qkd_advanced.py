@@ -1,9 +1,10 @@
 """고급 QKD 프로토콜 시뮬레이션 (Pygame).
 
-3 모드:
+4 모드:
   Mode 1 — E91: 얽힘 기반 양자 키 분배 + 벨 부등식 보안 검증
   Mode 2 — Key Sifting: BB84/E91 키 시프팅 & 프라이버시 증폭 시각화
   Mode 3 — Multi-Party: GHZ 기반 3자간 QKD 네트워크
+  Mode 4 — Compare: BB84 vs E91 동일 Eve 조건 비교
 """
 
 import math
@@ -18,10 +19,12 @@ from logger import get_module_logger
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from security.qkd_advanced_engine import (
+    BB84State,
     CHSH_CLASSICAL_BOUND,
     CHSH_QUANTUM_BOUND,
     E91State,
     GHZState,
+    bb84_round,
     compute_bell_S,
     e91_round,
     error_correct,
@@ -31,6 +34,7 @@ from security.qkd_advanced_engine import (
     ghz_round,
     key_sift,
     privacy_amplification,
+    reset_bb84,
     reset_e91,
     reset_ghz,
 )
@@ -80,7 +84,9 @@ def _load_theme_colors():
 MODE_E91 = 0
 MODE_SIFT = 1
 MODE_GHZ = 2
-MODE_NAMES = ["E91", "Key Sift & PA", "Multi-Party (GHZ)"]
+MODE_COMPARE = 3
+MODE_NAMES = ["E91", "Key Sift & PA", "Multi-Party (GHZ)", "BB84 vs E91"]
+NUM_MODES = len(MODE_NAMES)
 
 # ── 노드 위치 ────────────────────────────────────────
 ALICE_POS = (140, 140)
@@ -445,6 +451,158 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
         screen.blit(surf, (40, log_y + 18 + i * 14))
 
 
+# ── BB84 vs E91 비교 모드 ──────────────────────────
+
+_CMP_BATCH = cfg("qkd_advanced", "e91_batch_size", 50)
+
+
+def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
+                       anim_t, font, big_font):
+    """BB84 vs E91 비교 시각화 — 동일 Eve 조건 나란히 표시."""
+    half_w = WIDTH // 2 - 20
+    left_x = 20
+    right_x = WIDTH // 2 + 10
+
+    # ── 구분선 ──
+    pygame.draw.line(screen, OVERLAY, (WIDTH // 2, 62), (WIDTH // 2, HEIGHT - 50), 1)
+
+    # ── 헤더 ──
+    bb84_hdr = big_font.render(t("qa_cmp_bb84_title"), True, BLUE)
+    screen.blit(bb84_hdr, (left_x + half_w // 2 - bb84_hdr.get_width() // 2, 62))
+
+    e91_hdr = big_font.render(t("qa_cmp_e91_title"), True, MAUVE)
+    screen.blit(e91_hdr, (right_x + half_w // 2 - e91_hdr.get_width() // 2, 62))
+
+    # ── BB84 (왼쪽) ──
+    by = 84
+    bb84_stats = [
+        (f"Rounds: {bb84.total_rounds}", TEXT_CLR),
+        (f"Basis Match: {bb84.basis_match_rounds}  ({bb84.basis_match_rounds / max(bb84.total_rounds, 1) * 100:.0f}%)", TEXT_CLR),
+        (f"Raw Key: {bb84.raw_key_bits} bits", BLUE),
+        (f"Eve Intercepts: {bb84.eve_rounds}", RED if bb84.eve_rounds > 0 else SUBTEXT_CLR),
+        ("", TEXT_CLR),
+        (t("qa_cmp_detection"), ACCENT),
+        (f"  QBER = {bb84.qber * 100:.1f}%", RED if bb84.qber > 0.11 else GREEN),
+    ]
+    if bb84.eve_detected:
+        bb84_stats.append((t("qa_cmp_eve_detected"), RED))
+    elif bb84.total_rounds > 20:
+        bb84_stats.append((t("qa_cmp_secure"), GREEN))
+
+    for i, (txt, clr) in enumerate(bb84_stats):
+        surf = font.render(txt, True, clr)
+        screen.blit(surf, (left_x, by + i * 16))
+
+    # QBER 미터 (BB84)
+    _draw_qber_meter(screen, bb84.qber, left_x, by + len(bb84_stats) * 16 + 8,
+                     half_w, font, big_font)
+
+    # ── E91 (오른쪽) ──
+    e91_stats = [
+        (f"Rounds: {e91.total_rounds}  (Key: {e91.key_rounds}  Bell: {e91.bell_rounds})", TEXT_CLR),
+        (f"Key Pairs: {e91.key_rounds}  ({e91.key_rounds / max(e91.total_rounds, 1) * 100:.0f}%)", TEXT_CLR),
+        (f"Raw Key: {len(e91.raw_key_alice)} bits", MAUVE),
+        (f"Eve Rounds: {e91.eve_rounds}", RED if e91.eve_rounds > 0 else SUBTEXT_CLR),
+        ("", TEXT_CLR),
+        (t("qa_cmp_detection"), ACCENT),
+        (f"  Bell S = {e91.bell_S:.3f}  (bound: {CHSH_CLASSICAL_BOUND})", GREEN if e91.bell_violated else RED),
+    ]
+    if e91.bell_violated:
+        e91_stats.append((t("qa_cmp_bell_secure"), GREEN))
+    elif e91.bell_rounds > 20:
+        e91_stats.append((t("qa_cmp_bell_warning"), RED))
+
+    for i, (txt, clr) in enumerate(e91_stats):
+        surf = font.render(txt, True, clr)
+        screen.blit(surf, (right_x, by + i * 16))
+
+    # Bell S 미터 (E91)
+    _draw_bell_meter(screen, e91.bell_S, right_x, by + len(e91_stats) * 16 + 8,
+                     half_w, font, big_font)
+
+    # ── 하단 비교 요약 패널 ──
+    panel_y = 340
+    pygame.draw.rect(screen, PANEL_BG, (20, panel_y, WIDTH - 40, 170), border_radius=8)
+    pygame.draw.rect(screen, OVERLAY, (20, panel_y, WIDTH - 40, 170), 1, border_radius=8)
+
+    title = big_font.render(t("qa_cmp_summary"), True, ACCENT)
+    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, panel_y + 6))
+
+    # 비교 행
+    rows = [
+        (t("qa_cmp_row_method"), "QBER Sampling", "Bell Inequality (CHSH)"),
+        (t("qa_cmp_row_resource"), t("qa_cmp_bb84_resource"), t("qa_cmp_e91_resource")),
+        (t("qa_cmp_row_detect"),
+         f"QBER = {bb84.qber * 100:.1f}%  {'> 11% !' if bb84.qber > 0.11 else '< 11%'}",
+         f"S = {e91.bell_S:.3f}  {'> 2.0 !' if e91.bell_violated else '≤ 2.0'}"),
+        (t("qa_cmp_row_result"),
+         t("qa_cmp_eve_detected") if bb84.eve_detected else t("qa_cmp_secure"),
+         t("qa_cmp_bell_secure") if e91.bell_violated else (
+             t("qa_cmp_bell_warning") if e91.bell_rounds > 20 else "---")),
+        (t("qa_cmp_row_keybits"),
+         f"{bb84.raw_key_bits} bits",
+         f"{len(e91.raw_key_alice)} bits"),
+    ]
+
+    col_w = (WIDTH - 60) // 3
+    ry = panel_y + 26
+    for i, (label, bb84_val, e91_val) in enumerate(rows):
+        y = ry + i * 16
+        screen.blit(font.render(label, True, ACCENT), (30, y))
+        screen.blit(font.render(bb84_val, True, BLUE), (30 + col_w, y))
+        screen.blit(font.render(e91_val, True, MAUVE), (30 + col_w * 2, y))
+
+    # 프로토콜 특성 비교 메모
+    note_y = ry + len(rows) * 16 + 8
+    notes = [
+        t("qa_cmp_note_bb84"),
+        t("qa_cmp_note_e91"),
+    ]
+    for i, note in enumerate(notes):
+        screen.blit(font.render(note, True, SUBTEXT_CLR), (30, note_y + i * 14))
+
+
+def _draw_qber_meter(screen, qber, x, y, w, font, big_font):
+    """QBER 바 미터."""
+    h = 14
+    pygame.draw.rect(screen, PANEL_BG, (x, y, w, h))
+    # 11% 임계선
+    thresh_x = x + int(w * 0.11)
+    pygame.draw.line(screen, YELLOW, (thresh_x, y - 2), (thresh_x, y + h + 2), 2)
+    lbl = font.render("11%", True, YELLOW)
+    screen.blit(lbl, (thresh_x - 8, y + h + 3))
+    # 채움
+    fill_w = min(int(w * min(qber, 1.0)), w)
+    fill_clr = RED if qber > 0.11 else GREEN
+    if fill_w > 0:
+        pygame.draw.rect(screen, fill_clr, (x, y, fill_w, h))
+    pygame.draw.rect(screen, TEXT_CLR, (x, y, w, h), 1)
+    # 값 표시
+    val = big_font.render(f"QBER {qber * 100:.1f}%", True, TEXT_CLR)
+    screen.blit(val, (x + w + 8, y))
+
+
+def _draw_bell_meter(screen, bell_s, x, y, w, font, big_font):
+    """Bell S 바 미터."""
+    h = 14
+    pygame.draw.rect(screen, PANEL_BG, (x, y, w, h))
+    # 고전 한계 마커 (S=2)
+    cl_x = x + int(w * CHSH_CLASSICAL_BOUND / 3.0)
+    pygame.draw.line(screen, YELLOW, (cl_x, y - 2), (cl_x, y + h + 2), 2)
+    lbl = font.render("2.0", True, YELLOW)
+    screen.blit(lbl, (cl_x - 8, y + h + 3))
+    # 채움
+    s_ratio = min(abs(bell_s) / 3.0, 1.0)
+    fill_w = int(w * s_ratio)
+    fill_clr = GREEN if abs(bell_s) > CHSH_CLASSICAL_BOUND else RED
+    if fill_w > 0:
+        pygame.draw.rect(screen, fill_clr, (x, y, fill_w, h))
+    pygame.draw.rect(screen, TEXT_CLR, (x, y, w, h), 1)
+    # 값 표시
+    val = big_font.render(f"S = {abs(bell_s):.3f}", True, TEXT_CLR)
+    screen.blit(val, (x + w + 8, y))
+
+
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 def run_simulation():
@@ -461,6 +619,8 @@ def run_simulation():
     mode = MODE_E91
     e91 = E91State()
     ghz = GHZState()
+    bb84_cmp = BB84State()
+    e91_cmp = E91State()
     anim_t = 0.0
     paused = False
     auto_run = False
@@ -490,7 +650,7 @@ def run_simulation():
                     if confirm_quit(screen, font):
                         running = False
                 elif event.key == pygame.K_TAB:
-                    mode = (mode + 1) % 3
+                    mode = (mode + 1) % NUM_MODES
                 elif event.key == pygame.K_SPACE:
                     if mode == MODE_E91:
                         # 배치 실행 (config: e91_batch_size)
@@ -519,6 +679,12 @@ def run_simulation():
                     elif mode == MODE_GHZ:
                         for _ in range(GHZ_BATCH):
                             ghz_round(ghz, eve_chance)
+                    elif mode == MODE_COMPARE:
+                        # 두 프로토콜 동시 실행 (동일 Eve 조건)
+                        for _ in range(_CMP_BATCH):
+                            bb84_round(bb84_cmp, eve_chance)
+                            e91_round(e91_cmp, eve_chance)
+                        compute_bell_S(e91_cmp)
                 elif event.key == pygame.K_s:
                     # 전체 파이프라인 한번에 실행
                     if mode in (MODE_E91, MODE_SIFT):
@@ -531,6 +697,8 @@ def run_simulation():
                 elif event.key == pygame.K_r:
                     reset_e91(e91)
                     reset_ghz(ghz)
+                    reset_bb84(bb84_cmp)
+                    reset_e91(e91_cmp)
                 elif event.key == pygame.K_p:
                     paused = not paused
                 elif event.key == pygame.K_a:
@@ -552,6 +720,11 @@ def run_simulation():
                         compute_bell_S(e91)
                 elif mode == MODE_GHZ:
                     ghz_round(ghz, eve_chance)
+                elif mode == MODE_COMPARE:
+                    bb84_round(bb84_cmp, eve_chance)
+                    e91_round(e91_cmp, eve_chance)
+                    if e91_cmp.total_rounds % 10 == 0:
+                        compute_bell_S(e91_cmp)
 
         # 리플레이 기록
         if not paused:
@@ -572,16 +745,18 @@ def run_simulation():
 
         # 모드 탭
         tab_y = 32
+        tab_w = min(180, (WIDTH - 60) // NUM_MODES - 8)
+        tab_gap = (WIDTH - 40 - tab_w * NUM_MODES) // max(NUM_MODES - 1, 1)
         for i, name in enumerate(MODE_NAMES):
-            tx = 40 + i * 200
+            tx = 20 + i * (tab_w + tab_gap)
             active = i == mode
             clr = ACCENT if active else SUBTEXT_CLR
             pygame.draw.rect(screen, PANEL_BG if active else BG,
-                             (tx, tab_y, 180, 22), border_radius=4)
+                             (tx, tab_y, tab_w, 22), border_radius=4)
             if active:
-                pygame.draw.rect(screen, clr, (tx, tab_y, 180, 22), 2, border_radius=4)
+                pygame.draw.rect(screen, clr, (tx, tab_y, tab_w, 22), 2, border_radius=4)
             tab_lbl = big_font.render(name, True, clr)
-            screen.blit(tab_lbl, (tx + 90 - tab_lbl.get_width() // 2, tab_y + 3))
+            screen.blit(tab_lbl, (tx + tab_w // 2 - tab_lbl.get_width() // 2, tab_y + 3))
 
         # Eve 상태
         eve_txt = f"Eve: {'ON ({:.0f}%)'.format(eve_chance * 100) if eve_chance > 0 else 'OFF'}"
@@ -595,6 +770,8 @@ def run_simulation():
             _draw_sift_mode(screen, e91, anim_t, font, big_font)
         elif mode == MODE_GHZ:
             _draw_ghz_mode(screen, ghz, anim_t, font, big_font)
+        elif mode == MODE_COMPARE:
+            _draw_compare_mode(screen, bb84_cmp, e91_cmp, anim_t, font, big_font)
 
         # 안내
         hints = [

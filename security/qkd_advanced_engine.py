@@ -631,6 +631,93 @@ def ghz_privacy_amplification(state: GHZState) -> str:
     return final
 
 
+# ── BB84 간이 시뮬레이션 (비교 모드용) ────────────────
+#
+# bb84_protocol.py의 풀 게임 로직 대신, 비교 모드에서
+# E91과 동일 Eve 조건으로 순수 BB84 통계만 수집하는 경량 엔진.
+
+
+BB84_BASES = ["+", "×"]
+
+
+@dataclass
+class BB84State:
+    """BB84 프로토콜 상태 (비교 모드용)."""
+    total_rounds: int = 0
+    basis_match_rounds: int = 0
+    error_count: int = 0
+    eve_rounds: int = 0
+    raw_key_bits: int = 0
+    qber: float = 0.0
+    eve_detected: bool = False
+    # 슬라이딩 QBER
+    _recent_matches: list[bool] = field(default_factory=list)
+    _recent_errors: list[bool] = field(default_factory=list)
+
+
+def bb84_round(state: BB84State, eve_chance: float = 0.0) -> dict:
+    """BB84 프로토콜 1 라운드 (비교 모드용).
+
+    Returns:
+        dict with keys: basis_match, has_error, eve_present
+    """
+    state.total_rounds += 1
+
+    alice_basis = random.choice(BB84_BASES)
+    bob_basis = random.choice(BB84_BASES)
+    alice_bit = random.randint(0, 1)
+
+    eve_present = random.random() < eve_chance
+    if eve_present:
+        state.eve_rounds += 1
+
+    # Eve 도청: 랜덤 기저로 측정 → 50% 확률로 비트 오염
+    corrupted = False
+    if eve_present:
+        eve_basis = random.choice(BB84_BASES)
+        if eve_basis != alice_basis or random.random() < 0.5:
+            corrupted = True
+
+    basis_match = alice_basis == bob_basis
+    has_error = False
+
+    if basis_match:
+        state.basis_match_rounds += 1
+        state.raw_key_bits += 1
+        if corrupted:
+            has_error = True
+            state.error_count += 1
+
+        state._recent_matches.append(True)
+        state._recent_errors.append(has_error)
+        # 슬라이딩 윈도우 (최근 50개)
+        if len(state._recent_matches) > 50:
+            state._recent_matches.pop(0)
+            state._recent_errors.pop(0)
+
+    # QBER 계산
+    if state._recent_matches:
+        n_match = len(state._recent_errors)
+        n_err = sum(state._recent_errors)
+        state.qber = n_err / n_match if n_match > 0 else 0.0
+    state.eve_detected = state.qber > 0.11 and state.basis_match_rounds > 10
+
+    return {"basis_match": basis_match, "has_error": has_error, "eve_present": eve_present}
+
+
+def reset_bb84(state: BB84State):
+    """BB84 상태 리셋."""
+    state.total_rounds = 0
+    state.basis_match_rounds = 0
+    state.error_count = 0
+    state.eve_rounds = 0
+    state.raw_key_bits = 0
+    state.qber = 0.0
+    state.eve_detected = False
+    state._recent_matches.clear()
+    state._recent_errors.clear()
+
+
 # ── 리셋 ─────────────────────────────────────────────
 
 

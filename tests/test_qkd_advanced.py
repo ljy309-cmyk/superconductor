@@ -482,6 +482,88 @@ class TestE91Constants(unittest.TestCase):
                 msg=f"Key pair ({a_idx},{b_idx}) should be same angle")
 
 
+class TestBB84Compare(unittest.TestCase):
+    """BB84 비교 모드 엔진 테스트."""
+
+    def test_initial_state(self):
+        from security.qkd_advanced_engine import BB84State
+        state = BB84State()
+        self.assertEqual(state.total_rounds, 0)
+        self.assertEqual(state.basis_match_rounds, 0)
+        self.assertEqual(state.error_count, 0)
+        self.assertAlmostEqual(state.qber, 0.0)
+        self.assertFalse(state.eve_detected)
+
+    def test_single_round(self):
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        rd = bb84_round(state)
+        self.assertEqual(state.total_rounds, 1)
+        self.assertIn("basis_match", rd)
+        self.assertIn("has_error", rd)
+        self.assertIn("eve_present", rd)
+
+    def test_batch_generates_key_bits(self):
+        """200 라운드 후 기저 매칭된 키 비트가 생성되어야 함."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(200):
+            bb84_round(state)
+        # ~50% 기저 일치 확률 → 최소 50개 기대
+        self.assertGreater(state.basis_match_rounds, 30)
+        self.assertEqual(state.raw_key_bits, state.basis_match_rounds)
+
+    def test_low_qber_without_eve(self):
+        """Eve 없으면 QBER이 0에 가까워야 함."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(300):
+            bb84_round(state, eve_chance=0.0)
+        self.assertLess(state.qber, 0.05)
+        self.assertFalse(state.eve_detected)
+
+    def test_high_qber_with_eve(self):
+        """Eve 도청 시 QBER이 상승하고 탐지되어야 함."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(300):
+            bb84_round(state, eve_chance=1.0)
+        self.assertGreater(state.qber, 0.11)
+        self.assertTrue(state.eve_detected)
+
+    def test_eve_rounds_counted(self):
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(100):
+            bb84_round(state, eve_chance=1.0)
+        self.assertEqual(state.eve_rounds, 100)
+
+    def test_sliding_window_bounded(self):
+        """슬라이딩 윈도우가 50개로 제한."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        state = BB84State()
+        for _ in range(500):
+            bb84_round(state)
+        self.assertLessEqual(len(state._recent_matches), 50)
+        self.assertLessEqual(len(state._recent_errors), 50)
+
+    def test_reset_bb84(self):
+        from security.qkd_advanced_engine import BB84State, bb84_round, reset_bb84
+        state = BB84State()
+        for _ in range(100):
+            bb84_round(state, eve_chance=0.5)
+        reset_bb84(state)
+        self.assertEqual(state.total_rounds, 0)
+        self.assertEqual(state.basis_match_rounds, 0)
+        self.assertEqual(state.error_count, 0)
+        self.assertEqual(state.eve_rounds, 0)
+        self.assertEqual(state.raw_key_bits, 0)
+        self.assertAlmostEqual(state.qber, 0.0)
+        self.assertFalse(state.eve_detected)
+        self.assertEqual(len(state._recent_matches), 0)
+        self.assertEqual(len(state._recent_errors), 0)
+
+
 class TestMeasureEntangled(unittest.TestCase):
     """얽힘 측정 함수 테스트."""
 

@@ -77,12 +77,17 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
     "qkd_advanced": [
         {
             "title": "Advanced QKD Protocols",
-            "text": "E91(얽힘 기반), 키 시프팅/프라이버시 증폭,\n다자간 QKD(GHZ) 세 가지 프로토콜을 실험합니다.",
+            "text": "E91(얽힘 기반), 키 시프팅/프라이버시 증폭,\n다자간 QKD(GHZ), BB84 vs E91 비교를 실험합니다.",
             "highlight": "center",
         },
         {
             "title": "E91 Protocol",
             "text": "EPR 벨 쌍으로 양자 키를 분배합니다.\n벨 부등식(S>2)으로 도청 여부를 검증합니다!",
+            "highlight": "none",
+        },
+        {
+            "title": "BB84 vs E91 Compare",
+            "text": "같은 Eve 조건에서 BB84(QBER)와 E91(Bell)\n두 탐지 방식의 차이를 실시간 비교합니다.",
             "highlight": "none",
         },
         {
