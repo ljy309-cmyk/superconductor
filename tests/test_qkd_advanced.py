@@ -1394,5 +1394,79 @@ class TestLocaleNewKeys(unittest.TestCase):
             self.assertIn(key, ko, f"Missing key in ko.json: {key}")
 
 
+class TestLocaleRound8Keys(unittest.TestCase):
+    """Round 8 로케일 키 존재 확인."""
+
+    def _load_json(self, path):
+        import json
+        with open(path) as f:
+            return json.load(f)
+
+    def test_alice_bob_eve_keys(self):
+        """Alice/Bob/Eve 라벨 키가 en.json에 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        for key in ["qa_alice", "qa_bob", "qa_eve"]:
+            self.assertIn(key, en, f"Missing key: {key}")
+
+    def test_bell_badge_keys(self):
+        """Bell S 뱃지 키가 양쪽 로케일에 존재."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        badge_keys = ["qa_bell_badge_secure", "qa_bell_badge_caution", "qa_bell_badge_danger"]
+        for key in badge_keys:
+            self.assertIn(key, en, f"Missing in en.json: {key}")
+            self.assertIn(key, ko, f"Missing in ko.json: {key}")
+
+    def test_en_ko_keys_still_match(self):
+        """en.json과 ko.json의 키가 여전히 완전히 일치."""
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        en = self._load_json(os.path.join(base, "locale", "en.json"))
+        ko = self._load_json(os.path.join(base, "locale", "ko.json"))
+        en_keys = set(en.keys())
+        ko_keys = set(ko.keys())
+        self.assertEqual(en_keys - ko_keys, set(),
+                         f"Keys in en.json but not in ko.json: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(),
+                         f"Keys in ko.json but not in en.json: {ko_keys - en_keys}")
+
+
+class TestBellSBadgeLogic(unittest.TestCase):
+    """Bell S 뱃지 상태 논리 테스트."""
+
+    def test_secure_badge_without_eve(self):
+        """Eve 없을 때 S ≈ 2√2 → SECURE or CAUTION."""
+        from security.qkd_advanced_engine import (
+            CHSH_CLASSICAL_BOUND,
+            E91State,
+            compute_bell_S,
+            e91_round,
+        )
+        state = E91State()
+        for _ in range(2000):
+            e91_round(state, eve_chance=0.0)
+        S = compute_bell_S(state)
+        abs_s = abs(S)
+        # Eve 없으면 S > 고전 한계 2.0 (벨 부등식 위반)
+        self.assertGreater(abs_s, CHSH_CLASSICAL_BOUND)
+
+    def test_danger_badge_with_full_eve(self):
+        """100% Eve → S 약화 → DANGER 가능."""
+        from security.qkd_advanced_engine import (
+            CHSH_CLASSICAL_BOUND,
+            E91State,
+            compute_bell_S,
+            e91_round,
+        )
+        state = E91State()
+        for _ in range(1000):
+            e91_round(state, eve_chance=1.0)
+        S = compute_bell_S(state)
+        abs_s = abs(S)
+        # 100% Eve → S 약화 → classical bound 이하 가능
+        self.assertLess(abs_s, 2.8)
+
+
 if __name__ == "__main__":
     unittest.main()

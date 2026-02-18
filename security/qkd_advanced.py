@@ -125,7 +125,7 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     # Alice
     pygame.draw.circle(screen, BLUE, ALICE_POS, 28)
     pygame.draw.circle(screen, TEXT_CLR, ALICE_POS, 28, 2)
-    lbl = big_font.render("Alice", True, BLUE)
+    lbl = big_font.render(t("qa_alice"), True, BLUE)
     screen.blit(lbl, (ALICE_POS[0] - lbl.get_width() // 2, ALICE_POS[1] + 32))
     bases_a = font.render("0°, π/8, π/4", True, SUBTEXT_CLR)
     screen.blit(bases_a, (ALICE_POS[0] - bases_a.get_width() // 2, ALICE_POS[1] + 48))
@@ -133,7 +133,7 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     # Bob
     pygame.draw.circle(screen, GREEN, BOB_POS, 28)
     pygame.draw.circle(screen, TEXT_CLR, BOB_POS, 28, 2)
-    lbl = big_font.render("Bob", True, GREEN)
+    lbl = big_font.render(t("qa_bob"), True, GREEN)
     screen.blit(lbl, (BOB_POS[0] - lbl.get_width() // 2, BOB_POS[1] + 32))
     bases_b = font.render("π/8, π/4, 3π/8", True, SUBTEXT_CLR)
     screen.blit(bases_b, (BOB_POS[0] - bases_b.get_width() // 2, BOB_POS[1] + 48))
@@ -146,7 +146,7 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     pygame.draw.circle(screen, (*RED[:3], min(255, eve_alpha)),
                        EVE_POS, 18)
     pygame.draw.circle(screen, TEXT_CLR, EVE_POS, 18, 2)
-    lbl = font.render("Eve", True, RED)
+    lbl = font.render(t("qa_eve"), True, RED)
     screen.blit(lbl, (EVE_POS[0] - lbl.get_width() // 2, EVE_POS[1] - 28))
 
     # 통계 패널
@@ -194,6 +194,21 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
 
     s_lbl = big_font.render(f"S = {abs(e91.bell_S):.3f}", True, TEXT_CLR)
     screen.blit(s_lbl, (meter_x + meter_w + 10, meter_y))
+
+    # Bell S 보안 상태 뱃지
+    if e91.bell_rounds > 10:
+        abs_s = abs(e91.bell_S)
+        if abs_s > CHSH_QUANTUM_BOUND * 0.95:
+            badge_clr, badge_txt = GREEN, t("qa_bell_badge_secure")
+        elif abs_s > CHSH_CLASSICAL_BOUND:
+            badge_clr, badge_txt = YELLOW, t("qa_bell_badge_caution")
+        else:
+            badge_clr, badge_txt = RED, t("qa_bell_badge_danger")
+        badge_x = meter_x + meter_w + 14 + s_lbl.get_width()
+        pygame.draw.rect(screen, badge_clr,
+                         (badge_x, meter_y + 1, 50, 14), border_radius=3)
+        bt = font.render(badge_txt, True, BG_CLR)
+        screen.blit(bt, (badge_x + 25 - bt.get_width() // 2, meter_y + 1))
 
     # 최근 라운드 로그
     log_y = 320
@@ -651,8 +666,10 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
         (t("qa_cmp_row_method"), t("qa_cmp_bb84_method"), t("qa_cmp_e91_method")),
         (t("qa_cmp_row_resource"), t("qa_cmp_bb84_resource"), t("qa_cmp_e91_resource")),
         (t("qa_cmp_row_detect"),
-         t("qa_cmp_qber_thresh", pct=bb84.qber * 100, warn="> 11% !" if bb84.qber > 0.11 else "< 11%"),
-         t("qa_cmp_bell_thresh", s=e91.bell_S, warn="> 2.0 !" if e91.bell_violated else "≤ 2.0")),
+         t("qa_cmp_qber_thresh", pct=bb84.qber * 100, warn="> 11% !" if bb84.qber > 0.11 else "< 11%")
+            if bb84.total_rounds > 0 else t("qa_cmp_no_data"),
+         t("qa_cmp_bell_thresh", s=e91.bell_S, warn="> 2.0 !" if e91.bell_violated else "≤ 2.0")
+            if e91.bell_rounds > 0 else t("qa_cmp_no_data")),
         (t("qa_cmp_row_result"),
          t("qa_cmp_eve_detected") if bb84.eve_detected else t("qa_cmp_secure"),
          t("qa_cmp_bell_secure") if e91.bell_violated else (
@@ -1088,6 +1105,7 @@ def run_simulation():
                     reset_ghz(ghz)
                     reset_bb84(bb84_cmp)
                     reset_e91(e91_cmp)
+                    auto_run = False
                 elif event.key == pygame.K_p:
                     paused = not paused
                 elif event.key == pygame.K_a:
