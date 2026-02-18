@@ -333,6 +333,9 @@
 
   "fp_hint_line1": "드래그/화살표: 자석 이동  |  F: 뒤집기  |  SPACE: 초전도 ON/OFF",
   "fp_hint_line2": "상태: {state}  |  [/]: 속도 ({speed})  |  ESC: 종료",
+  "fp_hint_line1_v2": "드래그/화살표: 자석  |  W/S: 온도  |  SPACE: 핀닝 잠금  |  F: 뒤집기",
+  "fp_hint_line2_v2": "{state}  |  {temp}K  |  [/]: 속도 ({speed})  |  ESC: 종료",
+  "fp_state_pinned": "PINNED (잠금)",
 
   "help_f1_hint": "F1: 도움말",
   "help_close": "F1 또는 ESC로 닫기",

@@ -333,6 +333,9 @@
 
   "fp_hint_line1": "Drag/Arrow: Move magnet  |  F: Flip  |  SPACE: SC ON/OFF",
   "fp_hint_line2": "State: {state}  |  [/]: Speed ({speed})  |  ESC: Exit",
+  "fp_hint_line1_v2": "Drag/Arrow: Magnet  |  W/S: Temp  |  SPACE: Pin Lock  |  F: Flip",
+  "fp_hint_line2_v2": "{state}  |  {temp}K  |  [/]: Speed ({speed})  |  ESC: Exit",
+  "fp_state_pinned": "PINNED (Locked)",
 
   "help_f1_hint": "F1: Help",
   "help_close": "Press F1 or ESC to close",

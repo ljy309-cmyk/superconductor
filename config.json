@@ -86,7 +86,17 @@
     "damping": 0.88,
     "levitation_amp": 4.0,
     "levitation_freq": 2.0,
-    "gravity": 480.0
+    "gravity": 480.0,
+    "tc_kelvin": 92.0,
+    "temp_min": 4.0,
+    "temp_max": 150.0,
+    "temp_step": 2.0,
+    "pin_spring_k": 6.0,
+    "pin_damping": 0.82,
+    "pin_lock_radius": 40.0,
+    "num_pinning_sites": 7,
+    "field_line_count": 9,
+    "field_line_segments": 14
   },
   "achievements": {
     "qc_survive_short": 30,
