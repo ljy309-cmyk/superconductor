@@ -355,7 +355,7 @@ def _draw_sift_mode(screen, e91: E91State, anim_t, font, big_font):
         (t("qa_e91_rounds", total=e91.total_rounds, key=e91.key_rounds, bell=e91.bell_rounds), TEXT_CLR),
         (t("qa_sift_pipeline", raw=raw_n, sample=e91.qber_sample_size, corr=corr_n, final=final_n), ACCENT),
         (t("qa_sift_qber_stat", pct=e91.qber_value * 100, flips=e91.correction_flips), TEXT_CLR),
-        (f"Bell S = {e91.bell_S:.3f}  {t('qa_sift_stat_secure') if e91.bell_violated else t('qa_sift_stat_warning')}", GREEN if e91.bell_violated else RED),
+        (t("qa_sift_bell_stat", s=e91.bell_S, verdict=t('qa_sift_stat_secure') if e91.bell_violated else t('qa_sift_stat_warning')), GREEN if e91.bell_violated else RED),
     ]
     for i, (txt, clr) in enumerate(stats):
         screen.blit(font.render(txt, True, clr), (40, stats_y + i * 16))
@@ -552,11 +552,9 @@ def _draw_ghz_mode(screen, ghz: GHZState, anim_t, font, big_font):
 
 # ── BB84 vs E91 비교 모드 ──────────────────────────
 
-_CMP_BATCH = cfg("qkd_advanced", "e91_batch_size", 50)
-
 
 def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
-                       anim_t, font, big_font):
+                       font, big_font):
     """BB84 vs E91 비교 시각화 — 동일 Eve 조건 나란히 표시."""
     half_w = WIDTH // 2 - 20
     left_x = 20
@@ -882,7 +880,7 @@ def run_simulation():
                             ghz_round(ghz, eve_chance)
                     elif mode == MODE_COMPARE:
                         # 두 프로토콜 동시 실행 (동일 Eve 조건)
-                        for _ in range(_CMP_BATCH):
+                        for _ in range(E91_BATCH):
                             bb84_round(bb84_cmp, eve_chance)
                             e91_round(e91_cmp, eve_chance)
                         compute_bell_S(e91_cmp)
@@ -895,6 +893,11 @@ def run_simulation():
                     elif mode == MODE_GHZ:
                         ghz_key_sift(ghz)
                         ghz_privacy_amplification(ghz)
+                    elif mode == MODE_COMPARE:
+                        # Compare 모드 양쪽 파이프라인 실행
+                        if len(e91_cmp.raw_key_alice) > 0:
+                            key_sift(e91_cmp)
+                            privacy_amplification(e91_cmp)
                 elif event.key == pygame.K_r:
                     reset_e91(e91)
                     reset_ghz(ghz)
@@ -905,8 +908,11 @@ def run_simulation():
                 elif event.key == pygame.K_a:
                     auto_run = not auto_run
                 elif event.key == pygame.K_e:
-                    # Eve 토글
-                    eve_chance = 0.3 if eve_chance < 0.01 else 0.0
+                    # Eve 단계별 순환: 0→10→30→50→80→100→0%
+                    _EVE_LEVELS = [0.0, 0.1, 0.3, 0.5, 0.8, 1.0]
+                    _cur = min(range(len(_EVE_LEVELS)),
+                               key=lambda i: abs(_EVE_LEVELS[i] - eve_chance))
+                    eve_chance = _EVE_LEVELS[(_cur + 1) % len(_EVE_LEVELS)]
                 elif event.key == pygame.K_UP and mode == MODE_GHZ:
                     if ghz.n_parties < GHZ_MAX_PARTIES:
                         resize_ghz(ghz, ghz.n_parties + 1)
@@ -1030,7 +1036,7 @@ def run_simulation():
         elif mode == MODE_GHZ:
             _draw_ghz_mode(screen, ghz, anim_t, font, big_font)
         elif mode == MODE_COMPARE:
-            _draw_compare_mode(screen, bb84_cmp, e91_cmp, anim_t, font, big_font)
+            _draw_compare_mode(screen, bb84_cmp, e91_cmp, font, big_font)
 
         # 안내
         hints = [

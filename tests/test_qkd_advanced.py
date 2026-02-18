@@ -1099,6 +1099,86 @@ class TestGHZFullPipeline(unittest.TestCase):
         self.assertTrue(state.pa_done)
 
 
+class TestCompareModePA(unittest.TestCase):
+    """Compare 모드 파이프라인 (sift+PA) 테스트."""
+
+    def test_compare_e91_sift_pa(self):
+        """Compare 모드에서 E91 sift+PA 파이프라인 실행 가능."""
+        from security.qkd_advanced_engine import (
+            E91State,
+            compute_bell_S,
+            e91_round,
+            key_sift,
+            privacy_amplification,
+        )
+        e91_cmp = E91State()
+        for _ in range(300):
+            e91_round(e91_cmp, eve_chance=0.0)
+        compute_bell_S(e91_cmp)
+
+        key_sift(e91_cmp)
+        self.assertTrue(e91_cmp.sift_done)
+
+        final = privacy_amplification(e91_cmp)
+        self.assertTrue(e91_cmp.pa_done)
+        self.assertGreater(len(final), 0)
+
+    def test_compare_concurrent_pipeline(self):
+        """BB84과 E91 동시 실행 후 E91 PA까지 완료."""
+        from security.qkd_advanced_engine import (
+            BB84State,
+            E91State,
+            bb84_round,
+            compute_bell_S,
+            e91_round,
+            key_sift,
+            privacy_amplification,
+        )
+        bb84 = BB84State()
+        e91 = E91State()
+        for _ in range(300):
+            bb84_round(bb84, eve_chance=0.3)
+            e91_round(e91, eve_chance=0.3)
+        compute_bell_S(e91)
+
+        # E91 pipeline
+        key_sift(e91)
+        final = privacy_amplification(e91)
+        self.assertTrue(e91.pa_done)
+        self.assertGreater(len(final), 0)
+
+        # BB84 should have detected Eve
+        self.assertGreater(bb84.qber, 0.0)
+
+
+class TestEveLevels(unittest.TestCase):
+    """Eve 단계별 제어 테스트."""
+
+    def test_eve_levels_produce_different_qber(self):
+        """다른 Eve 레벨이 다른 QBER을 생성."""
+        from security.qkd_advanced_engine import BB84State, bb84_round
+        results = {}
+        for eve in [0.0, 0.3, 1.0]:
+            state = BB84State()
+            for _ in range(500):
+                bb84_round(state, eve_chance=eve)
+            results[eve] = state.qber
+        # 0% Eve → QBER ≈ 0, 100% Eve → QBER ≈ 25%
+        self.assertLess(results[0.0], 0.05)
+        self.assertGreater(results[1.0], 0.10)
+
+    def test_eve_cycle_values(self):
+        """Eve 순환 레벨 값 검증."""
+        levels = [0.0, 0.1, 0.3, 0.5, 0.8, 1.0]
+        # 각 레벨에서 다음 레벨로 순환
+        for i, lvl in enumerate(levels):
+            cur = min(range(len(levels)),
+                      key=lambda j: abs(levels[j] - lvl))
+            nxt = levels[(cur + 1) % len(levels)]
+            expected = levels[(i + 1) % len(levels)]
+            self.assertAlmostEqual(nxt, expected)
+
+
 class TestLocaleKeysComplete(unittest.TestCase):
     """로케일 파일 키 완전성 테스트."""
 
@@ -1133,6 +1213,7 @@ class TestLocaleKeysComplete(unittest.TestCase):
             "qa_cmp_bb84_rawkey", "qa_cmp_bb84_eve", "qa_cmp_bb84_qber",
             "qa_cmp_e91_rounds", "qa_cmp_e91_keypairs", "qa_cmp_e91_rawkey",
             "qa_cmp_e91_eve", "qa_cmp_e91_bell", "qa_key_rate",
+            "qa_sift_bell_stat",
         ]
         for key in required_keys:
             self.assertIn(key, en, f"Missing key in en.json: {key}")

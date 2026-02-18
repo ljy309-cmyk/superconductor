@@ -124,6 +124,7 @@
   "qa_cmp_e91_bell": "  Bell S = {s:.3f}  (bound: {bound})",
   "qa_cmp_qber_thresh": "{pct:.1f}%  {warn}",
   "qa_cmp_bell_thresh": "{s:.3f}  {warn}",
+  "qa_sift_bell_stat": "Bell S = {s:.3f}  {verdict}",
   "qa_ghz_updown": "Up/Down or Click: change",
   "qa_hint_line1": "SPACE: Run Batch  |  A: Auto ({auto})  |  E: Eve Toggle  |  {pause}",
   "qa_hint_line2": "Tab/Click: Mode  |  S: Sift/PA  |  P: Pause  |  R: Reset  |  F1: Help  |  ESC: Exit",

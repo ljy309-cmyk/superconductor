@@ -124,6 +124,7 @@
   "qa_cmp_e91_bell": "  Bell S = {s:.3f}  (한계: {bound})",
   "qa_cmp_qber_thresh": "{pct:.1f}%  {warn}",
   "qa_cmp_bell_thresh": "{s:.3f}  {warn}",
+  "qa_sift_bell_stat": "Bell S = {s:.3f}  {verdict}",
   "qa_ghz_updown": "Up/Down 또는 클릭: 변경",
   "qa_hint_line1": "SPACE: 배치 실행  |  A: 자동 ({auto})  |  E: Eve 토글  |  {pause}",
   "qa_hint_line2": "Tab/클릭: 모드  |  S: 시프팅/PA  |  P: 일시정지  |  R: 리셋  |  F1: 도움말  |  ESC: 종료",
