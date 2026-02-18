@@ -104,6 +104,18 @@
     "bb84_decoy_trapped": 3,
     "all_modules_count": 5
   },
+  "cooper_pair": {
+    "tc_kelvin": 77.0,
+    "temp_min": 4.0,
+    "temp_max": 150.0,
+    "lattice_cols": 10,
+    "lattice_rows": 6,
+    "phonon_strength": 8.0,
+    "pair_formation_range": 80.0,
+    "electron_count": 12,
+    "electron_speed": 120.0,
+    "gap_delta_max": 1.0
+  },
   "phase_transition": {
     "t_range_min": -275,
     "t_range_max": 50,
