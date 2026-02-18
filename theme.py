@@ -378,7 +378,7 @@ def _notify_listeners():
             continue  # 약참조 대상 소멸 → 건너뜀
         try:
             cb()
-        except Exception:
+        except (TypeError, AttributeError, ValueError, RuntimeError):
             pass  # 리스너 오류가 테마 변경을 차단하지 않도록
         alive.append((ref, is_weak))
     _listeners[:] = alive

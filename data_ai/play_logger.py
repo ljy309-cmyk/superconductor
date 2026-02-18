@@ -97,7 +97,7 @@ class PlayLogger:
                         reader = csv.DictReader(f)
                         self.records = list(reader)
                 _log.info("기존 기록 %d건 로드", len(self.records))
-            except Exception as e:
+            except (OSError, csv.Error, UnicodeDecodeError, ValueError) as e:
                 _log.error("기록 로드 실패: %s", e)
                 self.records = []
 

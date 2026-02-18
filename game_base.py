@@ -33,14 +33,14 @@ def finalize_session(mode: str, session_data: dict, *,
     try:
         from data_ai.play_logger import get_logger
         get_logger().log_session(mode, session_data)
-    except Exception as e:
+    except (ImportError, OSError, ValueError, TypeError) as e:
         _log.error("[%s] 플레이 기록 실패: %s", mode, e)
 
     # 보고서 생성
     try:
         from report import generate_report
         generate_report(mode, session_data)
-    except Exception as e:
+    except (ImportError, OSError, ValueError, TypeError) as e:
         _log.error("[%s] 보고서 생성 실패: %s", mode, e)
 
     # 업적 확인
@@ -50,14 +50,14 @@ def finalize_session(mode: str, session_data: dict, *,
         for ach in new_ach:
             _log.info("[%s] Achievement unlocked: %s — %s",
                       mode, ach["title"], ach["desc"])
-    except Exception as e:
+    except (ImportError, KeyError, TypeError, ValueError) as e:
         _log.error("[%s] 업적 확인 실패: %s", mode, e)
 
     # 추가 정리 (랭킹 서버 POST 등)
     if extra_cleanup:
         try:
             extra_cleanup()
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError, TypeError) as e:
             _log.error("[%s] 추가 정리 실패: %s", mode, e)
 
     # 리소스 정리

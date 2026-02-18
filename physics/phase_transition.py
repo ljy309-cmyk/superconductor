@@ -224,7 +224,7 @@ def open_phase_transition(master=None):
                 "last_temp": win._current_temp,
                 "noise": win._noise,
             })
-        except Exception as e:
+        except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("플레이 기록 실패: %s", e)
         try:
             from report import generate_report
@@ -233,7 +233,7 @@ def open_phase_transition(master=None):
                 "last_temp": win._current_temp,
                 "tc": win._tc,
             })
-        except Exception as e:
+        except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("보고서 생성 실패: %s", e)
         win.destroy()
 

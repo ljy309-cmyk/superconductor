@@ -558,7 +558,7 @@ def run_simulation():
     try:
         from data_ai.play_logger import get_logger
         get_logger().log_session("qec_shield", session_data)
-    except Exception as e:
+    except (ImportError, OSError, ValueError, TypeError) as e:
         _log.error("플레이 기록 실패: %s", e)
 
     try:
@@ -566,14 +566,14 @@ def run_simulation():
             "survival_time": round(elapsed, 1),
             "qec_uses": qec_uses,
         })
-    except Exception as e:
+    except (KeyError, TypeError, ValueError) as e:
         _log.error("업적 확인 실패: %s", e)
 
     # 보고서 자동 생성
     try:
         from report import generate_report
         generate_report("qec_shield", session_data)
-    except Exception as e:
+    except (ImportError, OSError, ValueError, TypeError) as e:
         _log.error("보고서 생성 실패: %s", e)
 
     # 랭킹 자동 등록 (생존 시간 기반)
@@ -586,7 +586,7 @@ def run_simulation():
             "score": round(elapsed, 2),
             "mode": "QEC Shield",
         }, timeout=2)
-    except Exception as e:
+    except (ImportError, OSError, ConnectionError, ValueError) as e:
         _log.error("랭킹 등록 실패: %s", e)
 
     recorder.save({"survival_time": round(elapsed, 1)})

@@ -297,7 +297,7 @@ def run_simulation():
             "play_time": play_time,
             "final_temp": round(temperature, 1),
         })
-    except Exception as e:
+    except (ImportError, OSError, ValueError, TypeError) as e:
         _log.warning("세션 로깅 실패: %s", e)
 
     recorder.save({"play_time": play_time})

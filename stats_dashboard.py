@@ -123,7 +123,7 @@ class StatsDashboard(tk.Toplevel):
         try:
             from data_ai.play_logger import get_logger
             summary = get_logger().get_summary()
-        except Exception as e:
+        except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("통계 로드 실패: %s", e)
             summary = {"total_sessions": 0}
 
@@ -222,7 +222,7 @@ class StatsDashboard(tk.Toplevel):
             ax2.legend(fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
             ax2.set_xlabel(t("stats_session_num"), color="#cdd6f4", fontsize=8)
             ax2.set_ylabel(t("stats_time_sec"), color="#cdd6f4", fontsize=8)
-        except Exception as e:
+        except (KeyError, ValueError, TypeError, AttributeError) as e:
             _log.warning("생존 시간 차트 렌더링 실패: %s", e)
             ax2.text(0.5, 0.5, t("stats_no_survival_data"), transform=ax2.transAxes,
                      ha="center", va="center", color="#585b70", fontsize=11)
@@ -246,7 +246,7 @@ class StatsDashboard(tk.Toplevel):
                 lines.append(f"  {status} [{ach['icon']}] {ach['title']} — {ach['desc']}")
 
             self._ach_text.insert("1.0", "\n".join(lines))
-        except Exception as e:
+        except (ImportError, KeyError, TypeError, ValueError) as e:
             _log.warning("업적 로드 실패: %s", e)
             self._ach_text.insert("1.0", t("stats_ach_unavailable"))
 
@@ -270,7 +270,7 @@ class StatsDashboard(tk.Toplevel):
                     t("stats_export_empty"),
                     parent=self,
                 )
-        except Exception as e:
+        except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("CSV 내보내기 실패: %s", e)
 
     def _export_json(self):
@@ -290,7 +290,7 @@ class StatsDashboard(tk.Toplevel):
                     t("stats_export_empty"),
                     parent=self,
                 )
-        except Exception as e:
+        except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("JSON 내보내기 실패: %s", e)
 
     def _toggle_auto_refresh(self):

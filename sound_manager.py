@@ -105,7 +105,7 @@ class SoundManager:
             for snd in self._sounds.values():
                 snd.set_volume(self._volume)
             self._initialized = True
-        except Exception as e:
+        except (pygame.error, OSError, TypeError) as e:
             _log.warning("사운드 초기화 실패: %s", e)
             self.enabled = False
 

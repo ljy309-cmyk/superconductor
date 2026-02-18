@@ -73,7 +73,7 @@ def _notify_locale_listeners():
     for cb in _locale_listeners:
         try:
             cb()
-        except Exception:
+        except (TypeError, AttributeError, ValueError, RuntimeError):
             pass
 
 

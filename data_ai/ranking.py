@@ -258,7 +258,7 @@ class RankingApp(tk.Toplevel):
         try:
             from stats_dashboard import open_stats_dashboard
             open_stats_dashboard(self)
-        except Exception as e:
+        except (ImportError, OSError, RuntimeError) as e:
             _log.error("통계 대시보드 열기 실패: %s", e)
             messagebox.showerror("Error", f"Stats dashboard unavailable: {e}", parent=self)
 
@@ -288,7 +288,7 @@ class RankingApp(tk.Toplevel):
                 text.insert(tk.END, f"      {ach['desc']}\n\n")
 
             text.configure(state="disabled")
-        except Exception as e:
+        except (ImportError, KeyError, TypeError, AttributeError) as e:
             _log.error("업적 표시 실패: %s", e)
             messagebox.showerror("Error", f"Achievement system unavailable: {e}", parent=self)
 
