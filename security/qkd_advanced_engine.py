@@ -101,6 +101,7 @@ class E91State:
     correlators: dict[tuple[int, int], list[float]] = field(default_factory=dict)
     bell_S: float = 0.0
     bell_violated: bool = False
+    bell_S_history: list[tuple[int, float]] = field(default_factory=list)  # (round, S)
 
     # 통계
     total_rounds: int = 0
@@ -246,6 +247,11 @@ def compute_bell_S(state: E91State) -> float:
     state.bell_S = S
     state.bell_violated = abs(S) > CHSH_CLASSICAL_BOUND
     state.eve_detected = not state.bell_violated and state.bell_rounds > 20
+
+    # S 수렴 히스토리 기록 (최대 200개)
+    state.bell_S_history.append((state.total_rounds, S))
+    if len(state.bell_S_history) > 200:
+        state.bell_S_history.pop(0)
 
     return S
 
@@ -732,6 +738,7 @@ def reset_e91(state: E91State):
     state.correlators.clear()
     state.bell_S = 0.0
     state.bell_violated = False
+    state.bell_S_history.clear()
     state.total_rounds = 0
     state.key_rounds = 0
     state.bell_rounds = 0

@@ -207,6 +207,10 @@ def _draw_e91_mode(screen, e91: E91State, anim_t, font, big_font):
     # 상관 함수 테이블
     _draw_correlator_table(screen, e91, font, big_font)
 
+    # Bell S 시계열 수렴 그래프
+    _draw_bell_s_graph(screen, e91.bell_S_history, 480, 340, 390, 170,
+                       font, big_font)
+
 
 def _draw_correlator_table(screen, e91: E91State, font, big_font):
     """E91 상관 함수 테이블."""
@@ -517,11 +521,17 @@ def _draw_compare_mode(screen, bb84: BB84State, e91: E91State,
         screen.blit(surf, (right_x, by + i * 16))
 
     # Bell S 미터 (E91)
-    _draw_bell_meter(screen, e91.bell_S, right_x, by + len(e91_stats) * 16 + 8,
+    meter_y = by + len(e91_stats) * 16 + 8
+    _draw_bell_meter(screen, e91.bell_S, right_x, meter_y,
                      half_w, font, big_font)
 
+    # Bell S 수렴 그래프 (E91 오른쪽 패널 하단)
+    graph_y = meter_y + 28
+    _draw_bell_s_graph(screen, e91.bell_S_history,
+                       right_x, graph_y, half_w, 100, font, big_font)
+
     # ── 하단 비교 요약 패널 ──
-    panel_y = 340
+    panel_y = max(graph_y + 108, 340)
     pygame.draw.rect(screen, PANEL_BG, (20, panel_y, WIDTH - 40, 170), border_radius=8)
     pygame.draw.rect(screen, OVERLAY, (20, panel_y, WIDTH - 40, 170), 1, border_radius=8)
 
@@ -601,6 +611,102 @@ def _draw_bell_meter(screen, bell_s, x, y, w, font, big_font):
     # 값 표시
     val = big_font.render(f"S = {abs(bell_s):.3f}", True, TEXT_CLR)
     screen.blit(val, (x + w + 8, y))
+
+
+def _draw_bell_s_graph(screen, history, x, y, w, h, font, big_font):
+    """Bell S 시계열 수렴 그래프.
+
+    Args:
+        history: list of (round_number, S_value) tuples.
+    """
+    # 패널 배경
+    pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=6)
+    pygame.draw.rect(screen, OVERLAY, (x, y, w, h), 1, border_radius=6)
+
+    # 제목
+    title = big_font.render(t("qa_bell_s_graph"), True, ACCENT)
+    screen.blit(title, (x + 6, y + 4))
+
+    # 그래프 영역 (패딩)
+    pad_l, pad_r, pad_t, pad_b = 38, 8, 22, 18
+    gx = x + pad_l
+    gy = y + pad_t
+    gw = w - pad_l - pad_r
+    gh = h - pad_t - pad_b
+
+    if gw < 10 or gh < 10:
+        return
+
+    # Y축 범위: 0 ~ 3.0
+    y_min, y_max = 0.0, 3.0
+
+    def _val_to_py(val):
+        """S 값 → 픽셀 Y 좌표."""
+        ratio = (val - y_min) / (y_max - y_min)
+        return gy + gh - int(ratio * gh)
+
+    def _round_to_px(rd_idx, total):
+        """히스토리 인덱스 → 픽셀 X 좌표."""
+        if total <= 1:
+            return gx + gw // 2
+        return gx + int(rd_idx / (total - 1) * gw)
+
+    # Y축 그리드 & 라벨
+    for val in (0.0, 1.0, 2.0, 3.0):
+        py = _val_to_py(val)
+        pygame.draw.line(screen, OVERLAY, (gx, py), (gx + gw, py), 1)
+        lbl = font.render(f"{val:.0f}", True, SUBTEXT_CLR)
+        screen.blit(lbl, (gx - lbl.get_width() - 3, py - 5))
+
+    # 고전 한계선 S = 2.0 (빨강 점선 느낌)
+    cl_py = _val_to_py(CHSH_CLASSICAL_BOUND)
+    for dx in range(0, gw, 8):
+        x1 = gx + dx
+        x2 = min(gx + dx + 4, gx + gw)
+        pygame.draw.line(screen, YELLOW, (x1, cl_py), (x2, cl_py), 1)
+    lbl = font.render("S=2", True, YELLOW)
+    screen.blit(lbl, (gx + gw - lbl.get_width(), cl_py - 12))
+
+    # 양자 한계선 S = 2√2 ≈ 2.828
+    ql_py = _val_to_py(CHSH_QUANTUM_BOUND)
+    for dx in range(0, gw, 8):
+        x1 = gx + dx
+        x2 = min(gx + dx + 4, gx + gw)
+        pygame.draw.line(screen, MAUVE, (x1, ql_py), (x2, ql_py), 1)
+    lbl = font.render("2√2", True, MAUVE)
+    screen.blit(lbl, (gx + gw - lbl.get_width(), ql_py + 2))
+
+    # 데이터가 없으면 안내
+    if not history:
+        msg = font.render(t("qa_bell_s_nodata"), True, SUBTEXT_CLR)
+        screen.blit(msg, (gx + gw // 2 - msg.get_width() // 2,
+                          gy + gh // 2 - 5))
+        return
+
+    # 데이터 포인트를 픽셀로 변환
+    n = len(history)
+    points = []
+    for i, (_rd, s_val) in enumerate(history):
+        px = _round_to_px(i, n)
+        py = _val_to_py(min(abs(s_val), y_max))
+        points.append((px, py))
+
+    # 라인 플롯
+    if len(points) >= 2:
+        pygame.draw.lines(screen, GREEN, False, points, 2)
+
+    # 최신 포인트 강조
+    if points:
+        last = points[-1]
+        pygame.draw.circle(screen, WHITE, last, 3)
+
+    # X축 라벨 (첫/마지막 라운드)
+    first_rd = history[0][0]
+    last_rd = history[-1][0]
+    fl = font.render(f"R{first_rd}", True, SUBTEXT_CLR)
+    screen.blit(fl, (gx, gy + gh + 3))
+    ll = font.render(f"R{last_rd}", True, SUBTEXT_CLR)
+    screen.blit(ll, (gx + gw - ll.get_width(), gy + gh + 3))
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────

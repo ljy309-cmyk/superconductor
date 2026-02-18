@@ -90,6 +90,41 @@ class TestE91Protocol(unittest.TestCase):
             e91_round(state)
         self.assertLessEqual(len(state.rounds), 200)
 
+    def test_bell_s_history_recorded(self):
+        """compute_bell_S 호출 시 히스토리가 기록되어야 함."""
+        from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round
+        state = E91State()
+        for _ in range(100):
+            e91_round(state)
+        compute_bell_S(state)
+        self.assertEqual(len(state.bell_S_history), 1)
+        rd, s_val = state.bell_S_history[0]
+        self.assertEqual(rd, state.total_rounds)
+        self.assertAlmostEqual(s_val, state.bell_S)
+
+    def test_bell_s_history_bounded(self):
+        """히스토리가 200개로 제한되어야 함."""
+        from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round
+        state = E91State()
+        for i in range(250):
+            e91_round(state)
+            if (i + 1) % 1 == 0:
+                compute_bell_S(state)
+        self.assertLessEqual(len(state.bell_S_history), 200)
+
+    def test_bell_s_history_convergence(self):
+        """충분한 라운드 후 S가 이론값에 수렴해야 함 (Eve 없음)."""
+        from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round
+        state = E91State()
+        for i in range(500):
+            e91_round(state, eve_chance=0.0)
+            if (i + 1) % 50 == 0:
+                compute_bell_S(state)
+        # 마지막 S 값은 2.0 이상 (벨 위반)
+        self.assertGreater(len(state.bell_S_history), 0)
+        _, last_s = state.bell_S_history[-1]
+        self.assertGreater(abs(last_s), 2.0)
+
     def test_reset_e91(self):
         from security.qkd_advanced_engine import E91State, e91_round, reset_e91
         state = E91State()
@@ -99,6 +134,7 @@ class TestE91Protocol(unittest.TestCase):
         self.assertEqual(state.total_rounds, 0)
         self.assertEqual(len(state.raw_key_alice), 0)
         self.assertEqual(len(state.rounds), 0)
+        self.assertEqual(len(state.bell_S_history), 0)
 
 
 class TestQBEREstimation(unittest.TestCase):
