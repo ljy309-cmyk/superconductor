@@ -3,16 +3,11 @@
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock, patch
-
-# pygame mock
-sys.modules.setdefault("pygame", MagicMock())
-sys.modules.setdefault("pygame.time", MagicMock())
-sys.modules.setdefault("pygame.mixer", MagicMock())
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from security.bb84_defense import (
+from security.bb84_protocol import (
     AUTO_BLOCK_THRESHOLD,
     ERROR_THRESHOLD,
     HISTORY_WINDOW,
@@ -146,28 +141,28 @@ class TestBB84ErrorTracking(unittest.TestCase):
 
     def test_error_rate_all_errors(self):
         game = BB84Game()
-        with patch("security.bb84_defense.random.choice", return_value="+"):
+        with patch("security.bb84_protocol.random.choice", return_value="+"):
             for _ in range(10):
                 game.process_arrival(self._make_packet(corrupted=True))
         self.assertAlmostEqual(game.error_rate, 1.0)
 
     def test_clean_channel(self):
         game = BB84Game()
-        with patch("security.bb84_defense.random.choice", return_value="+"):
+        with patch("security.bb84_protocol.random.choice", return_value="+"):
             for _ in range(10):
                 game.process_arrival(self._make_packet(corrupted=False))
         self.assertAlmostEqual(game.error_rate, 0.0)
 
     def test_history_window_cap(self):
         game = BB84Game()
-        with patch("security.bb84_defense.random.choice", return_value="+"):
+        with patch("security.bb84_protocol.random.choice", return_value="+"):
             for _ in range(HISTORY_WINDOW + 20):
                 game.process_arrival(self._make_packet(corrupted=False))
         self.assertLessEqual(len(game.error_history), HISTORY_WINDOW)
 
     def test_auto_block(self):
         game = BB84Game()
-        with patch("security.bb84_defense.random.choice", return_value="+"):
+        with patch("security.bb84_protocol.random.choice", return_value="+"):
             for _ in range(10):
                 game.process_arrival(self._make_packet(corrupted=True))
         self.assertFalse(game.channel_open)
@@ -178,7 +173,7 @@ class TestBB84ErrorTracking(unittest.TestCase):
     def test_decoy_double_error(self):
         game = BB84Game()
         pkt = self._make_packet(corrupted=True, intercepted=True, is_decoy=True)
-        with patch("security.bb84_defense.random.choice", return_value="+"):
+        with patch("security.bb84_protocol.random.choice", return_value="+"):
             game.process_arrival(pkt)
         errors = sum(game.error_history)
         self.assertEqual(errors, 2)

@@ -11,18 +11,27 @@ import random
 import pygame
 
 from config_loader import cfg
-from quantum.qubit_physics import QubitState
 from i18n import t, toggle_locale
-from theme import load_pg_colors, on_theme_change, off_theme_change
+from theme import load_pg_colors, on_theme_change
 from ui.slider import SliderPanel, PANEL_W
 from preset_hud import PresetHUD
 from help_overlay import HelpOverlay
 from sound_manager import get_sound_manager
-from achievements import check_achievements
 from replay import ReplayRecorder
 from game_summary import draw_game_summary
 from quit_dialog import confirm_quit
+from game_base import finalize_session, choose_difficulty_or_quit
 from logger import get_module_logger
+
+# ── 물리 엔진 (순수 로직) ────────────────────────────
+from quantum.qec_physics import (
+    NOISE_RATE, QEC_REDUCTION_DEFAULT, QEC_REDUCTION_MIN, QEC_REDUCTION_MAX,
+    QEC_REDUCTION_STEP, QEC_DURATION, QEC_COOLDOWN,
+    HEAL_AMOUNT, STRESS_THRESHOLD, CASCADE_DAMAGE,
+    NODE_RADIUS, GRID_COLS, GRID_ROWS,
+    QECQubit, build_grid,
+)
+from quantum.qubit_physics import QubitState
 
 _log = get_module_logger("qec_shield")
 
@@ -58,97 +67,6 @@ def _load_theme_colors():
     STATE_COLORS[QubitState.STABLE] = globals()["STABLE_CLR"]
     STATE_COLORS[QubitState.WARNING] = globals()["WARNING_CLR"]
     STATE_COLORS[QubitState.COLLAPSED] = globals()["COLLAPSED_CLR"]
-
-# ── 물리 파라미터 (config.json에서 로드) ──────────────
-NOISE_RATE = cfg("qec_shield", "noise_rate", 5.0)
-QEC_REDUCTION_DEFAULT = cfg("qec_shield", "qec_reduction_default", 0.5)
-QEC_REDUCTION_MIN = cfg("qec_shield", "qec_reduction_min", 0.0)
-QEC_REDUCTION_MAX = cfg("qec_shield", "qec_reduction_max", 1.0)
-QEC_REDUCTION_STEP = 0.1
-QEC_DURATION = cfg("qec_shield", "qec_duration", 5.0)
-QEC_COOLDOWN = cfg("qec_shield", "qec_cooldown", 8.0)
-HEAL_AMOUNT = cfg("qec_shield", "heal_amount", 20.0)
-STRESS_THRESHOLD = cfg("qec_shield", "stress_threshold", 100.0)
-CASCADE_DAMAGE = cfg("qec_shield", "cascade_damage", 15.0)
-
-NODE_RADIUS = cfg("qec_shield", "node_radius", 30)
-_STRESS_WARNING = cfg("qec_shield", "stress_warning", 70.0)
-GRID_COLS = cfg("qec_shield", "grid_cols", 5)
-GRID_ROWS = cfg("qec_shield", "grid_rows", 3)
-
-
-# ── 큐비트 노드 ──────────────────────────────────────
-
-class QECQubit:
-    """QEC 보호 대상 큐비트."""
-
-    def __init__(self, qid: int, x: float, y: float):
-        self.qid = qid
-        self.x = x
-        self.y = y
-        self.stress = 0.0
-        self.collapsed = False
-        self.neighbors: list["QECQubit"] = []
-
-    @property
-    def state(self) -> QubitState:
-        if self.collapsed:
-            return QubitState.COLLAPSED
-        if self.stress >= _STRESS_WARNING:
-            return QubitState.WARNING
-        return QubitState.STABLE
-
-    def add_neighbor(self, other: "QECQubit"):
-        if other not in self.neighbors:
-            self.neighbors.append(other)
-            other.neighbors.append(self)
-
-    def apply_noise(self, amount: float):
-        if not self.collapsed:
-            self.stress = min(self.stress + amount, 150.0)
-
-    def check_collapse(self, damage_mult: float = 1.0, base_damage: float = 0) -> bool:
-        if self.collapsed:
-            return False
-        if self.stress >= STRESS_THRESHOLD:
-            self.collapsed = True
-            dmg = (base_damage if base_damage > 0 else CASCADE_DAMAGE) * damage_mult
-            for nb in self.neighbors:
-                if not nb.collapsed:
-                    nb.apply_noise(dmg)
-            return True
-        return False
-
-    def reset(self):
-        self.stress = 0.0
-        self.collapsed = False
-
-
-# ── 네트워크 빌더 ────────────────────────────────────
-
-def _build_grid() -> list[QECQubit]:
-    """5x3 격자 큐비트 네트워크."""
-    nodes: list[QECQubit] = []
-    ox, oy = 200, 140
-    gap_x, gap_y = 110, 110
-
-    for r in range(GRID_ROWS):
-        for c in range(GRID_COLS):
-            qid = r * GRID_COLS + c
-            x = ox + c * gap_x
-            y = oy + r * gap_y
-            nodes.append(QECQubit(qid, x, y))
-
-    # 인접 연결 (상하좌우)
-    for r in range(GRID_ROWS):
-        for c in range(GRID_COLS):
-            idx = r * GRID_COLS + c
-            if c + 1 < GRID_COLS:
-                nodes[idx].add_neighbor(nodes[idx + 1])
-            if r + 1 < GRID_ROWS:
-                nodes[idx].add_neighbor(nodes[idx + GRID_COLS])
-
-    return nodes
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
@@ -304,7 +222,7 @@ def run_simulation():
     big_font = pygame.font.SysFont("Consolas", 16, bold=True)
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
 
-    nodes = _build_grid()
+    nodes = build_grid()
     total = len(nodes)
 
     # ── 슬라이더 패널 ─────────────────────────────────
@@ -346,13 +264,8 @@ def run_simulation():
     best_without_qec = 0.0    # QEC OFF 최고 생존 시간
 
     # ── 시작 시 난이도 선택 ──
-    from difficulty_dialog import choose_difficulty
-    chosen = choose_difficulty(screen, font)
-    if chosen is None:
-        off_theme_change(_load_theme_colors)
-        pygame.quit()
+    if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
-    preset_hud._apply_preset(chosen)
 
     running = True
     while running:
@@ -546,54 +459,16 @@ def run_simulation():
 
         pygame.display.flip()
 
-    # 최종미션: 플레이 기록 저장 + 보고서 생성 + 랭킹 자동 등록
-    session_data = {
+    # 최종미션: finalize_session으로 통합 정리
+    finalize_session("qec_shield", {
         "survival_time": round(elapsed, 1),
         "alive_count": sum(1 for n in nodes if not n.collapsed),
         "total_qubits": total,
         "qec_uses": qec_uses,
         "heal_uses": heal_uses,
         "qec_reduction": qec_reduction,
-    }
-    try:
-        from data_ai.play_logger import get_logger
-        get_logger().log_session("qec_shield", session_data)
-    except (ImportError, OSError, ValueError, TypeError) as e:
-        _log.error("플레이 기록 실패: %s", e)
-
-    try:
-        check_achievements("qec_shield", {
-            "survival_time": round(elapsed, 1),
-            "qec_uses": qec_uses,
-        })
-    except (KeyError, TypeError, ValueError) as e:
-        _log.error("업적 확인 실패: %s", e)
-
-    # 보고서 자동 생성
-    try:
-        from report import generate_report
-        generate_report("qec_shield", session_data)
-    except (ImportError, OSError, ValueError, TypeError) as e:
-        _log.error("보고서 생성 실패: %s", e)
-
-    # 랭킹 자동 등록 (생존 시간 기반)
-    try:
-        import requests
-        from data_ai.ranking_server import start_server, get_base_url
-        start_server()
-        requests.post(f"{get_base_url()}/ranking", json={
-            "name": "QEC Player",
-            "score": round(elapsed, 2),
-            "mode": "QEC Shield",
-        }, timeout=2)
-    except (ImportError, OSError, ConnectionError, ValueError) as e:
-        _log.error("랭킹 등록 실패: %s", e)
-
-    recorder.save({"survival_time": round(elapsed, 1)})
-    snd.quit()
-    off_theme_change(_load_theme_colors)
-
-    pygame.quit()
+    }, recorder=recorder, recorder_meta={"survival_time": round(elapsed, 1)},
+       snd=snd, theme_callback=_load_theme_colors)
 
 
 def open_qec_shield():

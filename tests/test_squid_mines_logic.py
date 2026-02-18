@@ -3,16 +3,10 @@
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock
-
-# pygame mock
-sys.modules.setdefault("pygame", MagicMock())
-sys.modules.setdefault("pygame.time", MagicMock())
-sys.modules.setdefault("pygame.mixer", MagicMock())
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from security.squid_mines import (
+from security.squid_logic import (
     CELL_SIZE,
     GRID_COLS,
     GRID_OX,
