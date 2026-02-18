@@ -1,12 +1,12 @@
 """게임 종료 요약 오버레이 — 모든 Pygame 모듈에서 사용 가능."""
 
 import pygame
-from theme import get_pg_theme
+
 from i18n import t
+from theme import get_pg_theme
 
 
-def draw_game_summary(screen, title: str, stats: list[tuple[str, str]],
-                      font=None, title_font=None):
+def draw_game_summary(screen, title: str, stats: list[tuple[str, str]], font=None, title_font=None):
     """게임 종료 시 반투명 오버레이에 요약 통계 표시.
 
     Args:
@@ -48,8 +48,7 @@ def draw_game_summary(screen, title: str, stats: list[tuple[str, str]],
 
     # 구분선
     line_y = py + pad + 36
-    pygame.draw.line(screen, pg.OVERLAY,
-                     (px + pad, line_y), (px + panel_w - pad, line_y))
+    pygame.draw.line(screen, pg.OVERLAY, (px + pad, line_y), (px + panel_w - pad, line_y))
 
     # 통계 행
     y = line_y + 12

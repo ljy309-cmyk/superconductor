@@ -34,6 +34,7 @@ SENSITIVITY_STEP = 0.5
 
 # ── 게임 로직 ────────────────────────────────────────
 
+
 class SQUIDGame:
     """SQUID 지뢰찾기 게임 상태."""
 
@@ -61,8 +62,9 @@ class SQUIDGame:
         cy = GRID_OY + row * CELL_SIZE + CELL_SIZE / 2
         return cx, cy
 
-    def flux_intensity(self, mx: float, my: float,
-                       sensitivity: float = SENSITIVITY_DEFAULT) -> tuple[float, float, int]:
+    def flux_intensity(
+        self, mx: float, my: float, sensitivity: float = SENSITIVITY_DEFAULT
+    ) -> tuple[float, float, int]:
         """마우스 위치에서의 자기 선속 강도.
 
         미션2: 가장 가까운 타겟 기반 신호 + 근접 타겟 수
@@ -77,7 +79,7 @@ class SQUIDGame:
 
         # 미션2: 각 타겟까지 거리 계산 → 최근접 기반
         distances: list[float] = []
-        for (c, r) in unfound:
+        for c, r in unfound:
             cx, cy = self.cell_center(c, r)
             distances.append(math.hypot(mx - cx, my - cy))
 

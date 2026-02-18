@@ -33,6 +33,7 @@ GRID_ROWS = cfg("qec_shield", "grid_rows", 3)
 
 # ── 큐비트 노드 ──────────────────────────────────────
 
+
 class QECQubit:
     """QEC 보호 대상 큐비트."""
 
@@ -42,7 +43,7 @@ class QECQubit:
         self.y = y
         self.stress = 0.0
         self.collapsed = False
-        self.neighbors: list["QECQubit"] = []
+        self.neighbors: list[QECQubit] = []
 
     @property
     def state(self) -> QubitState:
@@ -79,6 +80,7 @@ class QECQubit:
 
 
 # ── 네트워크 빌더 ────────────────────────────────────
+
 
 def build_grid() -> list[QECQubit]:
     """5x3 격자 큐비트 네트워크."""

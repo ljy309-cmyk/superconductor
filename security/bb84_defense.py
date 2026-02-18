@@ -11,27 +11,35 @@ import math
 import pygame
 
 from config_loader import cfg
-from i18n import t, toggle_locale
-from theme import load_pg_colors, on_theme_change
-from ui.slider import SliderPanel, PANEL_W
-from preset_hud import PresetHUD
+from game_base import choose_difficulty_or_quit, finalize_session
 from help_overlay import HelpOverlay
-from sound_manager import get_sound_manager
+from i18n import t, toggle_locale
+from logger import get_module_logger
+from preset_hud import PresetHUD
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
-from game_base import finalize_session, choose_difficulty_or_quit
-from logger import get_module_logger
 
 # ── 프로토콜 엔진 (순수 로직) ────────────────────────
 from security.bb84_protocol import (
-    SEND_INTERVAL, EVE_CHANCE,
-    ERROR_THRESHOLD, HISTORY_WINDOW,
-    AUTO_BLOCK_THRESHOLD, AUTO_BLOCK_SCORE, MANUAL_BLOCK_SCORE,
-    WARNING_THRESHOLD, DECOY_CHANCE, DECOY_ERROR_MULT,
-    ALICE_X, ALICE_Y, BOB_X, BOB_Y, CHANNEL_Y, EVE_X, EVE_Y,
+    ALICE_X,
+    ALICE_Y,
+    AUTO_BLOCK_THRESHOLD,
+    BOB_X,
+    BOB_Y,
+    CHANNEL_Y,
+    DECOY_CHANCE,
+    ERROR_THRESHOLD,
+    EVE_CHANCE,
+    EVE_X,
+    EVE_Y,
+    SEND_INTERVAL,
+    WARNING_THRESHOLD,
+    BB84Game,
     shared_key_available,
-    QubitPacket, BB84Game,
 )
+from sound_manager import get_sound_manager
+from theme import load_pg_colors, on_theme_change
+from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("bb84_defense")
 
@@ -58,13 +66,21 @@ PANEL_BG = (24, 24, 37)
 
 
 _COLOR_MAP = {
-    "BG": "BG", "TEXT_CLR": "TEXT",
-    "ALICE_CLR": "ALICE", "BOB_CLR": "BOB", "EVE_CLR": "EVE",
-    "QUBIT_CLR": "QUBIT", "DECOY_CLR": "DECOY",
-    "SAFE_CLR": "GREEN", "DANGER_CLR": "RED",
-    "CHANNEL_CLR": "OVERLAY", "PANEL_BG": "PANEL_BG",
-    "SUBTEXT_CLR": "SUBTEXT", "WARN_CLR": "ACCENT_YELLOW",
-    "WHITE": "WHITE", "ACCENT": "ACCENT_YELLOW",
+    "BG": "BG",
+    "TEXT_CLR": "TEXT",
+    "ALICE_CLR": "ALICE",
+    "BOB_CLR": "BOB",
+    "EVE_CLR": "EVE",
+    "QUBIT_CLR": "QUBIT",
+    "DECOY_CLR": "DECOY",
+    "SAFE_CLR": "GREEN",
+    "DANGER_CLR": "RED",
+    "CHANNEL_CLR": "OVERLAY",
+    "PANEL_BG": "PANEL_BG",
+    "SUBTEXT_CLR": "SUBTEXT",
+    "WARN_CLR": "ACCENT_YELLOW",
+    "WHITE": "WHITE",
+    "ACCENT": "ACCENT_YELLOW",
 }
 
 
@@ -74,6 +90,7 @@ def _load_theme_colors():
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
+
 
 def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     """Alice, Bob, Eve 캐릭터."""
@@ -212,11 +229,18 @@ def _draw_stats(screen, game: BB84Game, font, big_font):
         (t("bb84_eve_count", count=game.eve_intercept_count), EVE_CLR),
         (t("bb84_decoy_stats", sent=game.decoy_sent, trapped=game.decoy_trapped), DECOY_CLR),
         (t("bb84_block_stats", auto=game.auto_blocks, manual=game.manual_blocks), ALICE_CLR),
-        (t("bb84_qrng_stats", used=game.qrng_bits_used, remain=qrng_remain), ACCENT if qrng_remain > 0 else SUBTEXT_CLR),
-        (t("bb84_channel_status",
-           status="OPEN" if game.channel_open else "SHUTDOWN",
-           auto_state=t("auto_on") if game.auto_block_enabled else t("auto_off")),
-         SAFE_CLR if game.channel_open else DANGER_CLR),
+        (
+            t("bb84_qrng_stats", used=game.qrng_bits_used, remain=qrng_remain),
+            ACCENT if qrng_remain > 0 else SUBTEXT_CLR,
+        ),
+        (
+            t(
+                "bb84_channel_status",
+                status="OPEN" if game.channel_open else "SHUTDOWN",
+                auto_state=t("auto_on") if game.auto_block_enabled else t("auto_off"),
+            ),
+            SAFE_CLR if game.channel_open else DANGER_CLR,
+        ),
     ]
     for i, (text, color) in enumerate(lines):
         surf = font.render(text, True, color)
@@ -268,6 +292,7 @@ def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
+
 
 def run_simulation():
     _load_theme_colors()
@@ -351,8 +376,7 @@ def run_simulation():
             if game.send_timer >= cur_interval:
                 game.send_timer = 0.0
                 prev_decoy_trapped = game.decoy_trapped
-                game.new_round(eve_chance=sl_eve.value,
-                               decoy_chance=sl_decoy.value)
+                game.new_round(eve_chance=sl_eve.value, decoy_chance=sl_decoy.value)
                 if game.eve_active:
                     snd.play("eve_detected")
                 if game.decoy_trapped > prev_decoy_trapped:
@@ -362,20 +386,21 @@ def run_simulation():
             for pkt in game.packets:
                 pkt.update(dt)
                 if pkt.arrived:
-                    game.process_arrival(pkt,
-                                         auto_block_thresh=sl_autoblock.value)
+                    game.process_arrival(pkt, auto_block_thresh=sl_autoblock.value)
 
             # 도착한 패킷 제거
             game.packets = [p for p in game.packets if not p.arrived]
 
             # 리플레이 기록
-            recorder.record({
-                "round": game.round_id,
-                "error_rate": game.error_rate,
-                "eve_active": game.eve_active,
-                "channel_open": game.channel_open,
-                "score": game.score,
-            })
+            recorder.record(
+                {
+                    "round": game.round_id,
+                    "error_rate": game.error_rate,
+                    "eve_active": game.eve_active,
+                    "channel_open": game.channel_open,
+                    "score": game.score,
+                }
+            )
 
             # 플래시 타이머
             if game.eve_flash > 0:
@@ -426,9 +451,12 @@ def run_simulation():
 
         # 안내
         hints = [
-            t("hint_bb84_info", score=game.score,
-              auto_state=t("auto_on") if game.auto_block_enabled else t("auto_off"),
-              pause_state=t("paused") if paused else t("running_state")),
+            t(
+                "hint_bb84_info",
+                score=game.score,
+                auto_state=t("auto_on") if game.auto_block_enabled else t("auto_off"),
+                pause_state=t("paused") if paused else t("running_state"),
+            ),
             t("hint_bb84_controls"),
             t("hint_bb84_pause"),
         ]
@@ -441,18 +469,24 @@ def run_simulation():
 
         pygame.display.flip()
 
-    finalize_session("bb84_defense", {
-        "score": game.score,
-        "total_sent": game.total_sent,
-        "total_errors": game.total_errors,
-        "total_safe": game.total_safe,
-        "eve_intercepts": game.eve_intercept_count,
-        "auto_blocks": game.auto_blocks,
-        "manual_blocks": game.manual_blocks,
-        "decoy_sent": game.decoy_sent,
-        "decoy_trapped": game.decoy_trapped,
-        "qrng_bits_used": game.qrng_bits_used,
-    }, recorder=recorder, snd=snd, theme_callback=_load_theme_colors)
+    finalize_session(
+        "bb84_defense",
+        {
+            "score": game.score,
+            "total_sent": game.total_sent,
+            "total_errors": game.total_errors,
+            "total_safe": game.total_safe,
+            "eve_intercepts": game.eve_intercept_count,
+            "auto_blocks": game.auto_blocks,
+            "manual_blocks": game.manual_blocks,
+            "decoy_sent": game.decoy_sent,
+            "decoy_trapped": game.decoy_trapped,
+            "qrng_bits_used": game.qrng_bits_used,
+        },
+        recorder=recorder,
+        snd=snd,
+        theme_callback=_load_theme_colors,
+    )
 
 
 def open_bb84_defense():

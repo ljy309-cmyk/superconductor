@@ -13,18 +13,17 @@ Tc 이하에서 쿠퍼쌍(Cooper pair)이 형성되며 저항이 0으로 떨어�
 
 import math
 import random
-import sys
 import time
 
 import pygame
 
 from config_loader import cfg
-from theme import load_pg_colors, on_theme_change, off_theme_change
 from help_overlay import HelpOverlay
-from sound_manager import get_sound_manager
-from replay import ReplayRecorder
-from quit_dialog import confirm_quit
 from logger import get_module_logger
+from quit_dialog import confirm_quit
+from replay import ReplayRecorder
+from sound_manager import get_sound_manager
+from theme import load_pg_colors, off_theme_change, on_theme_change
 
 _log = get_module_logger("phase_transition_sim")
 
@@ -37,7 +36,7 @@ TEXT_CLR = (205, 214, 244)
 ACCENT = (137, 180, 250)
 
 # 물리 파라미터
-TC_KELVIN = 77.0   # YBCO 임계 온도 (K)
+TC_KELVIN = 77.0  # YBCO 임계 온도 (K)
 TC_CELSIUS = TC_KELVIN - 273.15
 
 # 격자 설정
@@ -48,16 +47,21 @@ GRID_OFFSET_Y = 80
 
 # 색상 (테마에서 동적 로드)
 ATOM_NORMAL = (205, 214, 244)
-ATOM_SC = (166, 227, 161)       # 초전도 상태
-COOPER_CLR = (137, 180, 250)    # 쿠퍼쌍 연결
+ATOM_SC = (166, 227, 161)  # 초전도 상태
+COOPER_CLR = (137, 180, 250)  # 쿠퍼쌍 연결
 RESISTANCE_CLR = (243, 139, 168)
 
 
 _COLOR_MAP = {
-    "BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_BLUE",
-    "ATOM_NORMAL": "TEXT", "ATOM_SC": "GREEN",
-    "COOPER_CLR": "ACCENT_BLUE", "RESISTANCE_CLR": "RED",
-    "OVERLAY_CLR": "OVERLAY", "SUBTEXT_CLR": "SUBTEXT",
+    "BG": "BG",
+    "TEXT_CLR": "TEXT",
+    "ACCENT": "ACCENT_BLUE",
+    "ATOM_NORMAL": "TEXT",
+    "ATOM_SC": "GREEN",
+    "COOPER_CLR": "ACCENT_BLUE",
+    "RESISTANCE_CLR": "RED",
+    "OVERLAY_CLR": "OVERLAY",
+    "SUBTEXT_CLR": "SUBTEXT",
 }
 
 
@@ -68,6 +72,7 @@ def _load_theme_colors():
 
 class Atom:
     """격자 원자."""
+
     __slots__ = ("base_x", "base_y", "x", "y", "phase")
 
     def __init__(self, base_x: float, base_y: float):
@@ -80,6 +85,7 @@ class Atom:
 
 class CooperPair:
     """쿠퍼쌍 (두 원자 연결)."""
+
     __slots__ = ("a", "b", "alpha")
 
     def __init__(self, a: Atom, b: Atom):
@@ -189,11 +195,13 @@ def run_simulation():
             cp.alpha += (target_alpha - cp.alpha) * dt * 3
 
         # 리플레이 기록
-        recorder.record_frame({
-            "temperature": round(temperature, 1),
-            "superconducting": is_superconducting,
-            "resistance": round(resistance_val, 3),
-        })
+        recorder.record_frame(
+            {
+                "temperature": round(temperature, 1),
+                "superconducting": is_superconducting,
+                "resistance": round(resistance_val, 3),
+            }
+        )
 
         # ── 렌더링 ──────────────────────
         screen.fill(BG)
@@ -207,9 +215,7 @@ def run_simulation():
             if cp.alpha > 0.05:
                 surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
                 alpha = int(cp.alpha * 100)
-                pygame.draw.line(surf, (*COOPER_CLR, alpha),
-                                 (int(cp.a.x), int(cp.a.y)),
-                                 (int(cp.b.x), int(cp.b.y)), 2)
+                pygame.draw.line(surf, (*COOPER_CLR, alpha), (int(cp.a.x), int(cp.a.y)), (int(cp.b.x), int(cp.b.y)), 2)
                 screen.blit(surf, (0, 0))
 
         # 원자 그리기
@@ -293,10 +299,14 @@ def run_simulation():
     play_time = round(time.time() - start_time, 1)
     try:
         from data_ai.play_logger import get_logger
-        get_logger().log_session("phase_transition_sim", {
-            "play_time": play_time,
-            "final_temp": round(temperature, 1),
-        })
+
+        get_logger().log_session(
+            "phase_transition_sim",
+            {
+                "play_time": play_time,
+                "final_temp": round(temperature, 1),
+            },
+        )
     except (ImportError, OSError, ValueError, TypeError) as e:
         _log.warning("세션 로깅 실패: %s", e)
 

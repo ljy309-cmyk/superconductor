@@ -5,7 +5,6 @@ import os
 import sys
 import tempfile
 import unittest
-import weakref
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -92,7 +91,10 @@ class TestThemeListeners(unittest.TestCase):
 
     def test_off_theme_change_removes_listener(self):
         calls = []
-        fn = lambda: calls.append(1)
+
+        def fn():
+            return calls.append(1)
+
         theme.on_theme_change(fn)
         theme.off_theme_change(fn)
         theme.toggle_theme()
@@ -104,7 +106,10 @@ class TestThemeListeners(unittest.TestCase):
 
     def test_duplicate_listener_prevented(self):
         calls = []
-        fn = lambda: calls.append(1)
+
+        def fn():
+            return calls.append(1)
+
         theme.on_theme_change(fn)
         theme.on_theme_change(fn)  # 중복 등록 시도
         theme.toggle_theme()
@@ -357,9 +362,7 @@ class TestSaveLoadPreferences(unittest.TestCase):
         )
         self._tmp.write("{}")
         self._tmp.close()
-        self._orig_file = os.path.join(
-            os.path.dirname(os.path.abspath(theme.__file__)), "config.json"
-        )
+        self._orig_file = os.path.join(os.path.dirname(os.path.abspath(theme.__file__)), "config.json")
         # 원본 백업 & 임시 파일로 교체
         self._backup = self._orig_file + ".test_bak"
         if os.path.exists(self._orig_file):

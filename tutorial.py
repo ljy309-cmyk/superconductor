@@ -31,48 +31,72 @@ _SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tutorial_
 # 모듈별 튜토리얼 스텝
 _TUTORIAL_STEPS: dict[str, list[dict]] = {
     "qubit_chain": [
-        {"title": "Welcome to Qubit Cascade!",
-         "text": "초전도 큐비트 7개가 얽힘으로 연결되어 있습니다.\n외부 노이즈가 큐비트를 불안정하게 만듭니다.",
-         "highlight": "center"},
-        {"title": "Step 1: Error Correction",
-         "text": "큐비트를 클릭하면 stress가 0으로 초기화됩니다.\n빨간색으로 변하기 전에 클릭하세요!",
-         "highlight": "click"},
-        {"title": "Step 2: QEC Shield",
-         "text": "S 키를 누르면 QEC 방어막이 활성화됩니다.\n노이즈와 연쇄 데미지가 크게 감소합니다.",
-         "highlight": "shield"},
-        {"title": "Step 3: Healing",
-         "text": "H 키를 누르면 모든 큐비트의 stress가 감소합니다.\n쿨다운이 있으니 타이밍을 맞추세요!",
-         "highlight": "heal"},
-        {"title": "Step 4: Presets",
-         "text": "1/2/3 키로 난이도를 바꿀 수 있습니다.\n1=Easy, 2=Normal, 3=Hard",
-         "highlight": "preset"},
-        {"title": "Goal: Survive!",
-         "text": "모든 큐비트가 붕괴하면 게임 오버입니다.\n최대한 오래 생존하세요! R 키로 리셋 가능.",
-         "highlight": "none"},
+        {
+            "title": "Welcome to Qubit Cascade!",
+            "text": "초전도 큐비트 7개가 얽힘으로 연결되어 있습니다.\n외부 노이즈가 큐비트를 불안정하게 만듭니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "Step 1: Error Correction",
+            "text": "큐비트를 클릭하면 stress가 0으로 초기화됩니다.\n빨간색으로 변하기 전에 클릭하세요!",
+            "highlight": "click",
+        },
+        {
+            "title": "Step 2: QEC Shield",
+            "text": "S 키를 누르면 QEC 방어막이 활성화됩니다.\n노이즈와 연쇄 데미지가 크게 감소합니다.",
+            "highlight": "shield",
+        },
+        {
+            "title": "Step 3: Healing",
+            "text": "H 키를 누르면 모든 큐비트의 stress가 감소합니다.\n쿨다운이 있으니 타이밍을 맞추세요!",
+            "highlight": "heal",
+        },
+        {
+            "title": "Step 4: Presets",
+            "text": "1/2/3 키로 난이도를 바꿀 수 있습니다.\n1=Easy, 2=Normal, 3=Hard",
+            "highlight": "preset",
+        },
+        {
+            "title": "Goal: Survive!",
+            "text": "모든 큐비트가 붕괴하면 게임 오버입니다.\n최대한 오래 생존하세요! R 키로 리셋 가능.",
+            "highlight": "none",
+        },
     ],
     "tunneling": [
-        {"title": "Quantum Tunneling",
-         "text": "입자가 에너지 장벽을 확률적으로 통과합니다.\n고전 물리에서는 불가능하지만 양자역학에서는 가능!",
-         "highlight": "center"},
-        {"title": "Controls",
-         "text": "클릭: 입자 재발사\nUp/Down: 속도 조절\nLeft/Right: 장벽 두께",
-         "highlight": "none"},
+        {
+            "title": "Quantum Tunneling",
+            "text": "입자가 에너지 장벽을 확률적으로 통과합니다.\n고전 물리에서는 불가능하지만 양자역학에서는 가능!",
+            "highlight": "center",
+        },
+        {
+            "title": "Controls",
+            "text": "클릭: 입자 재발사\nUp/Down: 속도 조절\nLeft/Right: 장벽 두께",
+            "highlight": "none",
+        },
     ],
     "bb84_defense": [
-        {"title": "BB84 Quantum Key Distribution",
-         "text": "Alice가 Bob에게 양자 키를 전송합니다.\nEve(도청자)가 중간에서 도청을 시도합니다!",
-         "highlight": "center"},
-        {"title": "Defense",
-         "text": "SPACE: 통신망 폐쇄/재개\nA: 자동차단 ON/OFF\n에러율이 높으면 Eve가 도청 중입니다!",
-         "highlight": "none"},
+        {
+            "title": "BB84 Quantum Key Distribution",
+            "text": "Alice가 Bob에게 양자 키를 전송합니다.\nEve(도청자)가 중간에서 도청을 시도합니다!",
+            "highlight": "center",
+        },
+        {
+            "title": "Defense",
+            "text": "SPACE: 통신망 폐쇄/재개\nA: 자동차단 ON/OFF\n에러율이 높으면 Eve가 도청 중입니다!",
+            "highlight": "none",
+        },
     ],
     "squid_mines": [
-        {"title": "SQUID Magnetic Sensor",
-         "text": "SQUID 센서로 숨겨진 자기 지뢰를 찾으세요.\n마우스를 움직이면 자기 선속이 변합니다.",
-         "highlight": "center"},
-        {"title": "Detection",
-         "text": "클릭: 지뢰 마킹\nUp/Down: 민감도 조절\n그래프를 잘 관찰하세요!",
-         "highlight": "none"},
+        {
+            "title": "SQUID Magnetic Sensor",
+            "text": "SQUID 센서로 숨겨진 자기 지뢰를 찾으세요.\n마우스를 움직이면 자기 선속이 변합니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "Detection",
+            "text": "클릭: 지뢰 마킹\nUp/Down: 민감도 조절\n그래프를 잘 관찰하세요!",
+            "highlight": "none",
+        },
     ],
 }
 
@@ -85,7 +109,7 @@ def _load_progress() -> dict:
     """
     if os.path.exists(_SAVE_PATH):
         try:
-            with open(_SAVE_PATH, "r") as f:
+            with open(_SAVE_PATH) as f:
                 data = json.load(f)
             # 레거시 호환: 리스트 → dict 변환
             if isinstance(data, list):

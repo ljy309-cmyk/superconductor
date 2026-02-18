@@ -13,8 +13,8 @@ import math
 import os
 import shutil
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from config_loader import cfg
 from logger import get_module_logger
@@ -34,6 +34,7 @@ def _sanitize_str(value, max_len: int = 50) -> str:
     s = str(value)[:max_len]
     return "".join(c for c in s if c.isprintable())
 
+
 _data_lock = threading.Lock()
 
 
@@ -43,7 +44,7 @@ def _load_data() -> list[dict]:
         for path in (DATA_PATH, _BACKUP_PATH):
             if os.path.exists(path):
                 try:
-                    with open(path, "r", encoding="utf-8") as f:
+                    with open(path, encoding="utf-8") as f:
                         data = json.load(f)
                     if isinstance(data, list):
                         return data
@@ -80,6 +81,7 @@ _RATE_LIMIT_SECONDS = 2.0  # 최소 POST 간격 (초)
 def _check_rate_limit(ip: str) -> bool:
     """속도 제한 확인. True=허용, False=거부."""
     import time
+
     now = time.time()
     with _rate_limit_lock:
         last = _rate_limit_map.get(ip, 0.0)
@@ -88,7 +90,7 @@ def _check_rate_limit(ip: str) -> bool:
         _rate_limit_map[ip] = now
         # 오래된 항목 정리 (100개 초과 시)
         if len(_rate_limit_map) > 100:
-            cutoff = now - 60
+            now - 60
             _rate_limit_map.clear()
     return True
 
@@ -171,6 +173,7 @@ class RankingHandler(BaseHTTPRequestHandler):
                     return self._send_error(400, "Invalid token format")
                 try:
                     from score_integrity import verify_score
+
                     if not verify_score(name, float(score) if isinstance(score, (int, float)) else 0, mode, token):
                         _log.warning("점수 무결성 검증 실패: name=%s, score=%s", name, score)
                         return self._send_error(403, "Invalid score token")
@@ -202,8 +205,11 @@ class RankingHandler(BaseHTTPRequestHandler):
             # 현재 순위 계산
             sorted_records = sorted(records, key=lambda r: r["score"], reverse=True)
             rank = next(
-                (i + 1 for i, r in enumerate(sorted_records)
-                 if r["timestamp"] == record["timestamp"] and r["name"] == record["name"]),
+                (
+                    i + 1
+                    for i, r in enumerate(sorted_records)
+                    if r["timestamp"] == record["timestamp"] and r["name"] == record["name"]
+                ),
                 len(sorted_records),
             )
 

@@ -20,8 +20,7 @@ from logger import get_module_logger
 _log = get_module_logger("sound")
 
 
-def _sine_wave(freq: float, duration_ms: int, volume: float = 0.3,
-               sample_rate: int = 22050):
+def _sine_wave(freq: float, duration_ms: int, volume: float = 0.3, sample_rate: int = 22050):
     """사인파 사운드 생성."""
     n = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n)
@@ -33,8 +32,7 @@ def _sine_wave(freq: float, duration_ms: int, volume: float = 0.3,
     return pygame.mixer.Sound(buffer=buf)
 
 
-def _dual_tone(f1: float, f2: float, duration_ms: int, volume: float = 0.25,
-               sample_rate: int = 22050):
+def _dual_tone(f1: float, f2: float, duration_ms: int, volume: float = 0.25, sample_rate: int = 22050):
     """두 주파수 혼합 사운드."""
     n = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n)
@@ -47,8 +45,7 @@ def _dual_tone(f1: float, f2: float, duration_ms: int, volume: float = 0.25,
     return pygame.mixer.Sound(buffer=buf)
 
 
-def _descending(start_freq: float, end_freq: float, duration_ms: int,
-                volume: float = 0.25, sample_rate: int = 22050):
+def _descending(start_freq: float, end_freq: float, duration_ms: int, volume: float = 0.25, sample_rate: int = 22050):
     """하강 톤 (경고/붕괴)."""
     n = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n)
@@ -118,26 +115,21 @@ class SoundManager:
             "shield_off": _descending(440, 220, 100),
             "heal": _dual_tone(523, 659, 100),
             "error_correct": _sine_wave(1046, 60, 0.2),
-
             # 터널링
             "tunnel_success": _dual_tone(880, 1320, 100),
             "tunnel_reflect": _sine_wave(220, 80, 0.2),
-
             # BB84
             "eve_detected": _descending(1000, 400, 200),
             "channel_shutdown": _descending(600, 150, 300),
             "channel_open": _dual_tone(440, 660, 120),
             "decoy_trap": _sine_wave(1200, 60, 0.15),
-
             # SQUID (기존 beep은 squid_mines에서 자체 관리)
             "mine_found": _dual_tone(880, 1100, 150),
             "wrong_mark": _descending(400, 200, 120),
             "victory": _dual_tone(523, 784, 300),
-
             # 플럭스 피닝
             "levitate": _sine_wave(440, 100, 0.15),
             "fall": _descending(300, 80, 200),
-
             # 공용
             "preset_change": _sine_wave(660, 50, 0.15),
             "achievement": _dual_tone(523, 1046, 250),
@@ -183,9 +175,10 @@ class SoundManager:
         """config.json에서 볼륨/뮤트 설정 로드."""
         import json
         import os
+
         cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
         try:
-            with open(cfg_path, "r", encoding="utf-8") as f:
+            with open(cfg_path, encoding="utf-8") as f:
                 cfg = json.load(f)
             if isinstance(cfg.get("sound_volume"), (int, float)):
                 self._volume = max(0.0, min(1.0, round(float(cfg["sound_volume"]), 2)))
@@ -198,9 +191,10 @@ class SoundManager:
         """현재 볼륨/뮤트 설정을 config.json에 저장."""
         import json
         import os
+
         cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
         try:
-            with open(cfg_path, "r", encoding="utf-8") as f:
+            with open(cfg_path, encoding="utf-8") as f:
                 cfg = json.load(f)
         except (OSError, json.JSONDecodeError):
             cfg = {}

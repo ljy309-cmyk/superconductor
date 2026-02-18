@@ -7,22 +7,22 @@
 
 import os
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 
 from logger import get_module_logger
 
 _log = get_module_logger("tc_predictor")
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use("TkAgg")
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+matplotlib.use("TkAgg")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score, mean_absolute_error
 
 from config_loader import cfg
 from data_ai.generate_sample_data import generate as generate_data
@@ -41,10 +41,10 @@ def _load_tc_colors():
     FG = _tk.TEXT
     ACCENT = _tk.ACCENT_GREEN
 
+
 DATA_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.xlsx")
 CSV_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.csv")
-FEATURES = ["density", "atomic_mass", "electron_affinity", "thermal_conductivity",
-            "valence", "electronegativity"]
+FEATURES = ["density", "atomic_mass", "electron_affinity", "thermal_conductivity", "valence", "electronegativity"]
 TARGET = "critical_temp"
 
 
@@ -127,8 +127,12 @@ class TcPredictorApp(tk.Toplevel):
             ax = self.fig.add_subplot(1, 6, i + 1)
             ax.set_facecolor("#181825")
             ax.scatter(
-                self.df[feat], self.df[TARGET],
-                c=color, s=8, alpha=0.6, edgecolors="none",
+                self.df[feat],
+                self.df[TARGET],
+                c=color,
+                s=8,
+                alpha=0.6,
+                edgecolors="none",
             )
             ax.set_xlabel(title, fontsize=8, color="#cdd6f4")
             if i == 0:
@@ -144,20 +148,30 @@ class TcPredictorApp(tk.Toplevel):
     def _build_input_panel(self, parent):
         """성분비 입력 패널."""
         input_frame = tk.LabelFrame(
-            parent, text="  New Material — Predict Tc  ", font=("Consolas", 11, "bold"),
-            bg=BG, fg=ACCENT, padx=12, pady=8,
+            parent,
+            text="  New Material — Predict Tc  ",
+            font=("Consolas", 11, "bold"),
+            bg=BG,
+            fg=ACCENT,
+            padx=12,
+            pady=8,
         )
         input_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
 
         self.entries: dict[str, tk.Entry] = {}
-        defaults = {"density": "6.5", "atomic_mass": "90.0", "electron_affinity": "80.0",
-                     "thermal_conductivity": "50.0", "valence": "3", "electronegativity": "1.8"}
+        defaults = {
+            "density": "6.5",
+            "atomic_mass": "90.0",
+            "electron_affinity": "80.0",
+            "thermal_conductivity": "50.0",
+            "valence": "3",
+            "electronegativity": "1.8",
+        }
 
         for feat in FEATURES:
             row = tk.Frame(input_frame, bg=BG)
             row.pack(fill=tk.X, pady=2)
-            lbl = tk.Label(row, text=f"{feat}:", width=22, anchor="w",
-                           font=("Consolas", 9), bg=BG, fg=FG)
+            lbl = tk.Label(row, text=f"{feat}:", width=22, anchor="w", font=("Consolas", 9), bg=BG, fg=FG)
             lbl.pack(side=tk.LEFT)
             entry = tk.Entry(row, width=10, font=("Consolas", 10))
             entry.insert(0, defaults.get(feat, "0"))
@@ -168,47 +182,61 @@ class TcPredictorApp(tk.Toplevel):
         btn_frame.pack(fill=tk.X, pady=(8, 0))
 
         tk.Button(
-            btn_frame, text="Predict Tc", command=self._predict,
-            font=("Consolas", 10, "bold"), width=14,
+            btn_frame,
+            text="Predict Tc",
+            command=self._predict,
+            font=("Consolas", 10, "bold"),
+            width=14,
         ).pack(side=tk.LEFT)
 
         self.result_var = tk.StringVar(value="—")
         tk.Label(
-            btn_frame, textvariable=self.result_var, font=("Consolas", 12, "bold"),
-            bg=BG, fg=ACCENT,
+            btn_frame,
+            textvariable=self.result_var,
+            font=("Consolas", 12, "bold"),
+            bg=BG,
+            fg=ACCENT,
         ).pack(side=tk.LEFT, padx=12)
 
     def _build_info_panel(self, parent):
         """모델 성능 정보."""
         info = tk.LabelFrame(
-            parent, text="  Model Performance  ", font=("Consolas", 11, "bold"),
-            bg=BG, fg="#89b4fa", padx=12, pady=8,
+            parent,
+            text="  Model Performance  ",
+            font=("Consolas", 11, "bold"),
+            bg=BG,
+            fg="#89b4fa",
+            padx=12,
+            pady=8,
         )
         info.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         lines = [
-            f"Algorithm:   RandomForestRegressor (100 trees)",
+            "Algorithm:   RandomForestRegressor (100 trees)",
             f"R² Score:    {self.r2:.4f}",
             f"MAE:         {self.mae:.2f} K",
             f"Data Points: {len(self.df)}",
             f"Features:    {', '.join(FEATURES)}",
-            f"Target:      critical_temp (Tc, K)",
+            "Target:      critical_temp (Tc, K)",
         ]
         for line in lines:
             tk.Label(info, text=line, font=("Consolas", 9), bg=BG, fg=FG, anchor="w").pack(
-                fill=tk.X, pady=1,
+                fill=tk.X,
+                pady=1,
             )
 
         # Feature importance
         importances = self.model.feature_importances_
         tk.Label(info, text="", bg=BG).pack()
-        tk.Label(info, text="Feature Importance:", font=("Consolas", 9, "bold"),
-                 bg=BG, fg="#f9e2af", anchor="w").pack(fill=tk.X)
+        tk.Label(info, text="Feature Importance:", font=("Consolas", 9, "bold"), bg=BG, fg="#f9e2af", anchor="w").pack(
+            fill=tk.X
+        )
         for feat, imp in sorted(zip(FEATURES, importances), key=lambda x: -x[1]):
             bar_len = int(imp * 30)
             bar = "█" * bar_len + "░" * (30 - bar_len)
-            tk.Label(info, text=f"  {feat:24s} {bar} {imp:.3f}",
-                     font=("Consolas", 8), bg=BG, fg=FG, anchor="w").pack(fill=tk.X)
+            tk.Label(info, text=f"  {feat:24s} {bar} {imp:.3f}", font=("Consolas", 8), bg=BG, fg=FG, anchor="w").pack(
+                fill=tk.X
+            )
 
     # ── 예측 ─────────────────────────────────────────
 
@@ -225,7 +253,9 @@ class TcPredictorApp(tk.Toplevel):
                 messagebox.showerror("입력 오류", f"{feat}에 유효한 숫자를 입력하세요.", parent=self)
                 return
             if val < 0:
-                messagebox.showwarning("범위 경고", f"{feat} 값이 음수입니다. 결과가 부정확할 수 있습니다.", parent=self)
+                messagebox.showwarning(
+                    "범위 경고", f"{feat} 값이 음수입니다. 결과가 부정확할 수 있습니다.", parent=self
+                )
                 break
 
         X_new = np.array([values])

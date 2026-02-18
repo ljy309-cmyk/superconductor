@@ -16,15 +16,17 @@ from config_loader import cfg
 # QRNG 키 통합 — 모듈이 있으면 양자 해시 키 사용
 try:
     from data_ai.qrng_logger import pop_key_bit, shared_key_available
+
     QRNG_AVAILABLE = True
 except ImportError:
     QRNG_AVAILABLE = False
 
-    def pop_key_bit():          # noqa: E306
+    def pop_key_bit():  # noqa: E306
         return None
 
     def shared_key_available() -> int:  # noqa: E306
         return 0
+
 
 # ── 레이아웃 ─────────────────────────────────────────
 ALICE_X, ALICE_Y = 100, 250
@@ -56,6 +58,7 @@ DECOY_ERROR_MULT = cfg("bb84", "decoy_error_mult", 2.0)
 
 # ── 큐비트 패킷 ──────────────────────────────────────
 
+
 class QubitPacket:
     """전송 중인 큐비트 패킷."""
 
@@ -63,7 +66,7 @@ class QubitPacket:
         self.bit = bit
         self.basis = basis
         self.round_id = round_id
-        self.is_decoy = is_decoy          # 미션3: 디코이 여부
+        self.is_decoy = is_decoy  # 미션3: 디코이 여부
         self.x = float(ALICE_X + 40)
         self.y = float(CHANNEL_Y)
         self.speed = 180.0
@@ -74,8 +77,10 @@ class QubitPacket:
     @property
     def display(self) -> str:
         arrows = {
-            ("+", "0"): "↑", ("+", "1"): "→",
-            ("×", "0"): "↗", ("×", "1"): "↘",
+            ("+", "0"): "↑",
+            ("+", "1"): "→",
+            ("×", "0"): "↗",
+            ("×", "1"): "↘",
         }
         return arrows.get((self.basis, self.bit), "?")
 
@@ -88,6 +93,7 @@ class QubitPacket:
 
 
 # ── 게임 상태 ────────────────────────────────────────
+
 
 class BB84Game:
     """BB84 프로토콜 시뮬레이션 상태."""
@@ -119,13 +125,13 @@ class BB84Game:
 
         # 미션1: 점수 시스템
         self.score = 0
-        self.auto_blocks = 0           # 자동 차단 횟수
-        self.manual_blocks = 0         # 수동 차단 횟수
-        self.auto_block_enabled = True # 자동 차단 ON/OFF
+        self.auto_blocks = 0  # 자동 차단 횟수
+        self.manual_blocks = 0  # 수동 차단 횟수
+        self.auto_block_enabled = True  # 자동 차단 ON/OFF
 
         # 미션3: 디코이 통계
         self.decoy_sent = 0
-        self.decoy_trapped = 0         # Eve가 디코이를 건드린 횟수
+        self.decoy_trapped = 0  # Eve가 디코이를 건드린 횟수
 
         # 미션3 (5-2): QRNG 키 사용 추적
         self.qrng_bits_used = 0
@@ -135,8 +141,7 @@ class BB84Game:
         self.total_errors = 0
         self.total_safe = 0
 
-    def new_round(self, eve_chance: float = EVE_CHANCE,
-                  decoy_chance: float = DECOY_CHANCE):
+    def new_round(self, eve_chance: float = EVE_CHANCE, decoy_chance: float = DECOY_CHANCE):
         """새 큐비트 전송 라운드."""
         if not self.channel_open:
             return
@@ -182,11 +187,10 @@ class BB84Game:
         self.packets.append(pkt)
         self.total_sent += 1
 
-    def process_arrival(self, pkt: QubitPacket,
-                        auto_block_thresh: float = AUTO_BLOCK_THRESHOLD):
+    def process_arrival(self, pkt: QubitPacket, auto_block_thresh: float = AUTO_BLOCK_THRESHOLD):
         """Bob이 큐비트 수신 처리."""
         bob_basis = random.choice(BASES)
-        basis_match = (bob_basis == pkt.basis)
+        basis_match = bob_basis == pkt.basis
 
         # 에러 판정: 기저 일치인데 비트가 다르면 에러 (도청 때문)
         has_error = False
@@ -211,10 +215,12 @@ class BB84Game:
             self.error_rate = sum(self.error_history) / len(self.error_history)
 
         # 미션1: 자동 차단 시스템
-        if (self.auto_block_enabled
-                and self.error_rate > auto_block_thresh
-                and len(self.error_history) >= 5
-                and self.channel_open):
+        if (
+            self.auto_block_enabled
+            and self.error_rate > auto_block_thresh
+            and len(self.error_history) >= 5
+            and self.channel_open
+        ):
             self.channel_open = False
             self.auto_shutdown = True
             self.shutdown_flash = 2.0
@@ -229,15 +235,17 @@ class BB84Game:
                 self.shutdown_flash = 2.0
 
         # 로그 기록
-        self.log.append({
-            "round": pkt.round_id,
-            "alice_basis": pkt.basis,
-            "bob_basis": bob_basis,
-            "match": basis_match,
-            "intercepted": pkt.intercepted,
-            "error": has_error,
-            "decoy": pkt.is_decoy,
-        })
+        self.log.append(
+            {
+                "round": pkt.round_id,
+                "alice_basis": pkt.basis,
+                "bob_basis": bob_basis,
+                "match": basis_match,
+                "intercepted": pkt.intercepted,
+                "error": has_error,
+                "decoy": pkt.is_decoy,
+            }
+        )
         if len(self.log) > 12:
             self.log.pop(0)
 

@@ -11,27 +11,34 @@ import random
 import pygame
 
 from config_loader import cfg
-from i18n import t, toggle_locale
-from theme import load_pg_colors, on_theme_change
-from ui.slider import SliderPanel, PANEL_W
-from preset_hud import PresetHUD
-from help_overlay import HelpOverlay
-from sound_manager import get_sound_manager
-from replay import ReplayRecorder
+from game_base import choose_difficulty_or_quit, finalize_session
 from game_summary import draw_game_summary
-from quit_dialog import confirm_quit
-from game_base import finalize_session, choose_difficulty_or_quit
+from help_overlay import HelpOverlay
+from i18n import t, toggle_locale
 from logger import get_module_logger
+from preset_hud import PresetHUD
 
 # ── 물리 엔진 (순수 로직) ────────────────────────────
 from quantum.qec_physics import (
-    NOISE_RATE, QEC_REDUCTION_DEFAULT, QEC_REDUCTION_MIN, QEC_REDUCTION_MAX,
-    QEC_REDUCTION_STEP, QEC_DURATION, QEC_COOLDOWN,
-    HEAL_AMOUNT, STRESS_THRESHOLD, CASCADE_DAMAGE,
-    NODE_RADIUS, GRID_COLS, GRID_ROWS,
-    QECQubit, build_grid,
+    CASCADE_DAMAGE,
+    HEAL_AMOUNT,
+    NODE_RADIUS,
+    NOISE_RATE,
+    QEC_COOLDOWN,
+    QEC_DURATION,
+    QEC_REDUCTION_DEFAULT,
+    QEC_REDUCTION_MAX,
+    QEC_REDUCTION_MIN,
+    QEC_REDUCTION_STEP,
+    QECQubit,
+    build_grid,
 )
 from quantum.qubit_physics import QubitState
+from quit_dialog import confirm_quit
+from replay import ReplayRecorder
+from sound_manager import get_sound_manager
+from theme import load_pg_colors, on_theme_change
+from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("qec_shield")
 
@@ -53,10 +60,17 @@ PANEL_BG = (24, 24, 37)
 
 
 _COLOR_MAP = {
-    "BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_PURPLE",
-    "SHIELD_CLR": "SHIELD_CLR", "SHIELD_GLOW": "SHIELD_GLOW",
-    "STABLE_CLR": "STABLE", "WARNING_CLR": "WARNING", "COLLAPSED_CLR": "COLLAPSED",
-    "PANEL_BG": "PANEL_BG", "SUBTEXT_CLR": "SUBTEXT", "OVERLAY_CLR": "OVERLAY",
+    "BG": "BG",
+    "TEXT_CLR": "TEXT",
+    "ACCENT": "ACCENT_PURPLE",
+    "SHIELD_CLR": "SHIELD_CLR",
+    "SHIELD_GLOW": "SHIELD_GLOW",
+    "STABLE_CLR": "STABLE",
+    "WARNING_CLR": "WARNING",
+    "COLLAPSED_CLR": "COLLAPSED",
+    "PANEL_BG": "PANEL_BG",
+    "SUBTEXT_CLR": "SUBTEXT",
+    "OVERLAY_CLR": "OVERLAY",
     "WHITE": "WHITE",
 }
 
@@ -93,7 +107,9 @@ def _draw_node(screen, node: QECQubit, font, shield_active: bool, t: float):
     if shield_active and not node.collapsed:
         pulse = int(6 + 4 * math.sin(t * 4))
         glow_surf = pygame.Surface((2 * (NODE_RADIUS + pulse), 2 * (NODE_RADIUS + pulse)), pygame.SRCALPHA)
-        pygame.draw.circle(glow_surf, (*SHIELD_GLOW, 40), (NODE_RADIUS + pulse, NODE_RADIUS + pulse), NODE_RADIUS + pulse)
+        pygame.draw.circle(
+            glow_surf, (*SHIELD_GLOW, 40), (NODE_RADIUS + pulse, NODE_RADIUS + pulse), NODE_RADIUS + pulse
+        )
         screen.blit(glow_surf, (cx - NODE_RADIUS - pulse, cy - NODE_RADIUS - pulse))
 
     # 본체
@@ -110,9 +126,16 @@ def _draw_node(screen, node: QECQubit, font, shield_active: bool, t: float):
     screen.blit(state_label, (cx - state_label.get_width() // 2, cy + NODE_RADIUS + 4))
 
 
-def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
-                     cooldown_timer: float, qec_reduction: float,
-                     heal_cooldown: float, font, big_font):
+def _draw_shield_hud(
+    screen,
+    shield_active: bool,
+    shield_timer: float,
+    cooldown_timer: float,
+    qec_reduction: float,
+    heal_cooldown: float,
+    font,
+    big_font,
+):
     """QEC 방어막 상태 HUD."""
     hud_x, hud_y = 660, 120
     hud_w, hud_h = 210, 260
@@ -192,8 +215,7 @@ def _draw_shield_hud(screen, shield_active: bool, shield_timer: float,
     screen.blit(heal_desc, (hud_x + 20, heal_y + 16))
 
 
-def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int,
-                     qec_uses: int, heal_uses: int, font):
+def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int, qec_uses: int, heal_uses: int, font):
     """경과 시간 · 생존 큐비트 수 · QEC/Heal 사용 횟수."""
     sx, sy = 660, 400
     lines = [
@@ -210,6 +232,7 @@ def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int,
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
+
 
 def run_simulation():
     _load_theme_colors()
@@ -259,9 +282,9 @@ def run_simulation():
     anim_t = 0.0
 
     # ── 비교 모드 ──
-    compare_mode = False      # QEC/Heal 비활성화 모드
-    best_with_qec = 0.0       # QEC ON 최고 생존 시간
-    best_without_qec = 0.0    # QEC OFF 최고 생존 시간
+    compare_mode = False  # QEC/Heal 비활성화 모드
+    best_with_qec = 0.0  # QEC ON 최고 생존 시간
+    best_without_qec = 0.0  # QEC OFF 최고 생존 시간
 
     # ── 시작 시 난이도 선택 ──
     if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
@@ -374,12 +397,14 @@ def run_simulation():
             preset_hud.update(dt)
 
             # ── 리플레이 기록 ──
-            recorder.record({
-                "elapsed": round(elapsed, 2),
-                "shield_active": shield_active,
-                "alive": sum(1 for n in nodes if not n.collapsed),
-                "stresses": [round(n.stress, 1) for n in nodes],
-            })
+            recorder.record(
+                {
+                    "elapsed": round(elapsed, 2),
+                    "shield_active": shield_active,
+                    "alive": sum(1 for n in nodes if not n.collapsed),
+                    "stresses": [round(n.stress, 1) for n in nodes],
+                }
+            )
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -409,8 +434,9 @@ def run_simulation():
             _draw_node(screen, n, font, shield_active, anim_t)
 
         # HUD
-        _draw_shield_hud(screen, shield_active, shield_timer, cooldown_timer,
-                         qec_reduction, heal_cooldown, font, big_font)
+        _draw_shield_hud(
+            screen, shield_active, shield_timer, cooldown_timer, qec_reduction, heal_cooldown, font, big_font
+        )
 
         alive_count = sum(1 for n in nodes if not n.collapsed)
         _draw_scoreboard(screen, elapsed, alive_count, total, qec_uses, heal_uses, font)
@@ -429,10 +455,8 @@ def run_simulation():
                 (t("summary_heal_uses"), str(heal_uses)),
             ]
             if best_with_qec > 0 and best_without_qec > 0:
-                stats.append((t("comparison_title"),
-                              f"QEC: {best_with_qec:.1f}s / NO QEC: {best_without_qec:.1f}s"))
-            draw_game_summary(screen, t("summary_title_gameover"), stats,
-                              font=font, title_font=title_font)
+                stats.append((t("comparison_title"), f"QEC: {best_with_qec:.1f}s / NO QEC: {best_without_qec:.1f}s"))
+            draw_game_summary(screen, t("summary_title_gameover"), stats, font=font, title_font=title_font)
 
         # 슬라이더 패널 그리기
         spanel.draw(screen, font)
@@ -444,9 +468,12 @@ def run_simulation():
 
         # 안내
         hints = [
-            t("hint_reduction_info", red=qec_reduction,
-              shield_state=t("shield_on") if shield_active else "",
-              pause_state=t("paused") if paused else t("running_state")),
+            t(
+                "hint_reduction_info",
+                red=qec_reduction,
+                shield_state=t("shield_on") if shield_active else "",
+                pause_state=t("paused") if paused else t("running_state"),
+            ),
             t("hint_qec_controls"),
             t("hint_pause_reset"),
         ]
@@ -460,15 +487,21 @@ def run_simulation():
         pygame.display.flip()
 
     # 최종미션: finalize_session으로 통합 정리
-    finalize_session("qec_shield", {
-        "survival_time": round(elapsed, 1),
-        "alive_count": sum(1 for n in nodes if not n.collapsed),
-        "total_qubits": total,
-        "qec_uses": qec_uses,
-        "heal_uses": heal_uses,
-        "qec_reduction": qec_reduction,
-    }, recorder=recorder, recorder_meta={"survival_time": round(elapsed, 1)},
-       snd=snd, theme_callback=_load_theme_colors)
+    finalize_session(
+        "qec_shield",
+        {
+            "survival_time": round(elapsed, 1),
+            "alive_count": sum(1 for n in nodes if not n.collapsed),
+            "total_qubits": total,
+            "qec_uses": qec_uses,
+            "heal_uses": heal_uses,
+            "qec_reduction": qec_reduction,
+        },
+        recorder=recorder,
+        recorder_meta={"survival_time": round(elapsed, 1)},
+        snd=snd,
+        theme_callback=_load_theme_colors,
+    )
 
 
 def open_qec_shield():

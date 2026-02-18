@@ -1,7 +1,7 @@
 """상전이 물리 함수 단위 테스트."""
 
-import sys
 import os
+import sys
 import unittest
 from unittest.mock import MagicMock
 
@@ -14,6 +14,7 @@ sys.modules.setdefault("matplotlib.figure", MagicMock())
 # numpy는 실제로 필요하지만 없을 수 있으므로 skip 처리
 try:
     import numpy as np
+
     HAS_NUMPY = True
 except ImportError:
     HAS_NUMPY = False
@@ -27,6 +28,7 @@ class TestTemperatureConversion(unittest.TestCase):
 
     def setUp(self):
         from physics.phase_transition import _celsius_to_kelvin, _kelvin_to_celsius
+
         self.c2k = _celsius_to_kelvin
         self.k2c = _kelvin_to_celsius
 
@@ -49,7 +51,8 @@ class TestResistance(unittest.TestCase):
     """resistance(t, tc, noise) — 초전도 상전이 계산."""
 
     def setUp(self):
-        from physics.phase_transition import resistance, MATERIALS, R_NORMAL
+        from physics.phase_transition import MATERIALS, R_NORMAL, resistance
+
         self.resistance = resistance
         self.MATERIALS = MATERIALS
         self.R_NORMAL = R_NORMAL
@@ -102,6 +105,7 @@ class TestResistance(unittest.TestCase):
 class TestMaterials(unittest.TestCase):
     def setUp(self):
         from physics.phase_transition import MATERIALS
+
         self.MATERIALS = MATERIALS
 
     def test_materials_exist(self):

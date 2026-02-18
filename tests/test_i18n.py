@@ -184,7 +184,10 @@ class TestLocaleListeners(unittest.TestCase):
 
     def test_off_locale_change_removes_listener(self):
         calls = []
-        fn = lambda: calls.append(1)
+
+        def fn():
+            return calls.append(1)
+
         i18n.on_locale_change(fn)
         i18n.off_locale_change(fn)
         i18n.set_locale("en")
@@ -196,7 +199,10 @@ class TestLocaleListeners(unittest.TestCase):
 
     def test_duplicate_listener_prevented(self):
         calls = []
-        fn = lambda: calls.append(1)
+
+        def fn():
+            return calls.append(1)
+
         i18n.on_locale_change(fn)
         i18n.on_locale_change(fn)  # 중복
         i18n.set_locale("en")

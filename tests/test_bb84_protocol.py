@@ -8,8 +8,6 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from security.bb84_protocol import (
-    AUTO_BLOCK_THRESHOLD,
-    ERROR_THRESHOLD,
     HISTORY_WINDOW,
     WARNING_THRESHOLD,
     BB84Game,
@@ -35,8 +33,10 @@ class TestQubitPacket(unittest.TestCase):
 
     def test_display_arrows(self):
         cases = {
-            ("+", "0"): "↑", ("+", "1"): "→",
-            ("×", "0"): "↗", ("×", "1"): "↘",
+            ("+", "0"): "↑",
+            ("+", "1"): "→",
+            ("×", "0"): "↗",
+            ("×", "1"): "↘",
         }
         for (basis, bit), expected in cases.items():
             pkt = QubitPacket(bit, basis, 1)

@@ -16,83 +16,85 @@
 # ── Catppuccin Mocha 기반 색상 (Tkinter 16진수) ──────
 class TK:
     """Tkinter 용 16진수 색상."""
-    BG          = "#1e1e2e"
-    PANEL_BG    = "#2a2a3d"
-    SURFACE     = "#181825"
-    OVERLAY     = "#45475a"
-    TEXT        = "#cdd6f4"
-    SUBTEXT     = "#585b70"
+
+    BG = "#1e1e2e"
+    PANEL_BG = "#2a2a3d"
+    SURFACE = "#181825"
+    OVERLAY = "#45475a"
+    TEXT = "#cdd6f4"
+    SUBTEXT = "#585b70"
     ACCENT_BLUE = "#89b4fa"
     ACCENT_PURPLE = "#cba6f7"
-    ACCENT_GREEN  = "#a6e3a1"
+    ACCENT_GREEN = "#a6e3a1"
     ACCENT_YELLOW = "#f9e2af"
-    ACCENT_PEACH  = "#fab387"
-    RED         = "#f38ba8"
-    GREEN       = "#a6e3a1"
-    YELLOW      = "#f9e2af"
-    GOLD        = "#f9e2af"
-    SILVER      = "#bac2de"
-    BRONZE      = "#fab387"
-    GAUGE_BG    = "#45475a"
+    ACCENT_PEACH = "#fab387"
+    RED = "#f38ba8"
+    GREEN = "#a6e3a1"
+    YELLOW = "#f9e2af"
+    GOLD = "#f9e2af"
+    SILVER = "#bac2de"
+    BRONZE = "#fab387"
+    GAUGE_BG = "#45475a"
 
 
 class PG:
     """Pygame 용 RGB 튜플."""
-    BG          = (30, 30, 46)
-    PANEL_BG    = (24, 24, 37)
-    SURFACE     = (24, 24, 37)
-    OVERLAY     = (69, 71, 90)
-    TEXT        = (205, 214, 244)
-    SUBTEXT     = (88, 91, 112)
+
+    BG = (30, 30, 46)
+    PANEL_BG = (24, 24, 37)
+    SURFACE = (24, 24, 37)
+    OVERLAY = (69, 71, 90)
+    TEXT = (205, 214, 244)
+    SUBTEXT = (88, 91, 112)
     ACCENT_BLUE = (137, 180, 250)
     ACCENT_PURPLE = (203, 166, 247)
-    ACCENT_GREEN  = (166, 227, 161)
+    ACCENT_GREEN = (166, 227, 161)
     ACCENT_YELLOW = (249, 226, 175)
-    ACCENT_PEACH  = (250, 179, 135)
-    RED         = (243, 139, 168)
-    GREEN       = (166, 227, 161)
-    YELLOW      = (249, 226, 175)
-    SHIELD_CLR  = (137, 180, 250)
+    ACCENT_PEACH = (250, 179, 135)
+    RED = (243, 139, 168)
+    GREEN = (166, 227, 161)
+    YELLOW = (249, 226, 175)
+    SHIELD_CLR = (137, 180, 250)
     SHIELD_GLOW = (116, 199, 236)
-    SENSOR_CLR  = (116, 199, 236)
+    SENSOR_CLR = (116, 199, 236)
 
     # 자석
-    MAGNET_N    = (235, 90, 90)
-    MAGNET_S    = (100, 130, 235)
-    SC_COLOR    = (166, 227, 161)
-    SC_GLOW     = (137, 180, 250)
+    MAGNET_N = (235, 90, 90)
+    MAGNET_S = (100, 130, 235)
+    SC_COLOR = (166, 227, 161)
+    SC_GLOW = (137, 180, 250)
 
     # 큐비트 상태
-    STABLE      = (166, 227, 161)
-    WARNING     = (249, 226, 175)
-    DANGER      = (250, 179, 135)
-    COLLAPSED   = (243, 139, 168)
+    STABLE = (166, 227, 161)
+    WARNING = (249, 226, 175)
+    DANGER = (250, 179, 135)
+    COLLAPSED = (243, 139, 168)
 
     # BB84
-    ALICE       = (137, 180, 250)
-    BOB         = (166, 227, 161)
-    EVE         = (243, 139, 168)
-    QUBIT       = (203, 166, 247)
-    DECOY       = (249, 226, 175)
+    ALICE = (137, 180, 250)
+    BOB = (166, 227, 161)
+    EVE = (243, 139, 168)
+    QUBIT = (203, 166, 247)
+    DECOY = (249, 226, 175)
 
     # 공통
-    WHITE       = (255, 255, 255)
-    INACTIVE    = (100, 100, 100)
+    WHITE = (255, 255, 255)
+    INACTIVE = (100, 100, 100)
 
 
 # ── 모듈별 Accent 색상 ──────────────────────────────
 LAUNCHER_ACCENTS = {
-    "physics":  TK.ACCENT_BLUE,
-    "quantum":  TK.ACCENT_PURPLE,
+    "physics": TK.ACCENT_BLUE,
+    "quantum": TK.ACCENT_PURPLE,
     "security": TK.ACCENT_YELLOW,
-    "data_ai":  TK.ACCENT_GREEN,
+    "data_ai": TK.ACCENT_GREEN,
 }
 
 LAUNCHER_ACCENTS_PG = {
-    "physics":  PG.ACCENT_BLUE,
-    "quantum":  PG.ACCENT_PURPLE,
+    "physics": PG.ACCENT_BLUE,
+    "quantum": PG.ACCENT_PURPLE,
     "security": PG.ACCENT_YELLOW,
-    "data_ai":  PG.ACCENT_GREEN,
+    "data_ai": PG.ACCENT_GREEN,
 }
 
 
@@ -113,7 +115,8 @@ class FONTS:
 
     font_scale 변경 시 프로퍼티처럼 동적으로 반환합니다.
     """
-    FAMILY  = "Consolas"
+
+    FAMILY = "Consolas"
 
     @staticmethod
     def _f(size, bold=False):
@@ -124,30 +127,39 @@ class FONTS:
     @property
     def TITLE(self):
         return self._f(18, True)
+
     @property
     def HEADING(self):
         return self._f(14, True)
+
     @property
     def BODY(self):
         return self._f(10)
+
     @property
     def BODY_BOLD(self):
         return self._f(10, True)
+
     @property
     def SMALL(self):
         return self._f(9)
+
     @property
     def TINY(self):
         return self._f(8)
+
     @property
     def MONO_12(self):
         return self._f(12)
+
     @property
     def MONO_11(self):
         return self._f(11)
+
     @property
     def BUTTON(self):
         return self._f(10)
+
 
 # 싱글톤 인스턴스 — 기존 코드와 호환 유지: FONTS.BODY 등 사용 가능
 FONTS = FONTS()
@@ -156,62 +168,64 @@ FONTS = FONTS()
 # ── 라이트 테마 (Catppuccin Latte 기반) ───────────────
 class TK_LIGHT:
     """Tkinter 용 라이트 테마."""
-    BG          = "#eff1f5"
-    PANEL_BG    = "#e6e9ef"
-    SURFACE     = "#dce0e8"
-    OVERLAY     = "#ccd0da"
-    TEXT        = "#4c4f69"
-    SUBTEXT     = "#6c6f85"
+
+    BG = "#eff1f5"
+    PANEL_BG = "#e6e9ef"
+    SURFACE = "#dce0e8"
+    OVERLAY = "#ccd0da"
+    TEXT = "#4c4f69"
+    SUBTEXT = "#6c6f85"
     ACCENT_BLUE = "#1e66f5"
     ACCENT_PURPLE = "#8839ef"
-    ACCENT_GREEN  = "#40a02b"
+    ACCENT_GREEN = "#40a02b"
     ACCENT_YELLOW = "#df8e1d"
-    ACCENT_PEACH  = "#fe640b"
-    RED         = "#d20f39"
-    GREEN       = "#40a02b"
-    YELLOW      = "#df8e1d"
-    GOLD        = "#df8e1d"
-    SILVER      = "#9ca0b0"
-    BRONZE      = "#fe640b"
-    GAUGE_BG    = "#ccd0da"
+    ACCENT_PEACH = "#fe640b"
+    RED = "#d20f39"
+    GREEN = "#40a02b"
+    YELLOW = "#df8e1d"
+    GOLD = "#df8e1d"
+    SILVER = "#9ca0b0"
+    BRONZE = "#fe640b"
+    GAUGE_BG = "#ccd0da"
 
 
 class PG_LIGHT:
     """Pygame 용 라이트 테마 RGB 튜플."""
-    BG          = (239, 241, 245)
-    PANEL_BG    = (230, 233, 239)
-    SURFACE     = (220, 224, 232)
-    OVERLAY     = (204, 208, 218)
-    TEXT        = (76, 79, 105)
-    SUBTEXT     = (108, 111, 133)
+
+    BG = (239, 241, 245)
+    PANEL_BG = (230, 233, 239)
+    SURFACE = (220, 224, 232)
+    OVERLAY = (204, 208, 218)
+    TEXT = (76, 79, 105)
+    SUBTEXT = (108, 111, 133)
     ACCENT_BLUE = (30, 102, 245)
     ACCENT_PURPLE = (136, 57, 239)
-    ACCENT_GREEN  = (64, 160, 43)
+    ACCENT_GREEN = (64, 160, 43)
     ACCENT_YELLOW = (223, 142, 29)
-    ACCENT_PEACH  = (254, 100, 11)
-    RED         = (210, 15, 57)
-    GREEN       = (64, 160, 43)
-    YELLOW      = (223, 142, 29)
-    SHIELD_CLR  = (30, 102, 245)
+    ACCENT_PEACH = (254, 100, 11)
+    RED = (210, 15, 57)
+    GREEN = (64, 160, 43)
+    YELLOW = (223, 142, 29)
+    SHIELD_CLR = (30, 102, 245)
     SHIELD_GLOW = (32, 159, 181)
-    SENSOR_CLR  = (32, 159, 181)
-    MAGNET_N    = (210, 15, 57)
-    MAGNET_S    = (30, 102, 245)
-    SC_COLOR    = (64, 160, 43)
-    SC_GLOW     = (30, 102, 245)
-    STABLE      = (64, 160, 43)
-    WARNING     = (223, 142, 29)
-    DANGER      = (254, 100, 11)
-    COLLAPSED   = (210, 15, 57)
-    ALICE       = (30, 102, 245)
-    BOB         = (64, 160, 43)
-    EVE         = (210, 15, 57)
-    QUBIT       = (136, 57, 239)
-    DECOY       = (223, 142, 29)
+    SENSOR_CLR = (32, 159, 181)
+    MAGNET_N = (210, 15, 57)
+    MAGNET_S = (30, 102, 245)
+    SC_COLOR = (64, 160, 43)
+    SC_GLOW = (30, 102, 245)
+    STABLE = (64, 160, 43)
+    WARNING = (223, 142, 29)
+    DANGER = (254, 100, 11)
+    COLLAPSED = (210, 15, 57)
+    ALICE = (30, 102, 245)
+    BOB = (64, 160, 43)
+    EVE = (210, 15, 57)
+    QUBIT = (136, 57, 239)
+    DECOY = (223, 142, 29)
 
     # 공통
-    WHITE       = (255, 255, 255)
-    INACTIVE    = (100, 100, 100)
+    WHITE = (255, 255, 255)
+    INACTIVE = (100, 100, 100)
 
 
 # ── 색맹 친화 다크 테마 (Blue/Orange — 적록 색맹 안전) ──
@@ -221,129 +235,133 @@ class TK_CB:
     RED/GREEN 구분 → Blue/Orange 구분으로 전환.
     Okabe-Ito 팔레트 원칙 적용.
     """
-    BG          = "#1e1e2e"
-    PANEL_BG    = "#2a2a3d"
-    SURFACE     = "#181825"
-    OVERLAY     = "#45475a"
-    TEXT        = "#cdd6f4"
-    SUBTEXT     = "#585b70"
+
+    BG = "#1e1e2e"
+    PANEL_BG = "#2a2a3d"
+    SURFACE = "#181825"
+    OVERLAY = "#45475a"
+    TEXT = "#cdd6f4"
+    SUBTEXT = "#585b70"
     ACCENT_BLUE = "#89b4fa"
     ACCENT_PURPLE = "#cba6f7"
-    ACCENT_GREEN  = "#74c7ec"     # Sky Blue (green 대체)
+    ACCENT_GREEN = "#74c7ec"  # Sky Blue (green 대체)
     ACCENT_YELLOW = "#f9e2af"
-    ACCENT_PEACH  = "#fab387"
-    RED         = "#fab387"       # Peach/Orange (red 대체)
-    GREEN       = "#74c7ec"       # Sky Blue (green 대체)
-    YELLOW      = "#f9e2af"
-    GOLD        = "#f9e2af"
-    SILVER      = "#bac2de"
-    BRONZE      = "#fab387"
-    GAUGE_BG    = "#45475a"
+    ACCENT_PEACH = "#fab387"
+    RED = "#fab387"  # Peach/Orange (red 대체)
+    GREEN = "#74c7ec"  # Sky Blue (green 대체)
+    YELLOW = "#f9e2af"
+    GOLD = "#f9e2af"
+    SILVER = "#bac2de"
+    BRONZE = "#fab387"
+    GAUGE_BG = "#45475a"
 
 
 class PG_CB:
     """Pygame 용 색맹 친화 다크 테마 RGB 튜플."""
-    BG          = (30, 30, 46)
-    PANEL_BG    = (24, 24, 37)
-    SURFACE     = (24, 24, 37)
-    OVERLAY     = (69, 71, 90)
-    TEXT        = (205, 214, 244)
-    SUBTEXT     = (88, 91, 112)
+
+    BG = (30, 30, 46)
+    PANEL_BG = (24, 24, 37)
+    SURFACE = (24, 24, 37)
+    OVERLAY = (69, 71, 90)
+    TEXT = (205, 214, 244)
+    SUBTEXT = (88, 91, 112)
     ACCENT_BLUE = (137, 180, 250)
     ACCENT_PURPLE = (203, 166, 247)
-    ACCENT_GREEN  = (116, 199, 236)   # Sky Blue
+    ACCENT_GREEN = (116, 199, 236)  # Sky Blue
     ACCENT_YELLOW = (249, 226, 175)
-    ACCENT_PEACH  = (250, 179, 135)
-    RED         = (250, 179, 135)     # Peach/Orange
-    GREEN       = (116, 199, 236)     # Sky Blue
-    YELLOW      = (249, 226, 175)
-    SHIELD_CLR  = (137, 180, 250)
+    ACCENT_PEACH = (250, 179, 135)
+    RED = (250, 179, 135)  # Peach/Orange
+    GREEN = (116, 199, 236)  # Sky Blue
+    YELLOW = (249, 226, 175)
+    SHIELD_CLR = (137, 180, 250)
     SHIELD_GLOW = (116, 199, 236)
-    SENSOR_CLR  = (116, 199, 236)
+    SENSOR_CLR = (116, 199, 236)
 
     # 자석
-    MAGNET_N    = (250, 179, 135)     # Warm orange (was red)
-    MAGNET_S    = (100, 130, 235)
-    SC_COLOR    = (116, 199, 236)     # Sky Blue (was green)
-    SC_GLOW     = (137, 180, 250)
+    MAGNET_N = (250, 179, 135)  # Warm orange (was red)
+    MAGNET_S = (100, 130, 235)
+    SC_COLOR = (116, 199, 236)  # Sky Blue (was green)
+    SC_GLOW = (137, 180, 250)
 
     # 큐비트 상태 — 밝기 그라데이션으로 구분
-    STABLE      = (116, 199, 236)     # Sky Blue (안정)
-    WARNING     = (249, 226, 175)     # Yellow (경고)
-    DANGER      = (250, 179, 135)     # Peach (위험)
-    COLLAPSED   = (230, 150, 100)     # Deep Orange (붕괴)
+    STABLE = (116, 199, 236)  # Sky Blue (안정)
+    WARNING = (249, 226, 175)  # Yellow (경고)
+    DANGER = (250, 179, 135)  # Peach (위험)
+    COLLAPSED = (230, 150, 100)  # Deep Orange (붕괴)
 
     # BB84
-    ALICE       = (137, 180, 250)
-    BOB         = (116, 199, 236)     # Sky Blue (was green)
-    EVE         = (250, 179, 135)     # Peach/Orange (was red)
-    QUBIT       = (203, 166, 247)
-    DECOY       = (249, 226, 175)
+    ALICE = (137, 180, 250)
+    BOB = (116, 199, 236)  # Sky Blue (was green)
+    EVE = (250, 179, 135)  # Peach/Orange (was red)
+    QUBIT = (203, 166, 247)
+    DECOY = (249, 226, 175)
 
     # 공통
-    WHITE       = (255, 255, 255)
-    INACTIVE    = (100, 100, 100)
+    WHITE = (255, 255, 255)
+    INACTIVE = (100, 100, 100)
 
 
 # ── 색맹 친화 라이트 테마 ─────────────────────────────
 class TK_CB_LIGHT:
     """Tkinter 용 색맹 친화 라이트 테마."""
-    BG          = "#eff1f5"
-    PANEL_BG    = "#e6e9ef"
-    SURFACE     = "#dce0e8"
-    OVERLAY     = "#ccd0da"
-    TEXT        = "#4c4f69"
-    SUBTEXT     = "#6c6f85"
+
+    BG = "#eff1f5"
+    PANEL_BG = "#e6e9ef"
+    SURFACE = "#dce0e8"
+    OVERLAY = "#ccd0da"
+    TEXT = "#4c4f69"
+    SUBTEXT = "#6c6f85"
     ACCENT_BLUE = "#1e66f5"
     ACCENT_PURPLE = "#8839ef"
-    ACCENT_GREEN  = "#209fb5"     # Teal (green 대체)
+    ACCENT_GREEN = "#209fb5"  # Teal (green 대체)
     ACCENT_YELLOW = "#df8e1d"
-    ACCENT_PEACH  = "#fe640b"
-    RED         = "#fe640b"       # Vivid Orange (red 대체)
-    GREEN       = "#209fb5"       # Teal (green 대체)
-    YELLOW      = "#df8e1d"
-    GOLD        = "#df8e1d"
-    SILVER      = "#9ca0b0"
-    BRONZE      = "#fe640b"
-    GAUGE_BG    = "#ccd0da"
+    ACCENT_PEACH = "#fe640b"
+    RED = "#fe640b"  # Vivid Orange (red 대체)
+    GREEN = "#209fb5"  # Teal (green 대체)
+    YELLOW = "#df8e1d"
+    GOLD = "#df8e1d"
+    SILVER = "#9ca0b0"
+    BRONZE = "#fe640b"
+    GAUGE_BG = "#ccd0da"
 
 
 class PG_CB_LIGHT:
     """Pygame 용 색맹 친화 라이트 테마 RGB 튜플."""
-    BG          = (239, 241, 245)
-    PANEL_BG    = (230, 233, 239)
-    SURFACE     = (220, 224, 232)
-    OVERLAY     = (204, 208, 218)
-    TEXT        = (76, 79, 105)
-    SUBTEXT     = (108, 111, 133)
+
+    BG = (239, 241, 245)
+    PANEL_BG = (230, 233, 239)
+    SURFACE = (220, 224, 232)
+    OVERLAY = (204, 208, 218)
+    TEXT = (76, 79, 105)
+    SUBTEXT = (108, 111, 133)
     ACCENT_BLUE = (30, 102, 245)
     ACCENT_PURPLE = (136, 57, 239)
-    ACCENT_GREEN  = (32, 159, 181)    # Teal
+    ACCENT_GREEN = (32, 159, 181)  # Teal
     ACCENT_YELLOW = (223, 142, 29)
-    ACCENT_PEACH  = (254, 100, 11)
-    RED         = (254, 100, 11)      # Vivid Orange
-    GREEN       = (32, 159, 181)      # Teal
-    YELLOW      = (223, 142, 29)
-    SHIELD_CLR  = (30, 102, 245)
+    ACCENT_PEACH = (254, 100, 11)
+    RED = (254, 100, 11)  # Vivid Orange
+    GREEN = (32, 159, 181)  # Teal
+    YELLOW = (223, 142, 29)
+    SHIELD_CLR = (30, 102, 245)
     SHIELD_GLOW = (32, 159, 181)
-    SENSOR_CLR  = (32, 159, 181)
-    MAGNET_N    = (254, 100, 11)      # Vivid Orange (was red)
-    MAGNET_S    = (30, 102, 245)
-    SC_COLOR    = (32, 159, 181)      # Teal (was green)
-    SC_GLOW     = (30, 102, 245)
-    STABLE      = (32, 159, 181)      # Teal (안정)
-    WARNING     = (223, 142, 29)      # Yellow (경고)
-    DANGER      = (254, 100, 11)      # Orange (위험)
-    COLLAPSED   = (200, 80, 10)       # Deep Orange (붕괴)
-    ALICE       = (30, 102, 245)
-    BOB         = (32, 159, 181)      # Teal (was green)
-    EVE         = (254, 100, 11)      # Orange (was red)
-    QUBIT       = (136, 57, 239)
-    DECOY       = (223, 142, 29)
+    SENSOR_CLR = (32, 159, 181)
+    MAGNET_N = (254, 100, 11)  # Vivid Orange (was red)
+    MAGNET_S = (30, 102, 245)
+    SC_COLOR = (32, 159, 181)  # Teal (was green)
+    SC_GLOW = (30, 102, 245)
+    STABLE = (32, 159, 181)  # Teal (안정)
+    WARNING = (223, 142, 29)  # Yellow (경고)
+    DANGER = (254, 100, 11)  # Orange (위험)
+    COLLAPSED = (200, 80, 10)  # Deep Orange (붕괴)
+    ALICE = (30, 102, 245)
+    BOB = (32, 159, 181)  # Teal (was green)
+    EVE = (254, 100, 11)  # Orange (was red)
+    QUBIT = (136, 57, 239)
+    DECOY = (223, 142, 29)
 
     # 공통
-    WHITE       = (255, 255, 255)
-    INACTIVE    = (100, 100, 100)
+    WHITE = (255, 255, 255)
+    INACTIVE = (100, 100, 100)
 
 
 # ── 테마 & 색맹 모드 토글 ─────────────────────────────
@@ -355,17 +373,17 @@ _listeners: list = []  # (ref_or_callable, is_weak) 튜플 목록
 
 # 테마 조합 매핑
 _TK_THEMES = {
-    ("dark",  False): TK,
-    ("dark",  True):  TK_CB,
+    ("dark", False): TK,
+    ("dark", True): TK_CB,
     ("light", False): TK_LIGHT,
-    ("light", True):  TK_CB_LIGHT,
+    ("light", True): TK_CB_LIGHT,
 }
 
 _PG_THEMES = {
-    ("dark",  False): PG,
-    ("dark",  True):  PG_CB,
+    ("dark", False): PG,
+    ("dark", True): PG_CB,
     ("light", False): PG_LIGHT,
-    ("light", True):  PG_CB_LIGHT,
+    ("light", True): PG_CB_LIGHT,
 }
 
 
@@ -403,7 +421,7 @@ def on_theme_change(callback):
         if existing is not None and existing == callback:
             return
 
-    if hasattr(callback, '__self__'):
+    if hasattr(callback, "__self__"):
         # 바운드 메서드 → WeakMethod (객체 GC 허용)
         _listeners.append((_weakref.WeakMethod(callback), True))
     else:
@@ -428,13 +446,13 @@ class use_theme_colors:
             ...
     """
 
-    __slots__ = ('_fn',)
+    __slots__ = ("_fn",)
 
     def __init__(self, load_fn):
         self._fn = load_fn
 
     def __enter__(self):
-        self._fn()                 # 초기 로드
+        self._fn()  # 초기 로드
         on_theme_change(self._fn)  # 런타임 갱신 등록
         return self
 
@@ -557,9 +575,10 @@ def save_preferences():
     """현재 테마/색맹 설정을 config.json에 저장."""
     import json
     import os
+
     cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     try:
-        with open(cfg_path, "r", encoding="utf-8") as f:
+        with open(cfg_path, encoding="utf-8") as f:
             cfg = json.load(f)
     except (OSError, json.JSONDecodeError):
         cfg = {}
@@ -577,10 +596,11 @@ def load_preferences():
     """config.json에서 테마/색맹 설정을 로드 (알림 없이)."""
     import json
     import os
+
     global _current_theme, _colorblind, _font_scale
     cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     try:
-        with open(cfg_path, "r", encoding="utf-8") as f:
+        with open(cfg_path, encoding="utf-8") as f:
             cfg = json.load(f)
         if cfg.get("theme") in ("dark", "light"):
             _current_theme = cfg["theme"]

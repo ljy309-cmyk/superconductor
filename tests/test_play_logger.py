@@ -1,10 +1,10 @@
 """play_logger 단위 테스트."""
 
 import os
-import sys
-import unittest
-import tempfile
 import shutil
+import sys
+import tempfile
+import unittest
 from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -24,10 +24,10 @@ if "pandas" not in sys.modules:
 
 
 class TestPlayLogger(unittest.TestCase):
-
     def setUp(self):
         """각 테스트마다 임시 디렉토리 사용 + pandas 모킹 해제."""
         import data_ai.play_logger as pl
+
         self._orig_csv = pl.PLAY_LOG_CSV
         self._orig_xlsx = pl.PLAY_LOG_XLSX
         self._orig_pd = pl.pd
@@ -39,6 +39,7 @@ class TestPlayLogger(unittest.TestCase):
 
     def tearDown(self):
         import data_ai.play_logger as pl
+
         pl.PLAY_LOG_CSV = self._orig_csv
         pl.PLAY_LOG_XLSX = self._orig_xlsx
         pl.pd = self._orig_pd
@@ -46,6 +47,7 @@ class TestPlayLogger(unittest.TestCase):
 
     def test_log_session_creates_record(self):
         from data_ai.play_logger import PlayLogger
+
         logger = PlayLogger()
         record = logger.log_session("bb84_defense", {"score": 100, "total_sent": 50})
         self.assertEqual(record["module"], "bb84_defense")
@@ -53,8 +55,9 @@ class TestPlayLogger(unittest.TestCase):
         self.assertEqual(len(logger.records), 1)
 
     def test_log_session_incremental_csv(self):
-        from data_ai.play_logger import PlayLogger
         import data_ai.play_logger as pl
+        from data_ai.play_logger import PlayLogger
+
         logger = PlayLogger()
         logger.log_session("bb84_defense", {"score": 100})
         logger.log_session("squid_mines", {"won": True, "mines_found": 8})
@@ -63,22 +66,25 @@ class TestPlayLogger(unittest.TestCase):
         self.assertEqual(len(logger.records), 2)
 
     def test_export_creates_files(self):
-        from data_ai.play_logger import PlayLogger
         import data_ai.play_logger as pl
+        from data_ai.play_logger import PlayLogger
+
         logger = PlayLogger()
         logger.log_session("qec_shield", {"survival_time": 45.2})
-        path = logger.export()
+        logger.export()
 
         self.assertTrue(os.path.exists(pl.PLAY_LOG_CSV))
 
     def test_get_summary_empty(self):
         from data_ai.play_logger import PlayLogger
+
         logger = PlayLogger()
         summary = logger.get_summary()
         self.assertEqual(summary["total_sessions"], 0)
 
     def test_get_summary_with_data(self):
         from data_ai.play_logger import PlayLogger
+
         logger = PlayLogger()
         logger.log_session("bb84_defense", {"score": 100, "total_sent": 50})
         logger.log_session("bb84_defense", {"score": 200, "total_sent": 80})
@@ -88,6 +94,7 @@ class TestPlayLogger(unittest.TestCase):
 
     def test_clear(self):
         from data_ai.play_logger import PlayLogger
+
         logger = PlayLogger()
         logger.log_session("bb84_defense", {"score": 100})
         logger.clear()
@@ -95,6 +102,7 @@ class TestPlayLogger(unittest.TestCase):
 
     def test_thread_safety_singleton(self):
         import threading
+
         from data_ai.play_logger import PlayLogger
 
         instances = []
@@ -117,15 +125,20 @@ class TestPlayLogger(unittest.TestCase):
 
     def test_custom_fields(self):
         from data_ai.play_logger import PlayLogger
+
         logger = PlayLogger()
-        record = logger.log_session("bb84_defense", {
-            "score": 100,
-            "custom_field": "hello",
-        })
+        record = logger.log_session(
+            "bb84_defense",
+            {
+                "score": 100,
+                "custom_field": "hello",
+            },
+        )
         self.assertEqual(record["custom_field"], "hello")
 
     def test_csv_injection_sanitize_function(self):
         from data_ai.play_logger import _sanitize_csv_value
+
         # 위험 접두사가 살균됨
         self.assertEqual(_sanitize_csv_value("=CMD()"), "'=CMD()")
         self.assertEqual(_sanitize_csv_value("+1+1"), "'+1+1")
@@ -141,24 +154,31 @@ class TestPlayLogger(unittest.TestCase):
     def test_csv_injection_in_incremental_write(self):
         """CSV 증분 저장 시 인젝션 위험 문자열이 살균되는지 확인."""
         import csv
+
         import data_ai.play_logger as pl
         from data_ai.play_logger import PlayLogger
+
         logger = PlayLogger()
-        logger.log_session("bb84_defense", {
-            "score": 100,
-            "custom_field": "=HYPERLINK(\"evil\")",
-        })
+        logger.log_session(
+            "bb84_defense",
+            {
+                "score": 100,
+                "custom_field": '=HYPERLINK("evil")',
+            },
+        )
         # CSV 파일 파싱하여 셀 값 검증
-        with open(pl.PLAY_LOG_CSV, "r", encoding="utf-8") as f:
+        with open(pl.PLAY_LOG_CSV, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             row = next(reader)
         # 셀 값이 '= 로 시작해야 함 (작은따옴표 접두사로 살균됨)
-        self.assertTrue(row["custom_field"].startswith("'="),
-                        f"Expected sanitized prefix, got: {row['custom_field']!r}")
+        self.assertTrue(
+            row["custom_field"].startswith("'="), f"Expected sanitized prefix, got: {row['custom_field']!r}"
+        )
 
 
 try:
     import tkinter
+
     _HAS_TKINTER = True
 except ImportError:
     _HAS_TKINTER = False
@@ -166,9 +186,8 @@ except ImportError:
 
 @unittest.skipUnless(_HAS_TKINTER, "tkinter not available in this environment")
 class TestQRNGThreadSafety(unittest.TestCase):
-
     def test_push_and_pop(self):
-        from data_ai.qrng_logger import push_key_bits, pop_key_bit, shared_key_available
+        from data_ai.qrng_logger import pop_key_bit, push_key_bits, shared_key_available
 
         # 큐 비우기
         while pop_key_bit() is not None:
@@ -182,7 +201,7 @@ class TestQRNGThreadSafety(unittest.TestCase):
         self.assertEqual(shared_key_available(), 3)
 
     def test_pop_empty(self):
-        from data_ai.qrng_logger import pop_key_bit, shared_key_available
+        from data_ai.qrng_logger import pop_key_bit
 
         # 큐 비우기
         while pop_key_bit() is not None:
@@ -193,7 +212,8 @@ class TestQRNGThreadSafety(unittest.TestCase):
 
     def test_concurrent_access(self):
         import threading
-        from data_ai.qrng_logger import push_key_bits, pop_key_bit
+
+        from data_ai.qrng_logger import pop_key_bit, push_key_bits
 
         # 큐 비우기
         while pop_key_bit() is not None:

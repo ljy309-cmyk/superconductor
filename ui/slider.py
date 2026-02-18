@@ -43,9 +43,18 @@ class Slider:
     BAR_H = 12
     TOTAL_H = 42  # 라벨 + 바 + 여백
 
-    def __init__(self, x: int, y: int, w: int,
-                 min_val: float, max_val: float, val: float,
-                 step: float, label: str, fmt: str = ".1f"):
+    def __init__(
+        self,
+        x: int,
+        y: int,
+        w: int,
+        min_val: float,
+        max_val: float,
+        val: float,
+        step: float,
+        label: str,
+        fmt: str = ".1f",
+    ):
         self.x = x
         self.y = y
         self.w = w
@@ -144,10 +153,8 @@ class Slider:
             tip_h = tip_surf.get_height() + 4
             tip_x = min(mx + 12, screen.get_width() - tip_w - 4)
             tip_y = my - tip_h - 4
-            pygame.draw.rect(screen, c["panel_bg"],
-                             (tip_x - 4, tip_y - 2, tip_w, tip_h), border_radius=3)
-            pygame.draw.rect(screen, c["subtext"],
-                             (tip_x - 4, tip_y - 2, tip_w, tip_h), 1, border_radius=3)
+            pygame.draw.rect(screen, c["panel_bg"], (tip_x - 4, tip_y - 2, tip_w, tip_h), border_radius=3)
+            pygame.draw.rect(screen, c["subtext"], (tip_x - 4, tip_y - 2, tip_w, tip_h), 1, border_radius=3)
             screen.blit(tip_surf, (tip_x, tip_y))
 
     def _ratio(self) -> float:
@@ -166,8 +173,7 @@ class SliderPanel:
         self.title = title
         self.sliders: list[Slider] = []
 
-    def add(self, min_val: float, max_val: float, val: float,
-            step: float, label: str, fmt: str = ".1f") -> Slider:
+    def add(self, min_val: float, max_val: float, val: float, step: float, label: str, fmt: str = ".1f") -> Slider:
         """슬라이더 추가. 반환된 Slider 객체의 .value로 현재 값을 읽는다."""
         sy = self.y + 28 + len(self.sliders) * Slider.TOTAL_H
         s = Slider(self.x + 10, sy, self.w - 20, min_val, max_val, val, step, label, fmt)
@@ -186,8 +192,7 @@ class SliderPanel:
     def panel_height(self) -> int:
         return 28 + len(self.sliders) * Slider.TOTAL_H + 10
 
-    def draw(self, screen: pygame.Surface, font: pygame.font.Font,
-             title_font: pygame.font.Font | None = None):
+    def draw(self, screen: pygame.Surface, font: pygame.font.Font, title_font: pygame.font.Font | None = None):
         h = self.panel_height()
         panel_rect = pygame.Rect(self.x, self.y, self.w, h)
 

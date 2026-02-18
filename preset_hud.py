@@ -19,9 +19,9 @@ except ImportError:
     pygame = None  # type: ignore[assignment]
 
 from i18n import t
-from presets import get_preset, save_profile, load_profile, list_profiles
-from theme import get_pg_theme
 from logger import get_module_logger
+from presets import get_preset, load_profile, save_profile
+from theme import get_pg_theme
 
 _log = get_module_logger("preset_hud")
 
@@ -143,8 +143,7 @@ class PresetHUD:
         if self.flash_timer > 0:
             self.flash_timer -= dt
 
-    def draw(self, screen: pygame.Surface, font: pygame.font.Font,
-             x: int = 10, y: int = 10):
+    def draw(self, screen: pygame.Surface, font: pygame.font.Font, x: int = 10, y: int = 10):
         """프리셋 HUD 렌더링."""
         color = _PRESET_COLORS.get(self.current, (205, 214, 244))
 
@@ -160,6 +159,6 @@ class PresetHUD:
 
         # 알림 메시지 (페이드 아웃)
         if self.flash_timer > 0:
-            alpha = min(255, int(255 * self.flash_timer / 0.5))
+            min(255, int(255 * self.flash_timer / 0.5))
             notif_surf = font.render(self.notification, True, color)
             screen.blit(notif_surf, (x, y + 16))

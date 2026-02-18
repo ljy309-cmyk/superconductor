@@ -23,11 +23,11 @@ from theme import get_pg_theme
 class AchievementToast:
     """업적 해금 토스트 알림 (슬라이드 인/아웃 애니메이션)."""
 
-    DISPLAY_TIME = 3.0      # 표시 시간 (초)
-    SLIDE_TIME = 0.3        # 슬라이드 애니메이션 (초)
+    DISPLAY_TIME = 3.0  # 표시 시간 (초)
+    SLIDE_TIME = 0.3  # 슬라이드 애니메이션 (초)
     TOAST_W = 320
     TOAST_H = 60
-    HISTORY_MAX = 20        # 히스토리 최대 보관 수
+    HISTORY_MAX = 20  # 히스토리 최대 보관 수
 
     def __init__(self):
         self._queue: list[dict] = []
@@ -99,10 +99,8 @@ class AchievementToast:
 
         # 배경
         surf = pygame.Surface((self.TOAST_W, self.TOAST_H), pygame.SRCALPHA)
-        pygame.draw.rect(surf, (30, 30, 46, 230), (0, 0, self.TOAST_W, self.TOAST_H),
-                         border_radius=8)
-        pygame.draw.rect(surf, (249, 226, 175, 200), (0, 0, self.TOAST_W, self.TOAST_H),
-                         2, border_radius=8)
+        pygame.draw.rect(surf, (30, 30, 46, 230), (0, 0, self.TOAST_W, self.TOAST_H), border_radius=8)
+        pygame.draw.rect(surf, (249, 226, 175, 200), (0, 0, self.TOAST_W, self.TOAST_H), 2, border_radius=8)
 
         # 아이콘
         icon = self._current.get("icon", "?")
@@ -137,6 +135,7 @@ class AchievementToast:
         # 전체 업적 목록 조회
         try:
             from achievements import get_all_achievements
+
             all_ach = get_all_achievements()
         except ImportError:
             all_ach = []
@@ -153,10 +152,8 @@ class AchievementToast:
 
         # 반투명 배경
         panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        pygame.draw.rect(panel_surf, (*pg.PANEL_BG, 230),
-                         (0, 0, panel_w, panel_h), border_radius=8)
-        pygame.draw.rect(panel_surf, pg.OVERLAY,
-                         (0, 0, panel_w, panel_h), 2, border_radius=8)
+        pygame.draw.rect(panel_surf, (*pg.PANEL_BG, 230), (0, 0, panel_w, panel_h), border_radius=8)
+        pygame.draw.rect(panel_surf, pg.OVERLAY, (0, 0, panel_w, panel_h), 2, border_radius=8)
 
         # 타이틀
         title_surf = font.render("Achievements (Tab to close)", True, pg.ACCENT_YELLOW)

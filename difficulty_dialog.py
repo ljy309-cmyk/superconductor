@@ -103,7 +103,7 @@ def choose_difficulty(screen: pygame.Surface, font: pygame.font.Font | None = No
         for i, (name, shortcut) in enumerate(_DIFFICULTIES):
             btn_rect = _btn_rect(W, H, i)
             color = diff_colors.get(name, pg.TEXT)
-            is_selected = (i == selected)
+            is_selected = i == selected
 
             # 버튼 배경
             bg_color = (*color[:3], 40) if not is_selected else (*color[:3], 80)
@@ -137,7 +137,7 @@ def _btn_rect(screen_w: int, screen_h: int, index: int) -> pygame.Rect:
     """버튼 위치 계산."""
     panel_w = 340
     btn_w, btn_h = 260, 36
-    px = screen_w // 2 - panel_w // 2
+    screen_w // 2 - panel_w // 2
     py = screen_h // 2 - 220 // 2
     bx = screen_w // 2 - btn_w // 2
     by = py + 54 + index * (btn_h + 8)

@@ -19,6 +19,7 @@ from config_loader import cfg
 
 class QubitState(Enum):
     """큐비트 상태 — 문자열 대신 Enum 사용."""
+
     STABLE = "stable"
     WARNING = "warning"
     DANGER = "danger"
@@ -58,7 +59,7 @@ class QubitNode:
         self.stress = 0.0
         self.collapsed = False
         self.collapse_timer = 0.0
-        self.neighbors: list["QubitNode"] = []
+        self.neighbors: list[QubitNode] = []
 
     @property
     def state(self) -> QubitState:
@@ -151,8 +152,9 @@ class QubitNetwork:
         self._cascade_events.clear()
         return events
 
-    def update(self, dt: float, noise_rate: float, cascade_damage: float,
-               shield_active: bool, qec_reduction: float) -> list[int]:
+    def update(
+        self, dt: float, noise_rate: float, cascade_damage: float, shield_active: bool, qec_reduction: float
+    ) -> list[int]:
         """물리 업데이트. 붕괴된 노드 ID 목록 반환."""
         noise_mult = qec_reduction if shield_active else 1.0
         collapsed_ids: list[int] = []
@@ -174,11 +176,9 @@ class QubitNetwork:
                     changed = True
                     collapsed_ids.append(n.qid)
                     if shield_active:
-                        self._cascade_events.append(
-                            f"Q{n.qid} COLLAPSED (shielded: +{int(effective_cascade)})")
+                        self._cascade_events.append(f"Q{n.qid} COLLAPSED (shielded: +{int(effective_cascade)})")
                     else:
-                        self._cascade_events.append(
-                            f"Q{n.qid} COLLAPSED → cascade +{int(cascade_damage)}")
+                        self._cascade_events.append(f"Q{n.qid} COLLAPSED → cascade +{int(cascade_damage)}")
 
         return collapsed_ids
 

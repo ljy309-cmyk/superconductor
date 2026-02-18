@@ -22,6 +22,26 @@ ignore = [
     "B905",  # zip without strict (Python 3.10+ strict param)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# F821: theme colors injected dynamically via load_pg_colors(_COLOR_MAP, globals())
+"quantum/tunneling.py" = ["F821"]
+"quantum/qec_shield.py" = ["F821"]
+"quantum/qubit_chain.py" = ["F821"]
+"security/bb84_defense.py" = ["F821"]
+"security/squid_mines.py" = ["F821"]
+"physics/flux_pinning.py" = ["F821", "E402"]
+"physics/phase_transition_sim.py" = ["F821"]
+# E402: imports after path setup or conditional imports
+"data_ai/tc_predictor.py" = ["E402"]
+"data_ai/qrng_logger.py" = ["E402"]
+"physics/phase_transition.py" = ["E402"]
+"theme.py" = ["E402"]
+"tests/*" = ["E402"]
+# F401: availability-check imports (try/except ImportError pattern)
+"perf_monitor.py" = ["F401"]
+"tests/test_new_modules.py" = ["F401"]
+"tests/test_play_logger.py" = ["F401"]
+
 [tool.ruff.lint.isort]
 known-first-party = [
     "config_loader",

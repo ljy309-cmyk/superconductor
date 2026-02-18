@@ -10,8 +10,8 @@
 
 import os
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from config_loader import cfg
 
@@ -23,18 +23,18 @@ CSV_PATH = os.path.join(os.path.dirname(__file__), "superconductor_data.csv")
 #  이름, 밀도, 원자질량, 전자친화도, 열전도도, 원자가전자, 전기음성도, 임계온도
 REAL_SUPERCONDUCTORS = [
     # name      density  mass    e_aff   therm_k  valence  electroneg  Tc(K)
-    ("Al",       2.70,   26.98,  42.5,   237.0,   3,       1.61,       1.18),
-    ("Sn",       7.31,  118.71,  107.3,   66.8,   4,       1.96,       3.72),
-    ("Pb",      11.34,  207.20,  35.1,    35.3,   4,       2.33,       7.19),
-    ("Nb",       8.57,   92.91,  86.1,    53.7,   5,       1.60,       9.25),
-    ("V",        6.11,   50.94,  50.9,    30.7,   5,       1.63,       5.40),
-    ("Hg",      13.53,  200.59,  34.2,     8.3,   2,       2.00,       4.15),
-    ("In",       7.31,  114.82,  28.9,    81.8,   3,       1.78,       3.41),
-    ("Ta",      16.65,  180.95,  31.0,    57.5,   5,       1.50,       4.47),
-    ("Zn",       7.13,   65.38,   9.4,   116.0,   2,       1.65,       0.85),
-    ("Ti",       4.51,   47.87,   7.6,    21.9,   4,       1.54,       0.40),
-    ("Ga",       5.91,   69.72,  28.9,    40.6,   3,       1.81,       1.08),
-    ("Tc",      11.00,   97.00,  53.0,    50.6,   7,       1.90,       7.77),
+    ("Al", 2.70, 26.98, 42.5, 237.0, 3, 1.61, 1.18),
+    ("Sn", 7.31, 118.71, 107.3, 66.8, 4, 1.96, 3.72),
+    ("Pb", 11.34, 207.20, 35.1, 35.3, 4, 2.33, 7.19),
+    ("Nb", 8.57, 92.91, 86.1, 53.7, 5, 1.60, 9.25),
+    ("V", 6.11, 50.94, 50.9, 30.7, 5, 1.63, 5.40),
+    ("Hg", 13.53, 200.59, 34.2, 8.3, 2, 2.00, 4.15),
+    ("In", 7.31, 114.82, 28.9, 81.8, 3, 1.78, 3.41),
+    ("Ta", 16.65, 180.95, 31.0, 57.5, 5, 1.50, 4.47),
+    ("Zn", 7.13, 65.38, 9.4, 116.0, 2, 1.65, 0.85),
+    ("Ti", 4.51, 47.87, 7.6, 21.9, 4, 1.54, 0.40),
+    ("Ga", 5.91, 69.72, 28.9, 40.6, 3, 1.81, 1.08),
+    ("Tc", 11.00, 97.00, 53.0, 50.6, 7, 1.90, 7.77),
 ]
 
 
@@ -49,16 +49,18 @@ def generate():
     # ── 실제 데이터 (미션1) ──
     real_rows = []
     for name, dens, mass, ea, tk, val, en, tc in REAL_SUPERCONDUCTORS:
-        real_rows.append({
-            "name": name,
-            "density": dens,
-            "atomic_mass": mass,
-            "electron_affinity": ea,
-            "thermal_conductivity": tk,
-            "valence": val,
-            "electronegativity": en,
-            "critical_temp": tc,
-        })
+        real_rows.append(
+            {
+                "name": name,
+                "density": dens,
+                "atomic_mass": mass,
+                "electron_affinity": ea,
+                "thermal_conductivity": tk,
+                "valence": val,
+                "electronegativity": en,
+                "critical_temp": tc,
+            }
+        )
     df_real = pd.DataFrame(real_rows)
 
     # ── 합성 데이터 ──
@@ -81,16 +83,18 @@ def generate():
     )
     critical_temp = np.clip(critical_temp, 0.5, 180.0)
 
-    df_synth = pd.DataFrame({
-        "name": [f"Synth-{i:03d}" for i in range(SAMPLE_SIZE)],
-        "density": np.round(density, 2),
-        "atomic_mass": np.round(atomic_mass, 2),
-        "electron_affinity": np.round(electron_affinity, 2),
-        "thermal_conductivity": np.round(thermal_conductivity, 2),
-        "valence": valence.astype(int),
-        "electronegativity": np.round(electronegativity, 2),
-        "critical_temp": np.round(critical_temp, 2),
-    })
+    df_synth = pd.DataFrame(
+        {
+            "name": [f"Synth-{i:03d}" for i in range(SAMPLE_SIZE)],
+            "density": np.round(density, 2),
+            "atomic_mass": np.round(atomic_mass, 2),
+            "electron_affinity": np.round(electron_affinity, 2),
+            "thermal_conductivity": np.round(thermal_conductivity, 2),
+            "valence": valence.astype(int),
+            "electronegativity": np.round(electronegativity, 2),
+            "critical_temp": np.round(critical_temp, 2),
+        }
+    )
 
     # 실제 + 합성 결합
     df = pd.concat([df_real, df_synth], ignore_index=True)

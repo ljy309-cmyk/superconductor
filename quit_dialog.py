@@ -1,8 +1,9 @@
 """종료 확인 대화상자 — Pygame 모듈 공통."""
 
 import pygame
-from theme import get_pg_theme
+
 from i18n import t
+from theme import get_pg_theme
 
 
 def confirm_quit(screen, font=None) -> bool:

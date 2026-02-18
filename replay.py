@@ -105,7 +105,7 @@ class ReplayPlayer:
     def load(self, filepath: str) -> bool:
         """리플레이 파일 로드 (버전 호환성 검사 포함)."""
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with open(filepath, encoding="utf-8") as f:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError) as e:
             _log.error("리플레이 로드 실패: %s", e)
@@ -116,11 +116,13 @@ class ReplayPlayer:
         if file_ver > REPLAY_FORMAT_VERSION:
             _log.warning(
                 "리플레이 버전 %d > 현재 %d — 일부 데이터가 손실될 수 있습니다",
-                file_ver, REPLAY_FORMAT_VERSION,
+                file_ver,
+                REPLAY_FORMAT_VERSION,
             )
         if file_ver < _MIN_SUPPORTED_VERSION:
             _log.warning(
-                "레거시 리플레이 (v%d) — 자동 마이그레이션 적용", file_ver,
+                "레거시 리플레이 (v%d) — 자동 마이그레이션 적용",
+                file_ver,
             )
             data = _migrate_replay(data, file_ver)
             data["format_version"] = REPLAY_FORMAT_VERSION

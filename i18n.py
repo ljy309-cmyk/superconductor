@@ -22,7 +22,7 @@ def _load_locale(locale: str) -> dict[str, str]:
     """로케일 파일 로드."""
     path = os.path.join(_LOCALE_DIR, f"{locale}.json")
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     return {}
 

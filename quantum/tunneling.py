@@ -9,26 +9,33 @@ import math
 import pygame
 
 from config_loader import cfg
-from i18n import t, toggle_locale
-from theme import load_pg_colors, on_theme_change
-from ui.slider import SliderPanel, PANEL_W
-from preset_hud import PresetHUD
+from game_base import choose_difficulty_or_quit, finalize_session
 from help_overlay import HelpOverlay
-from sound_manager import get_sound_manager
-from replay import ReplayRecorder
-from quit_dialog import confirm_quit
-from game_base import finalize_session, choose_difficulty_or_quit
+from i18n import t, toggle_locale
 from logger import get_module_logger
+from preset_hud import PresetHUD
 
 # ── 물리 엔진 (순수 로직) ────────────────────────────
 from quantum.tunneling_physics import (
-    TUNNEL_PROB_BASE, PARTICLE_SPEED, PARTICLE_RADIUS,
-    BARRIER_WIDTH_DEFAULT, BARRIER_WIDTH_MIN, BARRIER_WIDTH_MAX,
-    SUPERPOSITION_HZ, TUNNEL_SPEED_BOOST,
-    _TUNNEL_DECAY, _VY_RANGE, _TUNNEL_FLASH, _REFLECT_FLASH,
-    SIM_LEFT, SIM_TOP, SIM_W, SIM_H, BARRIER_X,
-    _calc_tunnel_prob, QuantumParticle,
+    BARRIER_WIDTH_DEFAULT,
+    BARRIER_WIDTH_MAX,
+    BARRIER_WIDTH_MIN,
+    BARRIER_X,
+    PARTICLE_RADIUS,
+    SIM_H,
+    SIM_LEFT,
+    SIM_TOP,
+    SIM_W,
+    TUNNEL_PROB_BASE,
+    TUNNEL_SPEED_BOOST,
+    QuantumParticle,
+    _calc_tunnel_prob,
 )
+from quit_dialog import confirm_quit
+from replay import ReplayRecorder
+from sound_manager import get_sound_manager
+from theme import load_pg_colors, on_theme_change
+from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("tunneling")
 
@@ -44,16 +51,22 @@ ACCENT = (203, 166, 247)
 BARRIER_CLR = (249, 226, 175)
 PARTICLE_CLR = (137, 180, 250)
 TUNNEL_FLASH = (166, 227, 161)  # 터널링 성공
-REFLECT_CLR = (243, 139, 168)   # 반사
+REFLECT_CLR = (243, 139, 168)  # 반사
 BLOCH_RING = (88, 91, 112)
 
 
 _COLOR_MAP = {
-    "BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_PURPLE",
-    "BARRIER_CLR": "ACCENT_YELLOW", "PARTICLE_CLR": "ACCENT_BLUE",
-    "TUNNEL_FLASH": "GREEN", "REFLECT_CLR": "RED",
-    "BLOCH_RING": "SUBTEXT", "SURFACE_CLR": "SURFACE",
-    "OVERLAY_CLR": "OVERLAY", "WHITE": "WHITE",
+    "BG": "BG",
+    "TEXT_CLR": "TEXT",
+    "ACCENT": "ACCENT_PURPLE",
+    "BARRIER_CLR": "ACCENT_YELLOW",
+    "PARTICLE_CLR": "ACCENT_BLUE",
+    "TUNNEL_FLASH": "GREEN",
+    "REFLECT_CLR": "RED",
+    "BLOCH_RING": "SUBTEXT",
+    "SURFACE_CLR": "SURFACE",
+    "OVERLAY_CLR": "OVERLAY",
+    "WHITE": "WHITE",
 }
 
 
@@ -61,12 +74,14 @@ def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
     load_pg_colors(_COLOR_MAP, globals())
 
+
 # ── 블로흐 구 레이아웃 ────────────────────────────────
 BLOCH_CX, BLOCH_CY = 730, 280
 BLOCH_R = 110
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
+
 
 def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     """시뮬레이션 영역 배경."""
@@ -127,7 +142,8 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
 
     # 적도 타원
     pygame.draw.ellipse(
-        screen, BLOCH_RING,
+        screen,
+        BLOCH_RING,
         (BLOCH_CX - BLOCH_R, BLOCH_CY - BLOCH_R // 4, BLOCH_R * 2, BLOCH_R // 2),
         1,
     )
@@ -163,7 +179,10 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
     lines = [
         (t("tn_attempts", count=p.total_attempts), TEXT_CLR),
         (t("tn_tunnel_stat", count=p.tunnel_count, pct=p.tunnel_count / max(p.total_attempts, 1) * 100), TUNNEL_FLASH),
-        (t("tn_reflect_stat", count=p.reflect_count, pct=p.reflect_count / max(p.total_attempts, 1) * 100), REFLECT_CLR),
+        (
+            t("tn_reflect_stat", count=p.reflect_count, pct=p.reflect_count / max(p.total_attempts, 1) * 100),
+            REFLECT_CLR,
+        ),
         (t("tn_current_prob", prob=tunnel_prob * 100), TEXT_CLR),
     ]
     for i, (line, color) in enumerate(lines):
@@ -172,6 +191,7 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
+
 
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
@@ -272,12 +292,14 @@ def run_simulation():
 
             preset_hud.update(dt)
 
-            recorder.record_frame({
-                "x": round(particle.x, 1),
-                "tunneled": particle.tunneled,
-                "attempts": particle.total_attempts,
-                "tunnels": particle.tunnel_count,
-            })
+            recorder.record_frame(
+                {
+                    "x": round(particle.x, 1),
+                    "tunneled": particle.tunneled,
+                    "attempts": particle.total_attempts,
+                    "tunnels": particle.tunnel_count,
+                }
+            )
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -303,8 +325,13 @@ def run_simulation():
 
         # 안내
         hints = [
-            t("hint_speed_info", speed=speed_mult, width=barrier_width, prob=tunnel_prob*100,
-              pause_state=t("paused") if paused else t("running_state")),
+            t(
+                "hint_speed_info",
+                speed=speed_mult,
+                width=barrier_width,
+                prob=tunnel_prob * 100,
+                pause_state=t("paused") if paused else t("running_state"),
+            ),
             t("hint_click_launch"),
             t("hint_pause_reset"),
         ]
@@ -318,14 +345,20 @@ def run_simulation():
         pygame.display.flip()
 
     rate = particle.tunnel_count / max(particle.total_attempts, 1)
-    finalize_session("tunneling", {
-        "total_attempts": particle.total_attempts,
-        "tunnel_count": particle.tunnel_count,
-        "reflect_count": particle.reflect_count,
-        "tunnel_rate": round(rate, 3),
-        "barrier_width": barrier_width,
-        "tunnel_prob": round(tunnel_prob, 3),
-    }, recorder=recorder, snd=snd, theme_callback=_load_theme_colors)
+    finalize_session(
+        "tunneling",
+        {
+            "total_attempts": particle.total_attempts,
+            "tunnel_count": particle.tunnel_count,
+            "reflect_count": particle.reflect_count,
+            "tunnel_rate": round(rate, 3),
+            "barrier_width": barrier_width,
+            "tunnel_prob": round(tunnel_prob, 3),
+        },
+        recorder=recorder,
+        snd=snd,
+        theme_callback=_load_theme_colors,
+    )
 
 
 def open_tunneling():

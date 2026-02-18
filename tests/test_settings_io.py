@@ -22,18 +22,21 @@ class TestExportSettings(unittest.TestCase):
 
     def test_returns_zip_path(self):
         from settings_io import export_settings
+
         path = export_settings(output_dir=self.tmpdir)
         self.assertTrue(path.endswith(".zip"))
         self.assertTrue(os.path.exists(path))
 
     def test_zip_is_valid(self):
         from settings_io import export_settings
+
         path = export_settings(output_dir=self.tmpdir)
         self.assertTrue(zipfile.is_zipfile(path))
 
     def test_zip_contains_config_json(self):
         """config.json이 존재하면 ZIP에 포함되어야 함."""
-        from settings_io import export_settings, _BASE
+        from settings_io import _BASE, export_settings
+
         path = export_settings(output_dir=self.tmpdir)
         config_path = os.path.join(_BASE, "config.json")
         if os.path.exists(config_path):
@@ -42,12 +45,14 @@ class TestExportSettings(unittest.TestCase):
 
     def test_zip_filename_has_timestamp(self):
         from settings_io import export_settings
+
         path = export_settings(output_dir=self.tmpdir)
         fname = os.path.basename(path)
         self.assertTrue(fname.startswith("settings_export_"))
 
     def test_creates_output_dir_if_missing(self):
         from settings_io import export_settings
+
         sub = os.path.join(self.tmpdir, "new_subdir")
         path = export_settings(output_dir=sub)
         self.assertTrue(os.path.isdir(sub))
@@ -55,12 +60,13 @@ class TestExportSettings(unittest.TestCase):
 
     def test_export_roundtrip_preserves_config(self):
         """내보내기한 ZIP에서 config.json 내용이 원본과 동일한지 확인."""
-        from settings_io import export_settings, _BASE
+        from settings_io import _BASE, export_settings
+
         config_path = os.path.join(_BASE, "config.json")
         if not os.path.exists(config_path):
             self.skipTest("config.json not found")
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             original = json.load(f)
 
         zip_path = export_settings(output_dir=self.tmpdir)
@@ -78,12 +84,14 @@ class TestImportSettings(unittest.TestCase):
         self.tmpdir = tempfile.mkdtemp()
         # import할 대상 디렉터리를 격리하기 위해 _BASE를 임시로 교체
         import settings_io
+
         self._orig_base = settings_io._BASE
         self.fake_base = tempfile.mkdtemp()
         settings_io._BASE = self.fake_base
 
     def tearDown(self):
         import settings_io
+
         settings_io._BASE = self._orig_base
         shutil.rmtree(self.tmpdir, ignore_errors=True)
         shutil.rmtree(self.fake_base, ignore_errors=True)
@@ -99,6 +107,7 @@ class TestImportSettings(unittest.TestCase):
     def test_import_config_json(self):
         """config.json을 정상적으로 가져오기."""
         from settings_io import import_settings
+
         data = {"display": {"fps": 120}}
         zip_path = self._make_zip({"config.json": json.dumps(data)})
         result = import_settings(zip_path)
@@ -106,12 +115,13 @@ class TestImportSettings(unittest.TestCase):
         # 실제 파일이 생성되었는지
         dest = os.path.join(self.fake_base, "config.json")
         self.assertTrue(os.path.exists(dest))
-        with open(dest, "r") as f:
+        with open(dest) as f:
             imported = json.load(f)
         self.assertEqual(imported, data)
 
     def test_import_achievements_json(self):
         from settings_io import import_settings
+
         zip_path = self._make_zip({"achievements.json": '{"unlocked": []}'})
         result = import_settings(zip_path)
         self.assertIn("achievements.json", result["imported"])
@@ -119,33 +129,38 @@ class TestImportSettings(unittest.TestCase):
     def test_import_profiles_dir(self):
         """profiles/ 디렉터리 내 파일 가져오기."""
         from settings_io import import_settings
-        zip_path = self._make_zip({
-            "profiles/user1.json": '{"name": "user1"}',
-            "profiles/user2.json": '{"name": "user2"}',
-        })
+
+        zip_path = self._make_zip(
+            {
+                "profiles/user1.json": '{"name": "user1"}',
+                "profiles/user2.json": '{"name": "user2"}',
+            }
+        )
         result = import_settings(zip_path)
         self.assertEqual(len(result["imported"]), 2)
-        self.assertTrue(os.path.exists(
-            os.path.join(self.fake_base, "profiles", "user1.json")))
+        self.assertTrue(os.path.exists(os.path.join(self.fake_base, "profiles", "user1.json")))
 
     def test_skip_unknown_files(self):
         """허용 목록에 없는 파일은 건너뜀."""
         from settings_io import import_settings
-        zip_path = self._make_zip({
-            "config.json": "{}",
-            "malicious.exe": b"bad".decode(),
-            "random.txt": "hello",
-        })
+
+        zip_path = self._make_zip(
+            {
+                "config.json": "{}",
+                "malicious.exe": b"bad".decode(),
+                "random.txt": "hello",
+            }
+        )
         result = import_settings(zip_path)
         self.assertIn("config.json", result["imported"])
         self.assertIn("malicious.exe", result["skipped"])
         self.assertIn("random.txt", result["skipped"])
         # 실제 파일이 생성되지 않았는지
-        self.assertFalse(os.path.exists(
-            os.path.join(self.fake_base, "malicious.exe")))
+        self.assertFalse(os.path.exists(os.path.join(self.fake_base, "malicious.exe")))
 
     def test_nonexistent_zip_returns_empty(self):
         from settings_io import import_settings
+
         result = import_settings("/nonexistent/path.zip")
         self.assertEqual(result["imported"], [])
         self.assertEqual(result["skipped"], [])
@@ -153,6 +168,7 @@ class TestImportSettings(unittest.TestCase):
     def test_corrupt_zip_returns_empty(self):
         """손상된 ZIP 파일 처리."""
         from settings_io import import_settings
+
         bad_path = os.path.join(self.tmpdir, "corrupt.zip")
         with open(bad_path, "wb") as f:
             f.write(b"this is not a zip file")
@@ -161,6 +177,7 @@ class TestImportSettings(unittest.TestCase):
 
     def test_empty_zip(self):
         from settings_io import import_settings
+
         zip_path = self._make_zip({})
         result = import_settings(zip_path)
         self.assertEqual(result["imported"], [])
@@ -173,12 +190,14 @@ class TestPathTraversal(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         import settings_io
+
         self._orig_base = settings_io._BASE
         self.fake_base = tempfile.mkdtemp()
         settings_io._BASE = self.fake_base
 
     def tearDown(self):
         import settings_io
+
         settings_io._BASE = self._orig_base
         shutil.rmtree(self.tmpdir, ignore_errors=True)
         shutil.rmtree(self.fake_base, ignore_errors=True)
@@ -193,9 +212,12 @@ class TestPathTraversal(unittest.TestCase):
     def test_dotdot_blocked(self):
         """.. 포함 경로 차단."""
         from settings_io import import_settings
-        zip_path = self._make_zip({
-            "../../../etc/passwd": "root:x:0:0",
-        })
+
+        zip_path = self._make_zip(
+            {
+                "../../../etc/passwd": "root:x:0:0",
+            }
+        )
         result = import_settings(zip_path)
         self.assertIn("../../../etc/passwd", result["skipped"])
         self.assertEqual(result["imported"], [])
@@ -203,9 +225,12 @@ class TestPathTraversal(unittest.TestCase):
     def test_absolute_path_blocked(self):
         """/로 시작하는 절대 경로 차단."""
         from settings_io import import_settings
-        zip_path = self._make_zip({
-            "/etc/shadow": "hacked",
-        })
+
+        zip_path = self._make_zip(
+            {
+                "/etc/shadow": "hacked",
+            }
+        )
         result = import_settings(zip_path)
         self.assertIn("/etc/shadow", result["skipped"])
         self.assertEqual(result["imported"], [])
@@ -213,24 +238,29 @@ class TestPathTraversal(unittest.TestCase):
     def test_dotdot_in_middle_blocked(self):
         """경로 중간의 .. 차단."""
         from settings_io import import_settings
-        zip_path = self._make_zip({
-            "profiles/../../../etc/passwd": "pwned",
-        })
+
+        zip_path = self._make_zip(
+            {
+                "profiles/../../../etc/passwd": "pwned",
+            }
+        )
         result = import_settings(zip_path)
         self.assertIn("profiles/../../../etc/passwd", result["skipped"])
 
     def test_mixed_safe_and_unsafe(self):
         """안전한 파일과 위험한 파일이 섞인 경우."""
         from settings_io import import_settings
-        zip_path = self._make_zip({
-            "config.json": '{"safe": true}',
-            "../escape.txt": "bad",
-            "profiles/ok.json": '{"good": true}',
-            "/root/.ssh/id_rsa": "secret",
-        })
+
+        zip_path = self._make_zip(
+            {
+                "config.json": '{"safe": true}',
+                "../escape.txt": "bad",
+                "profiles/ok.json": '{"good": true}',
+                "/root/.ssh/id_rsa": "secret",
+            }
+        )
         result = import_settings(zip_path)
-        self.assertEqual(sorted(result["imported"]),
-                         ["config.json", "profiles/ok.json"])
+        self.assertEqual(sorted(result["imported"]), ["config.json", "profiles/ok.json"])
         self.assertEqual(len(result["skipped"]), 2)
 
 
@@ -240,21 +270,25 @@ class TestListExports(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         import settings_io
+
         self._orig_export_dir = settings_io._EXPORT_DIR
         settings_io._EXPORT_DIR = self.tmpdir
 
     def tearDown(self):
         import settings_io
+
         settings_io._EXPORT_DIR = self._orig_export_dir
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_empty_dir(self):
         from settings_io import list_exports
+
         result = list_exports()
         self.assertEqual(result, [])
 
     def test_lists_only_zips(self):
         from settings_io import list_exports
+
         # zip 파일과 비-zip 파일 생성
         for name in ["a.zip", "b.zip", "readme.txt", "data.json"]:
             with open(os.path.join(self.tmpdir, name), "w") as f:
@@ -266,6 +300,7 @@ class TestListExports(unittest.TestCase):
     def test_sorted_reverse(self):
         """최신 파일이 먼저 오는지 확인."""
         from settings_io import list_exports
+
         for name in ["export_20260101.zip", "export_20260301.zip", "export_20260201.zip"]:
             with open(os.path.join(self.tmpdir, name), "w") as f:
                 f.write("x")
@@ -277,8 +312,10 @@ class TestListExports(unittest.TestCase):
     def test_nonexistent_dir(self):
         """내보내기 디렉터리가 없으면 빈 리스트."""
         import settings_io
+
         settings_io._EXPORT_DIR = "/nonexistent/dir/12345"
         from settings_io import list_exports
+
         result = list_exports()
         self.assertEqual(result, [])
 

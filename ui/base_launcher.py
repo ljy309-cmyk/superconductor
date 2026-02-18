@@ -13,8 +13,8 @@
 
 import tkinter as tk
 
-from theme import TK, LAUNCHER_ACCENTS, FONTS
 from i18n import t
+from theme import FONTS, LAUNCHER_ACCENTS, TK
 
 
 class BaseLauncher(tk.Toplevel):
@@ -23,8 +23,8 @@ class BaseLauncher(tk.Toplevel):
     서브클래스에서 MODULE, BUTTONS를 정의하면 자동으로 UI 구성.
     """
 
-    MODULE: str = ""             # "physics", "quantum", "security", "data_ai"
-    BUTTONS: list[tuple] = []    # [(i18n_key, callback_or_callable), ...]
+    MODULE: str = ""  # "physics", "quantum", "security", "data_ai"
+    BUTTONS: list[tuple] = []  # [(i18n_key, callback_or_callable), ...]
     BUTTON_WIDTH: int = 42
 
     def __init__(self, master=None):
@@ -41,15 +41,21 @@ class BaseLauncher(tk.Toplevel):
         frame.pack()
 
         tk.Label(
-            frame, text=t(heading_key),
-            font=FONTS.HEADING, bg=TK.BG, fg=accent,
+            frame,
+            text=t(heading_key),
+            font=FONTS.HEADING,
+            bg=TK.BG,
+            fg=accent,
         ).pack(pady=(0, 14))
 
         for btn_key, cmd in self.BUTTONS:
             callback = cmd if not callable(cmd) else (lambda c=cmd: c(self))
             tk.Button(
-                frame, text=t(btn_key), command=callback,
-                width=self.BUTTON_WIDTH, height=2,
+                frame,
+                text=t(btn_key),
+                command=callback,
+                width=self.BUTTON_WIDTH,
+                height=2,
                 font=FONTS.BUTTON,
             ).pack(pady=4)
 

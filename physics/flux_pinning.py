@@ -1,22 +1,21 @@
 """마이스너 부상 & 플럭스 피닝 시뮬레이션 (Pygame)."""
 
 import math
-import sys
 import time
 from dataclasses import dataclass, field
 
 import pygame
 
 from config_loader import cfg
-from i18n import t, toggle_locale
-from theme import load_pg_colors, on_theme_change
-from help_overlay import HelpOverlay
-from sound_manager import get_sound_manager
-from replay import ReplayRecorder
-from quit_dialog import confirm_quit
-from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from game_base import finalize_session
+from help_overlay import HelpOverlay
+from i18n import t, toggle_locale
 from logger import get_module_logger
+from quit_dialog import confirm_quit
+from replay import ReplayRecorder
+from sim_speed import apply_speed, cycle_sim_speed, speed_label
+from sound_manager import get_sound_manager
+from theme import load_pg_colors, on_theme_change
 
 _log = get_module_logger("flux_pinning")
 
@@ -27,6 +26,7 @@ FPS = cfg("display", "fps", 60)
 
 # ── 색상 (테마에서 동적 로드) ─────────────────────────
 from theme import get_pg_theme as _get_pg_theme_init
+
 _pg = _get_pg_theme_init()
 BG = _pg.BG
 TEXT_CLR = _pg.TEXT
@@ -39,16 +39,22 @@ del _get_pg_theme_init
 
 
 _COLOR_MAP = {
-    "BG": "BG", "TEXT_CLR": "TEXT",
-    "MAGNET_N": "MAGNET_N", "MAGNET_S": "MAGNET_S",
-    "SC_COLOR": "SC_COLOR", "SC_GLOW": "SC_GLOW",
-    "SUBTEXT_CLR": "SUBTEXT", "WHITE": "WHITE", "INACTIVE_CLR": "INACTIVE",
+    "BG": "BG",
+    "TEXT_CLR": "TEXT",
+    "MAGNET_N": "MAGNET_N",
+    "MAGNET_S": "MAGNET_S",
+    "SC_COLOR": "SC_COLOR",
+    "SC_GLOW": "SC_GLOW",
+    "SUBTEXT_CLR": "SUBTEXT",
+    "WHITE": "WHITE",
+    "INACTIVE_CLR": "INACTIVE",
 }
 
 
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
     load_pg_colors(_COLOR_MAP, globals())
+
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 EQUILIBRIUM_GAP = cfg("flux_pinning", "equilibrium_gap", 65.0)
@@ -57,7 +63,7 @@ DAMPING = cfg("flux_pinning", "damping", 0.88)
 LEVITATION_AMP = cfg("flux_pinning", "levitation_amp", 4.0)
 LEVITATION_FREQ = cfg("flux_pinning", "levitation_freq", 2.0)
 GRAVITY = cfg("flux_pinning", "gravity", 480.0)
-FLOOR_Y = 560.0          # 바닥 Y 좌표 (px)
+FLOOR_Y = 560.0  # 바닥 Y 좌표 (px)
 
 # ── 오브젝트 크기 ────────────────────────────────────
 MAGNET_W, MAGNET_H = 160, 50
@@ -69,9 +75,11 @@ KB_MAGNET_SPEED = 300
 
 # ── 게임 상태 데이터클래스 ────────────────────────────
 
+
 @dataclass
 class FluxPinningState:
     """마이스너 부상 & 플럭스 피닝 게임 상태."""
+
     magnet_x: float = 0.0
     magnet_y: float = 0.0
     sc_x: float = 0.0
@@ -196,12 +204,14 @@ def run_simulation():
             draw_sc_y = gs.sc_y
 
         # 리플레이 기록
-        recorder.record_frame({
-            "magnet": [round(gs.magnet_x, 1), round(gs.magnet_y, 1)],
-            "sc": [round(gs.sc_x, 1), round(draw_sc_y, 1)],
-            "flipped": gs.flipped,
-            "superconducting": gs.superconducting,
-        })
+        recorder.record_frame(
+            {
+                "magnet": [round(gs.magnet_x, 1), round(gs.magnet_y, 1)],
+                "sc": [round(gs.sc_x, 1), round(draw_sc_y, 1)],
+                "flipped": gs.flipped,
+                "superconducting": gs.superconducting,
+            }
+        )
 
         gs.prev_superconducting = gs.superconducting
 
@@ -224,7 +234,8 @@ def run_simulation():
         # 연결선 (스프링 시각화)
         if gs.superconducting:
             pygame.draw.line(
-                screen, SUBTEXT_CLR,
+                screen,
+                SUBTEXT_CLR,
                 (int(gs.magnet_x), int(gs.magnet_y)),
                 (int(gs.sc_x), int(draw_sc_y)),
                 1,
@@ -251,15 +262,22 @@ def run_simulation():
         pygame.display.flip()
 
     play_time = round(time.time() - gs.start_time, 1)
-    finalize_session("flux_pinning", {
-        "play_time": play_time,
-        "superconducting": gs.superconducting,
-        "flipped": gs.flipped,
-    }, recorder=recorder, recorder_meta={"play_time": play_time},
-       snd=snd, theme_callback=_load_theme_colors)
+    finalize_session(
+        "flux_pinning",
+        {
+            "play_time": play_time,
+            "superconducting": gs.superconducting,
+            "flipped": gs.flipped,
+        },
+        recorder=recorder,
+        recorder_meta={"play_time": play_time},
+        snd=snd,
+        theme_callback=_load_theme_colors,
+    )
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
+
 
 def _draw_magnet(screen, cx, cy, flipped, font):
     """자석 (N/S 극 분리 표시)."""

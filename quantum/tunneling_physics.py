@@ -47,6 +47,7 @@ def _calc_tunnel_prob(barrier_width: int) -> float:
 
 # ── 입자 클래스 ──────────────────────────────────────
 
+
 class QuantumParticle:
     """양자 입자 — 중첩 상태 + 터널링."""
 
@@ -84,9 +85,13 @@ class QuantumParticle:
         phase = math.sin(time_ms / 1000.0 * SUPERPOSITION_HZ * 2 * math.pi)
         return math.pi * (1 - phase) / 2  # 0→π 매핑
 
-    def update(self, dt: float, barrier_width: int = BARRIER_WIDTH_DEFAULT,
-               tunnel_prob: float = TUNNEL_PROB_BASE,
-               speed_boost: float = TUNNEL_SPEED_BOOST):
+    def update(
+        self,
+        dt: float,
+        barrier_width: int = BARRIER_WIDTH_DEFAULT,
+        tunnel_prob: float = TUNNEL_PROB_BASE,
+        speed_boost: float = TUNNEL_SPEED_BOOST,
+    ):
         if not self.alive:
             return
 

@@ -3,16 +3,17 @@
 import tkinter as tk
 from tkinter import ttk
 
-import numpy as np
 import matplotlib
+import numpy as np
+
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 # ── 물질별 임계 온도 (°C) ────────────────────────────────
 MATERIALS = {
-    "YBCO (Tc=77K)": -196.0,            # 77 K
-    "Mercury / Hg (Tc=4.2K)": -268.95, # 4.2 K
+    "YBCO (Tc=77K)": -196.0,  # 77 K
+    "Mercury / Hg (Tc=4.2K)": -268.95,  # 4.2 K
 }
 DEFAULT_MATERIAL = "YBCO (Tc=77K)"
 
@@ -62,7 +63,7 @@ class PhaseTransitionWindow(tk.Toplevel):
         self.geometry("780x600")
         self.resizable(False, False)
 
-        self._current_temp = 50.0       # 슬라이더 초기 온도 (°C)
+        self._current_temp = 50.0  # 슬라이더 초기 온도 (°C)
         self._tc = MATERIALS[DEFAULT_MATERIAL]
         self._noise = False
 
@@ -83,25 +84,35 @@ class PhaseTransitionWindow(tk.Toplevel):
         ctrl.pack(fill="x", padx=8, pady=4)
 
         tk.Label(
-            ctrl, text="물질:", font=("Consolas", 10, "bold"),
-            bg="#1e1e2e", fg="#cdd6f4",
+            ctrl,
+            text="물질:",
+            font=("Consolas", 10, "bold"),
+            bg="#1e1e2e",
+            fg="#cdd6f4",
         ).pack(side="left")
 
         self._material_var = tk.StringVar(value=DEFAULT_MATERIAL)
         material_combo = ttk.Combobox(
-            ctrl, textvariable=self._material_var,
+            ctrl,
+            textvariable=self._material_var,
             values=list(MATERIALS.keys()),
-            state="readonly", width=24,
+            state="readonly",
+            width=24,
         )
         material_combo.pack(side="left", padx=(4, 12))
         material_combo.bind("<<ComboboxSelected>>", self._on_material_change)
 
         self._noise_var = tk.BooleanVar(value=False)
         noise_cb = tk.Checkbutton(
-            ctrl, text="노이즈 추가", variable=self._noise_var,
+            ctrl,
+            text="노이즈 추가",
+            variable=self._noise_var,
             command=self._on_noise_toggle,
-            bg="#1e1e2e", fg="#cdd6f4", selectcolor="#45475a",
-            activebackground="#1e1e2e", activeforeground="#cdd6f4",
+            bg="#1e1e2e",
+            fg="#cdd6f4",
+            selectcolor="#45475a",
+            activebackground="#1e1e2e",
+            activeforeground="#cdd6f4",
             font=("Consolas", 10, "bold"),
         )
         noise_cb.pack(side="left", padx=(0, 12))
@@ -111,17 +122,22 @@ class PhaseTransitionWindow(tk.Toplevel):
         slider_frame.pack(fill="x", padx=8, pady=(0, 8))
 
         tk.Label(
-            slider_frame, text="온도 (°C):", font=("Consolas", 10, "bold"),
-            bg="#1e1e2e", fg="#cdd6f4",
+            slider_frame,
+            text="온도 (°C):",
+            font=("Consolas", 10, "bold"),
+            bg="#1e1e2e",
+            fg="#cdd6f4",
         ).pack(side="left")
 
         self._slider = tk.Scale(
             slider_frame,
-            from_=T_RANGE[0], to=T_RANGE[1],
+            from_=T_RANGE[0],
+            to=T_RANGE[1],
             orient="horizontal",
             resolution=0.5,
             length=550,
-            bg="#1e1e2e", fg="#cdd6f4",
+            bg="#1e1e2e",
+            fg="#cdd6f4",
             troughcolor="#45475a",
             highlightthickness=0,
             font=("Consolas", 9),
@@ -145,7 +161,9 @@ class PhaseTransitionWindow(tk.Toplevel):
         ax.set_ylabel("Resistance (a.u.)", color="#cdd6f4", fontsize=10)
         ax.set_title(
             "Superconducting Phase Transition",
-            color="#89b4fa", fontsize=12, fontweight="bold",
+            color="#89b4fa",
+            fontsize=12,
+            fontweight="bold",
         )
 
         # 전체 곡선
@@ -157,8 +175,12 @@ class PhaseTransitionWindow(tk.Toplevel):
         tc_k = _celsius_to_kelvin(self._tc)
         _tk = get_tk_theme()
         ax.axvline(
-            x=self._tc, color=_tk.RED, linestyle="--", linewidth=1,
-            alpha=0.7, label=f"Tc = {self._tc:.1f}°C ({tc_k:.1f}K)",
+            x=self._tc,
+            color=_tk.RED,
+            linestyle="--",
+            linewidth=1,
+            alpha=0.7,
+            label=f"Tc = {self._tc:.1f}°C ({tc_k:.1f}K)",
         )
 
         # 현재 온도 마커 (켈빈 병기)
@@ -169,7 +191,9 @@ class PhaseTransitionWindow(tk.Toplevel):
         ax.annotate(
             f"  {self._current_temp:.1f}°C ({cur_k:.1f}K)\n  R={cur_r:.3f}",
             xy=(self._current_temp, cur_r),
-            fontsize=9, color=marker_color, fontweight="bold",
+            fontsize=9,
+            color=marker_color,
+            fontweight="bold",
         )
 
         # 초전도 / 정상 영역 배경
@@ -177,8 +201,11 @@ class PhaseTransitionWindow(tk.Toplevel):
         ax.axvspan(self._tc, T_RANGE[1], alpha=0.08, color=_tk.RED, label="정상 영역")
 
         ax.legend(
-            loc="upper left", fontsize=8,
-            facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4",
+            loc="upper left",
+            fontsize=8,
+            facecolor="#2a2a3d",
+            edgecolor="#585b70",
+            labelcolor="#cdd6f4",
         )
 
         # ★ X축 반전: 오른쪽(고온 50°C) → 왼쪽(저온 -275°C)  냉각 방향
@@ -212,6 +239,7 @@ class PhaseTransitionWindow(tk.Toplevel):
 def open_phase_transition(master=None):
     """외부에서 호출하는 진입점."""
     from logger import get_module_logger
+
     _log = get_module_logger("phase_transition")
 
     win = PhaseTransitionWindow(master)
@@ -219,20 +247,28 @@ def open_phase_transition(master=None):
     def _on_close():
         try:
             from data_ai.play_logger import get_logger
-            get_logger().log_session("phase_transition", {
-                "material": win._material_var.get(),
-                "last_temp": win._current_temp,
-                "noise": win._noise,
-            })
+
+            get_logger().log_session(
+                "phase_transition",
+                {
+                    "material": win._material_var.get(),
+                    "last_temp": win._current_temp,
+                    "noise": win._noise,
+                },
+            )
         except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("플레이 기록 실패: %s", e)
         try:
             from report import generate_report
-            generate_report("phase_transition", {
-                "material": win._material_var.get(),
-                "last_temp": win._current_temp,
-                "tc": win._tc,
-            })
+
+            generate_report(
+                "phase_transition",
+                {
+                    "material": win._material_var.get(),
+                    "last_temp": win._current_temp,
+                    "tc": win._tc,
+                },
+            )
         except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("보고서 생성 실패: %s", e)
         win.destroy()

@@ -47,36 +47,64 @@ class PlayLogger:
     # 기록 가능한 필드 정의 (모듈별)
     FIELDS = {
         "qubit_chain": [
-            "total_qubits", "collapsed_count", "alive_count",
-            "noise_rate", "cascade_damage",
-            "shield_uses", "heal_uses",
-            "max_stress", "survival_time",
+            "total_qubits",
+            "collapsed_count",
+            "alive_count",
+            "noise_rate",
+            "cascade_damage",
+            "shield_uses",
+            "heal_uses",
+            "max_stress",
+            "survival_time",
         ],
         "tunneling": [
-            "total_attempts", "tunnel_count", "reflect_count",
-            "tunnel_rate", "barrier_width", "tunnel_prob",
+            "total_attempts",
+            "tunnel_count",
+            "reflect_count",
+            "tunnel_rate",
+            "barrier_width",
+            "tunnel_prob",
         ],
         "qec_shield": [
-            "survival_time", "alive_count", "total_qubits",
-            "qec_uses", "heal_uses", "qec_reduction",
+            "survival_time",
+            "alive_count",
+            "total_qubits",
+            "qec_uses",
+            "heal_uses",
+            "qec_reduction",
         ],
         "squid_mines": [
-            "mines_found", "wrong_marks", "total_mines",
-            "sensitivity", "won",
+            "mines_found",
+            "wrong_marks",
+            "total_mines",
+            "sensitivity",
+            "won",
         ],
         "bb84_defense": [
-            "score", "total_sent", "total_errors", "total_safe",
-            "eve_intercepts", "auto_blocks", "manual_blocks",
-            "decoy_sent", "decoy_trapped",
+            "score",
+            "total_sent",
+            "total_errors",
+            "total_safe",
+            "eve_intercepts",
+            "auto_blocks",
+            "manual_blocks",
+            "decoy_sent",
+            "decoy_trapped",
         ],
         "flux_pinning": [
-            "play_time", "superconducting", "flipped",
+            "play_time",
+            "superconducting",
+            "flipped",
         ],
         "phase_transition": [
-            "material", "last_temp", "noise", "tc",
+            "material",
+            "last_temp",
+            "noise",
+            "tc",
         ],
         "phase_transition_sim": [
-            "play_time", "final_temp",
+            "play_time",
+            "final_temp",
         ],
     }
 
@@ -93,7 +121,7 @@ class PlayLogger:
                     df = pd.read_csv(PLAY_LOG_CSV)
                     self.records = df.to_dict("records")
                 else:
-                    with open(PLAY_LOG_CSV, "r", encoding="utf-8") as f:
+                    with open(PLAY_LOG_CSV, encoding="utf-8") as f:
                         reader = csv.DictReader(f)
                         self.records = list(reader)
                 _log.info("기존 기록 %d건 로드", len(self.records))
@@ -109,8 +137,7 @@ class PlayLogger:
             data: 기록할 데이터 딕셔너리
         """
         if module_name not in self.FIELDS:
-            _log.warning("알 수 없는 모듈명: %r (허용: %s)",
-                         module_name, ", ".join(sorted(self.FIELDS)))
+            _log.warning("알 수 없는 모듈명: %r (허용: %s)", module_name, ", ".join(sorted(self.FIELDS)))
 
         record = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -195,9 +222,7 @@ class PlayLogger:
             # CSV 인젝션 방지: 문자열 컬럼 살균화
             safe_df = df.copy()
             for col in safe_df.select_dtypes(include=["object"]).columns:
-                safe_df[col] = safe_df[col].map(
-                    lambda v: _sanitize_csv_value(v) if isinstance(v, str) else v
-                )
+                safe_df[col] = safe_df[col].map(lambda v: _sanitize_csv_value(v) if isinstance(v, str) else v)
 
             try:
                 df.to_excel(PLAY_LOG_XLSX, index=False)

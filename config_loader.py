@@ -181,7 +181,7 @@ def _load() -> dict:
     if _cache is None:
         if os.path.exists(_CONFIG_PATH):
             try:
-                with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
+                with open(_CONFIG_PATH, encoding="utf-8") as f:
                     _cache = json.load(f)
                 _log.info("config.json 로드 완료")
             except (json.JSONDecodeError, OSError) as e:

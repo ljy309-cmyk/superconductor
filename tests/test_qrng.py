@@ -47,10 +47,7 @@ class TestQuantumNoiseSource(unittest.TestCase):
     def test_different_sources(self):
         s1 = QuantumNoiseSource(0)
         s2 = QuantumNoiseSource(1)
-        self.assertTrue(
-            s1._freq != s2._freq or s1._phase != s2._phase,
-            "Different qids should have different params"
-        )
+        self.assertTrue(s1._freq != s2._freq or s1._phase != s2._phase, "Different qids should have different params")
 
     def test_sample_noise_float(self):
         src = QuantumNoiseSource(0)

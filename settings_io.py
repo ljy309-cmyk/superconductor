@@ -6,7 +6,6 @@
     result = import_settings("backup.zip")     # → {"imported": [...], "skipped": [...]}
 """
 
-import json
 import os
 import shutil
 import zipfile
@@ -97,10 +96,7 @@ def import_settings(zip_path: str) -> dict:
                     continue
 
                 # 허용된 파일만 가져오기
-                allowed = any(
-                    member == p or member.startswith(p)
-                    for p in allowed_prefixes
-                )
+                allowed = any(member == p or member.startswith(p) for p in allowed_prefixes)
                 if not allowed:
                     result["skipped"].append(member)
                     _log.warning("허용되지 않은 파일 건너뜀: %s", member)
@@ -127,7 +123,6 @@ def list_exports() -> list[str]:
     if not os.path.isdir(_EXPORT_DIR):
         return []
     return sorted(
-        [os.path.join(_EXPORT_DIR, f) for f in os.listdir(_EXPORT_DIR)
-         if f.endswith(".zip")],
+        [os.path.join(_EXPORT_DIR, f) for f in os.listdir(_EXPORT_DIR) if f.endswith(".zip")],
         reverse=True,
     )

@@ -6,16 +6,22 @@ flux_pinning)가 공유하는 보일러플레이트를 통합합니다.
 
 import pygame
 
-from theme import off_theme_change
 from logger import get_module_logger
+from theme import off_theme_change
 
 _log = get_module_logger("game_base")
 
 
-def finalize_session(mode: str, session_data: dict, *,
-                     recorder=None, recorder_meta=None,
-                     snd=None, theme_callback=None,
-                     extra_cleanup=None):
+def finalize_session(
+    mode: str,
+    session_data: dict,
+    *,
+    recorder=None,
+    recorder_meta=None,
+    snd=None,
+    theme_callback=None,
+    extra_cleanup=None,
+):
     """게임 종료 시 공통 정리 로직.
 
     play_logger · report · achievements 저장 후 리소스를 해제합니다.
@@ -32,6 +38,7 @@ def finalize_session(mode: str, session_data: dict, *,
     # 플레이 기록
     try:
         from data_ai.play_logger import get_logger
+
         get_logger().log_session(mode, session_data)
     except (ImportError, OSError, ValueError, TypeError) as e:
         _log.error("[%s] 플레이 기록 실패: %s", mode, e)
@@ -39,6 +46,7 @@ def finalize_session(mode: str, session_data: dict, *,
     # 보고서 생성
     try:
         from report import generate_report
+
         generate_report(mode, session_data)
     except (ImportError, OSError, ValueError, TypeError) as e:
         _log.error("[%s] 보고서 생성 실패: %s", mode, e)
@@ -46,10 +54,10 @@ def finalize_session(mode: str, session_data: dict, *,
     # 업적 확인
     try:
         from achievements import check_achievements
+
         new_ach = check_achievements(mode, session_data)
         for ach in new_ach:
-            _log.info("[%s] Achievement unlocked: %s — %s",
-                      mode, ach["title"], ach["desc"])
+            _log.info("[%s] Achievement unlocked: %s — %s", mode, ach["title"], ach["desc"])
     except (ImportError, KeyError, TypeError, ValueError) as e:
         _log.error("[%s] 업적 확인 실패: %s", mode, e)
 
@@ -77,6 +85,7 @@ def choose_difficulty_or_quit(screen, font, preset_hud, theme_callback):
         True: 난이도 선택 완료, False: 취소(게임 종료)
     """
     from difficulty_dialog import choose_difficulty
+
     chosen = choose_difficulty(screen, font)
     if chosen is None:
         off_theme_change(theme_callback)

@@ -15,24 +15,31 @@ from dataclasses import dataclass
 import pygame
 
 from config_loader import cfg
-from theme import load_pg_colors, on_theme_change
-from ui.slider import SliderPanel, PANEL_W
-from preset_hud import PresetHUD
+from game_base import choose_difficulty_or_quit, finalize_session
 from help_overlay import HelpOverlay
-from sound_manager import get_sound_manager
-from replay import ReplayRecorder
-from quit_dialog import confirm_quit
-from sim_speed import apply_speed, cycle_sim_speed, speed_label
-from game_base import finalize_session, choose_difficulty_or_quit
 from logger import get_module_logger
+from preset_hud import PresetHUD
+from quit_dialog import confirm_quit
+from replay import ReplayRecorder
 
 # ── 게임 로직 (순수 로직) ────────────────────────────
 from security.squid_logic import (
-    GRID_COLS, GRID_ROWS, CELL_SIZE, GRID_OX, GRID_OY,
-    NUM_MINES, GRAPH_HISTORY,
-    SENSITIVITY_DEFAULT, SENSITIVITY_MIN, SENSITIVITY_MAX, SENSITIVITY_STEP,
+    CELL_SIZE,
+    GRAPH_HISTORY,
+    GRID_COLS,
+    GRID_OX,
+    GRID_OY,
+    GRID_ROWS,
+    SENSITIVITY_DEFAULT,
+    SENSITIVITY_MAX,
+    SENSITIVITY_MIN,
+    SENSITIVITY_STEP,
     SQUIDGame,
 )
+from sim_speed import apply_speed, cycle_sim_speed, speed_label
+from sound_manager import get_sound_manager
+from theme import load_pg_colors, on_theme_change
+from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("squid_mines")
 
@@ -48,26 +55,34 @@ ACCENT = (137, 180, 250)
 GRID_CLR = (69, 71, 90)
 CELL_SAFE = (49, 50, 68)
 CELL_HOVER = (59, 60, 82)
-CELL_MARKED = (166, 227, 161)   # 마킹한 셀 (초록)
-CELL_WRONG = (243, 139, 168)    # 오답 마킹 (빨강)
-MINE_CLR = (249, 226, 175)      # 지뢰 (노랑)
+CELL_MARKED = (166, 227, 161)  # 마킹한 셀 (초록)
+CELL_WRONG = (243, 139, 168)  # 오답 마킹 (빨강)
+MINE_CLR = (249, 226, 175)  # 지뢰 (노랑)
 GRAPH_BG = (24, 24, 37)
-GRAPH_LINE = (203, 166, 247)    # 자기 선속 그래프 (보라)
-GRAPH_PEAK = (243, 139, 168)    # 피크 (빨강)
-SENSOR_CLR = (116, 199, 236)    # 센서 커서 글로우
+GRAPH_LINE = (203, 166, 247)  # 자기 선속 그래프 (보라)
+GRAPH_PEAK = (243, 139, 168)  # 피크 (빨강)
+SENSOR_CLR = (116, 199, 236)  # 센서 커서 글로우
 
 
 _COLOR_MAP = {
-    "BG": "BG", "TEXT_CLR": "TEXT", "ACCENT": "ACCENT_BLUE",
-    "GRID_CLR": "OVERLAY", "CELL_MARKED": "GREEN", "CELL_WRONG": "RED",
-    "GRAPH_BG": "PANEL_BG", "GRAPH_LINE": "ACCENT_PURPLE", "GRAPH_PEAK": "RED",
-    "SENSOR_CLR": "SENSOR_CLR", "WHITE": "WHITE",
+    "BG": "BG",
+    "TEXT_CLR": "TEXT",
+    "ACCENT": "ACCENT_BLUE",
+    "GRID_CLR": "OVERLAY",
+    "CELL_MARKED": "GREEN",
+    "CELL_WRONG": "RED",
+    "GRAPH_BG": "PANEL_BG",
+    "GRAPH_LINE": "ACCENT_PURPLE",
+    "GRAPH_PEAK": "RED",
+    "SENSOR_CLR": "SENSOR_CLR",
+    "WHITE": "WHITE",
 }
 
 
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
     load_pg_colors(_COLOR_MAP, globals())
+
 
 # ── 그래프 렌더링 설정 ────────────────────────────────
 GRAPH_X = 50
@@ -78,14 +93,16 @@ GRAPH_H = 120
 # ── 사운드 (config.json에서 로드) ────────────────────
 BEEP_FREQ = cfg("squid_mines", "beep_freq", 880)
 BEEP_DURATION_MS = cfg("squid_mines", "beep_duration_ms", 60)
-BEEP_INTERVAL_MAX = 1.0       # 최대 간격 (초, intensity=0)
-BEEP_INTERVAL_MIN = 0.08      # 최소 간격 (초, intensity=1)
+BEEP_INTERVAL_MAX = 1.0  # 최대 간격 (초, intensity=0)
+BEEP_INTERVAL_MIN = 0.08  # 최소 간격 (초, intensity=1)
 
 
 # ── 사운드 생성 헬퍼 (미션1) ────────────────────────
 
-def _make_beep_sound(freq: int = BEEP_FREQ, duration_ms: int = BEEP_DURATION_MS,
-                     sample_rate: int = 22050, volume: float = 0.3) -> pygame.mixer.Sound:
+
+def _make_beep_sound(
+    freq: int = BEEP_FREQ, duration_ms: int = BEEP_DURATION_MS, sample_rate: int = 22050, volume: float = 0.3
+) -> pygame.mixer.Sound:
     """사인파 기반 경고 비프음 생성."""
     n_samples = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n_samples)
@@ -100,9 +117,11 @@ def _make_beep_sound(freq: int = BEEP_FREQ, duration_ms: int = BEEP_DURATION_MS,
 
 # ── 게임 루프 상태 데이터클래스 ───────────────────────
 
+
 @dataclass
 class SQUIDMinesState:
     """SQUID 지뢰찾기 게임 루프 상태."""
+
     t: float = 0.0
     beep_timer: float = 0.0
     sound_enabled: bool = True
@@ -117,8 +136,8 @@ class SQUIDMinesState:
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
-def _draw_grid(screen, game: SQUIDGame, hover_cell, font,
-               kb_cell=None):
+
+def _draw_grid(screen, game: SQUIDGame, hover_cell, font, kb_cell=None):
     """그리드 렌더링."""
     for r in range(GRID_ROWS):
         for c in range(GRID_COLS):
@@ -166,9 +185,9 @@ def _draw_sensor_glow(screen, mx: int, my: int, intensity: float, t: float):
     screen.blit(glow, (mx - radius, my - radius))
 
 
-def _draw_flux_graph(screen, game: SQUIDGame, intensity: float,
-                     nearest_dist: float, nearby_count: int,
-                     sensitivity: float, font):
+def _draw_flux_graph(
+    screen, game: SQUIDGame, intensity: float, nearest_dist: float, nearby_count: int, sensitivity: float, font
+):
     """하단 자기 선속 그래프."""
     # 배경
     pygame.draw.rect(screen, GRAPH_BG, (GRAPH_X, GRAPH_Y, GRAPH_W, GRAPH_H))
@@ -229,6 +248,7 @@ def _draw_status(screen, game: SQUIDGame, font, big_font):
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
+
 
 def run_simulation():
     _load_theme_colors()
@@ -405,14 +425,20 @@ def run_simulation():
 
         pygame.display.flip()
 
-    finalize_session("squid_mines", {
-        "mines_found": len(game.marked),
-        "wrong_marks": len(game.wrong),
-        "total_mines": len(game.mines),
-        "sensitivity": sensitivity,
-        "won": game.won,
-    }, recorder=recorder, snd=snd, theme_callback=_load_theme_colors,
-       extra_cleanup=pygame.mixer.quit)
+    finalize_session(
+        "squid_mines",
+        {
+            "mines_found": len(game.marked),
+            "wrong_marks": len(game.wrong),
+            "total_mines": len(game.mines),
+            "sensitivity": sensitivity,
+            "won": game.won,
+        },
+        recorder=recorder,
+        snd=snd,
+        theme_callback=_load_theme_colors,
+        extra_cleanup=pygame.mixer.quit,
+    )
 
 
 def open_squid_mines():

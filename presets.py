@@ -25,6 +25,7 @@ _SAFE_NAME_RE = re.compile(r"^[\w가-힣\s\-]{1,80}$")
 def _clamp_value(sec: str, key: str, value):
     """config 스키마 범위로 값을 클램핑. 범위 초과 시 경고 로그."""
     from config_loader import _SCHEMA
+
     schema = _SCHEMA.get(sec, {}).get(key)
     if schema is None:
         return value
@@ -71,6 +72,7 @@ def apply_preset_to_sliders(preset_name: str, slider_map: dict):
 
 # ── 프로파일 저장/불러오기 ────────────────────────────
 
+
 def _validate_profile_name(name: str) -> bool:
     """프로파일 이름 유효성 검사 (경로 순회 방지)."""
     if not name or not _SAFE_NAME_RE.match(name):
@@ -104,7 +106,7 @@ def load_profile(name: str) -> dict:
     if not os.path.exists(path):
         _log.warning("프로파일 없음: %s", path)
         return {}
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -112,11 +114,7 @@ def list_profiles() -> list[str]:
     """저장된 프로파일 이름 목록."""
     if not os.path.exists(PROFILES_DIR):
         return []
-    return [
-        os.path.splitext(f)[0]
-        for f in os.listdir(PROFILES_DIR)
-        if f.endswith(".json")
-    ]
+    return [os.path.splitext(f)[0] for f in os.listdir(PROFILES_DIR) if f.endswith(".json")]
 
 
 def delete_profile(name: str) -> bool:
@@ -166,7 +164,10 @@ def apply_profile_to_sliders(profile_name: str, sliders: dict):
                 if value < slider.min_val or value > slider.max_val:
                     _log.warning(
                         "프로파일 값 범위 초과: %s=%s (범위 %s~%s), 클램핑됨",
-                        label, value, slider.min_val, slider.max_val,
+                        label,
+                        value,
+                        slider.min_val,
+                        slider.max_val,
                     )
             slider.value = value
     _log.info("프로파일 '%s' 적용 완료", profile_name)
