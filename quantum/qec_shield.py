@@ -10,13 +10,16 @@ import random
 
 import pygame
 
+from achievement_toast import AchievementToast
 from config_loader import cfg
 from game_base import choose_difficulty_or_quit, finalize_session
 from game_summary import draw_game_summary
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
+from perf_monitor import PerfMonitor
 from preset_hud import PresetHUD
+from tutorial import TutorialOverlay
 
 # ── 물리 엔진 (순수 로직) ────────────────────────────
 from quantum.qec_physics import (
@@ -262,6 +265,9 @@ def run_simulation():
     }
     preset_hud = PresetHUD("qec_shield", slider_map)
     help_overlay = HelpOverlay("qec_shield")
+    toast = AchievementToast()
+    tutorial = TutorialOverlay("qec_shield")
+    perf = PerfMonitor(target_fps=FPS)
 
     # ── 사운드 ──
     snd = get_sound_manager()
@@ -290,13 +296,20 @@ def run_simulation():
     if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
 
+    import time as _time
+    start_time = _time.time()
+
     running = True
     while running:
-        dt = clock.tick(FPS) / 1000.0
+        raw_dt = clock.tick(FPS) / 1000.0
+        dt = raw_dt
+        perf.tick(raw_dt)
         anim_t += dt
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
+            if tutorial.handle_event(event):
+                continue
             spanel.handle_event(event)
             preset_hud.handle_event(event)
             help_overlay.handle_event(event)
@@ -482,14 +495,24 @@ def run_simulation():
             screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 40 + i * 16))
 
         preset_hud.draw(screen, font, 10, 50)
+
+        # ── 오버레이 ──
+        toast.update(dt)
+        toast.draw(screen, font)
+        toast.draw_history(screen, font)
         help_overlay.draw(screen, font)
+        tutorial.draw(screen, font)
+        perf.draw_overlay(screen, font, x=WIDTH - 250, y=4)
 
         pygame.display.flip()
 
     # 최종미션: finalize_session으로 통합 정리
+    perf.log_summary()
+    play_time = round(_time.time() - start_time, 1)
     finalize_session(
         "qec_shield",
         {
+            "play_time": play_time,
             "survival_time": round(elapsed, 1),
             "alive_count": sum(1 for n in nodes if not n.collapsed),
             "total_qubits": total,
@@ -498,7 +521,7 @@ def run_simulation():
             "qec_reduction": qec_reduction,
         },
         recorder=recorder,
-        recorder_meta={"survival_time": round(elapsed, 1)},
+        recorder_meta={"play_time": play_time},
         snd=snd,
         theme_callback=_load_theme_colors,
     )

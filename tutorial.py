@@ -165,6 +165,45 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "none",
         },
     ],
+    "qec_shield": [
+        {
+            "title": "QEC Shield — Error Correction",
+            "text": "양자 오류 정정(QEC) 방어막으로 큐비트 네트워크를\n노이즈로부터 보호하는 시뮬레이션입니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "Shield & Heal",
+            "text": "S: QEC 방어막 활성화 (노이즈 감소)\nH: 전체 큐비트 힐링 (stress 감소)",
+            "highlight": "none",
+        },
+        {
+            "title": "Compare Mode",
+            "text": "C: 비교 모드 (QEC/Heal 비활성화)\nQEC 없이 버틴 시간 vs QEC 사용 비교!",
+            "highlight": "none",
+        },
+        {
+            "title": "Controls",
+            "text": "Left/Right: QEC 감쇠 계수 조절\nR: 리셋  |  SPACE: 일시정지\n1/2/3: 난이도 프리셋",
+            "highlight": "none",
+        },
+    ],
+    "gate_builder": [
+        {
+            "title": "Quantum Gate Builder",
+            "text": "양자 회로를 시각적으로 구성하고\n실시간으로 상태 벡터를 확인합니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "Build a Circuit",
+            "text": "팔레트에서 게이트를 클릭 → 와이어를 클릭하여 배치\nCNOT은 제어-타겟 큐비트 자동 연결!",
+            "highlight": "none",
+        },
+        {
+            "title": "Measurement",
+            "text": "Enter: 측정 실행 (히스토그램 갱신)\nTab: 블로흐 구 표시 큐비트 전환\nBackspace: 마지막 게이트 제거",
+            "highlight": "none",
+        },
+    ],
     "grover_search": [
         {
             "title": "Grover's Search Algorithm",

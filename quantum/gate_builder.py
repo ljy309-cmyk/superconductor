@@ -12,11 +12,14 @@ import time
 
 import pygame
 
+from achievement_toast import AchievementToast
 from config_loader import cfg
 from game_base import finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
+from perf_monitor import PerfMonitor
+from tutorial import TutorialOverlay
 from quantum.gate_builder_engine import (
     ALL_GATES,
     GATE_INFO,
@@ -110,6 +113,9 @@ def run_simulation():
     gate_font = pygame.font.SysFont("Consolas", 14, bold=True)
 
     help_overlay = HelpOverlay("gate_builder")
+    toast = AchievementToast()
+    tutorial = TutorialOverlay("gate_builder")
+    perf = PerfMonitor(target_fps=FPS)
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("gate_builder")
@@ -130,9 +136,12 @@ def run_simulation():
         palette_rects[g] = pygame.Rect(px, PALETTE_Y, GATE_SIZE, GATE_SIZE)
 
     while running:
-        clock.tick(FPS)
+        raw_dt = clock.tick(FPS) / 1000.0
+        perf.tick(raw_dt)
 
         for event in pygame.event.get():
+            if tutorial.handle_event(event):
+                continue
             help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
@@ -275,9 +284,17 @@ def run_simulation():
         )
         screen.blit(count_text, (CIRCUIT_X, CIRCUIT_Y + qc.num_qubits * WIRE_SPACING + 10))
 
+        # ── 오버레이 ──
+        toast.update(raw_dt)
+        toast.draw(screen, font)
+        toast.draw_history(screen, font)
         help_overlay.draw(screen, font)
+        tutorial.draw(screen, font)
+        perf.draw_overlay(screen, font, x=WIDTH - 250, y=4)
+
         pygame.display.flip()
 
+    perf.log_summary()
     play_time = round(time.time() - start_time, 1)
     finalize_session(
         "gate_builder",
