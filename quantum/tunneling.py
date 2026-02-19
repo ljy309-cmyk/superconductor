@@ -14,6 +14,7 @@ from config_loader import cfg
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
     draw_bar_pattern as _draw_bar_pattern,
+    draw_circle_pattern as _draw_circle_pattern,
     paginate,
     render_notify,
 )
@@ -43,7 +44,7 @@ from quantum.tunneling_physics import (
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
-from theme import is_reduced_motion, load_pg_colors, on_theme_change
+from theme import is_high_contrast, is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
@@ -136,13 +137,17 @@ def _rebuild_layout(w: int, h: int):
 
 def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     """시뮬레이션 영역 배경."""
+    hc = is_high_contrast()
     pygame.draw.rect(screen, SURFACE_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H))
-    pygame.draw.rect(screen, OVERLAY_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H), 1)
+    border_w = 2 if hc else 1
+    pygame.draw.rect(screen, OVERLAY_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H), border_w)
 
     # 장벽
     bx = BARRIER_X - barrier_width // 2
     pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, barrier_width, SIM_H))
     _draw_bar_pattern(screen, (bx, SIM_TOP, barrier_width, SIM_H), BARRIER_CLR, "mid")
+    if hc:
+        pygame.draw.rect(screen, TEXT_CLR, (bx, SIM_TOP, barrier_width, SIM_H), 1)
 
     # 장벽 라벨
     label = font.render(t("tn_barrier"), True, BG)
@@ -160,6 +165,7 @@ def _draw_particle(screen, p: QuantumParticle, font):
     """입자 렌더링."""
     cx, cy = int(p.x), int(p.y)
     time_ms = pygame.time.get_ticks()
+    hc = is_high_contrast()
 
     # 터널링/반사 플래시
     if p.flash_timer > 0 and not is_reduced_motion():
@@ -169,11 +175,21 @@ def _draw_particle(screen, p: QuantumParticle, font):
         alpha = int(120 * p.flash_timer)
         pygame.draw.circle(glow, (*flash_clr, alpha), (flash_r, flash_r), flash_r)
         screen.blit(glow, (cx - flash_r, cy - flash_r))
+        # 플래시 원에 색맹 보조 패턴
+        tier = "high" if p.tunneled else "mid"
+        _draw_circle_pattern(screen, cx, cy, flash_r, flash_clr, tier)
 
     # 입자 본체 — 터널링 성공 시 흰색, 평상시 파랑
     color = WHITE if (p.tunneled is True and p.flash_timer > 0) else PARTICLE_CLR
     pygame.draw.circle(screen, color, (cx, cy), PARTICLE_RADIUS)
-    pygame.draw.circle(screen, TEXT_CLR, (cx, cy), PARTICLE_RADIUS, 1)
+    outline_w = 2 if hc else 1
+    pygame.draw.circle(screen, TEXT_CLR, (cx, cy), PARTICLE_RADIUS, outline_w)
+
+    # 색맹 보조: 입자 상태별 패턴 (터널링=수평선, 반사=대각선)
+    if p.tunneled is True and p.flash_timer > 0:
+        _draw_circle_pattern(screen, cx, cy, PARTICLE_RADIUS, color, "high")
+    elif p.tunneled is False and p.flash_timer > 0:
+        _draw_circle_pattern(screen, cx, cy, PARTICLE_RADIUS, REFLECT_CLR, "mid")
 
     # 중첩 |0⟩/|1⟩ 텍스트
     state_text = f"|{p.qubit_state(time_ms)}⟩"
@@ -186,24 +202,39 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     L = _layout
     BCX, BCY, BR = L.bloch_cx, L.bloch_cy, L.bloch_r
     time_ms = pygame.time.get_ticks()
+    hc = is_high_contrast()
 
     # 타이틀
     label = title_font.render(t("tn_bloch"), True, ACCENT)
     screen.blit(label, (BCX - label.get_width() // 2, BCY - BR - 40))
 
-    # 구 외곽 (원)
-    pygame.draw.circle(screen, BLOCH_RING, (BCX, BCY), BR, 1)
+    # 구 외곽 (원) — 고대비: 두꺼운 선
+    ring_w = 2 if hc else 1
+    pygame.draw.circle(screen, BLOCH_RING, (BCX, BCY), BR, ring_w)
 
     # 적도 타원
     pygame.draw.ellipse(
         screen,
         BLOCH_RING,
         (BCX - BR, BCY - BR // 4, BR * 2, BR // 2),
-        1,
+        ring_w,
     )
 
-    # 축
-    pygame.draw.line(screen, OVERLAY_CLR, (BCX, BCY - BR - 8), (BCX, BCY + BR + 8), 1)
+    # 축 — 고대비: 두꺼운 선
+    axis_w = 2 if hc else 1
+    pygame.draw.line(screen, OVERLAY_CLR, (BCX, BCY - BR - 8), (BCX, BCY + BR + 8), axis_w)
+
+    # |0⟩ 극점 마커 — 색맹 보조: 수평선 패턴 (터널링=성공과 동일)
+    pole0_y = BCY - BR
+    pole0_r = 5
+    pygame.draw.circle(screen, TUNNEL_FLASH, (BCX, pole0_y), pole0_r)
+    _draw_circle_pattern(screen, BCX, pole0_y, pole0_r, TUNNEL_FLASH, "high")
+
+    # |1⟩ 극점 마커 — 색맹 보조: 대각선 패턴 (반사와 동일)
+    pole1_y = BCY + BR
+    pole1_r = 5
+    pygame.draw.circle(screen, REFLECT_CLR, (BCX, pole1_y), pole1_r)
+    _draw_circle_pattern(screen, BCX, pole1_y, pole1_r, REFLECT_CLR, "mid")
 
     # |0⟩, |1⟩ 라벨
     z0 = font.render("|0⟩", True, TUNNEL_FLASH)
@@ -216,8 +247,13 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     tip_x = BCX + int(BR * 0.4 * math.sin(theta))
     tip_y = BCY - int(BR * math.cos(theta))
 
-    pygame.draw.line(screen, ACCENT, (BCX, BCY), (tip_x, tip_y), 2)
-    pygame.draw.circle(screen, ACCENT, (tip_x, tip_y), 6)
+    vec_w = 3 if hc else 2
+    pygame.draw.line(screen, ACCENT, (BCX, BCY), (tip_x, tip_y), vec_w)
+    tip_r = 7 if hc else 6
+    pygame.draw.circle(screen, ACCENT, (tip_x, tip_y), tip_r)
+    # 색맹 보조: 상태 벡터 끝점에 θ 기반 패턴
+    tip_tier = "high" if theta < math.pi / 2 else "mid"
+    _draw_circle_pattern(screen, tip_x, tip_y, tip_r, ACCENT, tip_tier)
 
     # 현재 상태 텍스트
     state_label = f"|{'0' if theta < math.pi / 2 else '1'}⟩  θ={math.degrees(theta):.0f}°"
