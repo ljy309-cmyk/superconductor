@@ -121,7 +121,9 @@
     "qa_bell_violation": true,
     "qa_ghz_consistency": 0.9,
     "qa_ghz_rounds": 100,
-    "all_modules_count": 6
+    "all_modules_count": 6,
+    "shor_large_number": 100,
+    "shor_speed_run_sec": 30
   },
   "entanglement": {
     "chsh_shots": 200,

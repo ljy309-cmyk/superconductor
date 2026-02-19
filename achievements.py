@@ -35,6 +35,8 @@ _T = {
     "qa_ghz_consistency": cfg("achievements", "qa_ghz_consistency", 0.9),
     "qa_ghz_rounds": cfg("achievements", "qa_ghz_rounds", 100),
     "all_modules": cfg("achievements", "all_modules_count", 6),
+    "shor_large_number": cfg("achievements", "shor_large_number", 100),
+    "shor_speed_run_sec": cfg("achievements", "shor_speed_run_sec", 30),
 }
 
 # ── 업적 정의 ───────────────────────────────────────────────
@@ -213,6 +215,34 @@ ACHIEVEMENTS = [
         "condition": lambda d: (
             d.get("ghz_consistency_rate", 0) >= _T["qa_ghz_consistency"]
             and d.get("ghz_rounds", 0) >= _T["qa_ghz_rounds"]
+        ),
+    },
+    # Shor's Algorithm
+    {
+        "id": "shor_first_factorization",
+        "module": "shor_algorithm",
+        "title": "Quantum Factorizer",
+        "desc": "Shor 알고리즘으로 첫 소인수분해에 성공했습니다!",
+        "icon": "F",
+        "condition": lambda d: d.get("numbers_factored", 0) >= 1,
+    },
+    {
+        "id": "shor_large_number",
+        "module": "shor_algorithm",
+        "title": "Big Number Breaker",
+        "desc": f"{_T['shor_large_number']} 이상의 큰 수를 소인수분해했습니다!",
+        "icon": "N",
+        "condition": lambda d: d.get("largest_factored", 0) >= _T["shor_large_number"],
+    },
+    {
+        "id": "shor_speed_run",
+        "module": "shor_algorithm",
+        "title": "Speed Cracker",
+        "desc": f"{_T['shor_speed_run_sec']}초 내에 소인수분해를 완료했습니다!",
+        "icon": "Z",
+        "condition": lambda d: (
+            d.get("numbers_factored", 0) >= 1
+            and d.get("play_time", 999) <= _T["shor_speed_run_sec"]
         ),
     },
     # 플럭스 피닝

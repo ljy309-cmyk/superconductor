@@ -837,11 +837,22 @@ def run_simulation():
 
     perf.log_summary()
 
+    # 가장 큰 소인수분해 성공 수 추적
+    largest = 0
+    if ui.shor.factors:
+        largest = ui.shor.number
+    for h in ui.shor.attempt_history:
+        if h.get("reason") == "success":
+            n = h.get("factors", (0, 0))
+            if isinstance(n, tuple) and len(n) == 2:
+                largest = max(largest, n[0] * n[1])
+
     session_data = {
         "play_time": round(time.time() - ui.start_time, 1),
         "numbers_factored": ui.numbers_factored,
         "total_steps": ui.total_steps,
         "last_number": ui.shor.number,
+        "largest_factored": largest,
     }
 
     finalize_session(
