@@ -21,16 +21,13 @@ from i18n import t, toggle_locale
 from logger import get_module_logger
 from perf_monitor import PerfMonitor
 from quantum.grover_search_engine import (
-    PHASE_DESCRIPTIONS,
     GroverPhase,
     GroverState,
     get_phase_description,
     get_quantum_advantage_message,
-    grover_run_full,
     grover_step,
     reset_state,
     get_probabilities,
-    target_probability,
 )
 from presets import get_preset
 from quit_dialog import confirm_quit
