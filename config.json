@@ -267,6 +267,12 @@
     "decoy_chance": 0.15,
     "decoy_error_mult": 2.0
   },
+  "shor": {
+    "max_number": 10000,
+    "qft_precision_bits": 8,
+    "max_period_attempts": 20,
+    "mod_exp_steps": 32
+  },
   "theme": "dark",
   "colorblind_mode": false,
   "font_scale": 1.0,
