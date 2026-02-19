@@ -102,6 +102,53 @@ NODE_RADIUS = cfg("qubit_chain", "node_radius", 28)
 PULSE_MAX = 8  # 글로우 펄스 최대 크기
 
 
+# ── 레이아웃 ─────────────────────────────────────────
+
+
+class Layout:
+    """해상도 기반 레이아웃 좌표 계산.
+
+    기준 해상도 900×600에 대한 비례식으로 좌표를 산출합니다.
+    """
+
+    def __init__(self, w: int = 900, h: int = 600):
+        self.W = w
+        self.H = h
+        sx = w / 900
+        sy = h / 600
+
+        # 네트워크 중심
+        self.net_cx = w // 2
+        self.net_cy = h // 2 + int(20 * sy)
+        self.ring_r = int(cfg("qubit_chain", "ring_radius", 150) * min(sx, sy))
+
+        # 하중 바 패널
+        self.panel_x = int(15 * sx)
+        self.panel_y = int(50 * sy)
+
+        # HUD (방어막 상태)
+        self.hud_x = int(720 * sx)
+        self.hud_y = int(50 * sy)
+
+        # 타이틀
+        self.title_y = int(12 * sy)
+
+        # 하단 힌트
+        self.hint_y = h - int(70 * sy)
+
+        # 퍼포먼스
+        self.perf_x = w - int(250 * sx)
+
+
+_layout = Layout()
+
+
+def _rebuild_layout(w: int, h: int):
+    """리사이즈 시 레이아웃 재계산."""
+    global _layout
+    _layout = Layout(w, h)
+
+
 # ── 게임 상태 데이터클래스 ────────────────────────────
 
 
@@ -202,8 +249,9 @@ class QubitNode:
 
 def _build_network() -> list[QubitNode]:
     """큐비트 네트워크 생성 (육각형 + 중앙)."""
-    cx, cy = WIDTH // 2, HEIGHT // 2 + 20
-    ring_r = cfg("qubit_chain", "ring_radius", 150)
+    L = _layout
+    cx, cy = L.net_cx, L.net_cy
+    ring_r = L.ring_r
     nodes: list[QubitNode] = []
 
     # 중앙 노드
@@ -315,7 +363,7 @@ def run_simulation():
     _load_theme_colors()
     on_theme_change(_load_theme_colors)
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption(t("game_title_qubit_chain"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
@@ -445,6 +493,19 @@ def run_simulation():
                     toggle_locale()
                 elif event.key == pygame.K_g:
                     toast.toggle_history()
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode(
+                    (event.w, event.h), pygame.RESIZABLE)
+                _rebuild_layout(event.w - PANEL_W, event.h)
+                # 네트워크 노드 위치 재계산
+                L = _layout
+                cx_new, cy_new = L.net_cx, L.net_cy
+                ring_r_new = L.ring_r
+                nodes[0].x, nodes[0].y = cx_new, cy_new
+                for i in range(6):
+                    angle = math.radians(60 * i - 90)
+                    nodes[i + 1].x = cx_new + ring_r_new * math.cos(angle)
+                    nodes[i + 1].y = cy_new + ring_r_new * math.sin(angle)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 for n in nodes:
@@ -537,8 +598,9 @@ def run_simulation():
             screen.blit(overlay, (0, 0))
 
         # 타이틀
+        L = _layout
         title_surf = title_font.render(t("game_title_qubit_chain"), True, ACCENT)
-        screen.blit(title_surf, (WIDTH // 2 - title_surf.get_width() // 2, 12))
+        screen.blit(title_surf, (L.W // 2 - title_surf.get_width() // 2, L.title_y))
 
         # 얽힘 연결선
         drawn_pairs = set()
@@ -554,14 +616,14 @@ def run_simulation():
             _draw_node(screen, n, gs.t, font, gs.shield_active, focused=(i == gs.kb_focus))
 
         # 하중 바 패널
-        panel_x, panel_y = 15, 50
+        panel_x, panel_y = L.panel_x, L.panel_y
         panel_label = info_font.render(t("qc_stress_panel"), True, ACCENT)
         screen.blit(panel_label, (panel_x, panel_y - 16))
         for i, n in enumerate(nodes):
             _draw_stress_bar(screen, n, font, panel_x, panel_y + i * 18)
 
         # 이벤트 로그
-        log_x = 15
+        log_x = L.panel_x
         log_y = panel_y + len(nodes) * 18 + 20
         log_label = info_font.render(t("qc_event_log"), True, ACCENT)
         screen.blit(log_label, (log_x, log_y - 16))
@@ -571,7 +633,7 @@ def run_simulation():
             screen.blit(surf, (log_x, log_y + i * 15))
 
         # 방어막 상태 HUD (미션3)
-        hud_x, hud_y = 720, 50
+        hud_x, hud_y = L.hud_x, L.hud_y
         if gs.shield_active:
             shield_txt = info_font.render(t("qc_shield_on_timer", time=gs.shield_timer), True, SHIELD_GLOW)
             screen.blit(shield_txt, (hud_x, hud_y))
@@ -617,7 +679,7 @@ def run_simulation():
         ]
         for i, hint in enumerate(hints):
             surf = info_font.render(hint, True, TEXT_CLR)
-            screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 70 + i * 16))
+            screen.blit(surf, (L.W // 2 - surf.get_width() // 2, L.hint_y + i * 16))
 
         # 최종보스미션: 생존 시간 갱신
         all_collapsed = all(n.collapsed for n in nodes)
@@ -673,7 +735,7 @@ def run_simulation():
 
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, info_font)
-        perf.draw_overlay(screen, info_font, x=WIDTH - 250, y=4)
+        perf.draw_overlay(screen, info_font, x=L.perf_x, y=4)
 
         pygame.display.flip()
 

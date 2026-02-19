@@ -83,6 +83,47 @@ def _load_theme_colors():
     STATE_COLORS[QubitState.COLLAPSED] = globals()["COLLAPSED_CLR"]
 
 
+# ── 레이아웃 ─────────────────────────────────────────
+
+
+class Layout:
+    """해상도 기반 레이아웃 좌표 계산.
+
+    기준 해상도 900×600에 대한 비례식으로 좌표를 산출합니다.
+    """
+
+    def __init__(self, w: int = 900, h: int = 600):
+        self.W = w
+        self.H = h
+        sx = w / 900
+        sy = h / 600
+
+        # Shield HUD
+        self.hud_x = int(660 * sx)
+        self.hud_y = int(120 * sy)
+        self.hud_w = int(210 * sx)
+        self.hud_h = int(260 * sy)
+
+        # 스코어보드
+        self.score_x = int(660 * sx)
+        self.score_y = int(400 * sy)
+
+        # 타이틀
+        self.title_y = int(12 * sy)
+
+        # 하단 힌트
+        self.hint_y = h - int(40 * sy)
+
+
+_layout = Layout()
+
+
+def _rebuild_layout(w: int, h: int):
+    """리사이즈 시 레이아웃 재계산."""
+    global _layout
+    _layout = Layout(w, h)
+
+
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
 STATE_COLORS = {
@@ -137,8 +178,9 @@ def _draw_shield_hud(
     big_font,
 ):
     """QEC 방어막 상태 HUD."""
-    hud_x, hud_y = 660, 120
-    hud_w, hud_h = 210, 260
+    L = _layout
+    hud_x, hud_y = L.hud_x, L.hud_y
+    hud_w, hud_h = L.hud_w, L.hud_h
 
     pygame.draw.rect(screen, PANEL_BG, (hud_x, hud_y, hud_w, hud_h), border_radius=8)
     pygame.draw.rect(screen, ACCENT, (hud_x, hud_y, hud_w, hud_h), 2, border_radius=8)
@@ -217,7 +259,8 @@ def _draw_shield_hud(
 
 def _draw_scoreboard(screen, elapsed: float, alive_count: int, total: int, qec_uses: int, heal_uses: int, font):
     """경과 시간 · 생존 큐비트 수 · QEC/Heal 사용 횟수."""
-    sx, sy = 660, 400
+    L = _layout
+    sx, sy = L.score_x, L.score_y
     lines = [
         (t("qec_elapsed"), f"{elapsed:.1f}s"),
         (t("qec_alive_qubits"), f"{alive_count} / {total}"),
@@ -238,7 +281,7 @@ def run_simulation():
     _load_theme_colors()
     on_theme_change(_load_theme_colors)
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption(t("game_title_qec_shield"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
@@ -302,6 +345,10 @@ def run_simulation():
             help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode(
+                    (event.w, event.h), pygame.RESIZABLE)
+                _rebuild_layout(event.w - PANEL_W, event.h)
             elif event.type == pygame.KEYDOWN:
                 snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE:
@@ -410,8 +457,9 @@ def run_simulation():
         screen.fill(BG)
 
         # 타이틀
+        L = _layout
         title = title_font.render(t("game_title_qec_shield"), True, ACCENT)
-        screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 12))
+        screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
         # 방어막 활성 시 전체 배경 글로우
         if shield_active:
@@ -464,7 +512,7 @@ def run_simulation():
         # 비교 모드 표시
         if compare_mode:
             cmp_surf = big_font.render(t("comparison_hint"), True, WARNING_CLR)
-            screen.blit(cmp_surf, (WIDTH // 2 - cmp_surf.get_width() // 2, 8))
+            screen.blit(cmp_surf, (L.W // 2 - cmp_surf.get_width() // 2, 8))
 
         # 안내
         hints = [
@@ -479,7 +527,7 @@ def run_simulation():
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
-            screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 40 + i * 16))
+            screen.blit(surf, (L.W // 2 - surf.get_width() // 2, L.hint_y + i * 16))
 
         preset_hud.draw(screen, font, 10, 50)
         help_overlay.draw(screen, font)

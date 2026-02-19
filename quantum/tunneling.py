@@ -75,9 +75,40 @@ def _load_theme_colors():
     load_pg_colors(_COLOR_MAP, globals())
 
 
-# ── 블로흐 구 레이아웃 ────────────────────────────────
-BLOCH_CX, BLOCH_CY = 730, 280
-BLOCH_R = 110
+# ── 레이아웃 ─────────────────────────────────────────
+
+
+class Layout:
+    """해상도 기반 레이아웃 좌표 계산.
+
+    기준 해상도 900×600에 대한 비례식으로 좌표를 산출합니다.
+    """
+
+    def __init__(self, w: int = 900, h: int = 600):
+        self.W = w
+        self.H = h
+        sx = w / 900
+        sy = h / 600
+
+        # 블로흐 구
+        self.bloch_cx = int(730 * sx)
+        self.bloch_cy = int(280 * sy)
+        self.bloch_r = int(110 * min(sx, sy))
+
+        # 타이틀
+        self.title_y = int(12 * sy)
+
+        # 하단 힌트
+        self.hint_y = h - int(52 * sy)
+
+
+_layout = Layout()
+
+
+def _rebuild_layout(w: int, h: int):
+    """리사이즈 시 레이아웃 재계산."""
+    global _layout
+    _layout = Layout(w, h)
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
@@ -131,50 +162,53 @@ def _draw_particle(screen, p: QuantumParticle, font):
 
 def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     """블로흐 구 시각화."""
+    L = _layout
+    BCX, BCY, BR = L.bloch_cx, L.bloch_cy, L.bloch_r
     time_ms = pygame.time.get_ticks()
 
     # 타이틀
     label = title_font.render(t("tn_bloch"), True, ACCENT)
-    screen.blit(label, (BLOCH_CX - label.get_width() // 2, BLOCH_CY - BLOCH_R - 40))
+    screen.blit(label, (BCX - label.get_width() // 2, BCY - BR - 40))
 
     # 구 외곽 (원)
-    pygame.draw.circle(screen, BLOCH_RING, (BLOCH_CX, BLOCH_CY), BLOCH_R, 1)
+    pygame.draw.circle(screen, BLOCH_RING, (BCX, BCY), BR, 1)
 
     # 적도 타원
     pygame.draw.ellipse(
         screen,
         BLOCH_RING,
-        (BLOCH_CX - BLOCH_R, BLOCH_CY - BLOCH_R // 4, BLOCH_R * 2, BLOCH_R // 2),
+        (BCX - BR, BCY - BR // 4, BR * 2, BR // 2),
         1,
     )
 
     # 축
-    pygame.draw.line(screen, OVERLAY_CLR, (BLOCH_CX, BLOCH_CY - BLOCH_R - 8), (BLOCH_CX, BLOCH_CY + BLOCH_R + 8), 1)
+    pygame.draw.line(screen, OVERLAY_CLR, (BCX, BCY - BR - 8), (BCX, BCY + BR + 8), 1)
 
     # |0⟩, |1⟩ 라벨
     z0 = font.render("|0⟩", True, TUNNEL_FLASH)
     z1 = font.render("|1⟩", True, REFLECT_CLR)
-    screen.blit(z0, (BLOCH_CX + 8, BLOCH_CY - BLOCH_R - 18))
-    screen.blit(z1, (BLOCH_CX + 8, BLOCH_CY + BLOCH_R + 4))
+    screen.blit(z0, (BCX + 8, BCY - BR - 18))
+    screen.blit(z1, (BCX + 8, BCY + BR + 4))
 
     # 상태 벡터 (θ 기반)
     theta = p.superposition_alpha(time_ms)
-    tip_x = BLOCH_CX + int(BLOCH_R * 0.4 * math.sin(theta))
-    tip_y = BLOCH_CY - int(BLOCH_R * math.cos(theta))
+    tip_x = BCX + int(BR * 0.4 * math.sin(theta))
+    tip_y = BCY - int(BR * math.cos(theta))
 
-    pygame.draw.line(screen, ACCENT, (BLOCH_CX, BLOCH_CY), (tip_x, tip_y), 2)
+    pygame.draw.line(screen, ACCENT, (BCX, BCY), (tip_x, tip_y), 2)
     pygame.draw.circle(screen, ACCENT, (tip_x, tip_y), 6)
 
     # 현재 상태 텍스트
     state_label = f"|{'0' if theta < math.pi / 2 else '1'}⟩  θ={math.degrees(theta):.0f}°"
     sl = font.render(state_label, True, TEXT_CLR)
-    screen.blit(sl, (BLOCH_CX - sl.get_width() // 2, BLOCH_CY + BLOCH_R + 26))
+    screen.blit(sl, (BCX - sl.get_width() // 2, BCY + BR + 26))
 
 
 def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PROB_BASE):
     """통계 패널."""
-    stats_x = BLOCH_CX - BLOCH_R
-    stats_y = BLOCH_CY + BLOCH_R + 60
+    L = _layout
+    stats_x = L.bloch_cx - L.bloch_r
+    stats_y = L.bloch_cy + L.bloch_r + 60
 
     lines = [
         (t("tn_attempts", count=p.total_attempts), TEXT_CLR),
@@ -198,7 +232,7 @@ def run_simulation():
     _load_theme_colors()
     on_theme_change(_load_theme_colors)
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption(t("game_title_tunneling"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
@@ -268,6 +302,10 @@ def run_simulation():
                     sl_barrier.value = sl_barrier.value - 10
                 elif event.key == pygame.K_l:
                     toggle_locale()
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode(
+                    (event.w, event.h), pygame.RESIZABLE)
+                _rebuild_layout(event.w - PANEL_W, event.h)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 # 클릭으로 입자 재발사
                 particle.reset()
@@ -305,8 +343,9 @@ def run_simulation():
         screen.fill(BG)
 
         # 타이틀
+        L = _layout
         t_surf = big_font.render(t("game_title_tunneling"), True, ACCENT)
-        screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
+        screen.blit(t_surf, (L.W // 2 - t_surf.get_width() // 2, L.title_y))
 
         # 시뮬레이션 영역
         _draw_sim_area(screen, font, barrier_width)
@@ -337,7 +376,7 @@ def run_simulation():
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
-            screen.blit(surf, (SIM_LEFT, HEIGHT - 52 + i * 16))
+            screen.blit(surf, (SIM_LEFT, L.hint_y + i * 16))
 
         preset_hud.draw(screen, font)
         help_overlay.draw(screen, font)

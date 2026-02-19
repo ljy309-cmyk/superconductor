@@ -92,6 +92,98 @@ MODE_TELEPORT = 2
 _MODE_TAB_KEYS = ["ent_tab_bell", "ent_tab_chsh", "ent_tab_teleport"]
 
 
+# ── 레이아웃 ─────────────────────────────────────────
+
+
+class Layout:
+    """해상도 기반 레이아웃 좌표 계산.
+
+    기준 해상도 900×600에 대한 비례식으로 좌표를 산출합니다.
+    """
+
+    def __init__(self, w: int = 900, h: int = 600):
+        self.W = w
+        self.H = h
+        sx = w / 900
+        sy = h / 600
+
+        # 마진
+        self.margin = int(20 * sx)
+
+        # 상단 탭
+        self.tab_y = int(8 * sy)
+        self.tab_h = int(28 * sy)
+        self.tab_w = (w - 2 * self.margin) // 3
+        self.tab_label_y = int(14 * sy)
+
+        # 공통 제목
+        self.title_y = int(45 * sy)
+        self.desc_y = int(72 * sy)
+
+        # ── Bell 모드 ──
+        self.bell_qubit_y = int(180 * sy)
+        self.bell_qubit_offset = int(140 * sx)
+        self.bell_qubit_r = int(35 * min(sx, sy))
+        self.bell_prob_y = int(260 * sy)
+        self.bell_prob_start = int(80 * sx)
+        self.bell_bar_w = int(140 * sx)
+        self.bell_bar_gap = int(30 * sx)
+        self.bell_bar_max_h = int(80 * sy)
+        self.bell_stat_y = int(400 * sy)
+        self.bell_recent_x = int(550 * sx)
+        self.bell_sel_y = h - int(100 * sy)
+        self.bell_sel_start = int(120 * sx)
+        self.bell_sel_gap = int(170 * sx)
+        self.bell_sel_w = int(150 * sx)
+        self.bell_sel_h = int(28 * sy)
+
+        # ── CHSH 모드 ──
+        self.chsh_alice_x = int(200 * sx)
+        self.chsh_bob_x = int(700 * sx)
+        self.chsh_mid_y = int(180 * sy)
+        self.chsh_qubit_r = int(30 * min(sx, sy))
+        self.chsh_res_y = int(270 * sy)
+        self.chsh_corr_x = int(80 * sx)
+        self.chsh_col_w = int(120 * sx)
+        self.chsh_gauge_w = int(500 * sx)
+        self.chsh_gauge_h = int(20 * sy)
+        self.chsh_hist_y = int(460 * sy)
+        self.chsh_hist_bar_w = int(50 * sx)
+
+        # ── Teleport 모드 ──
+        self.tp_steps_y = int(75 * sy)
+        self.tp_step_start = int(60 * sx)
+        self.tp_step_gap = int(138 * sx)
+        self.tp_step_w = int(130 * sx)
+        self.tp_step_h = int(22 * sy)
+        self.tp_qubit_y = int(170 * sy)
+        self.tp_input_x = int(150 * sx)
+        self.tp_bob_x = w - int(150 * sx)
+        self.tp_qubit_r = int(30 * min(sx, sy))
+        self.tp_bloch_r = int(40 * min(sx, sy))
+        self.tp_pv_y = int(310 * sy)
+        self.tp_pv_start = int(60 * sx)
+        self.tp_pv_gap = int(100 * sx)
+        self.tp_pv_max_h = int(50 * sy)
+        self.tp_log_y = int(420 * sy)
+        self.tp_log_x = int(60 * sx)
+
+        # 하단 힌트
+        self.hint_y = h - int(38 * sy)
+
+        # 퍼포먼스
+        self.perf_x = w - int(250 * sx)
+
+
+_layout = Layout()
+
+
+def _rebuild_layout(w: int, h: int):
+    """리사이즈 시 레이아웃 재계산."""
+    global _layout
+    _layout = Layout(w, h)
+
+
 @dataclass
 class EntanglementState:
     """얽힘 시뮬레이션 전체 상태."""
@@ -238,6 +330,7 @@ def _draw_bloch_mini(screen, cx, cy, radius, alpha, beta, font,
 
 def _draw_bell_mode(screen, gs, font, title_font, info_font):
     """벨 상태 모드 렌더링."""
+    L = _layout
     bell_name = BELL_LABELS[gs.bell_selected]
     state = BELL_STATES[bell_name]
     probs = bell_probabilities(state)
@@ -245,21 +338,24 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
     # 제목
     title = title_font.render(
         t("ent_bell_title", name=bell_name), True, ACCENT)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 45))
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     desc = info_font.render(BELL_DESCRIPTIONS[bell_name], True, PURPLE)
-    screen.blit(desc, (WIDTH // 2 - desc.get_width() // 2, 72))
+    screen.blit(desc, (L.W // 2 - desc.get_width() // 2, L.desc_y))
 
     # Alice & Bob 큐비트
-    alice_x, alice_y = WIDTH // 2 - 140, 180
-    bob_x, bob_y = WIDTH // 2 + 140, 180
+    alice_x = L.W // 2 - L.bell_qubit_offset
+    alice_y = L.bell_qubit_y
+    bob_x = L.W // 2 + L.bell_qubit_offset
+    bob_y = L.bell_qubit_y
+    qr = L.bell_qubit_r
 
-    _draw_qubit_sphere(screen, alice_x, alice_y, 35, "A", ACCENT,
+    _draw_qubit_sphere(screen, alice_x, alice_y, qr, "A", ACCENT,
                        title_font, gs.t)
-    _draw_qubit_sphere(screen, bob_x, bob_y, 35, "B", PURPLE,
+    _draw_qubit_sphere(screen, bob_x, bob_y, qr, "B", PURPLE,
                        title_font, gs.t)
-    _draw_entanglement_line(screen, alice_x + 35, alice_y,
-                            bob_x - 35, bob_y, gs.t)
+    _draw_entanglement_line(screen, alice_x + qr, alice_y,
+                            bob_x - qr, bob_y, gs.t)
 
     lbl_a = info_font.render("Alice", True, ACCENT)
     lbl_b = info_font.render("Bob", True, PURPLE)
@@ -267,12 +363,14 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
     screen.blit(lbl_b, (bob_x - lbl_b.get_width() // 2, bob_y + 42))
 
     # 확률 분포
-    prob_y = 260
+    prob_y = L.bell_prob_y
     prob_labels = ["|00⟩", "|01⟩", "|10⟩", "|11⟩"]
     prob_colors = [GREEN, ACCENT, PURPLE, RED]
-    bar_w = 140
+    bar_w = L.bell_bar_w
+    bar_gap = L.bell_bar_gap
+    max_h = L.bell_bar_max_h
     for i, (p, lbl, clr) in enumerate(zip(probs, prob_labels, prob_colors)):
-        bx = 80 + i * (bar_w + 30)
+        bx = L.bell_prob_start + i * (bar_w + bar_gap)
         by = prob_y
 
         # 라벨
@@ -280,7 +378,6 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
         screen.blit(ls, (bx + bar_w // 2 - ls.get_width() // 2, by))
 
         # 세로 바
-        max_h = 80
         bar_h = int(max_h * p)
         bar_top = by + 18 + (max_h - bar_h)
         pygame.draw.rect(screen, OVERLAY_CLR,
@@ -296,21 +393,21 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
                          by + 18 + max_h + 4))
 
     # 측정 통계
-    stat_y = 400
+    stat_y = L.bell_stat_y
     stat_title = info_font.render(
         t("ent_bell_measurements", count=gs.bell_total), True, ACCENT)
-    screen.blit(stat_title, (80, stat_y))
+    screen.blit(stat_title, (L.bell_prob_start, stat_y))
 
     if gs.bell_total > 0:
         counts = [gs.bell_counts["00"], gs.bell_counts["01"],
                   gs.bell_counts["10"], gs.bell_counts["11"]]
-        _draw_bar_chart(screen, 80, stat_y + 22, 400, 100,
+        _draw_bar_chart(screen, L.bell_prob_start, stat_y + 22, 400, 100,
                         counts, prob_colors, prob_labels, info_font)
 
     # 최근 측정 결과 표시
     if gs.bell_measurements:
         recent = gs.bell_measurements[-10:]
-        rx = 550
+        rx = L.bell_recent_x
         ry = stat_y
         r_title = info_font.render(t("ent_bell_recent"), True, YELLOW)
         screen.blit(r_title, (rx, ry))
@@ -319,23 +416,25 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
             screen.blit(ms, (rx + 55 + i * 35, ry))
 
     # 벨 상태 선택 가이드
-    sel_y = HEIGHT - 100
+    sel_y = L.bell_sel_y
     for i, name in enumerate(BELL_LABELS):
         is_sel = (i == gs.bell_selected)
         clr = ACCENT if is_sel else OVERLAY_CLR
-        bx = 120 + i * 170
-        pygame.draw.rect(screen, clr, (bx, sel_y, 150, 28), 0 if is_sel else 1,
-                         border_radius=4)
+        bx = L.bell_sel_start + i * L.bell_sel_gap
+        pygame.draw.rect(screen, clr,
+                         (bx, sel_y, L.bell_sel_w, L.bell_sel_h),
+                         0 if is_sel else 1, border_radius=4)
         key_s = info_font.render(f"[{i + 1}] |{name}⟩", True,
                                  BG if is_sel else TEXT_CLR)
-        screen.blit(key_s, (bx + 75 - key_s.get_width() // 2,
+        screen.blit(key_s, (bx + L.bell_sel_w // 2 - key_s.get_width() // 2,
                             sel_y + 6))
 
 
 def _draw_chsh_mode(screen, gs, font, title_font, info_font):
     """CHSH 부등식 모드 렌더링."""
+    L = _layout
     title = title_font.render(t("ent_chsh_title"), True, ACCENT)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 45))
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     # 설명
     desc_lines = [
@@ -344,18 +443,20 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
     ]
     for i, line in enumerate(desc_lines):
         ds = info_font.render(line, True, TEXT_CLR)
-        screen.blit(ds, (WIDTH // 2 - ds.get_width() // 2, 72 + i * 16))
+        screen.blit(ds, (L.W // 2 - ds.get_width() // 2, L.desc_y + i * 16))
 
     # Alice & Bob
-    alice_x, bob_x = 200, 700
-    mid_y = 180
+    alice_x = L.chsh_alice_x
+    bob_x = L.chsh_bob_x
+    mid_y = L.chsh_mid_y
+    qr = L.chsh_qubit_r
 
-    _draw_qubit_sphere(screen, alice_x, mid_y, 30, "A", ACCENT,
+    _draw_qubit_sphere(screen, alice_x, mid_y, qr, "A", ACCENT,
                        font, gs.t)
-    _draw_qubit_sphere(screen, bob_x, mid_y, 30, "B", PURPLE,
+    _draw_qubit_sphere(screen, bob_x, mid_y, qr, "B", PURPLE,
                        font, gs.t)
-    _draw_entanglement_line(screen, alice_x + 30, mid_y,
-                            bob_x - 30, mid_y, gs.t)
+    _draw_entanglement_line(screen, alice_x + qr, mid_y,
+                            bob_x - qr, mid_y, gs.t)
 
     # 측정 각도 표시
     angles_a = ["0°", "45°"]
@@ -368,7 +469,9 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
     screen.blit(b_lbl, (bob_x - 60, mid_y + 40))
 
     # 결과 표시
-    res_y = 270
+    res_y = L.chsh_res_y
+    corr_x = L.chsh_corr_x
+    col_w = L.chsh_col_w
     if gs.chsh_result:
         e_mat = gs.chsh_result["E"]
         s_val = gs.chsh_result["S"]
@@ -376,7 +479,7 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
 
         # 상관 행렬
         e_title = info_font.render(t("ent_chsh_corr_matrix"), True, YELLOW)
-        screen.blit(e_title, (80, res_y))
+        screen.blit(e_title, (corr_x, res_y))
 
         headers = ["", "b1=22.5°", "b2=67.5°"]
         rows = [
@@ -385,29 +488,29 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         ]
         for col_i, h in enumerate(headers):
             hs = info_font.render(h, True, TEXT_CLR)
-            screen.blit(hs, (80 + col_i * 120, res_y + 20))
+            screen.blit(hs, (corr_x + col_i * col_w, res_y + 20))
         for row_i, row in enumerate(rows):
             for col_i, cell in enumerate(row):
                 cs = info_font.render(cell, True, ACCENT if col_i > 0 else TEXT_CLR)
-                screen.blit(cs, (80 + col_i * 120, res_y + 40 + row_i * 18))
+                screen.blit(cs, (corr_x + col_i * col_w, res_y + 40 + row_i * 18))
 
         # S 값
         s_y = res_y + 100
         s_clr = RED if violated else GREEN
         s_txt = title_font.render(f"S = {s_val:+.4f}", True, s_clr)
-        screen.blit(s_txt, (WIDTH // 2 - s_txt.get_width() // 2, s_y))
+        screen.blit(s_txt, (L.W // 2 - s_txt.get_width() // 2, s_y))
 
         verdict = (t("ent_chsh_violated") if violated
                    else t("ent_chsh_not_violated"))
         v_clr = RED if violated else GREEN
         v_surf = info_font.render(verdict, True, v_clr)
-        screen.blit(v_surf, (WIDTH // 2 - v_surf.get_width() // 2, s_y + 28))
+        screen.blit(v_surf, (L.W // 2 - v_surf.get_width() // 2, s_y + 28))
 
         # S값 게이지
         gauge_y = s_y + 60
-        gauge_w = 500
-        gauge_x = WIDTH // 2 - gauge_w // 2
-        gauge_h = 20
+        gauge_w = L.chsh_gauge_w
+        gauge_x = L.W // 2 - gauge_w // 2
+        gauge_h = L.chsh_gauge_h
 
         pygame.draw.rect(screen, OVERLAY_CLR,
                          (gauge_x, gauge_y, gauge_w, gauge_h))
@@ -436,21 +539,22 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
 
     elif gs.chsh_running:
         run_txt = title_font.render(t("ent_chsh_running"), True, YELLOW)
-        screen.blit(run_txt, (WIDTH // 2 - run_txt.get_width() // 2, res_y + 40))
+        screen.blit(run_txt, (L.W // 2 - run_txt.get_width() // 2, res_y + 40))
     else:
         hint = info_font.render(t("ent_chsh_press_space"), True, TEXT_CLR)
-        screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, res_y + 40))
+        screen.blit(hint, (L.W // 2 - hint.get_width() // 2, res_y + 40))
 
     # S 값 히스토리
     if gs.chsh_history:
-        hist_y = 460
+        hist_y = L.chsh_hist_y
         hist_title = info_font.render(
             t("ent_chsh_history", count=len(gs.chsh_history)), True, ACCENT)
-        screen.blit(hist_title, (80, hist_y))
+        screen.blit(hist_title, (corr_x, hist_y))
 
         # 미니 히스토리 바
+        hist_bar_w = L.chsh_hist_bar_w
         for i, s_val in enumerate(gs.chsh_history[-15:]):
-            bx = 80 + i * 50
+            bx = corr_x + i * hist_bar_w
             by = hist_y + 20
             s_abs = abs(s_val)
             bar_h = int(40 * min(s_abs / 3.0, 1.0))
@@ -463,20 +567,21 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
 
 def _draw_teleport_mode(screen, gs, font, title_font, info_font):
     """양자 텔레포테이션 모드 렌더링."""
+    L = _layout
     title = title_font.render(t("ent_tp_title"), True, ACCENT)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 45))
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     ts = gs.teleport
     step = ts.step
     step_name = ts.step_names[min(step, 5)]
 
     # 단계 표시
-    steps_y = 75
+    steps_y = L.tp_steps_y
     step_labels = [t("ent_tp_step_prepare"), t("ent_tp_step_bell_pair"),
                    t("ent_tp_step_entangle"), t("ent_tp_step_measure"),
                    t("ent_tp_step_classical"), t("ent_tp_step_correct")]
     for i, sl in enumerate(step_labels):
-        sx = 60 + i * 138
+        sx = L.tp_step_start + i * L.tp_step_gap
         is_current = (i == min(step, 5))
         is_done = (i < step)
         if is_done:
@@ -490,76 +595,79 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
             bg_clr = (*OVERLAY_CLR, 30)
 
         # 배경
-        step_surf = pygame.Surface((130, 22), pygame.SRCALPHA)
+        step_surf = pygame.Surface((L.tp_step_w, L.tp_step_h), pygame.SRCALPHA)
         step_surf.fill(bg_clr)
         screen.blit(step_surf, (sx, steps_y))
-        pygame.draw.rect(screen, clr, (sx, steps_y, 130, 22), 1,
-                         border_radius=3)
+        pygame.draw.rect(screen, clr, (sx, steps_y, L.tp_step_w, L.tp_step_h),
+                         1, border_radius=3)
         ss = info_font.render(f"{i + 1}. {sl}", True, clr)
-        screen.blit(ss, (sx + 65 - ss.get_width() // 2, steps_y + 3))
+        screen.blit(ss, (sx + L.tp_step_w // 2 - ss.get_width() // 2,
+                         steps_y + 3))
 
     # 큐비트 시각화 (3개: Input, Alice, Bob)
-    q_y = 170
-    input_x = 150
-    alice_x = WIDTH // 2
-    bob_x = WIDTH - 150
+    q_y = L.tp_qubit_y
+    input_x = L.tp_input_x
+    alice_x = L.W // 2
+    bob_x = L.tp_bob_x
+    qr = L.tp_qubit_r
+    br = L.tp_bloch_r
 
     # Input qubit
     if step <= 2:
-        _draw_qubit_sphere(screen, input_x, q_y, 30, "ψ", YELLOW,
+        _draw_qubit_sphere(screen, input_x, q_y, qr, "ψ", YELLOW,
                            font, gs.t)
         il = info_font.render(t("ent_tp_input"), True, YELLOW)
         screen.blit(il, (input_x - il.get_width() // 2, q_y + 36))
         # 블로흐
-        _draw_bloch_mini(screen, input_x, q_y + 110, 40,
+        _draw_bloch_mini(screen, input_x, q_y + 110, br,
                          ts.alpha, ts.beta, info_font, t("ent_tp_input_state"))
     elif step >= 3:
         # 측정된 상태
         m0, m1 = ts.measurement_result
         m_lbl = f"|{m0}{m1}⟩" if step >= 3 else "?"
-        _draw_qubit_sphere(screen, input_x, q_y, 30, m_lbl, RED,
+        _draw_qubit_sphere(screen, input_x, q_y, qr, m_lbl, RED,
                            font, gs.t if step == 3 else 0)
         il = info_font.render(t("ent_tp_measured"), True, RED)
         screen.blit(il, (input_x - il.get_width() // 2, q_y + 36))
 
     # Alice
     a_clr = ACCENT if step >= 1 else OVERLAY_CLR
-    _draw_qubit_sphere(screen, alice_x, q_y, 30, "A", a_clr, font,
+    _draw_qubit_sphere(screen, alice_x, q_y, qr, "A", a_clr, font,
                        gs.t if step >= 1 else 0)
     al = info_font.render("Alice", True, a_clr)
     screen.blit(al, (alice_x - al.get_width() // 2, q_y + 36))
 
     # Bob
     b_clr = PURPLE if step >= 1 else OVERLAY_CLR
-    _draw_qubit_sphere(screen, bob_x, q_y, 30, "B", b_clr, font,
+    _draw_qubit_sphere(screen, bob_x, q_y, qr, "B", b_clr, font,
                        gs.t if step >= 1 else 0)
     bl = info_font.render("Bob", True, b_clr)
     screen.blit(bl, (bob_x - bl.get_width() // 2, q_y + 36))
 
     # 얽힘 연결선
     if 1 <= step <= 3:
-        _draw_entanglement_line(screen, alice_x + 30, q_y,
-                                bob_x - 30, q_y, gs.t, PURPLE)
+        _draw_entanglement_line(screen, alice_x + qr, q_y,
+                                bob_x - qr, q_y, gs.t, PURPLE)
     if 2 <= step <= 3:
-        _draw_entanglement_line(screen, input_x + 30, q_y,
-                                alice_x - 30, q_y, gs.t, YELLOW)
+        _draw_entanglement_line(screen, input_x + qr, q_y,
+                                alice_x - qr, q_y, gs.t, YELLOW)
 
     # 고전 채널 (파선)
     if step >= 4:
         dash_y = q_y - 10
         for dx in range(0, bob_x - alice_x - 60, 15):
-            px = alice_x + 30 + dx
+            px = alice_x + qr + dx
             alpha = max(0, min(255, int(200 * (1 - abs(
                 math.sin(gs.t * 2 + dx * 0.05))))))
             pygame.draw.line(screen, (*YELLOW, alpha),
                              (px, dash_y), (px + 8, dash_y), 2)
         cc_lbl = info_font.render(t("ent_tp_classical_channel"), True, YELLOW)
-        screen.blit(cc_lbl, (WIDTH // 2 - cc_lbl.get_width() // 2,
+        screen.blit(cc_lbl, (L.W // 2 - cc_lbl.get_width() // 2,
                               dash_y - 16))
 
     # Bob 최종 상태 블로흐
     if step >= 6:
-        _draw_bloch_mini(screen, bob_x, q_y + 110, 40,
+        _draw_bloch_mini(screen, bob_x, q_y + 110, br,
                          ts.bob_alpha, ts.bob_beta, info_font,
                          t("ent_tp_bob_state"))
         fid_clr = GREEN if ts.fidelity > 0.99 else YELLOW
@@ -569,16 +677,16 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
 
     # 확률 분포 (3큐비트 상태벡터)
     if 0 < step < 6:
-        pv_y = 310
+        pv_y = L.tp_pv_y
         pv_title = info_font.render(t("ent_tp_state_vector"), True, ACCENT)
-        screen.blit(pv_title, (60, pv_y))
+        screen.blit(pv_title, (L.tp_pv_start, pv_y))
 
         probs = [abs(a) ** 2 for a in ts.state_vector]
         labels_3q = [f"|{i:03b}⟩" for i in range(8)]
+        max_h = L.tp_pv_max_h
         for i, (p, lbl) in enumerate(zip(probs, labels_3q)):
-            bx = 60 + i * 100
+            bx = L.tp_pv_start + i * L.tp_pv_gap
             by = pv_y + 20
-            max_h = 50
             bar_h = int(max_h * p)
 
             ls = info_font.render(lbl, True, TEXT_CLR)
@@ -599,13 +707,13 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
                                  by - 14))
 
     # 프로토콜 로그
-    log_y = 420
+    log_y = L.tp_log_y
     log_title = info_font.render(t("ent_tp_protocol_log"), True, ACCENT)
-    screen.blit(log_title, (60, log_y))
+    screen.blit(log_title, (L.tp_log_x, log_y))
     for i, msg in enumerate(gs.teleport_log[-6:]):
         clr = GREEN if "Fidelity" in msg else TEXT_CLR
         ms = info_font.render(msg, True, clr)
-        screen.blit(ms, (60, log_y + 18 + i * 15))
+        screen.blit(ms, (L.tp_log_x, log_y + 18 + i * 15))
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
@@ -615,7 +723,7 @@ def run_simulation():
     _load_theme_colors()
     on_theme_change(_load_theme_colors)
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption(t("game_title_entanglement"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 13)
@@ -736,6 +844,11 @@ def run_simulation():
                         gs.reset_teleport()
                         snd.play("click")
 
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode(
+                    (event.w, event.h), pygame.RESIZABLE)
+                _rebuild_layout(event.w, event.h)
+
         # ── 레코딩 ──
         if not gs.paused:
             recorder.record_frame({
@@ -747,18 +860,22 @@ def run_simulation():
             })
 
         # ── 렌더링 ──
+        L = _layout
         screen.fill(BG)
 
         # 상단: 모드 탭
+        tab_start = L.margin
         for i, key in enumerate(_MODE_TAB_KEYS):
-            tab_x = 20 + i * 280
+            tab_x = tab_start + i * L.tab_w
             is_sel = (i == gs.mode)
             tab_clr = ACCENT if is_sel else OVERLAY_CLR
             pygame.draw.rect(screen, tab_clr,
-                             (tab_x, 8, 260, 28), 0 if is_sel else 1,
-                             border_radius=4)
+                             (tab_x, L.tab_y, L.tab_w - 4, L.tab_h),
+                             0 if is_sel else 1, border_radius=4)
             ts_text = font.render(t(key), True, BG if is_sel else TEXT_CLR)
-            screen.blit(ts_text, (tab_x + 130 - ts_text.get_width() // 2, 14))
+            screen.blit(ts_text, (tab_x + (L.tab_w - 4) // 2
+                                  - ts_text.get_width() // 2,
+                                  L.tab_label_y))
 
         # 모드별 렌더링
         if gs.mode == MODE_BELL:
@@ -786,8 +903,8 @@ def run_simulation():
             ]
         for i, hint in enumerate(hints):
             hs = info_font.render(hint, True, TEXT_CLR)
-            screen.blit(hs, (WIDTH // 2 - hs.get_width() // 2,
-                             HEIGHT - 38 + i * 16))
+            screen.blit(hs, (L.W // 2 - hs.get_width() // 2,
+                             L.hint_y + i * 16))
 
         # 오버레이
         toast.update(dt)
@@ -795,7 +912,7 @@ def run_simulation():
         toast.draw_history(screen, info_font)
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, info_font)
-        perf.draw_overlay(screen, info_font, x=WIDTH - 250, y=4)
+        perf.draw_overlay(screen, info_font, x=L.perf_x, y=4)
 
         pygame.display.flip()
 
