@@ -8,6 +8,7 @@ import math
 
 import pygame
 
+from achievement_toast import AchievementToast
 from config_loader import cfg
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
@@ -19,6 +20,7 @@ from game_base import choose_difficulty_or_quit, finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
+from perf_monitor import PerfMonitor
 from preset_hud import PresetHUD
 
 # ── 물리 엔진 (순수 로직) ────────────────────────────
@@ -41,6 +43,7 @@ from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
 from theme import is_reduced_motion, load_pg_colors, on_theme_change
+from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("tunneling")
@@ -113,6 +116,9 @@ class Layout:
 
         # 하단 힌트
         self.hint_y = h - int(52 * sy)
+
+        # 성능 모니터
+        self.perf_x = w - int(250 * sx)
 
 
 _layout = Layout()
@@ -278,6 +284,11 @@ def run_simulation():
     # ── 리플레이 ──
     recorder = ReplayRecorder("tunneling")
 
+    # ── 업적 / 튜토리얼 / 성능 모니터 ──
+    toast = AchievementToast()
+    tutorial = TutorialOverlay("tunneling")
+    perf = PerfMonitor(target_fps=FPS)
+
     barrier_width = BARRIER_WIDTH_DEFAULT
     tunnel_prob = _calc_tunnel_prob(barrier_width)
 
@@ -285,7 +296,7 @@ def run_simulation():
     notify_msg = ""
     notify_timer = 0.0
     history_page = 0
-    event_log: list[str] = []
+    event_log: list[tuple[str, bool]] = []  # (message, is_tunnel)
 
     def _notify(msg: str, duration: float = 2.0):
         nonlocal notify_msg, notify_timer
@@ -302,6 +313,8 @@ def run_simulation():
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
+            if tutorial.handle_event(event):
+                continue
             panel.handle_event(event)
             preset_hud.handle_event(event)
             help_overlay.handle_event(event)
@@ -359,10 +372,27 @@ def run_simulation():
             if particle.total_attempts > prev_attempts:
                 n = particle.total_attempts
                 if particle.tunneled is True:
-                    event_log.append(t("tn_notify_tunneled", n=n))
+                    event_log.append((t("tn_notify_tunneled", n=n), True))
                     _notify(t("tn_notify_tunneled", n=n), 1.0)
                 elif particle.tunneled is False:
-                    event_log.append(t("tn_notify_reflected", n=n))
+                    event_log.append((t("tn_notify_reflected", n=n), False))
+                    _notify(t("tn_notify_reflected", n=n), 1.0)
+
+                # 실시간 업적 체크
+                try:
+                    from achievements import check_achievements
+
+                    new_ach = check_achievements(
+                        "tunneling",
+                        {
+                            "tunnel_count": particle.tunnel_count,
+                            "total_attempts": particle.total_attempts,
+                            "tunnel_rate": particle.tunnel_count / max(particle.total_attempts, 1),
+                        },
+                    )
+                    toast.show_many(new_ach)
+                except (ImportError, KeyError, TypeError) as e:
+                    _log.warning("실시간 업적 확인 실패: %s", e)
 
             # ── 사운드 ──
             if particle.tunneled is True and particle.flash_timer > 0.5:
@@ -371,6 +401,7 @@ def run_simulation():
                 snd.play("tunnel_reflect")
 
             preset_hud.update(dt)
+            perf.tick(dt)
 
             recorder.record_frame(
                 {
@@ -409,8 +440,8 @@ def run_simulation():
                 title_text += f"  ({history_page + 1}/{total_pages})"
             lt = font.render(title_text, True, ACCENT)
             screen.blit(lt, (L.log_x, L.log_y))
-            for li, entry in enumerate(page_items):
-                clr = TUNNEL_FLASH if "Tunnel" in entry or "터널링" in entry else TEXT_CLR
+            for li, (entry, is_tunnel) in enumerate(page_items):
+                clr = TUNNEL_FLASH if is_tunnel else TEXT_CLR
                 es = font.render(f"  {entry}", True, clr)
                 screen.blit(es, (L.log_x, L.log_y + 16 + li * 14))
 
@@ -440,10 +471,18 @@ def run_simulation():
                           L.W // 2, L.notify_y)
 
         preset_hud.draw(screen, font)
+
+        toast.update(dt)
+        toast.draw(screen, font)
+        toast.draw_history(screen, font)
+
         help_overlay.draw(screen, font)
+        tutorial.draw(screen, font)
+        perf.draw_overlay(screen, font, x=L.perf_x, y=4)
 
         pygame.display.flip()
 
+    perf.log_summary()
     rate = particle.tunnel_count / max(particle.total_attempts, 1)
     finalize_session(
         "tunneling",

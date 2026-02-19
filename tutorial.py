@@ -70,8 +70,23 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "center",
         },
         {
+            "title": "Bloch Sphere",
+            "text": "오른쪽 블로흐 구는 큐비트의 중첩 상태를 보여줍니다.\n벡터가 |0⟩과 |1⟩ 사이를 오갑니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Barrier & Probability",
+            "text": "장벽이 두꺼울수록 터널링 확률이 지수적으로 감소합니다.\n슬라이더로 장벽 두께를 조절해 보세요!",
+            "highlight": "none",
+        },
+        {
+            "title": "Statistics",
+            "text": "시도 횟수, 터널링/반사 수, 성공률을 추적합니다.\n업적을 달성하면 토스트 알림이 나타납니다!",
+            "highlight": "none",
+        },
+        {
             "title": "Controls",
-            "text": "클릭: 입자 재발사\nUp/Down: 속도 조절\nLeft/Right: 장벽 두께",
+            "text": "클릭: 입자 재발사  |  Space: 일시정지\nUp/Down: 속도 조절  |  Left/Right: 장벽 두께\nR: 리셋  |  L: 언어 전환  |  T: 튜토리얼",
             "highlight": "none",
         },
     ],
