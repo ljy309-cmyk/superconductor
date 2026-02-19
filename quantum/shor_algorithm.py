@@ -55,6 +55,7 @@ AUTO_BATCH_SIZE = cfg("shor", "auto_batch_size", 1)
 RSA_DEFAULT_DIFFICULTY = cfg("shor", "rsa_default_difficulty", 0)
 RSA_CRACK_SPEED = cfg("shor", "rsa_crack_speed", 0.15)
 BAR_ANIM_INTERVAL = cfg("shor", "bar_anim_interval", 0.03)
+HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ────────────────────────
 BG = (30, 30, 46)
@@ -265,6 +266,9 @@ class UIState:
 
     # 진행률 (최고치 추적 — RETRY 역행 방지)
     progress_high: float = 0.0
+
+    # 시도 히스토리 페이지네이션
+    history_page: int = 0
 
     # 막대 애니메이션 (하나씩 나타나는 효과)
     mod_exp_anim_count: int = 0   # 현재 표시할 막대 수
@@ -602,18 +606,9 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
         result = title_font.render(f"{shor.number} is PRIME", True, RED)
         screen.blit(result, (L.W // 2 - result.get_width() // 2, L.result_y))
 
-    # 시도 히스토리
+    # 시도 히스토리 (페이지네이션)
     if shor.attempt_history:
-        hy = L.history_y
-        hist_title = info_font.render(t("shor_attempt_history"), True, ACCENT)
-        screen.blit(hist_title, (L.margin, hy))
-        for i, h in enumerate(shor.attempt_history[-4:]):
-            reason = h.get("reason", "")
-            clr = GREEN if reason == "success" else YELLOW
-            hs = info_font.render(
-                f"  #{h['attempt']}: a={h['a']}, r={h.get('r','?')} → {reason}",
-                True, clr)
-            screen.blit(hs, (L.margin, hy + 16 + i * 14))
+        _draw_attempt_history(screen, ui, info_font, L.margin, L.history_y)
 
     # 입력 필드 (DONE 또는 INPUT 상태일 때)
     if shor.phase in (ShorPhase.INPUT, ShorPhase.DONE, ShorPhase.SUCCESS):
@@ -811,6 +806,48 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
     screen.blit(hint, (L.W // 2 - hint.get_width() // 2, L.rsa_hint_y))
 
 
+def _draw_attempt_history(screen, ui, font, x, y):
+    """시도 히스토리 (페이지네이션: PgUp/PgDn)."""
+    history = ui.shor.attempt_history
+    total = len(history)
+    total_pages = max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
+
+    # 페이지 범위 클램핑
+    ui.history_page = max(0, min(ui.history_page, total_pages - 1))
+    page = ui.history_page
+
+    start = page * HISTORY_PAGE_SIZE
+    end = min(start + HISTORY_PAGE_SIZE, total)
+    page_items = history[start:end]
+
+    # 타이틀 + 페이지 표시
+    if total_pages > 1:
+        title_text = f"{t('shor_attempt_history')}  ({page + 1}/{total_pages})"
+    else:
+        title_text = t("shor_attempt_history")
+    hist_title = font.render(title_text, True, ACCENT)
+    screen.blit(hist_title, (x, y))
+
+    # 페이지 화살표 (여러 페이지일 때만)
+    if total_pages > 1:
+        arrow_x = x + hist_title.get_width() + 8
+        if page > 0:
+            arr_l = font.render("◀", True, ACCENT)
+            screen.blit(arr_l, (arrow_x, y))
+            arrow_x += arr_l.get_width() + 4
+        if page < total_pages - 1:
+            arr_r = font.render("▶", True, ACCENT)
+            screen.blit(arr_r, (arrow_x, y))
+
+    for i, h in enumerate(page_items):
+        reason = h.get("reason", "")
+        clr = GREEN if reason == "success" else YELLOW
+        hs = font.render(
+            f"  #{h['attempt']}: a={h['a']}, r={h.get('r', '?')} → {reason}",
+            True, clr)
+        screen.blit(hs, (x, y + 16 + i * 14))
+
+
 def _draw_input_field(screen, ui, font, x, y):
     """숫자 입력 필드."""
     label = font.render(t("shor_input_label"), True, TEXT_CLR)
@@ -969,6 +1006,12 @@ def run_simulation():
                         pygame.K_2: "normal",
                         pygame.K_3: "hard",
                     }[event.key], snd)
+
+                # ── 히스토리 페이지네이션 ──
+                elif event.key == pygame.K_PAGEUP:
+                    ui.history_page = max(0, ui.history_page - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    ui.history_page += 1  # 클램핑은 렌더링 시 수행
 
                 # ── Step 모드 키 ──
                 elif ui.mode == MODE_STEP:
@@ -1224,6 +1267,7 @@ def _submit_input(ui, snd):
         if n >= 2:
             reset_state(ui.shor, n)
             shor_step(ui.shor)  # INPUT → CLASSICAL_PRECHECK
+            ui.history_page = 0
             snd.play("click")
     except ValueError:
         pass
@@ -1231,6 +1275,7 @@ def _submit_input(ui, snd):
 
 def _on_mode_change(ui):
     """모드 전환 시 초기화."""
+    ui.history_page = 0
     if ui.mode == MODE_RSA:
         setup_rsa_demo(ui.shor, ui.rsa_difficulty)
         ui.rsa_phase = 0
