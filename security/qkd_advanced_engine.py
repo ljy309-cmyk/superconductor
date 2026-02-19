@@ -922,7 +922,11 @@ def bb84_round(state: BB84State, eve_chance: float = 0.0) -> dict:
         n_match = len(state._recent_errors)
         n_err = sum(state._recent_errors)
         state.qber = n_err / n_match if n_match > 0 else 0.0
-    state.eve_detected = state.qber > 0.11 and state.basis_match_rounds > 10
+    if state.basis_match_rounds > 10:
+        cumulative_qber = state.error_count / state.basis_match_rounds
+        state.eve_detected = cumulative_qber > 0.11
+    else:
+        state.eve_detected = False
 
     # QBER 히스토리 기록 (10 라운드마다)
     if state.total_rounds % 10 == 0 and state.basis_match_rounds > 0:
