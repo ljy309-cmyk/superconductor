@@ -165,6 +165,43 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "none",
         },
     ],
+    "shor_algorithm": [
+        {
+            "title": "Shor's Factoring Algorithm",
+            "text": "양자 컴퓨터로 큰 수를 소인수분해하는 알고리즘입니다.\nRSA 암호를 위협하는 핵심 양자 알고리즘!",
+            "highlight": "center",
+        },
+        {
+            "title": "Step 1: Classical Precheck",
+            "text": "먼저 짝수, 소수, 소수 거듭제곱 여부를 검사합니다.\n이 경우 양자 계산 없이 즉시 결과를 얻습니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Step 2: Modular Exponentiation",
+            "text": "임의의 a를 골라 a^x mod N을 계산합니다.\n이 수열의 주기(period)를 찾는 것이 핵심입니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Step 3: QFT & Measurement",
+            "text": "양자 푸리에 변환(QFT)으로 주기를 추출합니다.\n측정 결과에서 연분수 전개로 주기 r을 복원합니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Step 4: Factor Extraction",
+            "text": "gcd(a^(r/2) ± 1, N)으로 소인수를 추출합니다.\n실패하면 다른 a로 재시도합니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "3 Modes",
+            "text": "Tab 키로 모드를 전환합니다:\n1) Step-by-Step  2) Auto Run  3) RSA Threat",
+            "highlight": "none",
+        },
+        {
+            "title": "Controls",
+            "text": "SPACE: 다음 단계/시작  |  N: 새 수 입력  |  R: 리셋\nTab: 모드 전환  |  ↑↓: 난이도/속도 조절",
+            "highlight": "none",
+        },
+    ],
     "grover_search": [
         {
             "title": "Grover's Search Algorithm",

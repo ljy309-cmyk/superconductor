@@ -37,6 +37,7 @@ from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
 from theme import load_pg_colors, on_theme_change
+from tutorial import TutorialOverlay
 
 _log = get_module_logger("shor_algorithm")
 
@@ -668,6 +669,7 @@ def run_simulation():
     shor_step(ui.shor)  # INPUT → CLASSICAL_PRECHECK
 
     help_overlay = HelpOverlay("shor_algorithm")
+    tutorial = TutorialOverlay("shor_algorithm")
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("shor_algorithm")
@@ -701,6 +703,8 @@ def run_simulation():
 
         # ── 이벤트 ──
         for event in pygame.event.get():
+            if tutorial.handle_event(event):
+                continue
             help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
@@ -870,6 +874,7 @@ def run_simulation():
         toast.draw(screen, info_font)
         toast.draw_history(screen, info_font)
         help_overlay.draw(screen, info_font)
+        tutorial.draw(screen, font)
         perf.draw_overlay(screen, info_font, x=WIDTH - 250, y=4)
 
         pygame.display.flip()
