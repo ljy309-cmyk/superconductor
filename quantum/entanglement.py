@@ -89,7 +89,7 @@ def _load_theme_colors():
 MODE_BELL = 0
 MODE_CHSH = 1
 MODE_TELEPORT = 2
-MODE_NAMES = ["Bell States", "CHSH Inequality", "Teleportation"]
+_MODE_TAB_KEYS = ["ent_tab_bell", "ent_tab_chsh", "ent_tab_teleport"]
 
 
 @dataclass
@@ -244,7 +244,7 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
 
     # 제목
     title = title_font.render(
-        f"Bell State: |{bell_name}⟩", True, ACCENT)
+        t("ent_bell_title", name=bell_name), True, ACCENT)
     screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 45))
 
     desc = info_font.render(BELL_DESCRIPTIONS[bell_name], True, PURPLE)
@@ -298,7 +298,7 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
     # 측정 통계
     stat_y = 400
     stat_title = info_font.render(
-        f"Measurements: {gs.bell_total}", True, ACCENT)
+        t("ent_bell_measurements", count=gs.bell_total), True, ACCENT)
     screen.blit(stat_title, (80, stat_y))
 
     if gs.bell_total > 0:
@@ -312,7 +312,7 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
         recent = gs.bell_measurements[-10:]
         rx = 550
         ry = stat_y
-        r_title = info_font.render("Recent:", True, YELLOW)
+        r_title = info_font.render(t("ent_bell_recent"), True, YELLOW)
         screen.blit(r_title, (rx, ry))
         for i, (a, b) in enumerate(recent):
             ms = info_font.render(f"|{a}{b}⟩", True, TEXT_CLR)
@@ -334,13 +334,13 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
 
 def _draw_chsh_mode(screen, gs, font, title_font, info_font):
     """CHSH 부등식 모드 렌더링."""
-    title = title_font.render("CHSH Inequality Experiment", True, ACCENT)
+    title = title_font.render(t("ent_chsh_title"), True, ACCENT)
     screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 45))
 
     # 설명
     desc_lines = [
-        "Classical limit: |S| ≤ 2.0  |  Quantum limit: |S| ≤ 2√2 ≈ 2.828",
-        "Bell state |Φ+⟩ with optimal angles → S ≈ 2.828 (violates classical!)",
+        t("ent_chsh_desc1"),
+        t("ent_chsh_desc2"),
     ]
     for i, line in enumerate(desc_lines):
         ds = info_font.render(line, True, TEXT_CLR)
@@ -361,9 +361,9 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
     angles_a = ["0°", "45°"]
     angles_b = ["22.5°", "67.5°"]
     a_lbl = info_font.render(
-        f"Alice angles: {', '.join(angles_a)}", True, ACCENT)
+        t("ent_chsh_alice_angles", angles=', '.join(angles_a)), True, ACCENT)
     b_lbl = info_font.render(
-        f"Bob angles: {', '.join(angles_b)}", True, PURPLE)
+        t("ent_chsh_bob_angles", angles=', '.join(angles_b)), True, PURPLE)
     screen.blit(a_lbl, (alice_x - 60, mid_y + 40))
     screen.blit(b_lbl, (bob_x - 60, mid_y + 40))
 
@@ -375,7 +375,7 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         violated = gs.chsh_result["violated"]
 
         # 상관 행렬
-        e_title = info_font.render("Correlation Matrix E(a,b):", True, YELLOW)
+        e_title = info_font.render(t("ent_chsh_corr_matrix"), True, YELLOW)
         screen.blit(e_title, (80, res_y))
 
         headers = ["", "b1=22.5°", "b2=67.5°"]
@@ -397,8 +397,8 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         s_txt = title_font.render(f"S = {s_val:+.4f}", True, s_clr)
         screen.blit(s_txt, (WIDTH // 2 - s_txt.get_width() // 2, s_y))
 
-        verdict = ("VIOLATED! (Quantum)" if violated
-                   else "Not violated (Classical)")
+        verdict = (t("ent_chsh_violated") if violated
+                   else t("ent_chsh_not_violated"))
         v_clr = RED if violated else GREEN
         v_surf = info_font.render(verdict, True, v_clr)
         screen.blit(v_surf, (WIDTH // 2 - v_surf.get_width() // 2, s_y + 28))
@@ -435,17 +435,17 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         pygame.draw.circle(screen, s_clr, (sp_x, gauge_y + gauge_h // 2), 4)
 
     elif gs.chsh_running:
-        run_txt = title_font.render("Running experiment...", True, YELLOW)
+        run_txt = title_font.render(t("ent_chsh_running"), True, YELLOW)
         screen.blit(run_txt, (WIDTH // 2 - run_txt.get_width() // 2, res_y + 40))
     else:
-        hint = info_font.render("Press SPACE to run CHSH experiment", True, TEXT_CLR)
+        hint = info_font.render(t("ent_chsh_press_space"), True, TEXT_CLR)
         screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, res_y + 40))
 
     # S 값 히스토리
     if gs.chsh_history:
         hist_y = 460
         hist_title = info_font.render(
-            f"S-value history ({len(gs.chsh_history)} runs):", True, ACCENT)
+            t("ent_chsh_history", count=len(gs.chsh_history)), True, ACCENT)
         screen.blit(hist_title, (80, hist_y))
 
         # 미니 히스토리 바
@@ -463,7 +463,7 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
 
 def _draw_teleport_mode(screen, gs, font, title_font, info_font):
     """양자 텔레포테이션 모드 렌더링."""
-    title = title_font.render("Quantum Teleportation Protocol", True, ACCENT)
+    title = title_font.render(t("ent_tp_title"), True, ACCENT)
     screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 45))
 
     ts = gs.teleport
@@ -472,8 +472,9 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
 
     # 단계 표시
     steps_y = 75
-    step_labels = ["Prepare", "Bell Pair", "Entangle", "Measure",
-                   "Classical", "Correct"]
+    step_labels = [t("ent_tp_step_prepare"), t("ent_tp_step_bell_pair"),
+                   t("ent_tp_step_entangle"), t("ent_tp_step_measure"),
+                   t("ent_tp_step_classical"), t("ent_tp_step_correct")]
     for i, sl in enumerate(step_labels):
         sx = 60 + i * 138
         is_current = (i == min(step, 5))
@@ -507,18 +508,18 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
     if step <= 2:
         _draw_qubit_sphere(screen, input_x, q_y, 30, "ψ", YELLOW,
                            font, gs.t)
-        il = info_font.render("Input", True, YELLOW)
+        il = info_font.render(t("ent_tp_input"), True, YELLOW)
         screen.blit(il, (input_x - il.get_width() // 2, q_y + 36))
         # 블로흐
         _draw_bloch_mini(screen, input_x, q_y + 110, 40,
-                         ts.alpha, ts.beta, info_font, "Input State")
+                         ts.alpha, ts.beta, info_font, t("ent_tp_input_state"))
     elif step >= 3:
         # 측정된 상태
         m0, m1 = ts.measurement_result
         m_lbl = f"|{m0}{m1}⟩" if step >= 3 else "?"
         _draw_qubit_sphere(screen, input_x, q_y, 30, m_lbl, RED,
                            font, gs.t if step == 3 else 0)
-        il = info_font.render("Measured", True, RED)
+        il = info_font.render(t("ent_tp_measured"), True, RED)
         screen.blit(il, (input_x - il.get_width() // 2, q_y + 36))
 
     # Alice
@@ -552,7 +553,7 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
                 math.sin(gs.t * 2 + dx * 0.05))))))
             pygame.draw.line(screen, (*YELLOW, alpha),
                              (px, dash_y), (px + 8, dash_y), 2)
-        cc_lbl = info_font.render("Classical Channel", True, YELLOW)
+        cc_lbl = info_font.render(t("ent_tp_classical_channel"), True, YELLOW)
         screen.blit(cc_lbl, (WIDTH // 2 - cc_lbl.get_width() // 2,
                               dash_y - 16))
 
@@ -560,16 +561,16 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
     if step >= 6:
         _draw_bloch_mini(screen, bob_x, q_y + 110, 40,
                          ts.bob_alpha, ts.bob_beta, info_font,
-                         "Bob's State")
+                         t("ent_tp_bob_state"))
         fid_clr = GREEN if ts.fidelity > 0.99 else YELLOW
         fid = info_font.render(
-            f"Fidelity: {ts.fidelity:.4f}", True, fid_clr)
+            t("ent_tp_fidelity", fidelity=f"{ts.fidelity:.4f}"), True, fid_clr)
         screen.blit(fid, (bob_x - fid.get_width() // 2, q_y + 170))
 
     # 확률 분포 (3큐비트 상태벡터)
     if 0 < step < 6:
         pv_y = 310
-        pv_title = info_font.render("3-Qubit State Vector:", True, ACCENT)
+        pv_title = info_font.render(t("ent_tp_state_vector"), True, ACCENT)
         screen.blit(pv_title, (60, pv_y))
 
         probs = [abs(a) ** 2 for a in ts.state_vector]
@@ -599,7 +600,7 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
 
     # 프로토콜 로그
     log_y = 420
-    log_title = info_font.render("Protocol Log:", True, ACCENT)
+    log_title = info_font.render(t("ent_tp_protocol_log"), True, ACCENT)
     screen.blit(log_title, (60, log_y))
     for i, msg in enumerate(gs.teleport_log[-6:]):
         clr = GREEN if "Fidelity" in msg else TEXT_CLR
@@ -749,14 +750,14 @@ def run_simulation():
         screen.fill(BG)
 
         # 상단: 모드 탭
-        for i, name in enumerate(MODE_NAMES):
+        for i, key in enumerate(_MODE_TAB_KEYS):
             tab_x = 20 + i * 280
             is_sel = (i == gs.mode)
             tab_clr = ACCENT if is_sel else OVERLAY_CLR
             pygame.draw.rect(screen, tab_clr,
                              (tab_x, 8, 260, 28), 0 if is_sel else 1,
                              border_radius=4)
-            ts_text = font.render(name, True, BG if is_sel else TEXT_CLR)
+            ts_text = font.render(t(key), True, BG if is_sel else TEXT_CLR)
             screen.blit(ts_text, (tab_x + 130 - ts_text.get_width() // 2, 14))
 
         # 모드별 렌더링
