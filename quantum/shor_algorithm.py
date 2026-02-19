@@ -95,7 +95,7 @@ def _load_theme_colors():
 MODE_STEP = 0
 MODE_AUTO = 1
 MODE_RSA = 2
-MODE_NAMES = ["Step-by-Step", "Auto Run", "RSA Threat"]
+_MODE_TAB_KEYS = ["shor_tab_step", "shor_tab_auto", "shor_tab_rsa"]
 
 
 # ── 레이아웃 (해상도 적응) ─────────────────────────────
@@ -533,15 +533,15 @@ def _draw_continued_fraction(screen, qft_result, font, x, y):
     # 수렴분수
     if qft_result.convergents:
         convs_str = "  ".join(f"{p}/{q}" for p, q in qft_result.convergents[:6])
-        line2 = font.render(f"Convergents: {convs_str}", True, PURPLE)
+        line2 = font.render(t("shor_cf_convergents", convs=convs_str), True, PURPLE)
         screen.blit(line2, (x, y + 18))
 
     # 후보 주기
     if qft_result.candidate_r is not None:
-        line3 = font.render(f"→ Period candidate: r = {qft_result.candidate_r}",
+        line3 = font.render(t("shor_cf_period_found", r=qft_result.candidate_r),
                             True, GREEN)
     else:
-        line3 = font.render("→ No valid period found", True, RED)
+        line3 = font.render(t("shor_cf_no_period"), True, RED)
     screen.blit(line3, (x, y + 36))
 
 
@@ -637,7 +637,7 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
 
     # 우측 상단: 상태 메시지
     _draw_panel(screen, L.status_x, L.status_y, L.status_w, L.status_h,
-                "Status", font, info_font)
+                t("shor_status_title"), font, info_font)
     msg_lines = _wrap_text(shor.step_message, L.wrap_status)
     for i, line in enumerate(msg_lines):
         clr = GREEN if shor.phase == ShorPhase.SUCCESS else TEXT_CLR
@@ -715,7 +715,7 @@ def _draw_auto_mode(screen, ui, font, title_font, info_font):
 
     # 상태 메시지
     _draw_panel(screen, L.status_x, L.status_y, L.status_w, L.status_h,
-                "Status", font, info_font)
+                t("shor_status_title"), font, info_font)
     msg_lines = _wrap_text(shor.step_message, L.wrap_status)
     for i, line in enumerate(msg_lines):
         clr = GREEN if shor.phase == ShorPhase.SUCCESS else TEXT_CLR
@@ -1198,7 +1198,7 @@ def run_simulation():
 
         # 상단: 모드 탭
         L = _layout
-        for i, name in enumerate(MODE_NAMES):
+        for i, key in enumerate(_MODE_TAB_KEYS):
             tab_x = L.margin + i * L.tab_w
             is_sel = (i == ui.mode)
             tab_clr = ACCENT if is_sel else OVERLAY_CLR
@@ -1207,7 +1207,7 @@ def run_simulation():
                              (tab_x, L.tab_y, tw, L.tab_h),
                              0 if is_sel else 1,
                              border_radius=4)
-            ts_text = font.render(name, True, BG if is_sel else TEXT_CLR)
+            ts_text = font.render(t(key), True, BG if is_sel else TEXT_CLR)
             screen.blit(ts_text, (tab_x + tw // 2 - ts_text.get_width() // 2,
                                   L.tab_y + L.tab_label_offset_y))
 
