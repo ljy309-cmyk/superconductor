@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 
 from config_loader import cfg
+from i18n import t
 
 # ── 설정 ──────────────────────────────────────────────
 MAX_NUMBER = cfg("shor", "max_number", 10000)
@@ -472,14 +473,14 @@ def _step_input(state: ShorState):
     """Step 1: 입력 검증 → 고전 전처리로 전환."""
     n = state.number
     if n < 2:
-        state.step_message = "N must be >= 2"
+        state.step_message = t("shor_msg_n_too_small")
         state.phase = ShorPhase.DONE
         return
     if n > MAX_NUMBER:
-        state.step_message = f"N too large (max {MAX_NUMBER})"
+        state.step_message = t("shor_msg_n_too_large", max=MAX_NUMBER)
         state.phase = ShorPhase.DONE
         return
-    state.step_message = f"Factoring N = {n}"
+    state.step_message = t("shor_msg_factoring", n=n)
     state.phase = ShorPhase.CLASSICAL_PRECHECK
 
 
@@ -498,14 +499,14 @@ def _step_classical_precheck(state: ShorState):
         state.is_even = True
         state.factors = (2, n // 2)
         state.factor_method = "trivial_even"
-        state.step_message = f"{n} is even → {n} = 2 × {n // 2}"
+        state.step_message = t("shor_msg_even", n=n, half=n // 2)
         state.phase = ShorPhase.SUCCESS
         return
 
     # 소수 체크
     if is_prime(n):
         state.is_prime = True
-        state.step_message = f"{n} is prime — cannot factor"
+        state.step_message = t("shor_msg_prime", n=n)
         state.phase = ShorPhase.DONE
         return
 
@@ -514,11 +515,12 @@ def _step_classical_precheck(state: ShorState):
     if is_pp:
         state.factors = (base, n // base)
         state.factor_method = "trivial_prime_power"
-        state.step_message = f"{n} = {base}^{exp} → factors: {base} × {n // base}"
+        state.step_message = t("shor_msg_prime_power", n=n, base=base,
+                                exp=exp, other=n // base)
         state.phase = ShorPhase.SUCCESS
         return
 
-    state.step_message = f"{n} passed classical checks → quantum period finding"
+    state.step_message = t("shor_msg_passed_classical", n=n)
     state.phase = ShorPhase.PICK_RANDOM_A
 
 
@@ -528,7 +530,7 @@ def _step_pick_random_a(state: ShorState):
     state.attempt += 1
 
     if state.attempt > state.max_attempts:
-        state.step_message = f"Max attempts ({state.max_attempts}) exceeded"
+        state.step_message = t("shor_msg_max_attempts", max=state.max_attempts)
         state.phase = ShorPhase.DONE
         return
 
@@ -541,12 +543,13 @@ def _step_pick_random_a(state: ShorState):
         state.trivial_factor = g
         state.factors = (g, n // g)
         state.factor_method = "trivial_gcd"
-        state.step_message = f"Lucky! gcd({a}, {n}) = {g} → {n} = {g} × {n // g}"
+        state.step_message = t("shor_msg_lucky_gcd", a=a, n=n, g=g,
+                                other=n // g)
         state.phase = ShorPhase.SUCCESS
         return
 
     state.a = a
-    state.step_message = f"Attempt #{state.attempt}: a = {a}, gcd({a}, {n}) = 1 ✓"
+    state.step_message = t("shor_msg_pick_a", attempt=state.attempt, a=a, n=n)
     state.phase = ShorPhase.MODULAR_EXP
 
 
@@ -560,12 +563,11 @@ def _step_modular_exp(state: ShorState):
     state.mod_exp_period_visual = detect_period_from_table(state.mod_exp_table)
 
     if state.mod_exp_period_visual > 0:
-        state.step_message = (
-            f"a^x mod N table: period pattern visible at r = "
-            f"{state.mod_exp_period_visual}"
-        )
+        state.step_message = t("shor_msg_mod_exp_period",
+                                r=state.mod_exp_period_visual)
     else:
-        state.step_message = f"a^x mod {state.number} table computed ({table_len} entries)"
+        state.step_message = t("shor_msg_mod_exp_done", n=state.number,
+                                len=table_len)
 
     state.phase = ShorPhase.QFT_SETUP
 
@@ -581,10 +583,7 @@ def _step_qft_setup(state: ShorState):
         state.a, state.number, state.qft_n_qubits
     )
 
-    state.step_message = (
-        f"Quantum register: {state.qft_n_qubits} qubits | "
-        f"Hadamard → U_f → QFT"
-    )
+    state.step_message = t("shor_msg_qft_setup", qubits=state.qft_n_qubits)
     state.phase = ShorPhase.QFT_MEASURE
 
 
@@ -598,10 +597,8 @@ def _step_qft_measure(state: ShorState):
     state.total_qft_measurements += 1
 
     Q = 1 << state.qft_n_qubits
-    state.step_message = (
-        f"QFT measurement: m = {result.measured_value} / {Q} "
-        f"≈ {result.phase_estimate:.4f}"
-    )
+    state.step_message = t("shor_msg_qft_measure", m=result.measured_value,
+                            Q=Q, phase=f"{result.phase_estimate:.4f}")
     state.phase = ShorPhase.CONTINUED_FRACTION
 
 
@@ -634,14 +631,12 @@ def _step_continued_fraction(state: ShorState):
 
     if candidate_r is not None:
         state.period = candidate_r
-        state.step_message = (
-            f"Continued fraction → r = {candidate_r} "
-            f"(a^r mod N = {mod_pow(state.a, candidate_r, state.number)})"
-        )
+        state.step_message = t("shor_msg_cf_found", r=candidate_r,
+                                check=mod_pow(state.a, candidate_r, state.number))
         state.phase = ShorPhase.EXTRACT_FACTORS
     else:
         cf_str = "[" + "; ".join(str(c) for c in cf[:6]) + "...]"
-        state.step_message = f"CF {cf_str} → no valid period found"
+        state.step_message = t("shor_msg_cf_failed", cf=cf_str)
         state.phase = ShorPhase.RETRY
 
 
@@ -658,13 +653,13 @@ def _step_extract_factors(state: ShorState):
     a = state.a
 
     if r is None or r == 0:
-        state.step_message = "No period found"
+        state.step_message = t("shor_msg_no_period")
         state.phase = ShorPhase.RETRY
         return
 
     # r이 홀수이면 실패
     if r % 2 != 0:
-        state.step_message = f"r = {r} is odd → retry"
+        state.step_message = t("shor_msg_r_odd", r=r)
         state.attempt_history.append({
             "attempt": state.attempt, "a": a, "r": r,
             "reason": "r is odd",
@@ -677,7 +672,7 @@ def _step_extract_factors(state: ShorState):
 
     # a^(r/2) ≡ -1 (mod N) 이면 실패
     if a_half == n - 1:
-        state.step_message = f"a^(r/2) ≡ -1 (mod N) → retry"
+        state.step_message = t("shor_msg_r_minus_one")
         state.attempt_history.append({
             "attempt": state.attempt, "a": a, "r": r,
             "reason": "a^(r/2) ≡ -1",
@@ -699,9 +694,8 @@ def _step_extract_factors(state: ShorState):
         other = n // f
         state.factors = (min(f, other), max(f, other))
         state.factor_method = "quantum"
-        state.step_message = (
-            f"gcd(a^(r/2) ± 1, N) → {n} = {state.factors[0]} × {state.factors[1]}"
-        )
+        state.step_message = t("shor_msg_factors_found", n=n,
+                                p=state.factors[0], q=state.factors[1])
         state.attempt_history.append({
             "attempt": state.attempt, "a": a, "r": r,
             "reason": "success",
@@ -709,10 +703,9 @@ def _step_extract_factors(state: ShorState):
         })
         state.phase = ShorPhase.SUCCESS
     else:
-        state.step_message = (
-            f"gcd({a_half + 1}, {n}) = {factor1}, "
-            f"gcd({a_half - 1}, {n}) = {factor2} → trivial, retry"
-        )
+        state.step_message = t("shor_msg_trivial_factors",
+                                f1=a_half + 1, n=n, g1=factor1,
+                                f2=a_half - 1, g2=factor2)
         state.attempt_history.append({
             "attempt": state.attempt, "a": a, "r": r,
             "reason": "trivial factors",
@@ -729,10 +722,10 @@ def _step_retry(state: ShorState):
     state.qft_amplitudes.clear()
 
     if state.attempt >= state.max_attempts:
-        state.step_message = f"Exhausted {state.max_attempts} attempts"
+        state.step_message = t("shor_msg_exhausted", max=state.max_attempts)
         state.phase = ShorPhase.DONE
     else:
-        state.step_message = f"Retrying with new random a (attempt #{state.attempt + 1})"
+        state.step_message = t("shor_msg_retry", next=state.attempt + 1)
         state.phase = ShorPhase.PICK_RANDOM_A
 
 
@@ -855,60 +848,70 @@ def crack_rsa(state: ShorState) -> bool:
 
 # ── 교육 메시지 ──────────────────────────────────────
 
-PHASE_DESCRIPTIONS = {
-    ShorPhase.INPUT: (
-        "Input the number N to factor. "
-        "Shor's algorithm can factor large numbers exponentially faster "
-        "than the best classical algorithms."
-    ),
-    ShorPhase.CLASSICAL_PRECHECK: (
-        "Classical pre-check: eliminate trivial cases. "
-        "Even numbers, primes, and prime powers can be handled classically."
-    ),
-    ShorPhase.PICK_RANDOM_A: (
-        "Pick a random integer a (1 < a < N). "
-        "If gcd(a, N) > 1, we found a factor by luck!"
-    ),
-    ShorPhase.MODULAR_EXP: (
-        "Compute a^x mod N for x = 0, 1, 2, ... "
-        "The sequence is periodic with period r. "
-        "Finding r is the key quantum step."
-    ),
-    ShorPhase.QFT_SETUP: (
-        "Initialize quantum register with Hadamard gates. "
-        "Apply modular exponentiation U_f, then Quantum Fourier Transform."
-    ),
-    ShorPhase.QFT_MEASURE: (
-        "Measure the quantum register after QFT. "
-        "Result m/2^n approximates s/r for some integer s."
-    ),
-    ShorPhase.CONTINUED_FRACTION: (
-        "Use continued fraction expansion to extract r from m/2^n ≈ s/r. "
-        "The convergent denominators are period candidates."
-    ),
-    ShorPhase.EXTRACT_FACTORS: (
-        "If r is even and a^(r/2) ≢ -1 (mod N), compute "
-        "gcd(a^(r/2) ± 1, N) to find non-trivial factors."
-    ),
-    ShorPhase.SUCCESS: (
-        "Factorization successful! This demonstrates that a quantum computer "
-        "can break RSA encryption — that's why we need QKD."
-    ),
-    ShorPhase.RETRY: (
-        "This attempt failed (r odd or trivial factors). "
-        "Pick a new random a and try again."
-    ),
-    ShorPhase.DONE: (
-        "Algorithm complete."
-    ),
+_PHASE_DESC_KEYS = {
+    ShorPhase.INPUT: "shor_desc_input",
+    ShorPhase.CLASSICAL_PRECHECK: "shor_desc_classical",
+    ShorPhase.PICK_RANDOM_A: "shor_desc_pick_a",
+    ShorPhase.MODULAR_EXP: "shor_desc_mod_exp",
+    ShorPhase.QFT_SETUP: "shor_desc_qft_setup",
+    ShorPhase.QFT_MEASURE: "shor_desc_qft_measure",
+    ShorPhase.CONTINUED_FRACTION: "shor_desc_cf",
+    ShorPhase.EXTRACT_FACTORS: "shor_desc_extract",
+    ShorPhase.SUCCESS: "shor_desc_success",
+    ShorPhase.RETRY: "shor_desc_retry",
+    ShorPhase.DONE: "shor_desc_done",
 }
 
 
-QKD_MOTIVATION_MESSAGE = (
-    "Shor's Algorithm proves that a sufficiently powerful quantum computer "
-    "can break RSA and other public-key cryptosystems in polynomial time. "
-    "This is why Quantum Key Distribution (QKD) is essential: "
-    "QKD's security is based on the laws of quantum physics, "
-    "not on computational hardness assumptions, making it immune to "
-    "both classical and quantum attacks."
-)
+def get_phase_description(phase: ShorPhase) -> str:
+    """현재 단계의 다국어 설명을 반환합니다."""
+    key = _PHASE_DESC_KEYS.get(phase, "shor_desc_done")
+    return t(key)
+
+
+# 하위 호환: 기존 코드에서 dict처럼 접근할 수 있도록
+class _PhaseDescProxy:
+    """Dict-like proxy that returns i18n strings on access."""
+
+    def get(self, phase, default=""):
+        return get_phase_description(phase) if phase in _PHASE_DESC_KEYS else default
+
+    def __getitem__(self, phase):
+        return get_phase_description(phase)
+
+    def __contains__(self, phase):
+        return phase in _PHASE_DESC_KEYS
+
+
+PHASE_DESCRIPTIONS = _PhaseDescProxy()
+
+
+def get_qkd_motivation() -> str:
+    """QKD 동기부여 메시지를 다국어로 반환합니다."""
+    return t("shor_qkd_motivation")
+
+
+# 하위 호환: 기존 문자열 상수처럼 사용 가능하도록 lazy 프로퍼티
+QKD_MOTIVATION_MESSAGE = property(lambda self: get_qkd_motivation())
+
+
+class _QKDMotivationStr:
+    """Lazy string proxy that resolves to the current locale on access."""
+
+    def __str__(self):
+        return get_qkd_motivation()
+
+    def __repr__(self):
+        return get_qkd_motivation()
+
+    def __contains__(self, item):
+        return item in str(self)
+
+    def __len__(self):
+        return len(str(self))
+
+    def __getattr__(self, name):
+        return getattr(str(self), name)
+
+
+QKD_MOTIVATION_MESSAGE = _QKDMotivationStr()

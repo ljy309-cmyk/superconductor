@@ -26,6 +26,8 @@ from quantum.shor_algorithm_engine import (
     ShorPhase,
     ShorState,
     crack_rsa,
+    get_phase_description,
+    get_qkd_motivation,
     reset_state,
     setup_rsa_demo,
     shor_run_full,
@@ -42,6 +44,12 @@ _log = get_module_logger("shor_algorithm")
 WIDTH = cfg("display", "width", 900)
 HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
+
+# ── Shor UI 설정 (config.json에서 로드) ──────────────
+ANIMATION_SPEED = cfg("shor", "animation_speed", 0.6)
+QFT_DISPLAY_QUBITS = cfg("shor", "qft_display_qubits", 6)
+AUTO_BATCH_SIZE = cfg("shor", "auto_batch_size", 1)
+RSA_DEFAULT_DIFFICULTY = cfg("shor", "rsa_default_difficulty", 0)
 
 # ── 색상 (테마에서 동적 로드) ────────────────────────
 BG = (30, 30, 46)
@@ -98,10 +106,10 @@ class UIState:
     # Auto 모드
     auto_running: bool = False
     auto_timer: float = 0.0
-    auto_interval: float = 0.6  # 단계 간 간격 (초)
+    auto_interval: float = ANIMATION_SPEED  # 단계 간 간격 (초)
 
     # RSA 모드
-    rsa_difficulty: int = 0
+    rsa_difficulty: int = RSA_DEFAULT_DIFFICULTY
     rsa_phase: int = 0  # 0=setup, 1=cracking, 2=cracked, 3=qkd_message
     rsa_message: str = ""
 
@@ -140,13 +148,13 @@ def _draw_progress_bar(screen, x, y, w, h, progress, color=ACCENT):
 def _draw_phase_indicator(screen, phase, font, x, y):
     """현재 단계 표시 (좌측 패널)."""
     phases = [
-        (ShorPhase.CLASSICAL_PRECHECK, "Classical Check"),
-        (ShorPhase.PICK_RANDOM_A, "Pick Random a"),
-        (ShorPhase.MODULAR_EXP, "Mod Exp Table"),
-        (ShorPhase.QFT_SETUP, "QFT Setup"),
-        (ShorPhase.QFT_MEASURE, "QFT Measure"),
-        (ShorPhase.CONTINUED_FRACTION, "Cont. Fraction"),
-        (ShorPhase.EXTRACT_FACTORS, "Extract Factors"),
+        (ShorPhase.CLASSICAL_PRECHECK, t("shor_phase_classical")),
+        (ShorPhase.PICK_RANDOM_A, t("shor_phase_pick_a")),
+        (ShorPhase.MODULAR_EXP, t("shor_phase_mod_exp")),
+        (ShorPhase.QFT_SETUP, t("shor_phase_qft_setup")),
+        (ShorPhase.QFT_MEASURE, t("shor_phase_qft_measure")),
+        (ShorPhase.CONTINUED_FRACTION, t("shor_phase_cf")),
+        (ShorPhase.EXTRACT_FACTORS, t("shor_phase_extract")),
     ]
     for i, (ph, label) in enumerate(phases):
         py = y + i * 22
@@ -263,7 +271,7 @@ def _draw_continued_fraction(screen, qft_result, font, x, y):
 def _draw_circuit_diagram(screen, shor, font, x, y, w, h):
     """양자 회로 다이어그램 (간략화)."""
     n_qubits = shor.qft_n_qubits if shor.qft_n_qubits > 0 else 8
-    display_qubits = min(n_qubits, 6)
+    display_qubits = min(n_qubits, QFT_DISPLAY_QUBITS)
 
     # 배경 패널
     pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=4)
@@ -319,7 +327,7 @@ def _draw_circuit_diagram(screen, shor, font, x, y, w, h):
         screen.blit(gs_text, (gx - gs_text.get_width() // 2,
                               line_y_start - 20))
 
-    title = font.render("Quantum Circuit", True, ACCENT)
+    title = font.render(t("shor_circuit_title"), True, ACCENT)
     screen.blit(title, (x + 10, y + 4))
 
 
@@ -357,7 +365,7 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
         ms = info_font.render(line, True, clr)
         screen.blit(ms, (610, 115 + i * 16))
     # 단계 설명
-    desc_lines = _wrap_text(PHASE_DESCRIPTIONS.get(shor.phase, ""), 35)
+    desc_lines = _wrap_text(get_phase_description(shor.phase), 35)
     for i, line in enumerate(desc_lines[:3]):
         ds = info_font.render(line, True, SUBTEXT)
         screen.blit(ds, (610, 170 + i * 14))
@@ -390,7 +398,7 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
     # 시도 히스토리
     if shor.attempt_history:
         hy = 470
-        hist_title = info_font.render("Attempt History:", True, ACCENT)
+        hist_title = info_font.render(t("shor_attempt_history"), True, ACCENT)
         screen.blit(hist_title, (20, hy))
         for i, h in enumerate(shor.attempt_history[-4:]):
             reason = h.get("reason", "")
@@ -417,7 +425,7 @@ def _draw_auto_mode(screen, ui, font, title_font, info_font):
     n_text = font.render(f"N = {shor.number}", True, TEXT_CLR)
     screen.blit(n_text, (20, 70))
 
-    status = "RUNNING..." if ui.auto_running else "PAUSED"
+    status = t("shor_auto_running") if ui.auto_running else t("shor_auto_paused")
     status_clr = GREEN if ui.auto_running else YELLOW
     st = font.render(status, True, status_clr)
     screen.blit(st, (150, 70))
@@ -478,31 +486,37 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
     screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 42))
 
     # 난이도 표시
-    diff_names = ["Easy", "Medium", "Hard", "Expert"]
-    dn = diff_names[min(ui.rsa_difficulty, len(diff_names) - 1)]
-    diff = font.render(f"Difficulty: {dn}  (N = {rsa.rsa_n})", True, YELLOW)
+    diff_keys = ["shor_rsa_diff_easy", "shor_rsa_diff_medium",
+                  "shor_rsa_diff_hard", "shor_rsa_diff_expert"]
+    dk = diff_keys[min(ui.rsa_difficulty, len(diff_keys) - 1)]
+    diff = font.render(t("shor_rsa_difficulty", name=t(dk), n=rsa.rsa_n),
+                       True, YELLOW)
     screen.blit(diff, (20, 70))
 
     # RSA 키 정보 패널
-    _draw_panel(screen, 20, 95, 420, 120, "RSA Public Key", title_font, info_font)
+    _draw_panel(screen, 20, 95, 420, 120, t("shor_rsa_public_key"),
+                title_font, info_font)
     info_lines = [
-        f"N = p × q = {rsa.rsa_n}",
-        f"e = {rsa.rsa_e}  (public exponent)",
-        f"Plaintext:  M = {rsa.plaintext}",
-        f"Ciphertext: C = M^e mod N = {rsa.ciphertext}",
+        t("shor_rsa_n_line", n=rsa.rsa_n),
+        t("shor_rsa_e_line", e=rsa.rsa_e),
+        t("shor_rsa_plain_line", m=rsa.plaintext),
+        t("shor_rsa_cipher_line", c=rsa.ciphertext),
     ]
     for i, line in enumerate(info_lines):
         ls = info_font.render(line, True, TEXT_CLR)
         screen.blit(ls, (30, 118 + i * 18))
 
     # 비밀키 (크랙 전 숨김)
-    _draw_panel(screen, 460, 95, 420, 120, "Secret Key", title_font, info_font)
+    _draw_panel(screen, 460, 95, 420, 120, t("shor_rsa_secret_key"),
+                title_font, info_font)
     if rsa.cracked:
+        match_str = t("shor_rsa_match_yes") if rsa.decrypted == rsa.plaintext \
+            else t("shor_rsa_match_no")
         secret_lines = [
-            f"p = {rsa.cracked_p},  q = {rsa.cracked_q}",
-            f"d = {rsa.cracked_d}  (private exponent)",
-            f"Decrypted: C^d mod N = {rsa.decrypted}",
-            f"Match: {'✓ YES' if rsa.decrypted == rsa.plaintext else '✗ NO'}",
+            t("shor_rsa_p_q_line", p=rsa.cracked_p, q=rsa.cracked_q),
+            t("shor_rsa_d_line", d=rsa.cracked_d),
+            t("shor_rsa_decrypt_line", m=rsa.decrypted),
+            match_str,
         ]
         for i, line in enumerate(secret_lines):
             clr = GREEN if i == 3 and rsa.decrypted == rsa.plaintext else TEXT_CLR
@@ -520,28 +534,30 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
         screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 240))
     elif ui.rsa_phase == 1:
         # 크래킹 중
-        msg = title_font.render("Cracking RSA with Shor's Algorithm...", True, RED)
+        msg = title_font.render(t("shor_rsa_cracking"), True, RED)
         screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 240))
     elif ui.rsa_phase >= 2:
         # 크래킹 완료
         _draw_panel(screen, 40, 230, WIDTH - 80, 50, "", title_font, info_font)
         cracked = title_font.render(
-            f"RSA CRACKED!  {rsa.rsa_n} = {rsa.cracked_p} × {rsa.cracked_q}",
+            t("shor_rsa_cracked", n=rsa.rsa_n, p=rsa.cracked_p,
+              q=rsa.cracked_q),
             True, GREEN)
         screen.blit(cracked, (WIDTH // 2 - cracked.get_width() // 2, 242))
 
         # Shor 결과
         if shor.factors:
             method = info_font.render(
-                f"Method: {shor.factor_method}  |  Attempts: {shor.attempt}",
+                t("shor_rsa_method", method=shor.factor_method,
+                  attempts=shor.attempt),
                 True, PURPLE)
             screen.blit(method, (WIDTH // 2 - method.get_width() // 2, 268))
 
     # QKD 동기 메시지
     if ui.rsa_phase >= 3:
-        _draw_panel(screen, 40, 300, WIDTH - 80, 170, "Why QKD?",
+        _draw_panel(screen, 40, 300, WIDTH - 80, 170, t("shor_rsa_why_qkd"),
                     title_font, info_font)
-        msg_lines = _wrap_text(QKD_MOTIVATION_MESSAGE, 80)
+        msg_lines = _wrap_text(get_qkd_motivation(), 80)
         for i, line in enumerate(msg_lines[:7]):
             ms = info_font.render(line, True, YELLOW)
             screen.blit(ms, (55, 325 + i * 18))
@@ -585,7 +601,7 @@ def _draw_input_field(screen, ui, font, x, y):
         pygame.draw.line(screen, ACCENT, (cx, y), (cx, y + 16), 1)
 
     # 힌트
-    hint = font.render("Enter to confirm", True, SUBTEXT)
+    hint = font.render(t("shor_input_hint"), True, SUBTEXT)
     screen.blit(hint, (box_x + box_w + 10, y))
 
 
@@ -643,15 +659,18 @@ def run_simulation():
             ui.auto_timer += dt
             if ui.auto_timer >= ui.auto_interval:
                 ui.auto_timer = 0.0
-                if ui.shor.phase not in (ShorPhase.SUCCESS, ShorPhase.DONE):
-                    shor_step(ui.shor)
-                    ui.total_steps += 1
-                    if ui.shor.phase == ShorPhase.SUCCESS:
-                        ui.numbers_factored += 1
-                        snd.play("achievement")
+                for _ in range(AUTO_BATCH_SIZE):
+                    if ui.shor.phase not in (ShorPhase.SUCCESS, ShorPhase.DONE):
+                        shor_step(ui.shor)
+                        ui.total_steps += 1
+                        if ui.shor.phase == ShorPhase.SUCCESS:
+                            ui.numbers_factored += 1
+                            snd.play("achievement")
+                            ui.auto_running = False
+                            break
+                    else:
                         ui.auto_running = False
-                else:
-                    ui.auto_running = False
+                        break
 
         # ── 이벤트 ──
         for event in pygame.event.get():

@@ -271,7 +271,11 @@
     "max_number": 10000,
     "qft_precision_bits": 8,
     "max_period_attempts": 20,
-    "mod_exp_steps": 32
+    "mod_exp_steps": 32,
+    "animation_speed": 0.6,
+    "qft_display_qubits": 6,
+    "auto_batch_size": 1,
+    "rsa_default_difficulty": 0
   },
   "theme": "dark",
   "colorblind_mode": false,

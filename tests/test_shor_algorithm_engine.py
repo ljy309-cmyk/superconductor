@@ -498,8 +498,9 @@ class TestEducationalContent(unittest.TestCase):
     def test_qkd_motivation(self):
         """QKD 동기 부여 메시지 존재."""
         from quantum.shor_algorithm_engine import QKD_MOTIVATION_MESSAGE
-        self.assertIn("QKD", QKD_MOTIVATION_MESSAGE)
-        self.assertIn("quantum", QKD_MOTIVATION_MESSAGE.lower())
+        msg = str(QKD_MOTIVATION_MESSAGE)
+        self.assertIn("QKD", msg)
+        self.assertTrue(len(msg) > 50, "QKD motivation message should be substantial")
 
 
 # ── 통합 테스트 ──────────────────────────────────────
