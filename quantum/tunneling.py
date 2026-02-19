@@ -9,6 +9,12 @@ import math
 import pygame
 
 from config_loader import cfg
+from quantum.ui_common import (
+    HISTORY_PAGE_SIZE,
+    draw_bar_pattern as _draw_bar_pattern,
+    paginate,
+    render_notify,
+)
 from game_base import choose_difficulty_or_quit, finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
@@ -43,7 +49,6 @@ _log = get_module_logger("tunneling")
 WIDTH = cfg("display", "width", 900)
 HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
-HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
@@ -120,29 +125,6 @@ def _rebuild_layout(w: int, h: int):
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
-
-
-def _draw_bar_pattern(screen, rect, clr, tier):
-    """막대에 패턴을 그려 색상 외에도 시각적으로 구분 (색맹 보조).
-
-    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
-    """
-    bx, by, bw, bh = rect
-    if bh < 4 or bw < 2:
-        return
-    pc = tuple(min(255, c + 60) for c in clr[:3])
-    if tier == "high":
-        for ly in range(by + 2, by + bh - 1, 4):
-            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
-    elif tier == "mid":
-        for offset in range(-bh, bw, 5):
-            x1 = max(0, offset)
-            y1 = max(0, -offset)
-            diag_len = min(bw - 1 - x1, bh - 1 - y1)
-            if diag_len > 0:
-                pygame.draw.line(screen, pc,
-                                 (bx + x1, by + y1),
-                                 (bx + x1 + diag_len, by + y1 + diag_len))
 
 
 def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
@@ -421,12 +403,7 @@ def run_simulation():
 
         # ── 이벤트 로그 (페이지네이션) ──
         if event_log:
-            total_log = len(event_log)
-            total_pages = max(1, (total_log + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
-            history_page = max(0, min(history_page, total_pages - 1))
-            pg_start = history_page * HISTORY_PAGE_SIZE
-            pg_end = min(pg_start + HISTORY_PAGE_SIZE, total_log)
-            page_items = event_log[pg_start:pg_end]
+            page_items, history_page, total_pages = paginate(event_log, history_page)
             title_text = t("tn_event_log")
             if total_pages > 1:
                 title_text += f"  ({history_page + 1}/{total_pages})"
@@ -459,10 +436,8 @@ def run_simulation():
         # 알림 메시지 (페이드 아웃)
         if notify_timer > 0:
             notify_timer -= dt
-            alpha = min(255, int(255 * min(1.0, notify_timer / 0.3)))
-            ns = font.render(notify_msg, True, ACCENT)
-            ns.set_alpha(alpha)
-            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
+            render_notify(screen, notify_msg, notify_timer, font, ACCENT,
+                          L.W // 2, L.notify_y)
 
         preset_hud.draw(screen, font)
         help_overlay.draw(screen, font)

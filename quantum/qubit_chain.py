@@ -13,6 +13,12 @@ from dataclasses import dataclass, field
 import pygame
 
 from achievement_toast import AchievementToast
+from quantum.ui_common import (
+    HISTORY_PAGE_SIZE,
+    draw_bar_pattern as _draw_bar_pattern,
+    paginate,
+    render_notify,
+)
 from achievements import check_achievements
 from config_loader import cfg
 from game_base import choose_difficulty_or_quit, finalize_session
@@ -37,7 +43,6 @@ _log = get_module_logger("qubit_chain")
 WIDTH = cfg("display", "width", 900)
 HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
-HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
@@ -353,27 +358,6 @@ def _draw_node(
     screen.blit(state_label, (cx - state_label.get_width() // 2, cy + NODE_RADIUS + 16))
 
 
-def _draw_bar_pattern(screen, rect, clr, tier):
-    """막대에 패턴을 그려 색상 외에도 시각적으로 구분 (색맹 보조).
-
-    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
-    """
-    bx, by, bw, bh = rect
-    if bh < 4 or bw < 2:
-        return
-    pc = tuple(min(255, c + 60) for c in clr[:3])
-    if tier == "high":
-        for ly in range(by + 2, by + bh - 1, 4):
-            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
-    elif tier == "mid":
-        for offset in range(-bh, bw, 5):
-            x1 = max(0, offset)
-            y1 = max(0, -offset)
-            diag_len = min(bw - 1 - x1, bh - 1 - y1)
-            if diag_len > 0:
-                pygame.draw.line(screen, pc,
-                                 (bx + x1, by + y1),
-                                 (bx + x1 + diag_len, by + y1 + diag_len))
 
 
 _STATE_TIER = {
@@ -684,12 +668,7 @@ def run_simulation():
         log_x = L.panel_x
         log_y = panel_y + len(nodes) * 18 + 20
         if gs.cascade_log:
-            total_log = len(gs.cascade_log)
-            total_pages = max(1, (total_log + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
-            gs.history_page = max(0, min(gs.history_page, total_pages - 1))
-            pg_start = gs.history_page * HISTORY_PAGE_SIZE
-            pg_end = min(pg_start + HISTORY_PAGE_SIZE, total_log)
-            page_items = gs.cascade_log[pg_start:pg_end]
+            page_items, gs.history_page, total_pages = paginate(gs.cascade_log, gs.history_page)
             title_text = t("qc_event_log")
             if total_pages > 1:
                 title_text += f"  ({gs.history_page + 1}/{total_pages})"
@@ -806,10 +785,8 @@ def run_simulation():
 
         # 알림 메시지 (페이드 아웃)
         if gs.notify_timer > 0:
-            alpha = min(255, int(255 * min(1.0, gs.notify_timer / 0.3)))
-            ns = info_font.render(gs.notify_msg, True, ACCENT)
-            ns.set_alpha(alpha)
-            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
+            render_notify(screen, gs.notify_msg, gs.notify_timer, info_font,
+                          ACCENT, L.W // 2, L.notify_y)
 
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, info_font)

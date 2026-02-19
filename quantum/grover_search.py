@@ -14,6 +14,12 @@ from dataclasses import dataclass, field
 import pygame
 
 from achievement_toast import AchievementToast
+from quantum.ui_common import (
+    HISTORY_PAGE_SIZE,
+    paginate,
+    render_notify,
+    wrap_text as _wrap_text,
+)
 from config_loader import cfg
 from game_base import finalize_session
 from help_overlay import HelpOverlay
@@ -47,7 +53,6 @@ FPS = cfg("display", "fps", 60)
 ANIMATION_SPEED = cfg("grover", "animation_speed", 0.5)
 AUTO_BATCH_SIZE = cfg("grover", "auto_batch_size", 1)
 DISPLAY_STATES = cfg("grover", "display_states", 32)
-HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ────────────────────────
 BG = (30, 30, 46)
@@ -539,36 +544,13 @@ def _draw_input_fields(screen, ui, font, x, y):
     screen.blit(hint, (box2_start + 90, y))
 
 
-def _wrap_text(text, max_chars):
-    """텍스트를 max_chars 기준으로 줄바꿈."""
-    words = text.split()
-    lines = []
-    current = ""
-    for word in words:
-        if len(current) + len(word) + 1 > max_chars:
-            if current:
-                lines.append(current)
-            current = word
-        else:
-            current = f"{current} {word}" if current else word
-    if current:
-        lines.append(current)
-    return lines
-
-
 def _draw_search_history(screen, ui, font, x, y):
     """페이지네이션된 탐색 히스토리 표시."""
     history = ui.grover.search_history
     if not history:
         return
 
-    total = len(history)
-    total_pages = max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
-    ui.history_page = max(0, min(ui.history_page, total_pages - 1))
-
-    start = ui.history_page * HISTORY_PAGE_SIZE
-    end = min(start + HISTORY_PAGE_SIZE, total)
-    page_items = history[start:end]
+    page_items, ui.history_page, total_pages = paginate(history, ui.history_page)
 
     title_text = t("grover_search_history")
     if total_pages > 1:
@@ -1124,10 +1106,8 @@ def run_simulation():
         # 알림 표시
         if ui.notify_timer > 0:
             ui.notify_timer -= dt
-            alpha = min(255, int(255 * min(1.0, ui.notify_timer / 0.3)))
-            ns = info_font.render(ui.notify_msg, True, YELLOW)
-            ns.set_alpha(alpha)
-            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
+            render_notify(screen, ui.notify_msg, ui.notify_timer, info_font,
+                          YELLOW, L.W // 2, L.notify_y)
 
         # 난이도 뱃지
         diff_colors = {"easy": GREEN, "normal": YELLOW, "hard": RED}

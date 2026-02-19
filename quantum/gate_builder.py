@@ -13,6 +13,11 @@ import time
 import pygame
 
 from config_loader import cfg
+from quantum.ui_common import (
+    HISTORY_PAGE_SIZE,
+    draw_bar_pattern as _draw_bar_pattern,
+    paginate,
+)
 from game_base import finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
@@ -37,7 +42,6 @@ WIDTH = cfg("display", "width", 900)
 HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
 NUM_QUBITS = cfg("gate_builder", "num_qubits", 2)
-HISTORY_PAGE_SIZE = 4
 
 _pg = _get_pg_theme_init()
 BG = _pg.BG
@@ -343,12 +347,8 @@ def run_simulation():
 
         # ── 측정 기록 (페이지네이션) ──────────────────
         if measure_log:
-            total_log = len(measure_log)
-            total_pages = max(1, (total_log + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
-            history_page = max(0, min(history_page, total_pages - 1))
+            page_items, history_page, total_pages = paginate(measure_log, history_page)
             pg_start = history_page * HISTORY_PAGE_SIZE
-            pg_end = min(pg_start + HISTORY_PAGE_SIZE, total_log)
-            page_items = measure_log[pg_start:pg_end]
             title_text = t("gb_measure_log")
             if total_pages > 1:
                 title_text += f"  ({history_page + 1}/{total_pages})"
@@ -400,27 +400,6 @@ def run_simulation():
     )
 
 
-def _draw_bar_pattern(screen, rect, clr, tier):
-    """막대에 패턴을 그려 색상 외에도 시각적으로 구분 (색맹 보조).
-
-    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
-    """
-    bx, by, bw, bh = rect
-    if bh < 4 or bw < 2:
-        return
-    pc = tuple(min(255, c + 60) for c in clr[:3])
-    if tier == "high":
-        for ly in range(by + 2, by + bh - 1, 4):
-            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
-    elif tier == "mid":
-        for offset in range(-bh, bw, 5):
-            x1 = max(0, offset)
-            y1 = max(0, -offset)
-            diag_len = min(bw - 1 - x1, bh - 1 - y1)
-            if diag_len > 0:
-                pygame.draw.line(screen, pc,
-                                 (bx + x1, by + y1),
-                                 (bx + x1 + diag_len, by + y1 + diag_len))
 
 
 def _draw_prob_bars(screen, font, probs, labels):

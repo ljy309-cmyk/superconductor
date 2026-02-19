@@ -14,6 +14,12 @@ from dataclasses import dataclass, field
 import pygame
 
 from achievement_toast import AchievementToast
+from quantum.ui_common import (
+    HISTORY_PAGE_SIZE,
+    draw_bar_pattern as _draw_bar_pattern,
+    paginate,
+    render_notify,
+)
 from config_loader import cfg
 from game_base import finalize_session
 from help_overlay import HelpOverlay
@@ -52,7 +58,6 @@ FPS = cfg("display", "fps", 60)
 CHSH_SHOTS = cfg("entanglement", "chsh_shots", 200)
 MEASURE_BATCH = cfg("entanglement", "measure_batch", 50)
 TELEPORT_ANIM_SPEED = cfg("entanglement", "teleport_anim_speed", 1.5)
-HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ────────────────────────
 BG = (30, 30, 46)
@@ -315,27 +320,6 @@ def _draw_bar_chart(screen, x, y, w, h, data, colors, labels,
         screen.blit(v_surf, (x + w - 45, bar_y))
 
 
-def _draw_bar_pattern(screen, rect, clr, tier):
-    """막대에 패턴을 그려 색상 외에도 시각적으로 구분 (색맹 보조).
-
-    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
-    """
-    bx, by, bw, bh = rect
-    if bh < 4 or bw < 2:
-        return
-    pc = tuple(min(255, c + 60) for c in clr[:3])
-    if tier == "high":
-        for ly in range(by + 2, by + bh - 1, 4):
-            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
-    elif tier == "mid":
-        for offset in range(-bh, bw, 5):
-            x1 = max(0, offset)
-            y1 = max(0, -offset)
-            diag_len = min(bw - 1 - x1, bh - 1 - y1)
-            if diag_len > 0:
-                pygame.draw.line(screen, pc,
-                                 (bx + x1, by + y1),
-                                 (bx + x1 + diag_len, by + y1 + diag_len))
 
 
 def _draw_bloch_mini(screen, cx, cy, radius, alpha, beta, font,
@@ -450,13 +434,7 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
 
     # 최근 측정 결과 표시 (페이지네이션)
     if gs.bell_measurements:
-        history = gs.bell_measurements
-        total = len(history)
-        total_pages = max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
-        gs.history_page = max(0, min(gs.history_page, total_pages - 1))
-        start = gs.history_page * HISTORY_PAGE_SIZE
-        end = min(start + HISTORY_PAGE_SIZE, total)
-        page_items = history[start:end]
+        page_items, gs.history_page, total_pages = paginate(gs.bell_measurements, gs.history_page)
         rx = L.bell_recent_x
         ry = stat_y
         title_text = t("ent_bell_recent")
@@ -600,14 +578,9 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
     # S 값 히스토리 (페이지네이션)
     if gs.chsh_history:
         hist_y = L.chsh_hist_y
-        history = gs.chsh_history
-        total = len(history)
-        page_size = 15
-        total_pages = max(1, (total + page_size - 1) // page_size)
-        gs.history_page = max(0, min(gs.history_page, total_pages - 1))
-        start = gs.history_page * page_size
-        end = min(start + page_size, total)
-        page_items = history[start:end]
+        page_items, gs.history_page, total_pages = paginate(
+            gs.chsh_history, gs.history_page, page_size=15)
+        total = len(gs.chsh_history)
 
         title_text = t("ent_chsh_history", count=total)
         if total_pages > 1:
@@ -780,13 +753,7 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
 
     # 프로토콜 로그 (페이지네이션)
     log_y = L.tp_log_y
-    history = gs.teleport_log
-    total = len(history)
-    total_pages = max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
-    gs.history_page = max(0, min(gs.history_page, total_pages - 1))
-    start = gs.history_page * HISTORY_PAGE_SIZE
-    end = min(start + HISTORY_PAGE_SIZE, total)
-    page_items = history[start:end]
+    page_items, gs.history_page, total_pages = paginate(gs.teleport_log, gs.history_page)
 
     title_text = t("ent_tp_protocol_log")
     if total_pages > 1:
@@ -1010,10 +977,8 @@ def run_simulation():
         # 알림 메시지 (페이드 아웃)
         if gs.notify_timer > 0:
             gs.notify_timer -= dt
-            alpha = min(255, int(255 * min(1.0, gs.notify_timer / 0.3)))
-            ns = info_font.render(gs.notify_msg, True, ACCENT)
-            ns.set_alpha(alpha)
-            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
+            render_notify(screen, gs.notify_msg, gs.notify_timer, info_font,
+                          ACCENT, L.W // 2, L.notify_y)
 
         # 오버레이
         toast.update(dt)

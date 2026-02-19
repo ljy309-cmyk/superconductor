@@ -13,6 +13,12 @@ from dataclasses import dataclass, field
 import pygame
 
 from achievement_toast import AchievementToast
+from quantum.ui_common import (
+    HISTORY_PAGE_SIZE,
+    draw_bar_pattern as _draw_bar_pattern,
+    paginate,
+    wrap_text as _wrap_text,
+)
 from config_loader import cfg
 from game_base import finalize_session
 from difficulty_dialog import choose_difficulty
@@ -55,7 +61,6 @@ AUTO_BATCH_SIZE = cfg("shor", "auto_batch_size", 1)
 RSA_DEFAULT_DIFFICULTY = cfg("shor", "rsa_default_difficulty", 0)
 RSA_CRACK_SPEED = cfg("shor", "rsa_crack_speed", 0.15)
 BAR_ANIM_INTERVAL = cfg("shor", "bar_anim_interval", 0.03)
-HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ────────────────────────
 BG = (30, 30, 46)
@@ -428,31 +433,6 @@ def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h,
             screen.blit(xn_label, (xn_x, y + h - 2))
 
 
-def _draw_bar_pattern(screen, rect, clr, tier):
-    """막대에 패턴을 그려 색상 외에도 시각적으로 구분.
-
-    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
-    """
-    bx, by, bw, bh = rect
-    if bh < 4 or bw < 2:
-        return
-    # 패턴 색상: 원색을 밝게 변형
-    pc = tuple(min(255, c + 60) for c in clr[:3])
-    if tier == "high":
-        spacing = 4
-        for ly in range(by + 2, by + bh - 1, spacing):
-            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
-    elif tier == "mid":
-        spacing = 5
-        # 대각선을 사각형 내부로 클리핑
-        for offset in range(-bh, bw, spacing):
-            x1 = max(0, offset)
-            y1 = max(0, -offset)
-            diag_len = min(bw - 1 - x1, bh - 1 - y1)
-            if diag_len > 0:
-                pygame.draw.line(screen, pc,
-                                 (bx + x1, by + y1),
-                                 (bx + x1 + diag_len, by + y1 + diag_len))
 
 
 def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h,
@@ -878,16 +858,8 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
 def _draw_attempt_history(screen, ui, font, x, y):
     """시도 히스토리 (페이지네이션: PgUp/PgDn)."""
     history = ui.shor.attempt_history
-    total = len(history)
-    total_pages = max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
-
-    # 페이지 범위 클램핑
-    ui.history_page = max(0, min(ui.history_page, total_pages - 1))
+    page_items, ui.history_page, total_pages = paginate(history, ui.history_page)
     page = ui.history_page
-
-    start = page * HISTORY_PAGE_SIZE
-    end = min(start + HISTORY_PAGE_SIZE, total)
-    page_items = history[start:end]
 
     # 타이틀 + 페이지 표시
     if total_pages > 1:
@@ -943,23 +915,6 @@ def _draw_input_field(screen, ui, font, x, y):
     # 힌트
     hint = font.render(t("shor_input_hint"), True, SUBTEXT)
     screen.blit(hint, (box_x + box_w + 10, y))
-
-
-def _wrap_text(text, max_chars):
-    """텍스트를 max_chars 기준으로 줄바꿈."""
-    words = text.split()
-    lines = []
-    current = ""
-    for word in words:
-        if len(current) + len(word) + 1 > max_chars:
-            if current:
-                lines.append(current)
-            current = word
-        else:
-            current = f"{current} {word}" if current else word
-    if current:
-        lines.append(current)
-    return lines
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
