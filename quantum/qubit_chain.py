@@ -7,25 +7,29 @@
 
 import math
 import random
-import sys
 import time
 from dataclasses import dataclass, field
 
 import pygame
 
-from config_loader import cfg
-from theme import get_pg_theme
-from ui.slider import SliderPanel, PANEL_W
-from preset_hud import PresetHUD
-from help_overlay import HelpOverlay
-from sound_manager import get_sound_manager
-from achievements import check_achievements
-from replay import ReplayRecorder
 from achievement_toast import AchievementToast
-from tutorial import TutorialOverlay
-from sim_speed import apply_speed, cycle_sim_speed, speed_label
-from perf_monitor import PerfMonitor
+from achievements import check_achievements
+from config_loader import cfg
+from game_base import choose_difficulty_or_quit, finalize_session
+from game_summary import draw_game_summary
+from help_overlay import HelpOverlay
+from i18n import t, toggle_locale
 from logger import get_module_logger
+from perf_monitor import PerfMonitor
+from preset_hud import PresetHUD
+from quantum.qubit_physics import QubitState
+from quit_dialog import confirm_quit
+from replay import ReplayRecorder
+from sim_speed import apply_speed, cycle_sim_speed, speed_label
+from sound_manager import get_sound_manager
+from theme import load_pg_colors, on_theme_change
+from tutorial import TutorialOverlay
+from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("qubit_chain")
 
@@ -44,32 +48,37 @@ SHIELD_GLOW = (116, 199, 236)
 
 # 큐비트 상태별 색상
 STATE_COLORS = {
-    "stable": (166, 227, 161),     # 녹색 — 안정
-    "warning": (249, 226, 175),    # 노랑 — 경고
-    "danger": (250, 179, 135),     # 주황 — 위험
-    "collapsed": (243, 139, 168),  # 빨강 — 붕괴
+    QubitState.STABLE: (166, 227, 161),  # 녹색 — 안정
+    QubitState.WARNING: (249, 226, 175),  # 노랑 — 경고
+    QubitState.DANGER: (250, 179, 135),  # 주황 — 위험
+    QubitState.COLLAPSED: (243, 139, 168),  # 빨강 — 붕괴
+}
+
+
+_COLOR_MAP = {
+    "BG": "BG",
+    "TEXT_CLR": "TEXT",
+    "ACCENT": "ACCENT_BLUE",
+    "LINK_CLR": "SUBTEXT",
+    "LINK_ENTANGLED": "ACCENT_PURPLE",
+    "SHIELD_GLOW": "SHIELD_GLOW",
+    "OVERLAY_CLR": "OVERLAY",
+    "WHITE": "WHITE",
 }
 
 
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, ACCENT, LINK_CLR, LINK_ENTANGLED, STATE_COLORS
-    global SHIELD_GLOW, OVERLAY_CLR, WHITE
+    global STATE_COLORS
+    load_pg_colors(_COLOR_MAP, globals())
+    from theme import get_pg_theme
+
     pg = get_pg_theme()
-    BG = pg.BG
-    TEXT_CLR = pg.TEXT
-    ACCENT = pg.ACCENT_BLUE
-    LINK_CLR = pg.SUBTEXT
-    LINK_ENTANGLED = pg.ACCENT_PURPLE
-    SHIELD_GLOW = pg.SHIELD_GLOW
-    OVERLAY_CLR = pg.OVERLAY
-    WHITE = pg.WHITE
-    STATE_COLORS = {
-        "stable": pg.STABLE,
-        "warning": pg.WARNING,
-        "danger": pg.DANGER,
-        "collapsed": pg.COLLAPSED,
-    }
+    STATE_COLORS[QubitState.STABLE] = pg.STABLE
+    STATE_COLORS[QubitState.WARNING] = pg.WARNING
+    STATE_COLORS[QubitState.DANGER] = pg.DANGER
+    STATE_COLORS[QubitState.COLLAPSED] = pg.COLLAPSED
+
 
 # ── 물리 파라미터 (config.json에서 로드, 없으면 기본값) ──
 STRESS_THRESHOLD = cfg("qubit_chain", "stress_threshold", 100.0)
@@ -95,9 +104,11 @@ PULSE_MAX = 8  # 글로우 펄스 최대 크기
 
 # ── 게임 상태 데이터클래스 ────────────────────────────
 
+
 @dataclass
 class QubitChainState:
     """큐비트 연쇄 붕괴 시뮬레이션 게임 상태."""
+
     t: float = 0.0
     paused: bool = False
     cascade_log: list[str] = field(default_factory=list)
@@ -128,6 +139,7 @@ class QubitChainState:
 
 # ── 큐비트 노드 클래스 ───────────────────────────────
 
+
 class QubitNode:
     """초전도 큐비트 노드."""
 
@@ -135,20 +147,20 @@ class QubitNode:
         self.qid = qid
         self.x = x
         self.y = y
-        self.stress = 0.0          # 현재 하중 (%)
+        self.stress = 0.0  # 현재 하중 (%)
         self.collapsed = False
         self.collapse_timer = 0.0  # 붕괴 애니메이션 타이머
-        self.neighbors: list["QubitNode"] = []
+        self.neighbors: list[QubitNode] = []
 
     @property
-    def state(self) -> str:
+    def state(self) -> QubitState:
         if self.collapsed:
-            return "collapsed"
+            return QubitState.COLLAPSED
         if self.stress >= _STRESS_DANGER:
-            return "danger"
+            return QubitState.DANGER
         if self.stress >= _STRESS_WARNING:
-            return "warning"
-        return "stable"
+            return QubitState.WARNING
+        return QubitState.STABLE
 
     def add_neighbor(self, other: "QubitNode"):
         if other not in self.neighbors:
@@ -187,6 +199,7 @@ class QubitNode:
 
 # ── 네트워크 빌더 ────────────────────────────────────
 
+
 def _build_network() -> list[QubitNode]:
     """큐비트 네트워크 생성 (육각형 + 중앙)."""
     cx, cy = WIDTH // 2, HEIGHT // 2 + 20
@@ -216,6 +229,7 @@ def _build_network() -> list[QubitNode]:
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
+
 def _draw_link(screen, a: QubitNode, b: QubitNode):
     """큐비트 간 얽힘 연결선."""
     color = LINK_ENTANGLED if (a.collapsed or b.collapsed) else LINK_CLR
@@ -223,8 +237,9 @@ def _draw_link(screen, a: QubitNode, b: QubitNode):
     pygame.draw.line(screen, color, (int(a.x), int(a.y)), (int(b.x), int(b.y)), width)
 
 
-def _draw_node(screen, node: QubitNode, t: float, font: pygame.font.Font,
-               shield_active: bool = False, focused: bool = False):
+def _draw_node(
+    screen, node: QubitNode, t: float, font: pygame.font.Font, shield_active: bool = False, focused: bool = False
+):
     """큐비트 노드 렌더링."""
     color = STATE_COLORS[node.state]
     cx, cy = int(node.x), int(node.y)
@@ -238,8 +253,9 @@ def _draw_node(screen, node: QubitNode, t: float, font: pygame.font.Font,
     if shield_active and not node.collapsed:
         pulse_s = int(6 + 4 * math.sin(t * 4))
         glow_surf = pygame.Surface((2 * (NODE_RADIUS + pulse_s), 2 * (NODE_RADIUS + pulse_s)), pygame.SRCALPHA)
-        pygame.draw.circle(glow_surf, (*SHIELD_GLOW, 40),
-                           (NODE_RADIUS + pulse_s, NODE_RADIUS + pulse_s), NODE_RADIUS + pulse_s)
+        pygame.draw.circle(
+            glow_surf, (*SHIELD_GLOW, 40), (NODE_RADIUS + pulse_s, NODE_RADIUS + pulse_s), NODE_RADIUS + pulse_s
+        )
         screen.blit(glow_surf, (cx - NODE_RADIUS - pulse_s, cy - NODE_RADIUS - pulse_s))
 
     # 글로우 펄스 (stress 비례)
@@ -268,6 +284,10 @@ def _draw_node(screen, node: QubitNode, t: float, font: pygame.font.Font,
     id_surf = font.render(f"Q{node.qid}", True, TEXT_CLR)
     screen.blit(id_surf, (cx - id_surf.get_width() // 2, cy + NODE_RADIUS + 4))
 
+    # 상태 텍스트 라벨 (색상에만 의존하지 않도록)
+    state_label = font.render(node.state.label, True, color)
+    screen.blit(state_label, (cx - state_label.get_width() // 2, cy + NODE_RADIUS + 16))
+
 
 def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y: int):
     """개별 큐비트 하중 바."""
@@ -282,15 +302,21 @@ def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y:
     pygame.draw.rect(screen, color, (bar_x, y + 2, fill_w, bar_h))
     pygame.draw.rect(screen, TEXT_CLR, (bar_x, y + 2, bar_w, bar_h), 1)
 
+    # 상태 라벨
+    sl = font.render(node.state.label, True, color)
+    screen.blit(sl, (bar_x + bar_w + 4, y))
+
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
+
 
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
-    pygame.display.set_caption("Qubit Entanglement Cascade")
+    pygame.display.set_caption(t("game_title_qubit_chain"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
@@ -334,6 +360,10 @@ def run_simulation():
     # ── 성능 모니터 ──
     perf = PerfMonitor(target_fps=FPS)
 
+    # ── 시작 시 난이도 선택 ──
+    if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
+        return
+
     running = True
     while running:
         raw_dt = clock.tick(FPS) / 1000.0
@@ -351,8 +381,10 @@ def run_simulation():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if confirm_quit(screen, info_font):
+                        running = False
                 elif event.key == pygame.K_r:
                     # 전체 리셋
                     for n in nodes:
@@ -409,6 +441,10 @@ def run_simulation():
                             n.stress = 0.0
                             snd.play("error_correct")
                             gs.cascade_log.append(f"Q{n.qid} 오류 정정! (stress → 0)")
+                elif event.key == pygame.K_l:
+                    toggle_locale()
+                elif event.key == pygame.K_g:
+                    toast.toggle_history()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 for n in nodes:
@@ -472,17 +508,19 @@ def run_simulation():
                         snd.play("collapse")
                         if gs.shield_active:
                             gs.cascade_log.append(
-                                f"Q{n.qid} COLLAPSED → +{int(effective_cascade)} (shielded from +{int(cascade_damage)})")
+                                f"Q{n.qid} COLLAPSED → +{int(effective_cascade)} (shielded from +{int(cascade_damage)})"
+                            )
                         else:
-                            gs.cascade_log.append(
-                                f"Q{n.qid} COLLAPSED → cascade +{int(cascade_damage)} to neighbors")
+                            gs.cascade_log.append(f"Q{n.qid} COLLAPSED → cascade +{int(cascade_damage)} to neighbors")
 
-            recorder.record_frame({
-                "stresses": [n.stress for n in nodes],
-                "collapsed": [n.collapsed for n in nodes],
-                "shield": gs.shield_active,
-                "t": round(gs.survival_time, 2),
-            })
+            recorder.record_frame(
+                {
+                    "stresses": [n.stress for n in nodes],
+                    "collapsed": [n.collapsed for n in nodes],
+                    "shield": gs.shield_active,
+                    "t": round(gs.survival_time, 2),
+                }
+            )
 
         # 로그 길이 제한
         if len(gs.cascade_log) > 8:
@@ -499,7 +537,7 @@ def run_simulation():
             screen.blit(overlay, (0, 0))
 
         # 타이틀
-        title_surf = title_font.render("Qubit Entanglement Cascade", True, ACCENT)
+        title_surf = title_font.render(t("game_title_qubit_chain"), True, ACCENT)
         screen.blit(title_surf, (WIDTH // 2 - title_surf.get_width() // 2, 12))
 
         # 얽힘 연결선
@@ -517,7 +555,7 @@ def run_simulation():
 
         # 하중 바 패널
         panel_x, panel_y = 15, 50
-        panel_label = info_font.render("── Stress ──", True, ACCENT)
+        panel_label = info_font.render(t("qc_stress_panel"), True, ACCENT)
         screen.blit(panel_label, (panel_x, panel_y - 16))
         for i, n in enumerate(nodes):
             _draw_stress_bar(screen, n, font, panel_x, panel_y + i * 18)
@@ -525,36 +563,40 @@ def run_simulation():
         # 이벤트 로그
         log_x = 15
         log_y = panel_y + len(nodes) * 18 + 20
-        log_label = info_font.render("── Event Log ──", True, ACCENT)
+        log_label = info_font.render(t("qc_event_log"), True, ACCENT)
         screen.blit(log_label, (log_x, log_y - 16))
         for i, msg in enumerate(gs.cascade_log):
-            clr = STATE_COLORS["collapsed"] if "COLLAPSED" in msg else TEXT_CLR
+            clr = STATE_COLORS[QubitState.COLLAPSED] if "COLLAPSED" in msg else TEXT_CLR
             surf = info_font.render(msg, True, clr)
             screen.blit(surf, (log_x, log_y + i * 15))
 
         # 방어막 상태 HUD (미션3)
         hud_x, hud_y = 720, 50
         if gs.shield_active:
-            shield_txt = info_font.render(f"SHIELD ON ({gs.shield_timer:.1f}s)", True, SHIELD_GLOW)
+            shield_txt = info_font.render(t("qc_shield_on_timer", time=gs.shield_timer), True, SHIELD_GLOW)
             screen.blit(shield_txt, (hud_x, hud_y))
-            dmg_txt = info_font.render(f"cascade: +{int(cascade_damage)} → +{int(cascade_damage * gs.qec_reduction)}", True, SHIELD_CLR)
+            dmg_txt = info_font.render(
+                t("qc_cascade_dmg", orig=int(cascade_damage), reduced=int(cascade_damage * gs.qec_reduction)),
+                True,
+                SHIELD_CLR,
+            )
             screen.blit(dmg_txt, (hud_x, hud_y + 16))
         elif gs.cooldown_timer > 0:
-            cd_txt = info_font.render(f"Shield CD: {gs.cooldown_timer:.1f}s", True, STATE_COLORS["warning"])
+            cd_txt = info_font.render(t("qc_shield_cd", time=gs.cooldown_timer), True, STATE_COLORS[QubitState.WARNING])
             screen.blit(cd_txt, (hud_x, hud_y))
         else:
-            ready_txt = info_font.render("Shield: READY (S)", True, STATE_COLORS["stable"])
+            ready_txt = info_font.render(t("qc_shield_ready"), True, STATE_COLORS[QubitState.STABLE])
             screen.blit(ready_txt, (hud_x, hud_y))
 
         if gs.heal_cooldown > 0:
-            heal_txt = info_font.render(f"Heal CD: {gs.heal_cooldown:.1f}s", True, STATE_COLORS["warning"])
+            heal_txt = info_font.render(t("qc_heal_cd", time=gs.heal_cooldown), True, STATE_COLORS[QubitState.WARNING])
         else:
-            heal_txt = info_font.render("Heal: READY (H)", True, STATE_COLORS["stable"])
+            heal_txt = info_font.render(t("qc_heal_ready"), True, STATE_COLORS[QubitState.STABLE])
         screen.blit(heal_txt, (hud_x, hud_y + 32))
 
         # 최종보스미션: 생존 시간 표시
-        time_clr = STATE_COLORS["collapsed"] if gs.game_over else ACCENT
-        time_txt = info_font.render(f"Survival: {gs.survival_time:.1f}s", True, time_clr)
+        time_clr = STATE_COLORS[QubitState.COLLAPSED] if gs.game_over else ACCENT
+        time_txt = info_font.render(t("survival_time", time=gs.survival_time), True, time_clr)
         screen.blit(time_txt, (hud_x, hud_y + 52))
 
         # 슬라이더 패널 그리기
@@ -562,10 +604,16 @@ def run_simulation():
 
         # 조작 안내
         hints = [
-            f"노이즈: {noise_rate:.1f}%/s  |  연쇄: +{int(cascade_damage)}  |  {'SHIELD' if gs.shield_active else ''}  |  {'일시정지' if gs.paused else '실행 중'}",
-            "클릭/Enter: 오류 정정  |  Tab: 큐비트 선택  |  N: 노이즈  |  S: 방어막  |  H: 힐링",
-            "↑↓/←→: 파라미터 조절  |  우측 패널: 슬라이더  |  SPACE: 일시정지",
-            f"R: 전체 리셋  |  [/]: 속도 ({speed_label()})  |  ESC: 종료",
+            t(
+                "hint_noise_info",
+                rate=noise_rate,
+                damage=int(cascade_damage),
+                shield_state=t("shield_on") if gs.shield_active else "",
+                pause_state=t("paused") if gs.paused else t("running_state"),
+            ),
+            t("hint_click_correct"),
+            t("hint_params"),
+            t("hint_reset") + f"  |  [/]: {speed_label()}",
         ]
         for i, hint in enumerate(hints):
             surf = info_font.render(hint, True, TEXT_CLR)
@@ -586,26 +634,42 @@ def run_simulation():
                 if gs.survival_time >= milestone and milestone not in gs.ach_checked_milestones:
                     gs.ach_checked_milestones.add(milestone)
                     try:
-                        new_ach = check_achievements("qubit_chain", {
-                            "survival_time": gs.survival_time,
-                            "collapsed_count": sum(1 for n in nodes if n.collapsed),
-                            "shield_uses": gs.qec_uses,
-                        })
+                        new_ach = check_achievements(
+                            "qubit_chain",
+                            {
+                                "survival_time": gs.survival_time,
+                                "collapsed_count": sum(1 for n in nodes if n.collapsed),
+                                "shield_uses": gs.qec_uses,
+                            },
+                        )
                         toast.show_many(new_ach)
                     except (ImportError, KeyError, TypeError) as e:
                         _log.warning("실시간 업적 확인 실패: %s", e)
 
         if all_collapsed:
-            over_surf = title_font.render(
-                f"ALL QUBITS COLLAPSED  |  Survival: {gs.survival_time:.2f}s  |  Press R to reset",
-                True, STATE_COLORS["collapsed"])
-            screen.blit(over_surf, (WIDTH // 2 - over_surf.get_width() // 2, HEIGHT // 2 - 80))
+            collapsed_n = sum(1 for n in nodes if n.collapsed)
+            alive_n = len(nodes) - collapsed_n
+            draw_game_summary(
+                screen,
+                t("summary_title_gameover"),
+                [
+                    (t("summary_survival_time"), f"{gs.survival_time:.2f}s"),
+                    (t("summary_collapsed"), f"{collapsed_n} / {len(nodes)}"),
+                    (t("summary_alive"), str(alive_n)),
+                    (t("summary_shield_uses"), str(gs.qec_uses)),
+                    (t("summary_noise_rate"), f"{noise_rate:.3f}"),
+                    (t("summary_cascade_dmg"), str(int(cascade_damage))),
+                ],
+                font=info_font,
+                title_font=title_font,
+            )
 
         preset_hud.draw(screen, info_font, hud_x, hud_y + 72)
 
         # 업적 토스트 업데이트/렌더링
         toast.update(dt)
         toast.draw(screen, info_font)
+        toast.draw_history(screen, info_font)
 
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, info_font)
@@ -615,58 +679,27 @@ def run_simulation():
 
     perf.log_summary()
 
-    # 최종미션: 플레이 기록 저장
-    try:
-        from data_ai.play_logger import get_logger
-        get_logger().log_session("qubit_chain", {
-            "total_qubits": len(nodes),
-            "collapsed_count": sum(1 for n in nodes if n.collapsed),
-            "alive_count": sum(1 for n in nodes if not n.collapsed),
-            "noise_rate": noise_rate,
-            "cascade_damage": cascade_damage,
-            "shield_uses": gs.qec_uses,
-            "max_stress": max((n.stress for n in nodes), default=0),
-            "survival_time": round(gs.survival_time, 2),
-        })
-    except Exception as e:
-        _log.error("플레이 기록 실패: %s", e)
+    session_data = {
+        "total_qubits": len(nodes),
+        "collapsed_count": sum(1 for n in nodes if n.collapsed),
+        "alive_count": sum(1 for n in nodes if not n.collapsed),
+        "noise_rate": noise_rate,
+        "cascade_damage": cascade_damage,
+        "shield_uses": gs.qec_uses,
+        "max_stress": max((n.stress for n in nodes), default=0),
+        "survival_time": round(gs.survival_time, 2),
+    }
 
-    # 보고서 생성
-    try:
-        from report import generate_report
-        generate_report("qubit_chain", {
-            "total_qubits": len(nodes),
-            "collapsed_count": sum(1 for n in nodes if n.collapsed),
-            "survival_time": round(gs.survival_time, 2),
-            "shield_uses": gs.qec_uses,
-            "noise_rate": noise_rate,
-            "cascade_damage": cascade_damage,
-        })
-    except Exception as e:
-        _log.error("보고서 생성 실패: %s", e)
-
-    # 업적 확인
-    try:
-        new_ach = check_achievements("qubit_chain", {
-            "survival_time": gs.survival_time,
-            "collapsed_count": sum(1 for n in nodes if n.collapsed),
-            "shield_uses": gs.qec_uses,
-        })
-        for ach in new_ach:
-            _log.info("Achievement unlocked: %s — %s", ach["title"], ach["desc"])
-    except Exception as e:
-        _log.error("업적 확인 실패: %s", e)
-
-    # 최종보스미션 (5-3): 랭킹 서버에 생존 시간 POST
-    if gs.survival_time > 0:
-        try:
+    def _post_ranking():
+        if gs.survival_time > 0:
             import requests
+
             from data_ai.ranking_server import get_base_url, start_server
             from score_integrity import sign_score
+
             start_server()
             _score = round(gs.survival_time, 2)
-            _name = "Player"
-            _mode = "Entanglement Cascade"
+            _name, _mode = "Player", "Entanglement Cascade"
             payload = {
                 "name": _name,
                 "score": _score,
@@ -674,12 +707,16 @@ def run_simulation():
                 "token": sign_score(_name, _score, _mode),
             }
             requests.post(f"{get_base_url()}/ranking", json=payload, timeout=3)
-        except Exception as e:
-            _log.error("랭킹 등록 실패: %s", e)
 
-    recorder.save({"survival_time": round(gs.survival_time, 2)})
-    snd.quit()
-    pygame.quit()
+    finalize_session(
+        "qubit_chain",
+        session_data,
+        recorder=recorder,
+        recorder_meta={"survival_time": round(gs.survival_time, 2)},
+        snd=snd,
+        theme_callback=_load_theme_colors,
+        extra_cleanup=_post_ranking,
+    )
 
 
 def open_qubit_chain():

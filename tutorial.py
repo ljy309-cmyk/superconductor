@@ -23,6 +23,7 @@ except ImportError:
 import json
 import os
 
+from i18n import t
 from logger import get_module_logger
 
 _log = get_module_logger("tutorial")
@@ -31,67 +32,165 @@ _SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tutorial_
 # 모듈별 튜토리얼 스텝
 _TUTORIAL_STEPS: dict[str, list[dict]] = {
     "qubit_chain": [
-        {"title": "Welcome to Qubit Cascade!",
-         "text": "초전도 큐비트 7개가 얽힘으로 연결되어 있습니다.\n외부 노이즈가 큐비트를 불안정하게 만듭니다.",
-         "highlight": "center"},
-        {"title": "Step 1: Error Correction",
-         "text": "큐비트를 클릭하면 stress가 0으로 초기화됩니다.\n빨간색으로 변하기 전에 클릭하세요!",
-         "highlight": "click"},
-        {"title": "Step 2: QEC Shield",
-         "text": "S 키를 누르면 QEC 방어막이 활성화됩니다.\n노이즈와 연쇄 데미지가 크게 감소합니다.",
-         "highlight": "shield"},
-        {"title": "Step 3: Healing",
-         "text": "H 키를 누르면 모든 큐비트의 stress가 감소합니다.\n쿨다운이 있으니 타이밍을 맞추세요!",
-         "highlight": "heal"},
-        {"title": "Step 4: Presets",
-         "text": "1/2/3 키로 난이도를 바꿀 수 있습니다.\n1=Easy, 2=Normal, 3=Hard",
-         "highlight": "preset"},
-        {"title": "Goal: Survive!",
-         "text": "모든 큐비트가 붕괴하면 게임 오버입니다.\n최대한 오래 생존하세요! R 키로 리셋 가능.",
-         "highlight": "none"},
+        {
+            "title": "Welcome to Qubit Cascade!",
+            "text": "초전도 큐비트 7개가 얽힘으로 연결되어 있습니다.\n외부 노이즈가 큐비트를 불안정하게 만듭니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "Step 1: Error Correction",
+            "text": "큐비트를 클릭하면 stress가 0으로 초기화됩니다.\n빨간색으로 변하기 전에 클릭하세요!",
+            "highlight": "click",
+        },
+        {
+            "title": "Step 2: QEC Shield",
+            "text": "S 키를 누르면 QEC 방어막이 활성화됩니다.\n노이즈와 연쇄 데미지가 크게 감소합니다.",
+            "highlight": "shield",
+        },
+        {
+            "title": "Step 3: Healing",
+            "text": "H 키를 누르면 모든 큐비트의 stress가 감소합니다.\n쿨다운이 있으니 타이밍을 맞추세요!",
+            "highlight": "heal",
+        },
+        {
+            "title": "Step 4: Presets",
+            "text": "1/2/3 키로 난이도를 바꿀 수 있습니다.\n1=Easy, 2=Normal, 3=Hard",
+            "highlight": "preset",
+        },
+        {
+            "title": "Goal: Survive!",
+            "text": "모든 큐비트가 붕괴하면 게임 오버입니다.\n최대한 오래 생존하세요! R 키로 리셋 가능.",
+            "highlight": "none",
+        },
     ],
     "tunneling": [
-        {"title": "Quantum Tunneling",
-         "text": "입자가 에너지 장벽을 확률적으로 통과합니다.\n고전 물리에서는 불가능하지만 양자역학에서는 가능!",
-         "highlight": "center"},
-        {"title": "Controls",
-         "text": "클릭: 입자 재발사\nUp/Down: 속도 조절\nLeft/Right: 장벽 두께",
-         "highlight": "none"},
+        {
+            "title": "Quantum Tunneling",
+            "text": "입자가 에너지 장벽을 확률적으로 통과합니다.\n고전 물리에서는 불가능하지만 양자역학에서는 가능!",
+            "highlight": "center",
+        },
+        {
+            "title": "Controls",
+            "text": "클릭: 입자 재발사\nUp/Down: 속도 조절\nLeft/Right: 장벽 두께",
+            "highlight": "none",
+        },
+    ],
+    "qkd_advanced": [
+        {
+            "title": "Advanced QKD Protocols",
+            "text": "E91(얽힘 기반), 키 시프팅/프라이버시 증폭,\n다자간 QKD(GHZ), BB84 vs E91 비교를 실험합니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "E91 Protocol",
+            "text": "EPR 벨 쌍으로 양자 키를 분배합니다.\n벨 부등식(S>2)으로 도청 여부를 검증합니다!",
+            "highlight": "none",
+        },
+        {
+            "title": "OTP Encryption Demo",
+            "text": "PA 완료 후 최종 키로 XOR 암호화 시연!\nQKD → 실용 암호(One-Time Pad) 연결을 확인하세요.",
+            "highlight": "none",
+        },
+        {
+            "title": "Multi-Party GHZ (3~5)",
+            "text": "GHZ 모드에서 Up/Down 키로 파티 수를 변경합니다.\n3→4→5자간 얽힘 네트워크를 확장할 수 있습니다!",
+            "highlight": "none",
+        },
+        {
+            "title": "BB84 vs E91 Compare",
+            "text": "같은 Eve 조건에서 BB84(QBER)와 E91(Bell)\n두 탐지 방식의 차이를 실시간 비교합니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Controls",
+            "text": "SPACE: 배치 실행  |  Tab: 모드 전환  |  E: Eve 토글\nS: 키 시프팅  |  A: 자동  |  R: 리셋  |  Up/Down: 파티 수",
+            "highlight": "none",
+        },
     ],
     "bb84_defense": [
-        {"title": "BB84 Quantum Key Distribution",
-         "text": "Alice가 Bob에게 양자 키를 전송합니다.\nEve(도청자)가 중간에서 도청을 시도합니다!",
-         "highlight": "center"},
-        {"title": "Defense",
-         "text": "SPACE: 통신망 폐쇄/재개\nA: 자동차단 ON/OFF\n에러율이 높으면 Eve가 도청 중입니다!",
-         "highlight": "none"},
+        {
+            "title": "BB84 Quantum Key Distribution",
+            "text": "Alice가 Bob에게 양자 키를 전송합니다.\nEve(도청자)가 중간에서 도청을 시도합니다!",
+            "highlight": "center",
+        },
+        {
+            "title": "Defense",
+            "text": "SPACE: 통신망 폐쇄/재개\nA: 자동차단 ON/OFF\n에러율이 높으면 Eve가 도청 중입니다!",
+            "highlight": "none",
+        },
     ],
     "squid_mines": [
-        {"title": "SQUID Magnetic Sensor",
-         "text": "SQUID 센서로 숨겨진 자기 지뢰를 찾으세요.\n마우스를 움직이면 자기 선속이 변합니다.",
-         "highlight": "center"},
-        {"title": "Detection",
-         "text": "클릭: 지뢰 마킹\nUp/Down: 민감도 조절\n그래프를 잘 관찰하세요!",
-         "highlight": "none"},
+        {
+            "title": "SQUID Magnetic Sensor",
+            "text": "SQUID 센서로 숨겨진 자기 지뢰를 찾으세요.\n마우스를 움직이면 자기 선속이 변합니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "Detection",
+            "text": "클릭: 지뢰 마킹\nUp/Down: 민감도 조절\n그래프를 잘 관찰하세요!",
+            "highlight": "none",
+        },
+    ],
+    "scada_security": [
+        {
+            "title": "SCADA Security Scenario",
+            "text": "SCADA 시스템이 MITM(중간자) 공격을 받습니다.\n공격자가 센서 데이터를 조작하여 시스템을 속입니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "BB84 QKD Defense",
+            "text": "BB84 양자 키 분배로 QBER을 모니터링합니다.\nQBER > 11% → 공격 탐지 → 양자 인증 채널 구축!",
+            "highlight": "none",
+        },
+        {
+            "title": "Controls",
+            "text": "SPACE: 수동 공격/방어  |  A: 자동 시나리오 토글\nQ: QKD 토글  |  P: 일시정지  |  R: 리셋",
+            "highlight": "none",
+        },
+    ],
+    "entanglement": [
+        {
+            "title": "Quantum Entanglement",
+            "text": "벨 상태, CHSH 부등식, 양자 텔레포테이션을\n직접 실험해 볼 수 있습니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "3 Modes",
+            "text": "Tab 키로 모드를 전환합니다:\n1) Bell States  2) CHSH  3) Teleportation",
+            "highlight": "none",
+        },
+        {
+            "title": "Bell States",
+            "text": "1-4 키로 4종 벨 상태를 선택하고\nSPACE로 측정하여 상관관계를 확인하세요!",
+            "highlight": "none",
+        },
     ],
 }
 
 
-def _load_seen() -> set[str]:
-    """이미 본 튜토리얼 모듈 목록."""
+def _load_progress() -> dict:
+    """튜토리얼 진행 상태 로드.
+
+    반환 형식: {"module": {"completed": bool, "step": int}, ...}
+    레거시 형식(리스트)도 호환.
+    """
     if os.path.exists(_SAVE_PATH):
         try:
-            with open(_SAVE_PATH, "r") as f:
-                return set(json.load(f))
+            with open(_SAVE_PATH) as f:
+                data = json.load(f)
+            # 레거시 호환: 리스트 → dict 변환
+            if isinstance(data, list):
+                return {m: {"completed": True, "step": 0} for m in data}
+            return data
         except (OSError, json.JSONDecodeError, TypeError) as e:
             _log.warning("튜토리얼 상태 로드 실패: %s", e)
-    return set()
+    return {}
 
 
-def _save_seen(seen: set[str]):
+def _save_progress(progress: dict):
     try:
         with open(_SAVE_PATH, "w") as f:
-            json.dump(sorted(seen), f)
+            json.dump(progress, f, indent=2)
     except OSError as e:
         _log.warning("튜토리얼 상태 저장 실패: %s", e)
 
@@ -107,9 +206,16 @@ class TutorialOverlay:
         self._completed = False
 
         if auto_show and self.steps:
-            seen = _load_seen()
-            if module_name not in seen:
+            progress = _load_progress()
+            mod_state = progress.get(module_name, {})
+            if mod_state.get("completed"):
+                self._completed = True
+            else:
                 self.visible = True
+                # 이전 진행률에서 이어서 시작
+                saved_step = mod_state.get("step", 0)
+                if 0 < saved_step < len(self.steps):
+                    self.current_step = saved_step
 
     def handle_event(self, event) -> bool:
         """이벤트 처리. T 키로 토글, Enter/Space로 다음 스텝."""
@@ -131,10 +237,13 @@ class TutorialOverlay:
             self.current_step += 1
             if self.current_step >= len(self.steps):
                 self._finish()
+            else:
+                self._save_step()
             return True
 
         if event.key == pygame.K_LEFT:
             self.current_step = max(0, self.current_step - 1)
+            self._save_step()
             return True
 
         if event.key == pygame.K_ESCAPE:
@@ -143,13 +252,25 @@ class TutorialOverlay:
 
         return False
 
+    def _save_step(self):
+        """현재 진행 단계 저장."""
+        progress = _load_progress()
+        progress[self.module_name] = {
+            "completed": False,
+            "step": self.current_step,
+        }
+        _save_progress(progress)
+
     def _finish(self):
         """튜토리얼 완료."""
         self.visible = False
         self._completed = True
-        seen = _load_seen()
-        seen.add(self.module_name)
-        _save_seen(seen)
+        progress = _load_progress()
+        progress[self.module_name] = {
+            "completed": True,
+            "step": len(self.steps),
+        }
+        _save_progress(progress)
 
     def draw(self, screen, font):
         """튜토리얼 오버레이 렌더링."""
@@ -188,6 +309,6 @@ class TutorialOverlay:
             screen.blit(line_surf, (box_x + 16, box_y + 36 + i * 18))
 
         # 네비게이션 힌트
-        nav = "Enter/Right: Next  |  Left: Previous  |  ESC: Skip"
+        nav = t("tutorial_nav_hint")
         nav_surf = font.render(nav, True, (88, 91, 112))
         screen.blit(nav_surf, (box_x + box_w // 2 - nav_surf.get_width() // 2, box_y + box_h - 22))

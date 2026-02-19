@@ -180,6 +180,7 @@ class TestCoolingSystemStartStop(unittest.TestCase):
         cs.add_listener(lambda s: states.append(s))
         cs.start()
         import time
+
         time.sleep(0.1)
         cs.stop()
         self.assertGreater(len(states), 0)

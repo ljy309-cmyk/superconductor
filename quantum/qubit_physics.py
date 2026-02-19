@@ -12,8 +12,32 @@
 
 import math
 import random
+from enum import Enum
 
 from config_loader import cfg
+
+
+class QubitState(Enum):
+    """큐비트 상태 — 문자열 대신 Enum 사용."""
+
+    STABLE = "stable"
+    WARNING = "warning"
+    DANGER = "danger"
+    COLLAPSED = "collapsed"
+
+    @property
+    def label(self) -> str:
+        """노드 아래에 표시할 짧은 상태 라벨."""
+        return _STATE_LABELS[self]
+
+
+# 렌더링용 짧은 라벨 (i18n 미적용 — 짧은 약어이므로 고정)
+_STATE_LABELS = {
+    QubitState.STABLE: "OK",
+    QubitState.WARNING: "WARN",
+    QubitState.DANGER: "CRIT",
+    QubitState.COLLAPSED: "DEAD",
+}
 
 
 # 물리 파라미터 (config.json에서 로드, 없으면 기본값)
@@ -35,17 +59,17 @@ class QubitNode:
         self.stress = 0.0
         self.collapsed = False
         self.collapse_timer = 0.0
-        self.neighbors: list["QubitNode"] = []
+        self.neighbors: list[QubitNode] = []
 
     @property
-    def state(self) -> str:
+    def state(self) -> QubitState:
         if self.collapsed:
-            return "collapsed"
+            return QubitState.COLLAPSED
         if self.stress >= _STRESS_DANGER:
-            return "danger"
+            return QubitState.DANGER
         if self.stress >= _STRESS_WARNING:
-            return "warning"
-        return "stable"
+            return QubitState.WARNING
+        return QubitState.STABLE
 
     def add_neighbor(self, other: "QubitNode"):
         if other not in self.neighbors:
@@ -128,8 +152,9 @@ class QubitNetwork:
         self._cascade_events.clear()
         return events
 
-    def update(self, dt: float, noise_rate: float, cascade_damage: float,
-               shield_active: bool, qec_reduction: float) -> list[int]:
+    def update(
+        self, dt: float, noise_rate: float, cascade_damage: float, shield_active: bool, qec_reduction: float
+    ) -> list[int]:
         """물리 업데이트. 붕괴된 노드 ID 목록 반환."""
         noise_mult = qec_reduction if shield_active else 1.0
         collapsed_ids: list[int] = []
@@ -151,11 +176,9 @@ class QubitNetwork:
                     changed = True
                     collapsed_ids.append(n.qid)
                     if shield_active:
-                        self._cascade_events.append(
-                            f"Q{n.qid} COLLAPSED (shielded: +{int(effective_cascade)})")
+                        self._cascade_events.append(f"Q{n.qid} COLLAPSED (shielded: +{int(effective_cascade)})")
                     else:
-                        self._cascade_events.append(
-                            f"Q{n.qid} COLLAPSED → cascade +{int(cascade_damage)}")
+                        self._cascade_events.append(f"Q{n.qid} COLLAPSED → cascade +{int(cascade_damage)}")
 
         return collapsed_ids
 

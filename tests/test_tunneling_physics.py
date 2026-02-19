@@ -4,21 +4,15 @@ import math
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock
-
-# pygame/tkinter mock
-sys.modules.setdefault("pygame", MagicMock())
-sys.modules.setdefault("pygame.time", MagicMock())
-sys.modules.setdefault("pygame.mixer", MagicMock())
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from quantum.tunneling import (
+from quantum.tunneling_physics import (
+    _TUNNEL_DECAY,
     BARRIER_WIDTH_DEFAULT,
     BARRIER_WIDTH_MAX,
     BARRIER_WIDTH_MIN,
     TUNNEL_PROB_BASE,
-    _TUNNEL_DECAY,
     _calc_tunnel_prob,
 )
 

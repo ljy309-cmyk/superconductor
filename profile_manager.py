@@ -8,10 +8,10 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 
-from presets import list_profiles, delete_profile, rename_profile, load_profile
-from theme import get_tk_theme, FONTS
 from i18n import t
 from logger import get_module_logger
+from presets import delete_profile, list_profiles, load_profile, rename_profile
+from theme import FONTS, get_tk_theme
 
 _log = get_module_logger("profile_manager")
 
@@ -35,8 +35,11 @@ class ProfileManager(tk.Toplevel):
 
         # 상단 라벨
         tk.Label(
-            self, text=t("profile_heading"), font=FONTS.HEADING,
-            bg=_tk.BG, fg=_tk.TEXT,
+            self,
+            text=t("profile_heading"),
+            font=FONTS.HEADING,
+            bg=_tk.BG,
+            fg=_tk.TEXT,
         ).pack(pady=(12, 6))
 
         # 리스트 프레임
@@ -47,12 +50,15 @@ class ProfileManager(tk.Toplevel):
         scrollbar.pack(side="right", fill="y")
 
         self._listbox = tk.Listbox(
-            list_frame, font=FONTS.BODY,
-            bg=_tk.SURFACE, fg=_tk.TEXT,
+            list_frame,
+            font=FONTS.BODY,
+            bg=_tk.SURFACE,
+            fg=_tk.TEXT,
             selectbackground=_tk.ACCENT_BLUE,
             selectforeground="#ffffff",
             yscrollcommand=scrollbar.set,
-            bd=0, highlightthickness=0,
+            bd=0,
+            highlightthickness=0,
         )
         self._listbox.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self._listbox.yview)
@@ -60,8 +66,13 @@ class ProfileManager(tk.Toplevel):
 
         # 상세 정보
         self._detail_label = tk.Label(
-            self, text="", font=FONTS.SMALL,
-            bg=_tk.BG, fg=_tk.SUBTEXT, anchor="w", justify="left",
+            self,
+            text="",
+            font=FONTS.SMALL,
+            bg=_tk.BG,
+            fg=_tk.SUBTEXT,
+            anchor="w",
+            justify="left",
         )
         self._detail_label.pack(fill="x", padx=16, pady=(2, 4))
 
@@ -70,18 +81,27 @@ class ProfileManager(tk.Toplevel):
         btn_frame.pack(pady=(4, 12))
 
         tk.Button(
-            btn_frame, text=t("profile_rename"), font=FONTS.BUTTON,
-            width=12, command=self._rename,
+            btn_frame,
+            text=t("profile_rename"),
+            font=FONTS.BUTTON,
+            width=12,
+            command=self._rename,
         ).pack(side="left", padx=4)
 
         tk.Button(
-            btn_frame, text=t("profile_delete"), font=FONTS.BUTTON,
-            width=12, command=self._delete,
+            btn_frame,
+            text=t("profile_delete"),
+            font=FONTS.BUTTON,
+            width=12,
+            command=self._delete,
         ).pack(side="left", padx=4)
 
         tk.Button(
-            btn_frame, text=t("profile_refresh"), font=FONTS.BUTTON,
-            width=12, command=self._refresh_list,
+            btn_frame,
+            text=t("profile_refresh"),
+            font=FONTS.BUTTON,
+            width=12,
+            command=self._refresh_list,
         ).pack(side="left", padx=4)
 
     def _refresh_list(self):
@@ -120,8 +140,10 @@ class ProfileManager(tk.Toplevel):
             messagebox.showinfo(t("profile_title"), t("profile_select_first"), parent=self)
             return
         new_name = simpledialog.askstring(
-            t("profile_rename"), t("profile_new_name"),
-            initialvalue=name, parent=self,
+            t("profile_rename"),
+            t("profile_new_name"),
+            initialvalue=name,
+            parent=self,
         )
         if not new_name or new_name == name:
             return
@@ -129,7 +151,8 @@ class ProfileManager(tk.Toplevel):
             self._refresh_list()
         else:
             messagebox.showerror(
-                t("profile_title"), t("profile_rename_fail"),
+                t("profile_title"),
+                t("profile_rename_fail"),
                 parent=self,
             )
 

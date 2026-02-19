@@ -115,6 +115,22 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
         "levitation_freq": (float, 0.1, 10.0),
         "gravity": (float, 100.0, 2000.0),
     },
+    "achievements": {
+        "qc_survive_short": (int, 1, 600),
+        "qc_survive_long": (int, 1, 600),
+        "qc_shield_uses": (int, 1, 100),
+        "qc_no_collapse_time": (int, 1, 600),
+        "tn_tunnel_streak": (int, 1, 1000),
+        "tn_rate_threshold": (float, 0.0, 1.0),
+        "tn_rate_min_attempts": (int, 1, 1000),
+        "qec_survive_time": (int, 1, 600),
+        "qec_efficient_max_uses": (int, 0, 100),
+        "qec_efficient_time": (int, 1, 600),
+        "bb84_score_target": (int, 1, 100000),
+        "bb84_manual_blocks": (int, 1, 1000),
+        "bb84_decoy_trapped": (int, 1, 1000),
+        "all_modules_count": (int, 1, 20),
+    },
     "phase_transition": {
         "t_range_min": (float, -300.0, -100.0),
         "t_range_max": (float, -50.0, 200.0),
@@ -137,7 +153,10 @@ def _validate(section: str, key: str, value):
             _log.warning("설정 타입 오류: [%s].%s = %r (bool 필요)", section, key, value)
             return None
         return value
-    if expected_type in (int, float) and isinstance(value, (int, float)):
+    if expected_type in (int, float):
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            _log.warning("설정 타입 오류: [%s].%s = %r (%s 필요)", section, key, value, expected_type.__name__)
+            return None
         if expected_type is int:
             value = int(value)
         else:
@@ -162,7 +181,7 @@ def _load() -> dict:
     if _cache is None:
         if os.path.exists(_CONFIG_PATH):
             try:
-                with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
+                with open(_CONFIG_PATH, encoding="utf-8") as f:
                     _cache = json.load(f)
                 _log.info("config.json 로드 완료")
             except (json.JSONDecodeError, OSError) as e:
@@ -176,7 +195,10 @@ def _load() -> dict:
 
 def cfg(section: str, key: str, default=None):
     """설정 값 조회.  cfg("qubit_chain", "noise_rate_base", 3.0)"""
-    raw = _load().get(section, {}).get(key, default)
+    sec_data = _load().get(section, {})
+    if not isinstance(sec_data, dict):
+        return default
+    raw = sec_data.get(key, default)
     if raw is None:
         return default
     validated = _validate(section, key, raw)

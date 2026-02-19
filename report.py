@@ -39,6 +39,7 @@ def generate_report(module_name: str, data: dict, output_dir: str | None = None)
     """
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -97,7 +98,7 @@ def generate_report(module_name: str, data: dict, output_dir: str | None = None)
         labels = list(numeric_items.keys())[:8]
         values = [numeric_items[k] for k in labels]
         colors = ["#89b4fa", "#a6e3a1", "#f9e2af", "#cba6f7", "#f38ba8", "#fab387", "#74c7ec", "#94e2d5"]
-        bars = ax_bar.barh(labels, values, color=colors[:len(labels)])
+        bars = ax_bar.barh(labels, values, color=colors[: len(labels)])
         ax_bar.tick_params(colors="#cdd6f4", labelsize=8)
         for spine in ax_bar.spines.values():
             spine.set_color("#585b70")
@@ -105,17 +106,34 @@ def generate_report(module_name: str, data: dict, output_dir: str | None = None)
         # 값 레이블
         for bar, val in zip(bars, values):
             ax_bar.text(
-                bar.get_width(), bar.get_y() + bar.get_height() / 2,
+                bar.get_width(),
+                bar.get_y() + bar.get_height() / 2,
                 f" {val:.1f}" if isinstance(val, float) else f" {val}",
-                va="center", color="#cdd6f4", fontsize=8,
+                va="center",
+                color="#cdd6f4",
+                fontsize=8,
             )
     else:
-        ax_bar.text(0.5, 0.5, "No numeric data", transform=ax_bar.transAxes,
-                    ha="center", va="center", color="#585b70", fontsize=12)
+        ax_bar.text(
+            0.5,
+            0.5,
+            "No numeric data",
+            transform=ax_bar.transAxes,
+            ha="center",
+            va="center",
+            color="#585b70",
+            fontsize=12,
+        )
 
     # 타임스탬프
-    fig.text(0.5, 0.02, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-             ha="center", color="#585b70", fontsize=8)
+    fig.text(
+        0.5,
+        0.02,
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        ha="center",
+        color="#585b70",
+        fontsize=8,
+    )
 
     fig.tight_layout(rect=[0, 0.05, 1, 0.93])
     fig.savefig(filepath, dpi=150, facecolor="#1e1e2e", bbox_inches="tight")

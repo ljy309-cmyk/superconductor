@@ -20,8 +20,7 @@ from logger import get_module_logger
 _log = get_module_logger("sound")
 
 
-def _sine_wave(freq: float, duration_ms: int, volume: float = 0.3,
-               sample_rate: int = 22050):
+def _sine_wave(freq: float, duration_ms: int, volume: float = 0.3, sample_rate: int = 22050):
     """사인파 사운드 생성."""
     n = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n)
@@ -33,8 +32,7 @@ def _sine_wave(freq: float, duration_ms: int, volume: float = 0.3,
     return pygame.mixer.Sound(buffer=buf)
 
 
-def _dual_tone(f1: float, f2: float, duration_ms: int, volume: float = 0.25,
-               sample_rate: int = 22050):
+def _dual_tone(f1: float, f2: float, duration_ms: int, volume: float = 0.25, sample_rate: int = 22050):
     """두 주파수 혼합 사운드."""
     n = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n)
@@ -47,8 +45,7 @@ def _dual_tone(f1: float, f2: float, duration_ms: int, volume: float = 0.25,
     return pygame.mixer.Sound(buffer=buf)
 
 
-def _descending(start_freq: float, end_freq: float, duration_ms: int,
-                volume: float = 0.25, sample_rate: int = 22050):
+def _descending(start_freq: float, end_freq: float, duration_ms: int, volume: float = 0.25, sample_rate: int = 22050):
     """하강 톤 (경고/붕괴)."""
     n = int(sample_rate * duration_ms / 1000)
     buf = array.array("h", [0] * n)
@@ -69,6 +66,26 @@ class SoundManager:
         self.enabled = True
         self._sounds: dict = {}
         self._initialized = False
+        self._volume = 0.7  # 0.0 ~ 1.0
+
+    @property
+    def volume(self) -> float:
+        return self._volume
+
+    @volume.setter
+    def volume(self, val: float):
+        self._volume = max(0.0, min(1.0, round(val, 2)))
+        # 이미 생성된 사운드에 볼륨 적용
+        for snd in self._sounds.values():
+            snd.set_volume(self._volume)
+
+    def volume_up(self, step: float = 0.1):
+        """볼륨 한 단계 증가."""
+        self.volume = self._volume + step
+
+    def volume_down(self, step: float = 0.1):
+        """볼륨 한 단계 감소."""
+        self.volume = self._volume - step
 
     def init(self):
         """사운드 시스템 초기화. pygame.mixer.init() 이후 호출."""
@@ -81,8 +98,11 @@ class SoundManager:
             if not pygame.mixer.get_init():
                 pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
             self._build_sounds()
+            # 초기 볼륨 적용
+            for snd in self._sounds.values():
+                snd.set_volume(self._volume)
             self._initialized = True
-        except Exception as e:
+        except (pygame.error, OSError, TypeError) as e:
             _log.warning("사운드 초기화 실패: %s", e)
             self.enabled = False
 
@@ -95,26 +115,21 @@ class SoundManager:
             "shield_off": _descending(440, 220, 100),
             "heal": _dual_tone(523, 659, 100),
             "error_correct": _sine_wave(1046, 60, 0.2),
-
             # 터널링
             "tunnel_success": _dual_tone(880, 1320, 100),
             "tunnel_reflect": _sine_wave(220, 80, 0.2),
-
             # BB84
             "eve_detected": _descending(1000, 400, 200),
             "channel_shutdown": _descending(600, 150, 300),
             "channel_open": _dual_tone(440, 660, 120),
             "decoy_trap": _sine_wave(1200, 60, 0.15),
-
             # SQUID (기존 beep은 squid_mines에서 자체 관리)
             "mine_found": _dual_tone(880, 1100, 150),
             "wrong_mark": _descending(400, 200, 120),
             "victory": _dual_tone(523, 784, 300),
-
             # 플럭스 피닝
             "levitate": _sine_wave(440, 100, 0.15),
             "fall": _descending(300, 80, 200),
-
             # 공용
             "preset_change": _sine_wave(660, 50, 0.15),
             "achievement": _dual_tone(523, 1046, 250),
@@ -133,10 +148,63 @@ class SoundManager:
         self.enabled = not self.enabled
         return self.enabled
 
+    def handle_key(self, key) -> bool:
+        """공통 사운드 키 처리. 처리했으면 True 반환.
+
+        M: 뮤트 토글, +/=: 볼륨 업, -: 볼륨 다운
+        """
+        if pygame is None:
+            return False
+        if key == pygame.K_m:
+            self.toggle()
+            return True
+        if key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS):
+            self.volume_up()
+            return True
+        if key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+            self.volume_down()
+            return True
+        return False
+
     def quit(self):
         """정리."""
         self._sounds.clear()
         self._initialized = False
+
+    def load_preferences(self):
+        """config.json에서 볼륨/뮤트 설정 로드."""
+        import json
+        import os
+
+        cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        try:
+            with open(cfg_path, encoding="utf-8") as f:
+                cfg = json.load(f)
+            if isinstance(cfg.get("sound_volume"), (int, float)):
+                self._volume = max(0.0, min(1.0, round(float(cfg["sound_volume"]), 2)))
+            if isinstance(cfg.get("sound_enabled"), bool):
+                self.enabled = cfg["sound_enabled"]
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    def save_preferences(self):
+        """현재 볼륨/뮤트 설정을 config.json에 저장."""
+        import json
+        import os
+
+        cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        try:
+            with open(cfg_path, encoding="utf-8") as f:
+                cfg = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+        cfg["sound_volume"] = self._volume
+        cfg["sound_enabled"] = self.enabled
+        try:
+            with open(cfg_path, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=2, ensure_ascii=False)
+        except OSError:
+            pass
 
 
 # 전역 싱글턴
@@ -148,4 +216,5 @@ def get_sound_manager() -> SoundManager:
     global _instance
     if _instance is None:
         _instance = SoundManager()
+        _instance.load_preferences()
     return _instance

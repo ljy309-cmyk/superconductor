@@ -4,4 +4,5 @@ __all__ = [
     "open_qubit_chain",
     "open_tunneling",
     "open_qec_shield",
+    "open_entanglement",
 ]

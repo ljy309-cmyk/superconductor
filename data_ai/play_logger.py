@@ -16,7 +16,10 @@ import os
 import threading
 from datetime import datetime
 
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None  # pandas 없어도 JSON/CSV 기록은 가능
 
 from logger import get_module_logger
 
@@ -44,36 +47,64 @@ class PlayLogger:
     # 기록 가능한 필드 정의 (모듈별)
     FIELDS = {
         "qubit_chain": [
-            "total_qubits", "collapsed_count", "alive_count",
-            "noise_rate", "cascade_damage",
-            "shield_uses", "heal_uses",
-            "max_stress", "survival_time",
+            "total_qubits",
+            "collapsed_count",
+            "alive_count",
+            "noise_rate",
+            "cascade_damage",
+            "shield_uses",
+            "heal_uses",
+            "max_stress",
+            "survival_time",
         ],
         "tunneling": [
-            "total_attempts", "tunnel_count", "reflect_count",
-            "tunnel_rate", "barrier_width", "tunnel_prob",
+            "total_attempts",
+            "tunnel_count",
+            "reflect_count",
+            "tunnel_rate",
+            "barrier_width",
+            "tunnel_prob",
         ],
         "qec_shield": [
-            "survival_time", "alive_count", "total_qubits",
-            "qec_uses", "heal_uses", "qec_reduction",
+            "survival_time",
+            "alive_count",
+            "total_qubits",
+            "qec_uses",
+            "heal_uses",
+            "qec_reduction",
         ],
         "squid_mines": [
-            "mines_found", "wrong_marks", "total_mines",
-            "sensitivity", "won",
+            "mines_found",
+            "wrong_marks",
+            "total_mines",
+            "sensitivity",
+            "won",
         ],
         "bb84_defense": [
-            "score", "total_sent", "total_errors", "total_safe",
-            "eve_intercepts", "auto_blocks", "manual_blocks",
-            "decoy_sent", "decoy_trapped",
+            "score",
+            "total_sent",
+            "total_errors",
+            "total_safe",
+            "eve_intercepts",
+            "auto_blocks",
+            "manual_blocks",
+            "decoy_sent",
+            "decoy_trapped",
         ],
         "flux_pinning": [
-            "play_time", "superconducting", "flipped",
+            "play_time",
+            "superconducting",
+            "flipped",
         ],
         "phase_transition": [
-            "material", "last_temp", "noise", "tc",
+            "material",
+            "last_temp",
+            "noise",
+            "tc",
         ],
         "phase_transition_sim": [
-            "play_time", "final_temp",
+            "play_time",
+            "final_temp",
         ],
     }
 
@@ -86,10 +117,15 @@ class PlayLogger:
         """기존 기록 파일이 있으면 로드."""
         if os.path.exists(PLAY_LOG_CSV):
             try:
-                df = pd.read_csv(PLAY_LOG_CSV)
-                self.records = df.to_dict("records")
+                if pd is not None:
+                    df = pd.read_csv(PLAY_LOG_CSV)
+                    self.records = df.to_dict("records")
+                else:
+                    with open(PLAY_LOG_CSV, encoding="utf-8") as f:
+                        reader = csv.DictReader(f)
+                        self.records = list(reader)
                 _log.info("기존 기록 %d건 로드", len(self.records))
-            except Exception as e:
+            except (OSError, csv.Error, UnicodeDecodeError, ValueError) as e:
                 _log.error("기록 로드 실패: %s", e)
                 self.records = []
 
@@ -101,8 +137,7 @@ class PlayLogger:
             data: 기록할 데이터 딕셔너리
         """
         if module_name not in self.FIELDS:
-            _log.warning("알 수 없는 모듈명: %r (허용: %s)",
-                         module_name, ", ".join(sorted(self.FIELDS)))
+            _log.warning("알 수 없는 모듈명: %r (허용: %s)", module_name, ", ".join(sorted(self.FIELDS)))
 
         record = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -162,6 +197,21 @@ class PlayLogger:
             if not self.records:
                 return ""
 
+            if pd is None:
+                # pandas 없으면 CSV만 저장
+                try:
+                    with open(PLAY_LOG_CSV, "w", encoding="utf-8", newline="") as f:
+                        if self.records:
+                            writer = csv.DictWriter(f, fieldnames=self.records[0].keys())
+                            writer.writeheader()
+                            for rec in self.records:
+                                safe = {k: _sanitize_csv_value(v) for k, v in rec.items()}
+                                writer.writerow(safe)
+                    _log.info("기록 내보내기 완료 (CSV only): %d건", len(self.records))
+                except OSError as e:
+                    _log.error("내보내기 실패: %s", e)
+                return PLAY_LOG_CSV
+
             df = pd.DataFrame(self.records)
 
             # 컬럼 정렬: timestamp, module을 앞으로
@@ -172,9 +222,7 @@ class PlayLogger:
             # CSV 인젝션 방지: 문자열 컬럼 살균화
             safe_df = df.copy()
             for col in safe_df.select_dtypes(include=["object"]).columns:
-                safe_df[col] = safe_df[col].map(
-                    lambda v: _sanitize_csv_value(v) if isinstance(v, str) else v
-                )
+                safe_df[col] = safe_df[col].map(lambda v: _sanitize_csv_value(v) if isinstance(v, str) else v)
 
             try:
                 df.to_excel(PLAY_LOG_XLSX, index=False)
@@ -203,15 +251,20 @@ class PlayLogger:
         with self._lock:
             if not self.records:
                 return {"total_sessions": 0}
+            records_copy = list(self.records)
 
-            df = pd.DataFrame(self.records)
+        if pd is not None:
+            return self._get_summary_pandas(records_copy)
+        return self._get_summary_pure(records_copy)
 
+    def _get_summary_pandas(self, records: list[dict]) -> dict:
+        """pandas 사용 요약."""
+        df = pd.DataFrame(records)
         summary = {
             "total_sessions": len(df),
             "modules_played": df["module"].nunique(),
             "sessions_per_module": df["module"].value_counts().to_dict(),
         }
-
         for module in df["module"].unique():
             mod_df = df[df["module"] == module]
             fields = self.FIELDS.get(module, [])
@@ -226,7 +279,39 @@ class PlayLogger:
                             "min": round(series.min(), 2),
                         }
             summary[module] = mod_stats
+        return summary
 
+    def _get_summary_pure(self, records: list[dict]) -> dict:
+        """pandas 없이 순수 Python으로 요약."""
+        modules = {}
+        for rec in records:
+            m = rec.get("module", "unknown")
+            modules.setdefault(m, []).append(rec)
+
+        summary = {
+            "total_sessions": len(records),
+            "modules_played": len(modules),
+            "sessions_per_module": {m: len(recs) for m, recs in modules.items()},
+        }
+        for module, recs in modules.items():
+            fields = self.FIELDS.get(module, [])
+            mod_stats = {}
+            for field in fields:
+                vals = []
+                for rec in recs:
+                    v = rec.get(field)
+                    if v is not None:
+                        try:
+                            vals.append(float(v))
+                        except (ValueError, TypeError):
+                            pass
+                if vals:
+                    mod_stats[field] = {
+                        "mean": round(sum(vals) / len(vals), 2),
+                        "max": round(max(vals), 2),
+                        "min": round(min(vals), 2),
+                    }
+            summary[module] = mod_stats
         return summary
 
     def clear(self):

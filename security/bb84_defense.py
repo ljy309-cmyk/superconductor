@@ -7,28 +7,41 @@
 """
 
 import math
-import random
 
 import pygame
 
 from config_loader import cfg
-from theme import get_pg_theme
-from ui.slider import SliderPanel, PANEL_W
-from preset_hud import PresetHUD
+from game_base import choose_difficulty_or_quit, finalize_session
 from help_overlay import HelpOverlay
-from sound_manager import get_sound_manager
-from achievements import check_achievements
-from replay import ReplayRecorder
+from i18n import t, toggle_locale
 from logger import get_module_logger
+from preset_hud import PresetHUD
+from quit_dialog import confirm_quit
+from replay import ReplayRecorder
+
+# ── 프로토콜 엔진 (순수 로직) ────────────────────────
+from security.bb84_protocol import (
+    ALICE_X,
+    ALICE_Y,
+    AUTO_BLOCK_THRESHOLD,
+    BOB_X,
+    BOB_Y,
+    CHANNEL_Y,
+    DECOY_CHANCE,
+    ERROR_THRESHOLD,
+    EVE_CHANCE,
+    EVE_X,
+    EVE_Y,
+    SEND_INTERVAL,
+    WARNING_THRESHOLD,
+    BB84Game,
+    shared_key_available,
+)
+from sound_manager import get_sound_manager
+from theme import load_pg_colors, on_theme_change
+from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("bb84_defense")
-
-# 미션3 (5-2): QRNG 키 통합 — 모듈이 있으면 양자 해시 키 사용
-try:
-    from data_ai.qrng_logger import pop_key_bit, shared_key_available
-    _QRNG_AVAILABLE = True
-except ImportError:
-    _QRNG_AVAILABLE = False
 
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH = cfg("display", "width", 900)
@@ -52,274 +65,41 @@ CHANNEL_CLR = (69, 71, 90)
 PANEL_BG = (24, 24, 37)
 
 
+_COLOR_MAP = {
+    "BG": "BG",
+    "TEXT_CLR": "TEXT",
+    "ALICE_CLR": "ALICE",
+    "BOB_CLR": "BOB",
+    "EVE_CLR": "EVE",
+    "QUBIT_CLR": "QUBIT",
+    "DECOY_CLR": "DECOY",
+    "SAFE_CLR": "GREEN",
+    "DANGER_CLR": "RED",
+    "CHANNEL_CLR": "OVERLAY",
+    "PANEL_BG": "PANEL_BG",
+    "SUBTEXT_CLR": "SUBTEXT",
+    "WARN_CLR": "ACCENT_YELLOW",
+    "WHITE": "WHITE",
+    "ACCENT": "ACCENT_YELLOW",
+}
+
+
 def _load_theme_colors():
     """현재 테마(색맹 모드 포함)에서 색상을 로드."""
-    global BG, TEXT_CLR, ALICE_CLR, BOB_CLR, EVE_CLR, QUBIT_CLR
-    global DECOY_CLR, SAFE_CLR, DANGER_CLR, CHANNEL_CLR, PANEL_BG
-    global SUBTEXT_CLR, WARN_CLR, WHITE, ACCENT
-    pg = get_pg_theme()
-    BG = pg.BG
-    TEXT_CLR = pg.TEXT
-    ALICE_CLR = pg.ALICE
-    BOB_CLR = pg.BOB
-    EVE_CLR = pg.EVE
-    QUBIT_CLR = pg.QUBIT
-    DECOY_CLR = pg.DECOY
-    SAFE_CLR = pg.GREEN
-    DANGER_CLR = pg.RED
-    CHANNEL_CLR = pg.OVERLAY
-    PANEL_BG = pg.PANEL_BG
-    SUBTEXT_CLR = pg.SUBTEXT
-    WARN_CLR = pg.ACCENT_YELLOW
-    WHITE = pg.WHITE
-    ACCENT = pg.ACCENT_YELLOW
-
-# ── 레이아웃 ─────────────────────────────────────────
-ALICE_X, ALICE_Y = 100, 250
-BOB_X, BOB_Y = 800, 250
-CHANNEL_Y = 250
-EVE_X, EVE_Y = 450, 100
-
-# ── 프로토콜 파라미터 (config.json에서 로드) ─────────
-BASES = ["+", "×"]
-BITS = ["0", "1"]
-SEND_INTERVAL = cfg("bb84", "send_interval", 1.2)
-EVE_CHANCE = cfg("bb84", "eve_chance", 0.25)
-EVE_ERROR_INJECT = cfg("bb84", "eve_error_inject", 0.50)
-ERROR_THRESHOLD = cfg("bb84", "error_threshold", 0.25)
-HISTORY_WINDOW = cfg("bb84", "history_window", 20)
-
-# ── 자동 차단 시스템 ────────────────────────────────
-AUTO_BLOCK_THRESHOLD = cfg("bb84", "auto_block_threshold", 0.15)
-AUTO_BLOCK_SCORE = cfg("bb84", "auto_block_score", 50)
-MANUAL_BLOCK_SCORE = cfg("bb84", "manual_block_score", 100)
-
-# ── 경고 알람 ───────────────────────────────────────
-WARNING_THRESHOLD = cfg("bb84", "warning_threshold", 0.10)
-
-# ── 디코이 상태 ─────────────────────────────────────
-DECOY_CHANCE = cfg("bb84", "decoy_chance", 0.15)
-DECOY_ERROR_MULT = cfg("bb84", "decoy_error_mult", 2.0)
-
-
-# ── 큐비트 패킷 ──────────────────────────────────────
-
-class QubitPacket:
-    """전송 중인 큐비트 패킷."""
-
-    def __init__(self, bit: str, basis: str, round_id: int, is_decoy: bool = False):
-        self.bit = bit
-        self.basis = basis
-        self.round_id = round_id
-        self.is_decoy = is_decoy          # 미션3: 디코이 여부
-        self.x = float(ALICE_X + 40)
-        self.y = float(CHANNEL_Y)
-        self.speed = 180.0
-        self.intercepted = False
-        self.corrupted = False
-        self.arrived = False
-
-    @property
-    def display(self) -> str:
-        arrows = {
-            ("+", "0"): "↑", ("+", "1"): "→",
-            ("×", "0"): "↗", ("×", "1"): "↘",
-        }
-        return arrows.get((self.basis, self.bit), "?")
-
-    def update(self, dt: float):
-        if not self.arrived:
-            self.x += self.speed * dt
-            if self.x >= BOB_X - 40:
-                self.x = BOB_X - 40
-                self.arrived = True
-
-
-# ── 게임 상태 ────────────────────────────────────────
-
-class BB84Game:
-    """BB84 프로토콜 시뮬레이션 상태."""
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.round_id = 0
-        self.packets: list[QubitPacket] = []
-        self.send_timer = 0.0
-
-        # 로그
-        self.log: list[dict] = []
-
-        # 에러 추적
-        self.error_history: list[bool] = []  # True = 에러 발생
-        self.error_rate = 0.0
-
-        # Eve 상태
-        self.eve_active = False
-        self.eve_flash = 0.0
-        self.eve_intercept_count = 0
-
-        # 채널 상태
-        self.channel_open = True
-        self.auto_shutdown = False
-        self.shutdown_flash = 0.0
-
-        # 미션1: 점수 시스템
-        self.score = 0
-        self.auto_blocks = 0           # 자동 차단 횟수
-        self.manual_blocks = 0         # 수동 차단 횟수
-        self.auto_block_enabled = True # 자동 차단 ON/OFF
-
-        # 미션3: 디코이 통계
-        self.decoy_sent = 0
-        self.decoy_trapped = 0         # Eve가 디코이를 건드린 횟수
-
-        # 미션3 (5-2): QRNG 키 사용 추적
-        self.qrng_bits_used = 0
-
-        # 통계
-        self.total_sent = 0
-        self.total_errors = 0
-        self.total_safe = 0
-
-    def new_round(self, eve_chance: float = EVE_CHANCE,
-                  decoy_chance: float = DECOY_CHANCE):
-        """새 큐비트 전송 라운드."""
-        if not self.channel_open:
-            return
-
-        self.round_id += 1
-
-        # 미션3 (5-2): QRNG 키가 있으면 양자 해시 비트를 Alice가 전송
-        qrng_bit = None
-        if _QRNG_AVAILABLE:
-            qrng_bit = pop_key_bit()
-        if qrng_bit is not None:
-            alice_bit = str(qrng_bit)
-            self.qrng_bits_used += 1
-        else:
-            alice_bit = random.choice(BITS)
-
-        alice_basis = random.choice(BASES)
-
-        # 미션3: 디코이 패킷 — Alice가 가끔 가짜 데이터 삽입
-        is_decoy = random.random() < decoy_chance
-        pkt = QubitPacket(alice_bit, alice_basis, self.round_id, is_decoy=is_decoy)
-        if is_decoy:
-            self.decoy_sent += 1
-
-        # Eve 도청 여부
-        eve_present = random.random() < eve_chance
-        if eve_present:
-            self.eve_active = True
-            self.eve_flash = 0.8
-            self.eve_intercept_count += 1
-            pkt.intercepted = True
-
-            # Eve가 다른 기저로 측정하면 큐비트 파괴
-            eve_basis = random.choice(BASES)
-            if eve_basis != alice_basis or random.random() < EVE_ERROR_INJECT:
-                pkt.corrupted = True
-
-            # 미션3: 디코이를 건드리면 트랩 발동!
-            if is_decoy:
-                pkt.corrupted = True  # 디코이는 무조건 오염
-                self.decoy_trapped += 1
-        else:
-            self.eve_active = False
-
-        self.packets.append(pkt)
-        self.total_sent += 1
-
-    def process_arrival(self, pkt: QubitPacket,
-                        auto_block_thresh: float = AUTO_BLOCK_THRESHOLD):
-        """Bob이 큐비트 수신 처리."""
-        bob_basis = random.choice(BASES)
-        basis_match = (bob_basis == pkt.basis)
-
-        # 에러 판정: 기저 일치인데 비트가 다르면 에러 (도청 때문)
-        has_error = False
-        if basis_match and pkt.corrupted:
-            has_error = True
-            self.total_errors += 1
-        elif basis_match:
-            self.total_safe += 1
-
-        if basis_match:
-            # 미션3: 디코이가 도청당한 경우 에러 기여 2배 (에러 2개 추가)
-            if has_error and pkt.is_decoy and pkt.intercepted:
-                self.error_history.append(True)
-                self.error_history.append(True)  # 2배 기여
-            else:
-                self.error_history.append(has_error)
-            while len(self.error_history) > HISTORY_WINDOW:
-                self.error_history.pop(0)
-
-        # 에러율 계산
-        if self.error_history:
-            self.error_rate = sum(self.error_history) / len(self.error_history)
-
-        # 미션1: 자동 차단 시스템
-        if (self.auto_block_enabled
-                and self.error_rate > auto_block_thresh
-                and len(self.error_history) >= 5
-                and self.channel_open):
-            self.channel_open = False
-            self.auto_shutdown = True
-            self.shutdown_flash = 2.0
-            self.auto_blocks += 1
-            self.score += AUTO_BLOCK_SCORE
-
-        # 기존 임계값 폐쇄 (25%) — 자동 차단 꺼져 있을 때 대비
-        elif self.error_rate >= ERROR_THRESHOLD and len(self.error_history) >= 5:
-            if self.channel_open:
-                self.channel_open = False
-                self.auto_shutdown = True
-                self.shutdown_flash = 2.0
-
-        # 로그 기록
-        decoy_tag = " [DECOY]" if pkt.is_decoy else ""
-        self.log.append({
-            "round": pkt.round_id,
-            "alice_basis": pkt.basis,
-            "bob_basis": bob_basis,
-            "match": basis_match,
-            "intercepted": pkt.intercepted,
-            "error": has_error,
-            "decoy": pkt.is_decoy,
-        })
-        if len(self.log) > 12:
-            self.log.pop(0)
-
-    def manual_shutdown(self):
-        """사용자 수동 통신망 폐쇄 — 미션1: 수동 차단 보너스."""
-        if self.channel_open:
-            self.channel_open = False
-            self.shutdown_flash = 2.0
-            self.manual_blocks += 1
-            # 해킹 중일 때 수동 차단하면 높은 점수
-            if self.error_rate > WARNING_THRESHOLD:
-                self.score += MANUAL_BLOCK_SCORE
-
-    def reopen(self):
-        """통신망 재개통 (리셋 없이)."""
-        self.channel_open = True
-        self.auto_shutdown = False
-        self.error_history.clear()
-        self.error_rate = 0.0
+    load_pg_colors(_COLOR_MAP, globals())
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
-def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
+
+def _draw_actors(screen, game: BB84Game, anim_t: float, font, big_font):
     """Alice, Bob, Eve 캐릭터."""
     # Alice
     pygame.draw.circle(screen, ALICE_CLR, (ALICE_X, ALICE_Y), 30)
     pygame.draw.circle(screen, TEXT_CLR, (ALICE_X, ALICE_Y), 30, 2)
     label = big_font.render("Alice", True, ALICE_CLR)
     screen.blit(label, (ALICE_X - label.get_width() // 2, ALICE_Y + 38))
-    role = font.render("Sender", True, SUBTEXT_CLR)
+    role = font.render(t("bb84_sender"), True, SUBTEXT_CLR)
     screen.blit(role, (ALICE_X - role.get_width() // 2, ALICE_Y + 56))
 
     # Bob
@@ -327,14 +107,14 @@ def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     pygame.draw.circle(screen, TEXT_CLR, (BOB_X, BOB_Y), 30, 2)
     label = big_font.render("Bob", True, BOB_CLR)
     screen.blit(label, (BOB_X - label.get_width() // 2, BOB_Y + 38))
-    role = font.render("Receiver", True, SUBTEXT_CLR)
+    role = font.render(t("bb84_receiver"), True, SUBTEXT_CLR)
     screen.blit(role, (BOB_X - role.get_width() // 2, BOB_Y + 56))
 
     # Eve (항상 표시, 도청 시 강조)
     eve_alpha = 255 if game.eve_active else 80
     if game.eve_flash > 0:
         # 플래시 글로우
-        glow_r = int(40 + 20 * math.sin(t * 10))
+        glow_r = int(40 + 20 * math.sin(anim_t * 10))
         glow = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
         pygame.draw.circle(glow, (*EVE_CLR, int(100 * game.eve_flash)), (glow_r, glow_r), glow_r)
         screen.blit(glow, (EVE_X - glow_r, EVE_Y - glow_r))
@@ -343,7 +123,7 @@ def _draw_actors(screen, game: BB84Game, t: float, font, big_font):
     pygame.draw.circle(screen, TEXT_CLR, (EVE_X, EVE_Y), 24, 2)
     label = big_font.render("Eve", True, EVE_CLR)
     screen.blit(label, (EVE_X - label.get_width() // 2, EVE_Y - 42))
-    role = font.render("Eavesdropper", True, SUBTEXT_CLR)
+    role = font.render(t("bb84_eavesdropper"), True, SUBTEXT_CLR)
     screen.blit(role, (EVE_X - role.get_width() // 2, EVE_Y - 28))
 
 
@@ -391,7 +171,7 @@ def _draw_error_meter(screen, game: BB84Game, font, big_font):
     mx, my = 50, 380
     mw, mh = 260, 20
 
-    label = big_font.render("Error Rate (QBER)", True, ACCENT)
+    label = big_font.render(t("bb84_error_rate_label"), True, ACCENT)
     screen.blit(label, (mx, my - 24))
 
     # 배경
@@ -440,18 +220,27 @@ def _draw_stats(screen, game: BB84Game, font, big_font):
     screen.blit(score_surf, (sx, sy - 20))
 
     # 미션3 (5-2): QRNG 키 잔량 표시
-    qrng_remain = shared_key_available() if _QRNG_AVAILABLE else 0
-    qrng_tag = f"QRNG: {game.qrng_bits_used}bit 사용 (잔여 {qrng_remain})"
+    qrng_remain = shared_key_available()
 
     lines = [
-        (f"전송: {game.total_sent}", TEXT_CLR),
-        (f"안전 수신: {game.total_safe}", SAFE_CLR),
-        (f"에러 감지: {game.total_errors}", DANGER_CLR),
-        (f"Eve 도청: {game.eve_intercept_count}", EVE_CLR),
-        (f"디코이 발사: {game.decoy_sent}  트랩: {game.decoy_trapped}", DECOY_CLR),
-        (f"자동차단: {game.auto_blocks}회  수동: {game.manual_blocks}회", ALICE_CLR),
-        (qrng_tag, ACCENT if qrng_remain > 0 else SUBTEXT_CLR),
-        (f"채널: {'OPEN' if game.channel_open else 'SHUTDOWN'}  |  자동: {'ON' if game.auto_block_enabled else 'OFF'}", SAFE_CLR if game.channel_open else DANGER_CLR),
+        (t("bb84_sent", count=game.total_sent), TEXT_CLR),
+        (t("bb84_safe", count=game.total_safe), SAFE_CLR),
+        (t("bb84_errors", count=game.total_errors), DANGER_CLR),
+        (t("bb84_eve_count", count=game.eve_intercept_count), EVE_CLR),
+        (t("bb84_decoy_stats", sent=game.decoy_sent, trapped=game.decoy_trapped), DECOY_CLR),
+        (t("bb84_block_stats", auto=game.auto_blocks, manual=game.manual_blocks), ALICE_CLR),
+        (
+            t("bb84_qrng_stats", used=game.qrng_bits_used, remain=qrng_remain),
+            ACCENT if qrng_remain > 0 else SUBTEXT_CLR,
+        ),
+        (
+            t(
+                "bb84_channel_status",
+                status="OPEN" if game.channel_open else "SHUTDOWN",
+                auto_state=t("auto_on") if game.auto_block_enabled else t("auto_off"),
+            ),
+            SAFE_CLR if game.channel_open else DANGER_CLR,
+        ),
     ]
     for i, (text, color) in enumerate(lines):
         surf = font.render(text, True, color)
@@ -461,7 +250,7 @@ def _draw_stats(screen, game: BB84Game, font, big_font):
 def _draw_log(screen, game: BB84Game, font):
     """프로토콜 로그."""
     lx, ly = 380, 340
-    header = font.render("── Protocol Log ──", True, ACCENT)
+    header = font.render(t("bb84_protocol_log"), True, ACCENT)
     screen.blit(header, (lx, ly))
 
     for i, entry in enumerate(game.log):
@@ -486,7 +275,7 @@ def _draw_log(screen, game: BB84Game, font):
         screen.blit(surf, (lx, ly + 18 + i * 15))
 
 
-def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
+def _draw_shutdown_banner(screen, game: BB84Game, big_font, anim_t: float):
     """통신망 폐쇄 배너."""
     if game.shutdown_flash > 0:
         alpha = int(200 * min(game.shutdown_flash, 1.0))
@@ -494,28 +283,30 @@ def _draw_shutdown_banner(screen, game: BB84Game, big_font, t: float):
         banner.fill((*DANGER_CLR, alpha // 3))
         screen.blit(banner, (0, CHANNEL_Y - 25))
 
-        blink = int(t * 4) % 2 == 0
+        blink = int(anim_t * 4) % 2 == 0
         if blink:
-            msg = "CHANNEL SHUTDOWN" if game.auto_shutdown else "MANUAL SHUTDOWN"
-            reason = " — Error rate exceeded threshold!" if game.auto_shutdown else ""
+            msg = t("bb84_channel_shutdown_msg") if game.auto_shutdown else t("bb84_manual_shutdown_msg")
+            reason = t("bb84_error_exceeded") if game.auto_shutdown else ""
             text = big_font.render(f"⚠ {msg}{reason}", True, DANGER_CLR)
             screen.blit(text, (WIDTH // 2 - text.get_width() // 2, CHANNEL_Y + 60))
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
+
 def run_simulation():
     _load_theme_colors()
+    on_theme_change(_load_theme_colors)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
-    pygame.display.set_caption("BB84 Quantum Key Distribution Defense")
+    pygame.display.set_caption(t("game_title_bb84"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 11)
     big_font = pygame.font.SysFont("Consolas", 14, bold=True)
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
 
     game = BB84Game()
-    t = 0.0
+    anim_t = 0.0
     paused = False
 
     # ── 슬라이더 패널 ─────────────────────────────────
@@ -537,10 +328,14 @@ def run_simulation():
     snd.init()
     recorder = ReplayRecorder("bb84_defense")
 
+    # ── 시작 시 난이도 선택 ──
+    if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
+        return
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
-        t += dt
+        anim_t += dt
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
@@ -550,8 +345,10 @@ def run_simulation():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                snd.handle_key(event.key)
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if confirm_quit(screen, font):
+                        running = False
                 elif event.key == pygame.K_SPACE:
                     if game.channel_open:
                         game.manual_shutdown()
@@ -566,6 +363,8 @@ def run_simulation():
                 elif event.key == pygame.K_a:
                     # 미션1: 자동 차단 토글
                     game.auto_block_enabled = not game.auto_block_enabled
+                elif event.key == pygame.K_l:
+                    toggle_locale()
 
         # ── 업데이트 ─────────────────────────────────
         preset_hud.update(dt)
@@ -577,8 +376,7 @@ def run_simulation():
             if game.send_timer >= cur_interval:
                 game.send_timer = 0.0
                 prev_decoy_trapped = game.decoy_trapped
-                game.new_round(eve_chance=sl_eve.value,
-                               decoy_chance=sl_decoy.value)
+                game.new_round(eve_chance=sl_eve.value, decoy_chance=sl_decoy.value)
                 if game.eve_active:
                     snd.play("eve_detected")
                 if game.decoy_trapped > prev_decoy_trapped:
@@ -588,20 +386,21 @@ def run_simulation():
             for pkt in game.packets:
                 pkt.update(dt)
                 if pkt.arrived:
-                    game.process_arrival(pkt,
-                                         auto_block_thresh=sl_autoblock.value)
+                    game.process_arrival(pkt, auto_block_thresh=sl_autoblock.value)
 
             # 도착한 패킷 제거
             game.packets = [p for p in game.packets if not p.arrived]
 
             # 리플레이 기록
-            recorder.record({
-                "round": game.round_id,
-                "error_rate": game.error_rate,
-                "eve_active": game.eve_active,
-                "channel_open": game.channel_open,
-                "score": game.score,
-            })
+            recorder.record(
+                {
+                    "round": game.round_id,
+                    "error_rate": game.error_rate,
+                    "eve_active": game.eve_active,
+                    "channel_open": game.channel_open,
+                    "score": game.score,
+                }
+            )
 
             # 플래시 타이머
             if game.eve_flash > 0:
@@ -614,7 +413,7 @@ def run_simulation():
         # 미션2: 에러율 10% 초과 시 배경을 짙은 빨강으로 번쩍
         if game.error_rate > WARNING_THRESHOLD and game.channel_open:
             # 번쩍거리는 효과 — sin으로 강도 변조
-            flash_intensity = 0.5 + 0.5 * math.sin(t * 6)
+            flash_intensity = 0.5 + 0.5 * math.sin(anim_t * 6)
             r = int(BG[0] + (WARNING_BG[0] - BG[0]) * flash_intensity)
             g = int(BG[1] + (WARNING_BG[1] - BG[1]) * flash_intensity)
             b = int(BG[2] + (WARNING_BG[2] - BG[2]) * flash_intensity)
@@ -623,7 +422,7 @@ def run_simulation():
             screen.fill(BG)
 
         # 타이틀
-        title = title_font.render("BB84 Quantum Key Distribution Defense", True, ACCENT)
+        title = title_font.render(t("game_title_bb84"), True, ACCENT)
         screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 12))
 
         # 채널
@@ -633,7 +432,7 @@ def run_simulation():
         _draw_packets(screen, game, font)
 
         # 캐릭터
-        _draw_actors(screen, game, t, font, big_font)
+        _draw_actors(screen, game, anim_t, font, big_font)
 
         # 에러 미터
         _draw_error_meter(screen, game, font, big_font)
@@ -645,16 +444,21 @@ def run_simulation():
         _draw_log(screen, game, font)
 
         # 폐쇄 배너
-        _draw_shutdown_banner(screen, game, big_font, t)
+        _draw_shutdown_banner(screen, game, big_font, anim_t)
 
         # 슬라이더 패널 그리기
         panel.draw(screen, font)
 
         # 안내
         hints = [
-            f"SCORE: {game.score}  |  자동차단: {'ON' if game.auto_block_enabled else 'OFF'}  |  {'일시정지' if paused else '실행 중'}",
-            "SPACE: 폐쇄/재개  |  A: 자동차단  |  우측 패널: 슬라이더",
-            "P: 일시정지  |  R: 리셋  |  ESC: 종료",
+            t(
+                "hint_bb84_info",
+                score=game.score,
+                auto_state=t("auto_on") if game.auto_block_enabled else t("auto_off"),
+                pause_state=t("paused") if paused else t("running_state"),
+            ),
+            t("hint_bb84_controls"),
+            t("hint_bb84_pause"),
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
@@ -665,39 +469,24 @@ def run_simulation():
 
         pygame.display.flip()
 
-    # 최종미션: 플레이 기록 저장 + 보고서 생성
-    session_data = {
-        "score": game.score,
-        "total_sent": game.total_sent,
-        "total_errors": game.total_errors,
-        "total_safe": game.total_safe,
-        "eve_intercepts": game.eve_intercept_count,
-        "auto_blocks": game.auto_blocks,
-        "manual_blocks": game.manual_blocks,
-        "decoy_sent": game.decoy_sent,
-        "decoy_trapped": game.decoy_trapped,
-        "qrng_bits_used": game.qrng_bits_used,
-    }
-    try:
-        from data_ai.play_logger import get_logger
-        get_logger().log_session("bb84_defense", session_data)
-    except Exception as e:
-        _log.error("플레이 기록 저장 실패: %s", e)
-
-    try:
-        check_achievements("bb84_defense", session_data)
-    except Exception as e:
-        _log.error("업적 확인 실패: %s", e)
-
-    try:
-        from report import generate_report
-        generate_report("bb84_defense", session_data)
-    except Exception as e:
-        _log.error("보고서 생성 실패: %s", e)
-
-    recorder.save()
-    snd.quit()
-    pygame.quit()
+    finalize_session(
+        "bb84_defense",
+        {
+            "score": game.score,
+            "total_sent": game.total_sent,
+            "total_errors": game.total_errors,
+            "total_safe": game.total_safe,
+            "eve_intercepts": game.eve_intercept_count,
+            "auto_blocks": game.auto_blocks,
+            "manual_blocks": game.manual_blocks,
+            "decoy_sent": game.decoy_sent,
+            "decoy_trapped": game.decoy_trapped,
+            "qrng_bits_used": game.qrng_bits_used,
+        },
+        recorder=recorder,
+        snd=snd,
+        theme_callback=_load_theme_colors,
+    )
 
 
 def open_bb84_defense():

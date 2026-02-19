@@ -3,16 +3,10 @@
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock
-
-# pygame mock
-sys.modules.setdefault("pygame", MagicMock())
-sys.modules.setdefault("pygame.time", MagicMock())
-sys.modules.setdefault("pygame.mixer", MagicMock())
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from security.squid_mines import (
+from security.squid_logic import (
     CELL_SIZE,
     GRID_COLS,
     GRID_OX,
@@ -156,6 +150,74 @@ class TestSQUIDMarkCell(unittest.TestCase):
         mine = next(iter(game.mines))
         game.mark_cell(*mine)
         self.assertEqual(len(game.marked), 0)
+
+
+class TestSQUIDUndoMark(unittest.TestCase):
+    """실행취소 (undo) 기능."""
+
+    def test_undo_correct_mark(self):
+        game = SQUIDGame()
+        mine = next(iter(game.mines))
+        game.mark_cell(*mine)
+        self.assertIn(mine, game.marked)
+        result = game.undo_mark()
+        self.assertEqual(result, (mine, "marked"))
+        self.assertNotIn(mine, game.marked)
+
+    def test_undo_wrong_mark(self):
+        game = SQUIDGame()
+        empty = None
+        for c in range(GRID_COLS):
+            for r in range(GRID_ROWS):
+                if (c, r) not in game.mines:
+                    empty = (c, r)
+                    break
+            if empty:
+                break
+        game.mark_cell(*empty)
+        self.assertIn(empty, game.wrong)
+        result = game.undo_mark()
+        self.assertEqual(result, (empty, "wrong"))
+        self.assertNotIn(empty, game.wrong)
+
+    def test_undo_empty_stack_returns_none(self):
+        game = SQUIDGame()
+        self.assertIsNone(game.undo_mark())
+
+    def test_undo_blocked_after_reveal(self):
+        game = SQUIDGame()
+        mine = next(iter(game.mines))
+        game.mark_cell(*mine)
+        game.revealed = True
+        self.assertIsNone(game.undo_mark())
+
+    def test_undo_multiple_lifo_order(self):
+        game = SQUIDGame()
+        mines = list(game.mines)[:2]
+        for m in mines:
+            game.mark_cell(*m)
+        # LIFO: last marked should be undone first
+        result = game.undo_mark()
+        self.assertEqual(result[0], mines[1])
+        result = game.undo_mark()
+        self.assertEqual(result[0], mines[0])
+        self.assertEqual(len(game.marked), 0)
+
+    def test_undo_then_remark(self):
+        """실행취소 후 같은 셀을 다시 마킹할 수 있어야 함."""
+        game = SQUIDGame()
+        mine = next(iter(game.mines))
+        game.mark_cell(*mine)
+        game.undo_mark()
+        game.mark_cell(*mine)
+        self.assertIn(mine, game.marked)
+
+    def test_reset_clears_undo_stack(self):
+        game = SQUIDGame()
+        mine = next(iter(game.mines))
+        game.mark_cell(*mine)
+        game.reset()
+        self.assertIsNone(game.undo_mark())
 
 
 class TestSQUIDHoverCell(unittest.TestCase):

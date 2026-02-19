@@ -9,11 +9,12 @@
 """
 
 import json
+import math
 import os
 import shutil
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from config_loader import cfg
 from logger import get_module_logger
@@ -25,6 +26,14 @@ _BACKUP_PATH = DATA_PATH + ".bak"
 HOST = cfg("server", "host", "127.0.0.1")
 PORT = cfg("server", "port", 18084)
 TOP_N = cfg("server", "top_n", 5)
+_MAX_RECORDS = 1000  # 저장할 최대 레코드 수
+
+
+def _sanitize_str(value, max_len: int = 50) -> str:
+    """문자열 살균 — 제어 문자 제거 및 길이 제한."""
+    s = str(value)[:max_len]
+    return "".join(c for c in s if c.isprintable())
+
 
 _data_lock = threading.Lock()
 
@@ -35,7 +44,7 @@ def _load_data() -> list[dict]:
         for path in (DATA_PATH, _BACKUP_PATH):
             if os.path.exists(path):
                 try:
-                    with open(path, "r", encoding="utf-8") as f:
+                    with open(path, encoding="utf-8") as f:
                         data = json.load(f)
                     if isinstance(data, list):
                         return data
@@ -61,6 +70,31 @@ def _save_data(records: list[dict]):
             os.replace(tmp_path, DATA_PATH)
         except OSError as e:
             _log.error("랭킹 데이터 저장 실패: %s", e)
+
+
+# ── 속도 제한 (IP 당 POST 간격) ────────────────────
+_rate_limit_lock = threading.Lock()
+_rate_limit_map: dict[str, float] = {}  # IP → 마지막 POST 시각
+_RATE_LIMIT_SECONDS = 2.0  # 최소 POST 간격 (초)
+
+
+def _check_rate_limit(ip: str) -> bool:
+    """속도 제한 확인. True=허용, False=거부."""
+    import time
+
+    now = time.time()
+    with _rate_limit_lock:
+        last = _rate_limit_map.get(ip, 0.0)
+        if now - last < _RATE_LIMIT_SECONDS:
+            return False
+        _rate_limit_map[ip] = now
+        # 오래된 항목 정리 (100개 초과 시)
+        if len(_rate_limit_map) > 100:
+            cutoff = now - 60
+            stale = [k for k, v in _rate_limit_map.items() if v < cutoff]
+            for k in stale:
+                del _rate_limit_map[k]
+    return True
 
 
 class RankingHandler(BaseHTTPRequestHandler):
@@ -94,45 +128,67 @@ class RankingHandler(BaseHTTPRequestHandler):
             self._set_json_headers(404)
             self.wfile.write(json.dumps({"error": "Not found"}).encode())
 
+    def _send_error(self, status: int, msg: str):
+        """JSON 에러 응답 전송 헬퍼."""
+        self._set_json_headers(status)
+        self.wfile.write(json.dumps({"error": msg}).encode())
+
     def do_POST(self):
         if self.path == "/ranking":
-            length = int(self.headers.get("Content-Length", 0))
-            if length > 10_000:  # 최대 10KB
-                self._set_json_headers(413)
-                self.wfile.write(json.dumps({"error": "Payload too large"}).encode())
-                return
+            # 속도 제한
+            client_ip = self.client_address[0] if self.client_address else "unknown"
+            if not _check_rate_limit(client_ip):
+                return self._send_error(429, "Too many requests")
+
+            # Content-Type 검증
+            content_type = (self.headers.get("Content-Type") or "").lower()
+            if "application/json" not in content_type:
+                return self._send_error(415, "Content-Type must be application/json")
+
+            # Content-Length 검증
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+            except (ValueError, TypeError):
+                return self._send_error(411, "Invalid Content-Length")
+
+            if length <= 0 or length > 10_000:  # 1B ~ 10KB
+                return self._send_error(413, "Payload too large or empty")
 
             body = self.rfile.read(length)
             try:
                 data = json.loads(body)
             except json.JSONDecodeError:
-                self._set_json_headers(400)
-                self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
-                return
+                return self._send_error(400, "Invalid JSON")
 
-            name = str(data.get("name", "Anonymous"))[:50]  # 최대 50자
+            # JSON body는 반드시 dict
+            if not isinstance(data, dict):
+                return self._send_error(400, "JSON body must be an object")
+
+            name = _sanitize_str(data.get("name", "Anonymous"), max_len=50)
             score = data.get("score", 0)
-            mode = str(data.get("mode", "unknown"))[:30]
+            mode = _sanitize_str(data.get("mode", "unknown"), max_len=30)
             token = data.get("token", "")
 
             # 무결성 토큰 검증 (있으면)
             if token:
+                if not isinstance(token, str) or len(token) > 200:
+                    return self._send_error(400, "Invalid token format")
                 try:
                     from score_integrity import verify_score
+
                     if not verify_score(name, float(score) if isinstance(score, (int, float)) else 0, mode, token):
                         _log.warning("점수 무결성 검증 실패: name=%s, score=%s", name, score)
-                        self._set_json_headers(403)
-                        self.wfile.write(json.dumps({"error": "Invalid score token"}).encode())
-                        return
-                except (ImportError, Exception) as e:
+                        return self._send_error(403, "Invalid score token")
+                except (ImportError, ValueError, TypeError) as e:
                     _log.warning("무결성 검증 모듈 오류: %s", e)
 
             # 점수 타입/범위 검증
             if not isinstance(score, (int, float)):
-                self._set_json_headers(400)
-                self.wfile.write(json.dumps({"error": "score must be a number"}).encode())
-                return
-            score = max(0.0, min(float(score), 999999.0))  # 0 ~ 999999
+                return self._send_error(400, "score must be a number")
+            score = float(score)
+            if math.isnan(score) or math.isinf(score):
+                return self._send_error(400, "score must be a finite number")
+            score = max(0.0, min(score, 999999.0))  # 0 ~ 999999
 
             record = {
                 "name": name,
@@ -143,17 +199,26 @@ class RankingHandler(BaseHTTPRequestHandler):
 
             records = _load_data()
             records.append(record)
+            # 레코드 수 상한 — 최신 1000개만 유지
+            if len(records) > _MAX_RECORDS:
+                records = sorted(records, key=lambda r: r.get("score", 0), reverse=True)[:_MAX_RECORDS]
             _save_data(records)
 
             # 현재 순위 계산
             sorted_records = sorted(records, key=lambda r: r["score"], reverse=True)
-            rank = next(i + 1 for i, r in enumerate(sorted_records) if r["timestamp"] == record["timestamp"] and r["name"] == record["name"])
+            rank = next(
+                (
+                    i + 1
+                    for i, r in enumerate(sorted_records)
+                    if r["timestamp"] == record["timestamp"] and r["name"] == record["name"]
+                ),
+                len(sorted_records),
+            )
 
             self._set_json_headers(201)
             self.wfile.write(json.dumps({"status": "ok", "rank": rank, "record": record}, ensure_ascii=False).encode())
         else:
-            self._set_json_headers(404)
-            self.wfile.write(json.dumps({"error": "Not found"}).encode())
+            self._send_error(404, "Not found")
 
     def do_OPTIONS(self):
         self.send_response(200)

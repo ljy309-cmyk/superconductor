@@ -19,7 +19,12 @@
   "ml": {
     "n_estimators": 100,
     "test_size": 0.2,
-    "random_state": 42
+    "random_state": 42,
+    "gbr_max_depth": 4,
+    "gbr_learning_rate": 0.1,
+    "svr_c": 100.0,
+    "svr_epsilon": 0.1,
+    "perm_importance_repeats": 10
   },
   "data_gen": {
     "sample_size": 200
@@ -86,7 +91,83 @@
     "damping": 0.88,
     "levitation_amp": 4.0,
     "levitation_freq": 2.0,
-    "gravity": 480.0
+    "gravity": 480.0,
+    "tc_kelvin": 92.0,
+    "temp_min": 4.0,
+    "temp_max": 150.0,
+    "temp_step": 2.0,
+    "pin_spring_k": 6.0,
+    "pin_damping": 0.82,
+    "pin_lock_radius": 40.0,
+    "num_pinning_sites": 7,
+    "field_line_count": 9,
+    "field_line_segments": 14
+  },
+  "achievements": {
+    "qc_survive_short": 30,
+    "qc_survive_long": 60,
+    "qc_shield_uses": 5,
+    "qc_no_collapse_time": 30,
+    "tn_tunnel_streak": 10,
+    "tn_rate_threshold": 0.5,
+    "tn_rate_min_attempts": 10,
+    "qec_survive_time": 60,
+    "qec_efficient_max_uses": 3,
+    "qec_efficient_time": 60,
+    "bb84_score_target": 500,
+    "bb84_manual_blocks": 5,
+    "bb84_decoy_trapped": 3,
+    "qa_e91_rounds": 200,
+    "qa_bell_violation": true,
+    "qa_ghz_consistency": 0.9,
+    "qa_ghz_rounds": 100,
+    "all_modules_count": 6
+  },
+  "entanglement": {
+    "chsh_shots": 200,
+    "measure_batch": 50,
+    "teleport_anim_speed": 1.5
+  },
+  "qkd_advanced": {
+    "pa_compression": 0.5,
+    "e91_batch_size": 50,
+    "ghz_batch_size": 50
+  },
+  "scada_security": {
+    "target_temp": -196.0,
+    "heat_leak": 0.3,
+    "cooling_power": -0.8,
+    "sensor_noise": 0.2,
+    "mitm_spoof_offset": 8.0,
+    "mitm_ramp_speed": 0.5,
+    "qber_normal": 0.03,
+    "qber_attack": 0.28,
+    "qber_detect_threshold": 0.11,
+    "critical_temp": -188.0,
+    "recovery_cooling": -2.0
+  },
+  "gate_builder": {
+    "num_qubits": 2
+  },
+  "josephson_junction": {
+    "ic_default": 1.0,
+    "bias_max": 3.0,
+    "r_normal": 1.0,
+    "capacitance": 0.5,
+    "phase_damping": 0.3,
+    "time_scale": 5.0
+  },
+  "cooper_pair": {
+    "tc_kelvin": 77.0,
+    "temp_min": 4.0,
+    "temp_max": 150.0,
+    "lattice_cols": 10,
+    "lattice_rows": 6,
+    "phonon_strength": 8.0,
+    "pair_formation_range": 80.0,
+    "electron_count": 12,
+    "electron_speed": 120.0,
+    "gap_delta_max": 1.0
   },
   "phase_transition": {
     "t_range_min": -275,
@@ -188,5 +269,7 @@
   },
   "theme": "dark",
   "colorblind_mode": false,
-  "font_scale": 1.0
+  "font_scale": 1.0,
+  "sound_volume": 0.7,
+  "sound_enabled": true
 }

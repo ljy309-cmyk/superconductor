@@ -9,6 +9,7 @@
 
 import json
 import os
+import re
 
 from config_loader import section
 from logger import get_module_logger
@@ -17,10 +18,14 @@ _log = get_module_logger("presets")
 
 PROFILES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "profiles")
 
+# 프로파일 이름 허용 패턴 (영문, 한글, 숫자, _, -, 공백)
+_SAFE_NAME_RE = re.compile(r"^[\w가-힣\s\-]{1,80}$")
+
 
 def _clamp_value(sec: str, key: str, value):
     """config 스키마 범위로 값을 클램핑. 범위 초과 시 경고 로그."""
     from config_loader import _SCHEMA
+
     schema = _SCHEMA.get(sec, {}).get(key)
     if schema is None:
         return value
@@ -67,6 +72,17 @@ def apply_preset_to_sliders(preset_name: str, slider_map: dict):
 
 # ── 프로파일 저장/불러오기 ────────────────────────────
 
+
+def _validate_profile_name(name: str) -> bool:
+    """프로파일 이름 유효성 검사 (경로 순회 방지)."""
+    if not name or not _SAFE_NAME_RE.match(name):
+        return False
+    # 경로 구분자 포함 방지
+    if os.sep in name or "/" in name or ".." in name:
+        return False
+    return True
+
+
 def save_profile(name: str, slider_values: dict):
     """슬라이더 값을 프로파일로 저장.
 
@@ -74,6 +90,9 @@ def save_profile(name: str, slider_values: dict):
         name: 프로파일 이름 (확장자 없이)
         slider_values: {"slider_label": value, ...}
     """
+    if not _validate_profile_name(name):
+        _log.warning("잘못된 프로파일 이름: %s", name)
+        return
     os.makedirs(PROFILES_DIR, exist_ok=True)
     path = os.path.join(PROFILES_DIR, f"{name}.json")
     with open(path, "w", encoding="utf-8") as f:
@@ -87,7 +106,7 @@ def load_profile(name: str) -> dict:
     if not os.path.exists(path):
         _log.warning("프로파일 없음: %s", path)
         return {}
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -95,15 +114,14 @@ def list_profiles() -> list[str]:
     """저장된 프로파일 이름 목록."""
     if not os.path.exists(PROFILES_DIR):
         return []
-    return [
-        os.path.splitext(f)[0]
-        for f in os.listdir(PROFILES_DIR)
-        if f.endswith(".json")
-    ]
+    return [os.path.splitext(f)[0] for f in os.listdir(PROFILES_DIR) if f.endswith(".json")]
 
 
 def delete_profile(name: str) -> bool:
     """프로파일 삭제."""
+    if not _validate_profile_name(name):
+        _log.warning("잘못된 프로파일 이름 (삭제 거부): %s", name)
+        return False
     path = os.path.join(PROFILES_DIR, f"{name}.json")
     if os.path.exists(path):
         os.remove(path)
@@ -115,6 +133,9 @@ def delete_profile(name: str) -> bool:
 
 def rename_profile(old_name: str, new_name: str) -> bool:
     """프로파일 이름 변경."""
+    if not _validate_profile_name(old_name) or not _validate_profile_name(new_name):
+        _log.warning("잘못된 프로파일 이름 (이름변경 거부): %s → %s", old_name, new_name)
+        return False
     old_path = os.path.join(PROFILES_DIR, f"{old_name}.json")
     new_path = os.path.join(PROFILES_DIR, f"{new_name}.json")
     if not os.path.exists(old_path):
@@ -143,7 +164,10 @@ def apply_profile_to_sliders(profile_name: str, sliders: dict):
                 if value < slider.min_val or value > slider.max_val:
                     _log.warning(
                         "프로파일 값 범위 초과: %s=%s (범위 %s~%s), 클램핑됨",
-                        label, value, slider.min_val, slider.max_val,
+                        label,
+                        value,
+                        slider.min_val,
+                        slider.max_val,
                     )
             slider.value = value
     _log.info("프로파일 '%s' 적용 완료", profile_name)

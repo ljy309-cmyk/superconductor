@@ -8,9 +8,9 @@
 import tkinter as tk
 from tkinter import messagebox
 
-from theme import TK, FONTS, get_tk_theme
 from i18n import t
 from logger import get_module_logger
+from theme import FONTS, TK, get_tk_theme
 
 _log = get_module_logger("stats_dashboard")
 
@@ -31,8 +31,11 @@ class StatsDashboard(tk.Toplevel):
     def _build_ui(self):
         # 타이틀
         tk.Label(
-            self, text=t("stats_title"),
-            font=FONTS.HEADING, bg=TK.BG, fg=TK.ACCENT_BLUE,
+            self,
+            text=t("stats_title"),
+            font=FONTS.HEADING,
+            bg=TK.BG,
+            fg=TK.ACCENT_BLUE,
         ).pack(pady=(12, 4))
 
         # 메인 프레임
@@ -41,26 +44,43 @@ class StatsDashboard(tk.Toplevel):
 
         # 좌측: 요약 통계
         left = tk.LabelFrame(
-            body, text=f" {t('stats_summary')} ", font=FONTS.BODY_BOLD,
-            bg=TK.PANEL_BG, fg=TK.TEXT, bd=1,
+            body,
+            text=f" {t('stats_summary')} ",
+            font=FONTS.BODY_BOLD,
+            bg=TK.PANEL_BG,
+            fg=TK.TEXT,
+            bd=1,
         )
         left.pack(side="left", fill="both", expand=True, padx=(0, 6))
 
         self._summary_text = tk.Text(
-            left, bg=TK.SURFACE, fg=TK.TEXT, font=FONTS.BODY,
-            state="disabled", wrap="word", bd=0, padx=8, pady=8, width=35,
+            left,
+            bg=TK.SURFACE,
+            fg=TK.TEXT,
+            font=FONTS.BODY,
+            state="disabled",
+            wrap="word",
+            bd=0,
+            padx=8,
+            pady=8,
+            width=35,
         )
         self._summary_text.pack(fill="both", expand=True)
 
         # 우측: 그래프
         right = tk.LabelFrame(
-            body, text=f" {t('stats_charts')} ", font=FONTS.BODY_BOLD,
-            bg=TK.PANEL_BG, fg=TK.TEXT, bd=1,
+            body,
+            text=f" {t('stats_charts')} ",
+            font=FONTS.BODY_BOLD,
+            bg=TK.PANEL_BG,
+            fg=TK.TEXT,
+            bd=1,
         )
         right.pack(side="right", fill="both", expand=True, padx=(6, 0))
 
         try:
             import matplotlib
+
             matplotlib.use("TkAgg")
             from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
             from matplotlib.figure import Figure
@@ -71,21 +91,36 @@ class StatsDashboard(tk.Toplevel):
             self._has_matplotlib = True
         except ImportError:
             tk.Label(
-                right, text=t("stats_matplotlib_missing"),
-                font=FONTS.BODY, bg=TK.PANEL_BG, fg=TK.RED,
+                right,
+                text=t("stats_matplotlib_missing"),
+                font=FONTS.BODY,
+                bg=TK.PANEL_BG,
+                fg=TK.RED,
             ).pack(expand=True)
             self._has_matplotlib = False
 
         # 하단: 업적
         ach_frame = tk.LabelFrame(
-            self, text=f" {t('stats_achievements')} ", font=FONTS.BODY_BOLD,
-            bg=TK.PANEL_BG, fg=TK.ACCENT_YELLOW, bd=1,
+            self,
+            text=f" {t('stats_achievements')} ",
+            font=FONTS.BODY_BOLD,
+            bg=TK.PANEL_BG,
+            fg=TK.ACCENT_YELLOW,
+            bd=1,
         )
         ach_frame.pack(fill="x", padx=14, pady=(0, 12))
 
         self._ach_text = tk.Text(
-            ach_frame, bg=TK.SURFACE, fg=TK.TEXT, font=FONTS.BODY,
-            state="disabled", wrap="word", bd=0, padx=8, pady=4, height=4,
+            ach_frame,
+            bg=TK.SURFACE,
+            fg=TK.TEXT,
+            font=FONTS.BODY,
+            state="disabled",
+            wrap="word",
+            bd=0,
+            padx=8,
+            pady=4,
+            height=4,
         )
         self._ach_text.pack(fill="x")
 
@@ -94,25 +129,39 @@ class StatsDashboard(tk.Toplevel):
         ctrl_frame.pack(pady=(0, 8))
 
         tk.Button(
-            ctrl_frame, text=t("stats_refresh"), command=self._load_data,
-            font=FONTS.BUTTON, width=12,
+            ctrl_frame,
+            text=t("stats_refresh"),
+            command=self._load_data,
+            font=FONTS.BUTTON,
+            width=12,
         ).pack(side="left", padx=4)
 
         tk.Button(
-            ctrl_frame, text=t("stats_export_csv"), command=self._export_csv,
-            font=FONTS.BUTTON, width=12,
+            ctrl_frame,
+            text=t("stats_export_csv"),
+            command=self._export_csv,
+            font=FONTS.BUTTON,
+            width=12,
         ).pack(side="left", padx=4)
 
         tk.Button(
-            ctrl_frame, text=t("stats_export_json"), command=self._export_json,
-            font=FONTS.BUTTON, width=12,
+            ctrl_frame,
+            text=t("stats_export_json"),
+            command=self._export_json,
+            font=FONTS.BUTTON,
+            width=12,
         ).pack(side="left", padx=4)
 
         # 자동 새로고침 토글
         self._auto_refresh = tk.BooleanVar(value=False)
         tk.Checkbutton(
-            ctrl_frame, text=t("stats_auto_refresh"), variable=self._auto_refresh,
-            font=FONTS.SMALL, bg=TK.BG, fg=TK.TEXT, selectcolor=TK.SURFACE,
+            ctrl_frame,
+            text=t("stats_auto_refresh"),
+            variable=self._auto_refresh,
+            font=FONTS.SMALL,
+            bg=TK.BG,
+            fg=TK.TEXT,
+            selectcolor=TK.SURFACE,
             command=self._toggle_auto_refresh,
         ).pack(side="left", padx=4)
 
@@ -122,8 +171,9 @@ class StatsDashboard(tk.Toplevel):
         """데이터 로드 및 표시."""
         try:
             from data_ai.play_logger import get_logger
+
             summary = get_logger().get_summary()
-        except Exception as e:
+        except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("통계 로드 실패: %s", e)
             summary = {"total_sessions": 0}
 
@@ -164,9 +214,9 @@ class StatsDashboard(tk.Toplevel):
                 for field, vals in stats.items():
                     if isinstance(vals, dict):
                         lines.append(f"    {field}:")
-                        lines.append(f"      avg={vals.get('mean', '-')}  "
-                                     f"max={vals.get('max', '-')}  "
-                                     f"min={vals.get('min', '-')}")
+                        lines.append(
+                            f"      avg={vals.get('mean', '-')}  max={vals.get('max', '-')}  min={vals.get('min', '-')}"
+                        )
 
         self._summary_text.insert("1.0", "\n".join(lines))
         self._summary_text.configure(state="disabled")
@@ -193,7 +243,7 @@ class StatsDashboard(tk.Toplevel):
         counts = list(per_module.values())
         colors = ["#89b4fa", "#a6e3a1", "#f9e2af", "#cba6f7", "#f38ba8", "#fab387", "#74c7ec"]
 
-        ax1.barh(modules, counts, color=colors[:len(modules)])
+        ax1.barh(modules, counts, color=colors[: len(modules)])
         ax1.set_title(t("stats_sessions_per_module"), color="#89b4fa", fontsize=10, fontweight="bold")
 
         for i, v in enumerate(counts):
@@ -208,8 +258,10 @@ class StatsDashboard(tk.Toplevel):
         ax2.set_title(t("stats_survival_trend"), color=get_tk_theme().GREEN, fontsize=10, fontweight="bold")
 
         try:
-            from data_ai.play_logger import get_logger
             import pandas as pd
+
+            from data_ai.play_logger import get_logger
+
             records = get_logger().records
             df = pd.DataFrame(records)
             for mod_name, color in [("qubit_chain", "#89b4fa"), ("qec_shield", "#cba6f7")]:
@@ -217,15 +269,30 @@ class StatsDashboard(tk.Toplevel):
                 if "survival_time" in mod_df.columns and not mod_df.empty:
                     times = pd.to_numeric(mod_df["survival_time"], errors="coerce").dropna().tolist()
                     if times:
-                        ax2.plot(range(len(times)), times, color=color, linewidth=1.5,
-                                 label=mod_name, marker="o", markersize=3)
+                        ax2.plot(
+                            range(len(times)),
+                            times,
+                            color=color,
+                            linewidth=1.5,
+                            label=mod_name,
+                            marker="o",
+                            markersize=3,
+                        )
             ax2.legend(fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
             ax2.set_xlabel(t("stats_session_num"), color="#cdd6f4", fontsize=8)
             ax2.set_ylabel(t("stats_time_sec"), color="#cdd6f4", fontsize=8)
-        except Exception as e:
+        except (KeyError, ValueError, TypeError, AttributeError) as e:
             _log.warning("생존 시간 차트 렌더링 실패: %s", e)
-            ax2.text(0.5, 0.5, t("stats_no_survival_data"), transform=ax2.transAxes,
-                     ha="center", va="center", color="#585b70", fontsize=11)
+            ax2.text(
+                0.5,
+                0.5,
+                t("stats_no_survival_data"),
+                transform=ax2.transAxes,
+                ha="center",
+                va="center",
+                color="#585b70",
+                fontsize=11,
+            )
 
         self._fig.tight_layout()
         self._canvas.draw()
@@ -237,6 +304,7 @@ class StatsDashboard(tk.Toplevel):
 
         try:
             from achievements import get_all_achievements, get_unlocked_count
+
             unlocked, total = get_unlocked_count()
             achievements = get_all_achievements()
 
@@ -246,17 +314,17 @@ class StatsDashboard(tk.Toplevel):
                 lines.append(f"  {status} [{ach['icon']}] {ach['title']} — {ach['desc']}")
 
             self._ach_text.insert("1.0", "\n".join(lines))
-        except Exception as e:
+        except (ImportError, KeyError, TypeError, ValueError) as e:
             _log.warning("업적 로드 실패: %s", e)
             self._ach_text.insert("1.0", t("stats_ach_unavailable"))
 
         self._ach_text.configure(state="disabled")
 
-
     def _export_csv(self):
         """CSV 내보내기."""
         try:
             from data_ai.play_logger import get_logger
+
             path = get_logger().export()
             if path:
                 messagebox.showinfo(
@@ -270,13 +338,14 @@ class StatsDashboard(tk.Toplevel):
                     t("stats_export_empty"),
                     parent=self,
                 )
-        except Exception as e:
+        except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("CSV 내보내기 실패: %s", e)
 
     def _export_json(self):
         """JSON 내보내기."""
         try:
             from data_ai.play_logger import get_logger
+
             path = get_logger().export_json()
             if path:
                 messagebox.showinfo(
@@ -290,7 +359,7 @@ class StatsDashboard(tk.Toplevel):
                     t("stats_export_empty"),
                     parent=self,
                 )
-        except Exception as e:
+        except (ImportError, OSError, ValueError, TypeError) as e:
             _log.error("JSON 내보내기 실패: %s", e)
 
     def _toggle_auto_refresh(self):

@@ -43,9 +43,18 @@ class Slider:
     BAR_H = 12
     TOTAL_H = 42  # 라벨 + 바 + 여백
 
-    def __init__(self, x: int, y: int, w: int,
-                 min_val: float, max_val: float, val: float,
-                 step: float, label: str, fmt: str = ".1f"):
+    def __init__(
+        self,
+        x: int,
+        y: int,
+        w: int,
+        min_val: float,
+        max_val: float,
+        val: float,
+        step: float,
+        label: str,
+        fmt: str = ".1f",
+    ):
         self.x = x
         self.y = y
         self.w = w
@@ -134,6 +143,20 @@ class Slider:
         # 바 테두리
         pygame.draw.rect(screen, c["subtext"], self.bar_rect, 1, border_radius=4)
 
+        # 툴팁: 마우스가 바 위에 있으면 범위 정보 표시
+        mx, my = pygame.mouse.get_pos()
+        hover_rect = self.bar_rect.inflate(0, 8)
+        if hover_rect.collidepoint(mx, my):
+            tip = f"{self.min_val:{self.fmt}} ~ {self.max_val:{self.fmt}} (step {self.step:{self.fmt}})"
+            tip_surf = font.render(tip, True, c["text"])
+            tip_w = tip_surf.get_width() + 8
+            tip_h = tip_surf.get_height() + 4
+            tip_x = min(mx + 12, screen.get_width() - tip_w - 4)
+            tip_y = my - tip_h - 4
+            pygame.draw.rect(screen, c["panel_bg"], (tip_x - 4, tip_y - 2, tip_w, tip_h), border_radius=3)
+            pygame.draw.rect(screen, c["subtext"], (tip_x - 4, tip_y - 2, tip_w, tip_h), 1, border_radius=3)
+            screen.blit(tip_surf, (tip_x, tip_y))
+
     def _ratio(self) -> float:
         if self.max_val <= self.min_val:
             return 0.0
@@ -150,8 +173,7 @@ class SliderPanel:
         self.title = title
         self.sliders: list[Slider] = []
 
-    def add(self, min_val: float, max_val: float, val: float,
-            step: float, label: str, fmt: str = ".1f") -> Slider:
+    def add(self, min_val: float, max_val: float, val: float, step: float, label: str, fmt: str = ".1f") -> Slider:
         """슬라이더 추가. 반환된 Slider 객체의 .value로 현재 값을 읽는다."""
         sy = self.y + 28 + len(self.sliders) * Slider.TOTAL_H
         s = Slider(self.x + 10, sy, self.w - 20, min_val, max_val, val, step, label, fmt)
@@ -170,8 +192,7 @@ class SliderPanel:
     def panel_height(self) -> int:
         return 28 + len(self.sliders) * Slider.TOTAL_H + 10
 
-    def draw(self, screen: pygame.Surface, font: pygame.font.Font,
-             title_font: pygame.font.Font | None = None):
+    def draw(self, screen: pygame.Surface, font: pygame.font.Font, title_font: pygame.font.Font | None = None):
         h = self.panel_height()
         panel_rect = pygame.Rect(self.x, self.y, self.w, h)
 

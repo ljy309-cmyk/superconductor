@@ -12,25 +12,30 @@ class TestColorblindThemeToggle(unittest.TestCase):
 
     def setUp(self):
         from theme import set_colorblind, set_theme
+
         set_colorblind(False)
         set_theme("dark")
 
     def tearDown(self):
         from theme import set_colorblind, set_theme
+
         set_colorblind(False)
         set_theme("dark")
 
     def test_default_colorblind_off(self):
         from theme import is_colorblind
+
         self.assertFalse(is_colorblind())
 
     def test_set_colorblind_on(self):
-        from theme import set_colorblind, is_colorblind
+        from theme import is_colorblind, set_colorblind
+
         set_colorblind(True)
         self.assertTrue(is_colorblind())
 
     def test_toggle_colorblind(self):
-        from theme import toggle_colorblind, is_colorblind
+        from theme import is_colorblind, toggle_colorblind
+
         result = toggle_colorblind()
         self.assertTrue(result)
         self.assertTrue(is_colorblind())
@@ -39,36 +44,43 @@ class TestColorblindThemeToggle(unittest.TestCase):
         self.assertFalse(is_colorblind())
 
     def test_get_tk_theme_dark_normal(self):
-        from theme import get_tk_theme, TK
+        from theme import TK, get_tk_theme
+
         self.assertIs(get_tk_theme(), TK)
 
     def test_get_tk_theme_dark_colorblind(self):
-        from theme import set_colorblind, get_tk_theme, TK_CB
+        from theme import TK_CB, get_tk_theme, set_colorblind
+
         set_colorblind(True)
         self.assertIs(get_tk_theme(), TK_CB)
 
     def test_get_tk_theme_light_normal(self):
-        from theme import set_theme, get_tk_theme, TK_LIGHT
+        from theme import TK_LIGHT, get_tk_theme, set_theme
+
         set_theme("light")
         self.assertIs(get_tk_theme(), TK_LIGHT)
 
     def test_get_tk_theme_light_colorblind(self):
-        from theme import set_theme, set_colorblind, get_tk_theme, TK_CB_LIGHT
+        from theme import TK_CB_LIGHT, get_tk_theme, set_colorblind, set_theme
+
         set_theme("light")
         set_colorblind(True)
         self.assertIs(get_tk_theme(), TK_CB_LIGHT)
 
     def test_get_pg_theme_dark_normal(self):
-        from theme import get_pg_theme, PG
+        from theme import PG, get_pg_theme
+
         self.assertIs(get_pg_theme(), PG)
 
     def test_get_pg_theme_dark_colorblind(self):
-        from theme import set_colorblind, get_pg_theme, PG_CB
+        from theme import PG_CB, get_pg_theme, set_colorblind
+
         set_colorblind(True)
         self.assertIs(get_pg_theme(), PG_CB)
 
     def test_get_pg_theme_light_colorblind(self):
-        from theme import set_theme, set_colorblind, get_pg_theme, PG_CB_LIGHT
+        from theme import PG_CB_LIGHT, get_pg_theme, set_colorblind, set_theme
+
         set_theme("light")
         set_colorblind(True)
         self.assertIs(get_pg_theme(), PG_CB_LIGHT)
@@ -79,27 +91,32 @@ class TestColorblindPaletteDistinctness(unittest.TestCase):
 
     def test_cb_dark_green_differs_from_normal(self):
         from theme import TK, TK_CB
+
         self.assertNotEqual(TK.GREEN, TK_CB.GREEN)
 
     def test_cb_dark_red_differs_from_normal(self):
         from theme import TK, TK_CB
+
         self.assertNotEqual(TK.RED, TK_CB.RED)
 
     def test_cb_dark_green_is_blue_family(self):
         """색맹 모드 GREEN은 blue 계열이어야 한다."""
         from theme import PG_CB
+
         r, g, b = PG_CB.GREEN
         self.assertGreater(b, r, "Blue channel should dominate for colorblind green")
 
     def test_cb_dark_red_is_orange_family(self):
         """색맹 모드 RED는 orange 계열이어야 한다."""
         from theme import PG_CB
+
         r, g, b = PG_CB.RED
         self.assertGreater(r, b, "Red channel should dominate for colorblind red")
 
     def test_cb_dark_stable_collapsed_distinguishable(self):
         """STABLE과 COLLAPSED가 충분히 다른 색이어야 한다."""
         from theme import PG_CB
+
         sr, sg, sb = PG_CB.STABLE
         cr, cg, cb = PG_CB.COLLAPSED
         # 유클리드 거리가 최소 100 이상
@@ -107,16 +124,19 @@ class TestColorblindPaletteDistinctness(unittest.TestCase):
         self.assertGreater(dist, 100, "STABLE and COLLAPSED must be visually distinct")
 
     def test_cb_light_green_differs_from_normal(self):
-        from theme import TK_LIGHT, TK_CB_LIGHT
+        from theme import TK_CB_LIGHT, TK_LIGHT
+
         self.assertNotEqual(TK_LIGHT.GREEN, TK_CB_LIGHT.GREEN)
 
     def test_cb_light_red_differs_from_normal(self):
-        from theme import TK_LIGHT, TK_CB_LIGHT
+        from theme import TK_CB_LIGHT, TK_LIGHT
+
         self.assertNotEqual(TK_LIGHT.RED, TK_CB_LIGHT.RED)
 
     def test_all_four_qubit_states_distinct(self):
         """4개 큐비트 상태 색상이 모두 서로 다른지 확인."""
         from theme import PG_CB
+
         states = [PG_CB.STABLE, PG_CB.WARNING, PG_CB.DANGER, PG_CB.COLLAPSED]
         for i, a in enumerate(states):
             for j, b in enumerate(states):
@@ -129,39 +149,31 @@ class TestColorblindPGAttributes(unittest.TestCase):
 
     def test_pg_cb_has_all_pg_attributes(self):
         from theme import PG, PG_CB
+
         for attr in dir(PG):
             if not attr.startswith("_"):
-                self.assertTrue(
-                    hasattr(PG_CB, attr),
-                    f"PG_CB is missing attribute: {attr}"
-                )
+                self.assertTrue(hasattr(PG_CB, attr), f"PG_CB is missing attribute: {attr}")
 
     def test_pg_cb_light_has_all_pg_light_attributes(self):
-        from theme import PG_LIGHT, PG_CB_LIGHT
+        from theme import PG_CB_LIGHT, PG_LIGHT
+
         for attr in dir(PG_LIGHT):
             if not attr.startswith("_"):
-                self.assertTrue(
-                    hasattr(PG_CB_LIGHT, attr),
-                    f"PG_CB_LIGHT is missing attribute: {attr}"
-                )
+                self.assertTrue(hasattr(PG_CB_LIGHT, attr), f"PG_CB_LIGHT is missing attribute: {attr}")
 
     def test_tk_cb_has_all_tk_attributes(self):
         from theme import TK, TK_CB
+
         for attr in dir(TK):
             if not attr.startswith("_"):
-                self.assertTrue(
-                    hasattr(TK_CB, attr),
-                    f"TK_CB is missing attribute: {attr}"
-                )
+                self.assertTrue(hasattr(TK_CB, attr), f"TK_CB is missing attribute: {attr}")
 
     def test_tk_cb_light_has_all_tk_light_attributes(self):
-        from theme import TK_LIGHT, TK_CB_LIGHT
+        from theme import TK_CB_LIGHT, TK_LIGHT
+
         for attr in dir(TK_LIGHT):
             if not attr.startswith("_"):
-                self.assertTrue(
-                    hasattr(TK_CB_LIGHT, attr),
-                    f"TK_CB_LIGHT is missing attribute: {attr}"
-                )
+                self.assertTrue(hasattr(TK_CB_LIGHT, attr), f"TK_CB_LIGHT is missing attribute: {attr}")
 
 
 class TestConfigColorblindMode(unittest.TestCase):
@@ -169,11 +181,9 @@ class TestConfigColorblindMode(unittest.TestCase):
 
     def test_config_has_accessibility_section(self):
         import json
-        config_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "config.json"
-        )
-        with open(config_path, "r", encoding="utf-8") as f:
+
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+        with open(config_path, encoding="utf-8") as f:
             config = json.load(f)
         self.assertIn("accessibility", config)
         self.assertIn("colorblind_mode", config["accessibility"])
@@ -181,6 +191,7 @@ class TestConfigColorblindMode(unittest.TestCase):
 
     def test_config_loader_reads_colorblind(self):
         from config_loader import cfg
+
         result = cfg("accessibility", "colorblind_mode", False)
         self.assertIsInstance(result, bool)
 
@@ -190,22 +201,18 @@ class TestI18nColorblindKeys(unittest.TestCase):
 
     def test_ko_has_colorblind_keys(self):
         import json
-        path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "locale", "ko.json"
-        )
-        with open(path, "r", encoding="utf-8") as f:
+
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "locale", "ko.json")
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         self.assertIn("colorblind_on", data)
         self.assertIn("colorblind_off", data)
 
     def test_en_has_colorblind_keys(self):
         import json
-        path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "locale", "en.json"
-        )
-        with open(path, "r", encoding="utf-8") as f:
+
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "locale", "en.json")
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         self.assertIn("colorblind_on", data)
         self.assertIn("colorblind_off", data)

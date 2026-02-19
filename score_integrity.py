@@ -32,7 +32,7 @@ _TOKEN_TTL = 60
 
 def _make_message(name: str, score: float, mode: str, ts: int) -> bytes:
     """서명할 메시지 조합."""
-    return f"{name}:{score:.2f}:{mode}:{ts}".encode("utf-8")
+    return f"{name}:{score:.2f}:{mode}:{ts}".encode()
 
 
 def sign_score(name: str, score: float, mode: str) -> str:

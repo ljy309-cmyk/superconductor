@@ -4,13 +4,14 @@ import tkinter as tk
 from datetime import datetime
 
 import matplotlib
+
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from scada.cooler import CoolerState, CoolingSystem
-from theme import TK, FONTS, get_tk_theme
 from i18n import t
+from scada.cooler import CoolerState, CoolingSystem
+from theme import FONTS, TK, get_tk_theme
 
 # 최대 기록 유지할 온도 데이터 포인트 수
 MAX_HISTORY = 120
@@ -42,8 +43,11 @@ class Dashboard(tk.Toplevel):
     def _build_ui(self):
         # 상단 타이틀
         title = tk.Label(
-            self, text=t("dashboard_heading"),
-            font=FONTS.HEADING, bg=TK.BG, fg=TK.ACCENT_BLUE,
+            self,
+            text=t("dashboard_heading"),
+            font=FONTS.HEADING,
+            bg=TK.BG,
+            fg=TK.ACCENT_BLUE,
         )
         title.pack(pady=(12, 6))
 
@@ -53,14 +57,25 @@ class Dashboard(tk.Toplevel):
 
         # ── 좌측: 실시간 온도 텍스트 로그 ──
         left = tk.LabelFrame(
-            body, text=f" {t('temp_log')} ",
-            font=FONTS.BODY_BOLD, bg=TK.PANEL_BG, fg=TK.TEXT, bd=1,
+            body,
+            text=f" {t('temp_log')} ",
+            font=FONTS.BODY_BOLD,
+            bg=TK.PANEL_BG,
+            fg=TK.TEXT,
+            bd=1,
         )
         left.pack(side="left", fill="both", expand=True, padx=(0, 6))
 
         self._log = tk.Text(
-            left, bg=TK.SURFACE, fg=TK.TEXT, font=FONTS.BODY,
-            state="disabled", wrap="none", bd=0, padx=8, pady=8,
+            left,
+            bg=TK.SURFACE,
+            fg=TK.TEXT,
+            font=FONTS.BODY,
+            state="disabled",
+            wrap="none",
+            bd=0,
+            padx=8,
+            pady=8,
         )
         scrollbar = tk.Scrollbar(left, command=self._log.yview)
         self._log.configure(yscrollcommand=scrollbar.set)
@@ -70,15 +85,23 @@ class Dashboard(tk.Toplevel):
         # 목표 온도 표시
         self._target_var = tk.StringVar(value=t("target_temp", temp=-196.0))
         tk.Label(
-            left, textvariable=self._target_var,
-            font=FONTS.BODY_BOLD, bg=TK.PANEL_BG, fg=TK.YELLOW,
-            anchor="w", padx=8,
+            left,
+            textvariable=self._target_var,
+            font=FONTS.BODY_BOLD,
+            bg=TK.PANEL_BG,
+            fg=TK.YELLOW,
+            anchor="w",
+            padx=8,
         ).pack(side="bottom", fill="x", pady=(4, 6))
 
         # ── 중앙: 실시간 온도 그래프 ──
         mid = tk.LabelFrame(
-            body, text=f" {t('graph_title_temp')} ",
-            font=FONTS.BODY_BOLD, bg=TK.PANEL_BG, fg=TK.TEXT, bd=1,
+            body,
+            text=f" {t('graph_title_temp')} ",
+            font=FONTS.BODY_BOLD,
+            bg=TK.PANEL_BG,
+            fg=TK.TEXT,
+            bd=1,
         )
         mid.pack(side="left", fill="both", expand=True, padx=6)
 
@@ -90,30 +113,47 @@ class Dashboard(tk.Toplevel):
 
         # ── 우측: 시스템 상태 게이지 패널 ──
         right = tk.LabelFrame(
-            body, text=f" {t('system_status')} ",
-            font=FONTS.BODY_BOLD, bg=TK.PANEL_BG, fg=TK.TEXT, bd=1,
+            body,
+            text=f" {t('system_status')} ",
+            font=FONTS.BODY_BOLD,
+            bg=TK.PANEL_BG,
+            fg=TK.TEXT,
+            bd=1,
         )
         right.pack(side="right", fill="both", padx=(6, 0))
 
         # 현재 온도 표시
         self._temp_var = tk.StringVar(value="-- °C")
         tk.Label(
-            right, text=t("current_temp"),
-            font=FONTS.SMALL, bg=TK.PANEL_BG, fg=TK.TEXT,
+            right,
+            text=t("current_temp"),
+            font=FONTS.SMALL,
+            bg=TK.PANEL_BG,
+            fg=TK.TEXT,
         ).pack(pady=(12, 0))
         self._temp_label = tk.Label(
-            right, textvariable=self._temp_var,
-            font=("Consolas", 22, "bold"), bg=TK.PANEL_BG, fg=TK.ACCENT_BLUE,
+            right,
+            textvariable=self._temp_var,
+            font=("Consolas", 22, "bold"),
+            bg=TK.PANEL_BG,
+            fg=TK.ACCENT_BLUE,
         )
         self._temp_label.pack()
 
         # 게이지 바
         tk.Label(
-            right, text=t("cooling_gauge"),
-            font=FONTS.SMALL, bg=TK.PANEL_BG, fg=TK.TEXT,
+            right,
+            text=t("cooling_gauge"),
+            font=FONTS.SMALL,
+            bg=TK.PANEL_BG,
+            fg=TK.TEXT,
         ).pack(pady=(16, 4))
         self._gauge_canvas = tk.Canvas(
-            right, width=60, height=220, bg=TK.PANEL_BG, highlightthickness=0,
+            right,
+            width=60,
+            height=220,
+            bg=TK.PANEL_BG,
+            highlightthickness=0,
         )
         self._gauge_canvas.pack()
         self._draw_gauge_frame()
@@ -125,8 +165,11 @@ class Dashboard(tk.Toplevel):
 
         for var in (self._status_var, self._cooling_var, self._emergency_var):
             tk.Label(
-                right, textvariable=var,
-                font=FONTS.BODY_BOLD, bg=TK.PANEL_BG, fg=TK.TEXT,
+                right,
+                textvariable=var,
+                font=FONTS.BODY_BOLD,
+                bg=TK.PANEL_BG,
+                fg=TK.TEXT,
             ).pack(pady=2)
 
         # 하단 제어 버튼
@@ -135,16 +178,25 @@ class Dashboard(tk.Toplevel):
 
         _tk = get_tk_theme()
         self._start_btn = tk.Button(
-            btn_frame, text=t("start"), width=12,
-            font=FONTS.BODY_BOLD, bg=_tk.GREEN, fg=_tk.BG,
+            btn_frame,
+            text=t("start"),
+            width=12,
+            font=FONTS.BODY_BOLD,
+            bg=_tk.GREEN,
+            fg=_tk.BG,
             command=self._start,
         )
         self._start_btn.pack(side="left", padx=6)
 
         self._stop_btn = tk.Button(
-            btn_frame, text=t("stop"), width=12,
-            font=FONTS.BODY_BOLD, bg=_tk.RED, fg=_tk.BG,
-            command=self._stop, state="disabled",
+            btn_frame,
+            text=t("stop"),
+            width=12,
+            font=FONTS.BODY_BOLD,
+            bg=_tk.RED,
+            fg=_tk.BG,
+            command=self._stop,
+            state="disabled",
         )
         self._stop_btn.pack(side="left", padx=6)
 
@@ -163,7 +215,7 @@ class Dashboard(tk.Toplevel):
         ax.axhline(y=-196.0, color=_tk.RED, linestyle="--", linewidth=1, alpha=0.7, label=t("graph_target_tc"))
 
         # 라인 객체를 미리 생성 (blitting용)
-        self._temp_line, = ax.plot([], [], color="#89b4fa", linewidth=1.5, label=t("graph_temperature"))
+        (self._temp_line,) = ax.plot([], [], color="#89b4fa", linewidth=1.5, label=t("graph_temperature"))
         ax.legend(loc="upper right", fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4")
         self._fig.tight_layout()
         self._canvas.draw()
@@ -195,14 +247,20 @@ class Dashboard(tk.Toplevel):
                 ax.collections[0].remove()
             _tk = get_tk_theme()
             ax.fill_between(
-                self._time_history, self._temp_history, -196.0,
+                self._time_history,
+                self._temp_history,
+                -196.0,
                 where=[tmp > -196.0 for tmp in self._temp_history],
-                alpha=0.1, color=_tk.RED,
+                alpha=0.1,
+                color=_tk.RED,
             )
             ax.fill_between(
-                self._time_history, self._temp_history, -196.0,
+                self._time_history,
+                self._temp_history,
+                -196.0,
                 where=[tmp <= -196.0 for tmp in self._temp_history],
-                alpha=0.1, color=_tk.GREEN,
+                alpha=0.1,
+                color=_tk.GREEN,
             )
             self._fig.tight_layout()
             self._canvas.draw()

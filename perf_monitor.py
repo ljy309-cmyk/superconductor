@@ -93,8 +93,12 @@ class PerfMonitor:
         s = self.summary()
         _log.info(
             "성능: %d 프레임, 드롭 %d (%.1f%%), 평균 %.1f FPS, 최소 %.1f FPS, %.1fs",
-            s["total_frames"], s["frame_drops"], s["drop_rate"],
-            s["avg_fps"], s["min_fps"], s["uptime"],
+            s["total_frames"],
+            s["frame_drops"],
+            s["drop_rate"],
+            s["avg_fps"],
+            s["min_fps"],
+            s["uptime"],
         )
 
     def draw_overlay(self, screen, font, x: int = 4, y: int = 4):
@@ -105,8 +109,11 @@ class PerfMonitor:
             return
         fps = self.current_fps
         avg = self.avg_fps
-        color = (166, 227, 161) if fps >= self.target_fps * 0.9 else (
-            (249, 226, 175) if fps >= self.target_fps * 0.5 else (243, 139, 168))
+        color = (
+            (166, 227, 161)
+            if fps >= self.target_fps * 0.9
+            else ((249, 226, 175) if fps >= self.target_fps * 0.5 else (243, 139, 168))
+        )
         text = f"FPS: {fps:.0f}  AVG: {avg:.0f}  DROP: {self._drop_count}"
         surf = font.render(text, True, color)
         screen.blit(surf, (x, y))
