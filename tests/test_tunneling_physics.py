@@ -1057,5 +1057,54 @@ class TestNotifyToast(unittest.TestCase):
         self.assertEqual(nt.active_count, 1)
 
 
+# ══════════════════════════════════════════════════════
+# 15. _make_fonts — 해상도 비례 폰트 스케일링
+# ══════════════════════════════════════════════════════
+
+from quantum.tunneling import _make_fonts, _BASE_W, _BASE_H
+
+
+class TestMakeFonts(unittest.TestCase):
+    """_make_fonts 호출이 해상도에 비례하여 폰트 크기를 결정하는지 검증."""
+
+    def test_returns_four_fonts(self):
+        """4-튜플 반환."""
+        fonts = _make_fonts(900, 600)
+        self.assertEqual(len(fonts), 4)
+
+    def test_calls_sysfont_with_scaled_sizes(self):
+        """저해상도에서 SysFont 호출 크기가 기본보다 작음."""
+        pg = sys.modules["pygame"]
+        before = pg.font.SysFont.call_count
+        _make_fonts(450, 300)  # 50% 해상도
+        calls = pg.font.SysFont.call_args_list[before:]
+        # 4회 호출 (font, info, title, big)
+        self.assertEqual(len(calls), 4)
+        # 50% 해상도에서 크기가 기본(13)보다 작아야 함
+        first_size = calls[0][0][1]
+        self.assertLess(first_size, 13)
+        self.assertGreaterEqual(first_size, 8)
+
+    def test_high_resolution_does_not_over_scale(self):
+        """고해상도에서 기본 크기 이상이지만 합리적 범위."""
+        pg = sys.modules["pygame"]
+        before = pg.font.SysFont.call_count
+        _make_fonts(1800, 1200)  # 200% 해상도
+        calls = pg.font.SysFont.call_args_list[before:]
+        big_size = calls[3][0][1]
+        self.assertGreater(big_size, 18)
+        self.assertLess(big_size, 100)
+
+    def test_minimum_floor(self):
+        """매우 작은 해상도에서도 최소 8px 보장."""
+        pg = sys.modules["pygame"]
+        before = pg.font.SysFont.call_count
+        _make_fonts(100, 60)  # 극소 해상도
+        calls = pg.font.SysFont.call_args_list[before:]
+        for call in calls:
+            size = call[0][1]
+            self.assertGreaterEqual(size, 8)
+
+
 if __name__ == "__main__":
     unittest.main()

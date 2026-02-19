@@ -48,7 +48,7 @@ from quantum.tunneling_physics import (
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
-from theme import is_high_contrast, is_reduced_motion, load_pg_colors, on_theme_change
+from theme import get_font_scale, is_high_contrast, is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
@@ -422,6 +422,32 @@ def _draw_compare_mode(screen, font, title_font, info_font, cmp):
                              L.cmp_stats_y + 15 + i * 22))
 
 
+# ── 해상도 비례 폰트 ─────────────────────────────────
+
+_BASE_W, _BASE_H = 900, 600
+
+
+def _make_fonts(w: int, h: int):
+    """해상도와 테마 폰트 스케일에 비례하는 폰트 생성.
+
+    Returns:
+        (font, info_font, title_font, big_font) 튜플.
+    """
+    sx = w / _BASE_W
+    sy = h / _BASE_H
+    scale = max(min(sx, sy), 0.6) * get_font_scale()
+
+    def sz(base):
+        return max(8, int(base * scale))
+
+    return (
+        pygame.font.SysFont("Consolas", sz(13)),
+        pygame.font.SysFont("Consolas", sz(11)),
+        pygame.font.SysFont("Consolas", sz(16), bold=True),
+        pygame.font.SysFont("Consolas", sz(18), bold=True),
+    )
+
+
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 
@@ -433,10 +459,7 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption(t("game_title_tunneling"))
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 12)
-    info_font = pygame.font.SysFont("Consolas", 11)
-    title_font = pygame.font.SysFont("Consolas", 16, bold=True)
-    big_font = pygame.font.SysFont("Consolas", 18, bold=True)
+    font, info_font, title_font, big_font = _make_fonts(WIDTH, HEIGHT)
 
     particle = QuantumParticle()
     paused = False
@@ -592,6 +615,8 @@ def run_simulation():
                 screen = pygame.display.set_mode(
                     (event.w, event.h), pygame.RESIZABLE)
                 _rebuild_layout(event.w - PANEL_W, event.h)
+                font, info_font, title_font, big_font = _make_fonts(
+                    event.w - PANEL_W, event.h)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if mode in (MODE_STEP, MODE_AUTO):
                     particle.reset()
