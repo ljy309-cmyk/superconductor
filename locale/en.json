@@ -718,10 +718,10 @@
   "tn_tab_step": "Step-by-Step",
   "tn_tab_auto": "Auto Run",
   "tn_tab_compare": "Width Compare",
-  "tn_hint_step_1": "SPACE: Launch  |  R: Reset  |  Tab: Mode  |  PgUp/PgDn: History",
-  "tn_hint_step_2": "↑/↓: Speed  |  ←/→: Barrier Width  |  L: Language  |  ESC: Exit",
-  "tn_hint_auto_1": "SPACE: Pause  |  Click: Relaunch  |  R: Reset  |  Tab: Mode  |  PgUp/PgDn: History",
-  "tn_hint_auto_2": "↑/↓: Speed  |  ←/→: Barrier Width  |  L: Language  |  ESC: Exit",
+  "tn_hint_step_1": "SPACE: Launch  |  P: Pause  |  . : Step Frame  |  R: Reset  |  Tab: Mode",
+  "tn_hint_step_2": "↑/↓: Speed  |  ←/→: Barrier Width  |  PgUp/PgDn: History  |  L: Language  |  ESC: Exit",
+  "tn_hint_auto_1": "SPACE/P: Pause  |  . : Step Frame  |  Click: Relaunch  |  R: Reset  |  Tab: Mode",
+  "tn_hint_auto_2": "↑/↓: Speed  |  ←/→: Barrier Width  |  PgUp/PgDn: History  |  L: Language  |  ESC: Exit",
   "tn_hint_compare_1": "SPACE: Start Race  |  ↑/↓: Thick Barrier Size  |  Tab: Mode",
   "tn_hint_compare_2": "R: Reset  |  L: Language  |  ESC: Exit",
   "tn_compare_title": "Thin vs Thick Barrier — Tunneling Race",
@@ -875,5 +875,8 @@
   "tn_qc_result_classical": "Classical: {count}/{total} tunneled  ({pct:.1f}%)",
   "tn_qc_done": "Analysis complete!",
   "tn_hint_qc_1": "SPACE: Start Simulation  |  ↑/↓: Barrier Width  |  Tab: Mode",
-  "tn_hint_qc_2": "R: Reset  |  L: Language  |  ESC: Exit"
+  "tn_hint_qc_2": "R: Reset  |  L: Language  |  ESC: Exit",
+
+  "tn_paused": "Paused",
+  "tn_paused_banner": "PAUSED — P/SPACE: Resume  |  . : Step 1 Frame"
 }

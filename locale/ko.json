@@ -718,10 +718,10 @@
   "tn_tab_step": "단계별",
   "tn_tab_auto": "연속 자동",
   "tn_tab_compare": "두께 비교",
-  "tn_hint_step_1": "SPACE: 입자 발사  |  R: 초기화  |  Tab: 모드  |  PgUp/PgDn: 히스토리",
-  "tn_hint_step_2": "↑/↓: 속도  |  ←/→: 장벽 두께  |  L: 언어 전환  |  ESC: 종료",
-  "tn_hint_auto_1": "SPACE: 일시정지  |  클릭: 재발사  |  R: 초기화  |  Tab: 모드  |  PgUp/PgDn: 히스토리",
-  "tn_hint_auto_2": "↑/↓: 속도  |  ←/→: 장벽 두께  |  L: 언어 전환  |  ESC: 종료",
+  "tn_hint_step_1": "SPACE: 입자 발사  |  P: 일시정지  |  . : 1프레임  |  R: 초기화  |  Tab: 모드",
+  "tn_hint_step_2": "↑/↓: 속도  |  ←/→: 장벽 두께  |  PgUp/PgDn: 히스토리  |  L: 언어  |  ESC: 종료",
+  "tn_hint_auto_1": "SPACE/P: 일시정지  |  . : 1프레임  |  클릭: 재발사  |  R: 초기화  |  Tab: 모드",
+  "tn_hint_auto_2": "↑/↓: 속도  |  ←/→: 장벽 두께  |  PgUp/PgDn: 히스토리  |  L: 언어  |  ESC: 종료",
   "tn_hint_compare_1": "SPACE: 경쟁 시작  |  ↑/↓: 두꺼운 장벽 두께  |  Tab: 모드",
   "tn_hint_compare_2": "R: 초기화  |  L: 언어 전환  |  ESC: 종료",
   "tn_compare_title": "얇은 장벽 vs 두꺼운 장벽 — 터널링 확률 대결",
@@ -875,5 +875,8 @@
   "tn_qc_result_classical": "고전: {count}/{total} 터널링  ({pct:.1f}%)",
   "tn_qc_done": "분석 완료!",
   "tn_hint_qc_1": "SPACE: 시뮬레이션 시작  |  ↑/↓: 장벽 두께  |  Tab: 모드",
-  "tn_hint_qc_2": "R: 초기화  |  L: 언어 전환  |  ESC: 종료"
+  "tn_hint_qc_2": "R: 초기화  |  L: 언어 전환  |  ESC: 종료",
+
+  "tn_paused": "일시정지",
+  "tn_paused_banner": "일시정지 — P/SPACE: 재개  |  . : 1프레임 전진"
 }

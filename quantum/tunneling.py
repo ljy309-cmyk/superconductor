@@ -636,6 +636,7 @@ def run_simulation():
 
     particle = QuantumParticle()
     paused = False
+    frame_step = False  # 일시정지 중 1프레임 전진
 
     # ── 슬라이더 패널 ─────────────────────────────────
     panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
@@ -693,8 +694,9 @@ def run_simulation():
     }
 
     def _on_mode_change():
-        nonlocal step_waiting, paused, history_page
+        nonlocal step_waiting, paused, frame_step, history_page
         history_page = 0
+        frame_step = False
         if mode == MODE_STEP:
             step_waiting = True
             paused = False
@@ -747,8 +749,10 @@ def run_simulation():
                 elif event.key == pygame.K_SPACE:
                     if mode == MODE_STEP:
                         step_waiting = False
+                        paused = False
                     elif mode == MODE_AUTO:
                         paused = not paused
+                        frame_step = False
                     elif mode == MODE_COMPARE:
                         if cmp["done"]:
                             cmp["thin_tunnels"] = 0
@@ -812,6 +816,20 @@ def run_simulation():
                 elif event.key == pygame.K_LEFT:
                     if mode not in (MODE_COMPARE, MODE_QC):
                         sl_barrier.value = sl_barrier.value - 10
+                elif event.key == pygame.K_PERIOD:
+                    # 일시정지 중 1프레임 전진
+                    if mode == MODE_AUTO and paused:
+                        frame_step = True
+                    elif mode == MODE_STEP and not step_waiting:
+                        if not paused:
+                            paused = True
+                            _notify(t("tn_paused"), "info", 0.8)
+                        frame_step = True
+                elif event.key == pygame.K_p:
+                    if mode in (MODE_STEP, MODE_AUTO):
+                        paused = not paused
+                        if paused:
+                            _notify(t("tn_paused"), "info", 0.8)
                 elif event.key == pygame.K_l:
                     toggle_locale()
                 elif event.key == pygame.K_g:
@@ -839,16 +857,22 @@ def run_simulation():
         # ── 물리 업데이트 ────────────────────────────
         should_update = False
         if mode == MODE_STEP:
-            should_update = not step_waiting
+            should_update = (not step_waiting) and (not paused or frame_step)
         elif mode == MODE_AUTO:
-            should_update = not paused
+            should_update = not paused or frame_step
+
+        # 프레임 단위 전진: 고정 dt 사용 (1/FPS)
+        if frame_step:
+            dt_phys = 1.0 / FPS
+        else:
+            dt_phys = dt
 
         if should_update:
             prev_attempts = particle.total_attempts
             prev_tunneled = particle.tunneled
             orig_vx = particle.vx
             particle.vx = orig_vx * speed_mult if orig_vx > 0 else orig_vx
-            particle.update(dt, barrier_width, tunnel_prob, sl_boost.value)
+            particle.update(dt_phys, barrier_width, tunnel_prob, sl_boost.value)
             particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
 
             # Step 모드: 입자가 리스폰되면 다음 발사 대기
@@ -896,6 +920,8 @@ def run_simulation():
                     "tunnels": particle.tunnel_count,
                 }
             )
+
+        frame_step = False  # 1프레임 전진 후 리셋
 
         # ── Compare 모드 시뮬레이션 ──────────────────
         if mode == MODE_COMPARE and cmp["running"] and not cmp["done"]:
@@ -985,6 +1011,13 @@ def run_simulation():
                 screen.blit(wait_surf,
                             (SIM_LEFT + SIM_W // 2 - wait_surf.get_width() // 2,
                              SIM_TOP + SIM_H + max(3, int(5 * L.H / 600))))
+
+            # 일시정지 배너
+            if paused:
+                banner = info_font.render(t("tn_paused_banner"), True, ACCENT)
+                bx = SIM_LEFT + SIM_W // 2 - banner.get_width() // 2
+                by = SIM_TOP + SIM_H + max(3, int(5 * L.H / 600))
+                screen.blit(banner, (bx, by))
 
             # 힌트
             if mode == MODE_STEP:
