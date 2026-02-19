@@ -340,6 +340,29 @@ def run_simulation():
     )
 
 
+def _draw_bar_pattern(screen, rect, clr, tier):
+    """막대에 패턴을 그려 색상 외에도 시각적으로 구분 (색맹 보조).
+
+    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
+    """
+    bx, by, bw, bh = rect
+    if bh < 4 or bw < 2:
+        return
+    pc = tuple(min(255, c + 60) for c in clr[:3])
+    if tier == "high":
+        for ly in range(by + 2, by + bh - 1, 4):
+            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
+    elif tier == "mid":
+        for offset in range(-bh, bw, 5):
+            x1 = max(0, offset)
+            y1 = max(0, -offset)
+            diag_len = min(bw - 1 - x1, bh - 1 - y1)
+            if diag_len > 0:
+                pygame.draw.line(screen, pc,
+                                 (bx + x1, by + y1),
+                                 (bx + x1 + diag_len, by + y1 + diag_len))
+
+
 def _draw_prob_bars(screen, font, probs, labels):
     """확률 막대 그래프."""
     L = _layout
@@ -358,6 +381,9 @@ def _draw_prob_bars(screen, font, probs, labels):
         fill_w = int(prob * w)
         if fill_w > 0:
             pygame.draw.rect(screen, PROB_BAR, (x, by, fill_w, bar_h - 2), border_radius=2)
+            tier = "high" if prob > 0.3 else "mid" if prob > 0.05 else "low"
+            _draw_bar_pattern(screen, (x, by, fill_w, bar_h - 2),
+                              PROB_BAR, tier)
         # 라벨
         lbl = font.render(f"{label} {prob:.1%}", True, TEXT_CLR)
         screen.blit(lbl, (x + 4, by + 1))
@@ -388,7 +414,11 @@ def _draw_measure_hist(screen, font, counts, total, labels):
         bar_h_val = int((c / max_count) * (h - 30)) if max_count > 0 else 0
         # 바
         if bar_h_val > 0:
-            pygame.draw.rect(screen, MEASURE_COLOR, (bx, y + h - 10 - bar_h_val, bar_w - 2, bar_h_val), border_radius=2)
+            bar_top = y + h - 10 - bar_h_val
+            pygame.draw.rect(screen, MEASURE_COLOR, (bx, bar_top, bar_w - 2, bar_h_val), border_radius=2)
+            tier = "high" if c == max_count else "mid"
+            _draw_bar_pattern(screen, (bx, bar_top, bar_w - 2, bar_h_val),
+                              MEASURE_COLOR, tier)
         # 라벨
         lbl = font.render(labels[i], True, SUBTEXT_CLR)
         screen.blit(lbl, (bx, y + h - 8))

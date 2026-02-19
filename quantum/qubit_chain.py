@@ -337,6 +337,37 @@ def _draw_node(
     screen.blit(state_label, (cx - state_label.get_width() // 2, cy + NODE_RADIUS + 16))
 
 
+def _draw_bar_pattern(screen, rect, clr, tier):
+    """막대에 패턴을 그려 색상 외에도 시각적으로 구분 (색맹 보조).
+
+    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
+    """
+    bx, by, bw, bh = rect
+    if bh < 4 or bw < 2:
+        return
+    pc = tuple(min(255, c + 60) for c in clr[:3])
+    if tier == "high":
+        for ly in range(by + 2, by + bh - 1, 4):
+            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
+    elif tier == "mid":
+        for offset in range(-bh, bw, 5):
+            x1 = max(0, offset)
+            y1 = max(0, -offset)
+            diag_len = min(bw - 1 - x1, bh - 1 - y1)
+            if diag_len > 0:
+                pygame.draw.line(screen, pc,
+                                 (bx + x1, by + y1),
+                                 (bx + x1 + diag_len, by + y1 + diag_len))
+
+
+_STATE_TIER = {
+    QubitState.COLLAPSED: "high",
+    QubitState.DANGER: "high",
+    QubitState.WARNING: "mid",
+    QubitState.STABLE: "low",
+}
+
+
 def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y: int):
     """개별 큐비트 하중 바."""
     bar_w, bar_h = 90, 10
@@ -348,6 +379,7 @@ def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y:
     fill_w = int(bar_w * min(node.stress, 100) / 100)
     color = STATE_COLORS[node.state]
     pygame.draw.rect(screen, color, (bar_x, y + 2, fill_w, bar_h))
+    _draw_bar_pattern(screen, (bar_x, y + 2, fill_w, bar_h), color, _STATE_TIER[node.state])
     pygame.draw.rect(screen, TEXT_CLR, (bar_x, y + 2, bar_w, bar_h), 1)
 
     # 상태 라벨

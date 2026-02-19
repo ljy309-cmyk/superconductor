@@ -292,10 +292,35 @@ def _draw_bar_chart(screen, x, y, w, h, data, colors, labels,
         bar_w = int((w - 100) * val / total) if total > 0 else 0
         pygame.draw.rect(screen, OVERLAY_CLR, (bar_x, bar_y, w - 100, bar_h))
         pygame.draw.rect(screen, color, (bar_x, bar_y, bar_w, bar_h))
+        tier = "high" if i % 2 == 0 else "mid"
+        _draw_bar_pattern(screen, (bar_x, bar_y, bar_w, bar_h), color, tier)
         pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, w - 100, bar_h), 1)
         # 값
         v_surf = font.render(f"{val}", True, TEXT_CLR)
         screen.blit(v_surf, (x + w - 45, bar_y))
+
+
+def _draw_bar_pattern(screen, rect, clr, tier):
+    """막대에 패턴을 그려 색상 외에도 시각적으로 구분 (색맹 보조).
+
+    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
+    """
+    bx, by, bw, bh = rect
+    if bh < 4 or bw < 2:
+        return
+    pc = tuple(min(255, c + 60) for c in clr[:3])
+    if tier == "high":
+        for ly in range(by + 2, by + bh - 1, 4):
+            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
+    elif tier == "mid":
+        for offset in range(-bh, bw, 5):
+            x1 = max(0, offset)
+            y1 = max(0, -offset)
+            diag_len = min(bw - 1 - x1, bh - 1 - y1)
+            if diag_len > 0:
+                pygame.draw.line(screen, pc,
+                                 (bx + x1, by + y1),
+                                 (bx + x1 + diag_len, by + y1 + diag_len))
 
 
 def _draw_bloch_mini(screen, cx, cy, radius, alpha, beta, font,
@@ -380,12 +405,16 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
         # 세로 바
         bar_h = int(max_h * p)
         bar_top = by + 18 + (max_h - bar_h)
+        inner_w = bar_w - 60
         pygame.draw.rect(screen, OVERLAY_CLR,
-                         (bx + 30, by + 18, bar_w - 60, max_h))
+                         (bx + 30, by + 18, inner_w, max_h))
         pygame.draw.rect(screen, clr,
-                         (bx + 30, bar_top, bar_w - 60, bar_h))
+                         (bx + 30, bar_top, inner_w, bar_h))
+        tier = "high" if i % 2 == 0 else "mid"
+        _draw_bar_pattern(screen, (bx + 30, bar_top, inner_w, bar_h),
+                          clr, tier)
         pygame.draw.rect(screen, TEXT_CLR,
-                         (bx + 30, by + 18, bar_w - 60, max_h), 1)
+                         (bx + 30, by + 18, inner_w, max_h), 1)
 
         # 확률값
         ps = info_font.render(f"{p:.3f}", True, clr)
@@ -559,7 +588,10 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
             s_abs = abs(s_val)
             bar_h = int(40 * min(s_abs / 3.0, 1.0))
             clr = RED if s_abs > CHSH_CLASSICAL_BOUND else GREEN
-            pygame.draw.rect(screen, clr, (bx, by + 40 - bar_h, 40, bar_h))
+            tier = "high" if s_abs > CHSH_CLASSICAL_BOUND else "mid"
+            bar_top = by + 40 - bar_h
+            pygame.draw.rect(screen, clr, (bx, bar_top, 40, bar_h))
+            _draw_bar_pattern(screen, (bx, bar_top, 40, bar_h), clr, tier)
             pygame.draw.rect(screen, TEXT_CLR, (bx, by, 40, 40), 1)
             vs = info_font.render(f"{s_val:.1f}", True, TEXT_CLR)
             screen.blit(vs, (bx + 20 - vs.get_width() // 2, by + 42))
@@ -696,8 +728,13 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
                              (bx + 10, by, 40, max_h))
             if bar_h > 0:
                 clr = GREEN if p > 0.01 else OVERLAY_CLR
+                bar_top = by + max_h - bar_h
                 pygame.draw.rect(screen, clr,
-                                 (bx + 10, by + max_h - bar_h, 40, bar_h))
+                                 (bx + 10, bar_top, 40, bar_h))
+                if p > 0.01:
+                    tier = "high" if p > 0.3 else "mid"
+                    _draw_bar_pattern(screen, (bx + 10, bar_top, 40, bar_h),
+                                      clr, tier)
             pygame.draw.rect(screen, TEXT_CLR,
                              (bx + 10, by, 40, max_h), 1)
 

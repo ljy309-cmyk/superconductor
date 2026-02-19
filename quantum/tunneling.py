@@ -114,6 +114,29 @@ def _rebuild_layout(w: int, h: int):
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
 
+def _draw_bar_pattern(screen, rect, clr, tier):
+    """막대에 패턴을 그려 색상 외에도 시각적으로 구분 (색맹 보조).
+
+    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
+    """
+    bx, by, bw, bh = rect
+    if bh < 4 or bw < 2:
+        return
+    pc = tuple(min(255, c + 60) for c in clr[:3])
+    if tier == "high":
+        for ly in range(by + 2, by + bh - 1, 4):
+            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
+    elif tier == "mid":
+        for offset in range(-bh, bw, 5):
+            x1 = max(0, offset)
+            y1 = max(0, -offset)
+            diag_len = min(bw - 1 - x1, bh - 1 - y1)
+            if diag_len > 0:
+                pygame.draw.line(screen, pc,
+                                 (bx + x1, by + y1),
+                                 (bx + x1 + diag_len, by + y1 + diag_len))
+
+
 def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     """시뮬레이션 영역 배경."""
     pygame.draw.rect(screen, SURFACE_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H))
@@ -122,6 +145,7 @@ def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     # 장벽
     bx = BARRIER_X - barrier_width // 2
     pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, barrier_width, SIM_H))
+    _draw_bar_pattern(screen, (bx, SIM_TOP, barrier_width, SIM_H), BARRIER_CLR, "mid")
 
     # 장벽 라벨
     label = font.render(t("tn_barrier"), True, BG)

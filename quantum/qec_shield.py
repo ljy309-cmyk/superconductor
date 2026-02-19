@@ -133,6 +133,29 @@ STATE_COLORS = {
 }
 
 
+def _draw_bar_pattern(screen, rect, clr, tier):
+    """막대에 패턴을 그려 색상 외에도 시각적으로 구분 (색맹 보조).
+
+    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
+    """
+    bx, by, bw, bh = rect
+    if bh < 4 or bw < 2:
+        return
+    pc = tuple(min(255, c + 60) for c in clr[:3])
+    if tier == "high":
+        for ly in range(by + 2, by + bh - 1, 4):
+            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
+    elif tier == "mid":
+        for offset in range(-bh, bw, 5):
+            x1 = max(0, offset)
+            y1 = max(0, -offset)
+            diag_len = min(bw - 1 - x1, bh - 1 - y1)
+            if diag_len > 0:
+                pygame.draw.line(screen, pc,
+                                 (bx + x1, by + y1),
+                                 (bx + x1 + diag_len, by + y1 + diag_len))
+
+
 def _draw_link(screen, a: QECQubit, b: QECQubit):
     color = SUBTEXT_CLR
     if a.collapsed or b.collapsed:
@@ -196,8 +219,11 @@ def _draw_shield_hud(
         bar_x, bar_y = hud_x + 20, hud_y + 70
         bar_w, bar_h = hud_w - 40, 16
         ratio = max(shield_timer / QEC_DURATION, 0)
+        fill_w = int(bar_w * ratio)
         pygame.draw.rect(screen, OVERLAY_CLR, (bar_x, bar_y, bar_w, bar_h))
-        pygame.draw.rect(screen, SHIELD_GLOW, (bar_x, bar_y, int(bar_w * ratio), bar_h))
+        pygame.draw.rect(screen, SHIELD_GLOW, (bar_x, bar_y, fill_w, bar_h))
+        _draw_bar_pattern(screen, (bar_x, bar_y, fill_w, bar_h),
+                          SHIELD_GLOW, "high")
         pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), 1)
 
         time_txt = font.render(t("qec_remaining", time=shield_timer), True, TEXT_CLR)
@@ -225,8 +251,11 @@ def _draw_shield_hud(
         bar_x, bar_y = hud_x + 20, hud_y + 70
         bar_w, bar_h = hud_w - 40, 16
         ratio = max(1 - cooldown_timer / QEC_COOLDOWN, 0)
+        fill_w = int(bar_w * ratio)
         pygame.draw.rect(screen, OVERLAY_CLR, (bar_x, bar_y, bar_w, bar_h))
-        pygame.draw.rect(screen, WARNING_CLR, (bar_x, bar_y, int(bar_w * ratio), bar_h))
+        pygame.draw.rect(screen, WARNING_CLR, (bar_x, bar_y, fill_w, bar_h))
+        _draw_bar_pattern(screen, (bar_x, bar_y, fill_w, bar_h),
+                          WARNING_CLR, "mid")
         pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), 1)
 
         time_txt = font.render(t("qec_until_ready", time=cooldown_timer), True, TEXT_CLR)
