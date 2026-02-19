@@ -387,7 +387,8 @@ def _draw_amplitude_bar_chart(screen, grover, font, x, y, w, h):
 
     # 레이블
     label = font.render(
-        f"P(x)  iter={grover.current_iteration}/{grover.optimal_iterations}",
+        t("grover_bar_label", current=grover.current_iteration,
+          optimal=grover.optimal_iterations),
         True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
 
@@ -578,9 +579,12 @@ def _draw_search_history(screen, ui, font, x, y):
     for i, h in enumerate(page_items):
         clr = GREEN if h["success"] else YELLOW
         hs = font.render(
-            f"  {h['n_qubits']}q target={h['targets'][:3]} → "
-            f"|{h['measured']}⟩ {'✓' if h['success'] else '✗'} "
-            f"({h['iterations']} iters)",
+            t("grover_history_entry",
+              qubits=h['n_qubits'],
+              targets=h['targets'][:3],
+              measured=h['measured'],
+              mark='✓' if h['success'] else '✗',
+              iters=h['iterations']),
             True, clr)
         screen.blit(hs, (x, y + 16 + i * 14))
 
@@ -597,13 +601,16 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
 
     # 큐빗/대상 표시
     n_text = font.render(
-        f"N = 2^{grover.n_qubits} = {1 << grover.n_qubits}  "
-        f"target = {grover.targets}", True, TEXT_CLR)
+        t("grover_n_target_info", qubits=grover.n_qubits,
+          N=1 << grover.n_qubits, targets=grover.targets),
+        True, TEXT_CLR)
     screen.blit(n_text, (L.margin, L.n_row_y))
 
     if grover.current_iteration > 0:
         att = font.render(
-            f"Iteration {grover.current_iteration}/{grover.optimal_iterations}",
+            t("grover_iteration_count",
+              current=grover.current_iteration,
+              optimal=grover.optimal_iterations),
             True, TEAL)
         screen.blit(att, (L.iter_text_x, L.n_row_y))
 
@@ -653,9 +660,10 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
         if grover.comparison:
             comp = grover.comparison
             speedup = info_font.render(
-                f"Classical: ~{comp.classical_expected:.0f} queries  |  "
-                f"Grover: {comp.quantum_iterations} queries  |  "
-                f"Speedup: {comp.speedup_ratio:.1f}×",
+                t("grover_speedup_text",
+                  classical=f"{comp.classical_expected:.0f}",
+                  quantum=comp.quantum_iterations,
+                  ratio=f"{comp.speedup_ratio:.1f}"),
                 True, PURPLE)
             screen.blit(speedup,
                         (L.W // 2 - speedup.get_width() // 2, L.speedup_y))
@@ -683,8 +691,9 @@ def _draw_auto_mode(screen, ui, font, title_font, info_font):
     screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     n_text = font.render(
-        f"N = 2^{grover.n_qubits} = {1 << grover.n_qubits}  "
-        f"target = {grover.targets}", True, TEXT_CLR)
+        t("grover_n_target_info", qubits=grover.n_qubits,
+          N=1 << grover.n_qubits, targets=grover.targets),
+        True, TEXT_CLR)
     screen.blit(n_text, (L.margin, L.n_row_y))
 
     status = t("grover_auto_running") if ui.auto_running \
@@ -756,8 +765,8 @@ def _draw_compare_mode(screen, ui, font, title_font, info_font):
     n_qubits = ui.compare_n_qubits
     n_states = 1 << n_qubits
     n_text = font.render(
-        f"Database: N = 2^{n_qubits} = {n_states} items  |  "
-        f"Target: 1 item", True, TEXT_CLR)
+        t("grover_compare_db_info", qubits=n_qubits, N=n_states),
+        True, TEXT_CLR)
     screen.blit(n_text, (L.margin, L.n_row_y))
 
     # 레이스 트랙
@@ -773,7 +782,8 @@ def _draw_compare_mode(screen, ui, font, title_font, info_font):
                        ui.compare_classical_pos, RED)
     queries_c = int(ui.compare_classical_pos * n_states)
     qc_text = info_font.render(
-        f"{queries_c}/{n_states} queries", True, TEXT_CLR)
+        t("grover_queries_count", current=queries_c, total=n_states),
+        True, TEXT_CLR)
     screen.blit(qc_text, (tx + tw + 5, cy + 20))
 
     # 양자 트랙
@@ -784,7 +794,8 @@ def _draw_compare_mode(screen, ui, font, title_font, info_font):
                        ui.compare_quantum_pos, GREEN)
     queries_q = int(ui.compare_quantum_pos * opt_iter)
     qq_text = info_font.render(
-        f"{queries_q}/{opt_iter} queries", True, TEXT_CLR)
+        t("grover_queries_count", current=queries_q, total=opt_iter),
+        True, TEXT_CLR)
     screen.blit(qq_text, (tx + tw + 5, qy + 20))
 
     # 완료 마커

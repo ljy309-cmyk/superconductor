@@ -223,6 +223,13 @@
   "grover_legend_normal": "일반",
   "grover_input_err_invalid": "잘못된 입력 — 숫자를 입력하세요",
   "grover_speed_changed": "속도: {speed}초 / 단계",
+  "grover_bar_label": "P(x)  반복={current}/{optimal}",
+  "grover_n_target_info": "N = 2^{qubits} = {N}  대상 = {targets}",
+  "grover_iteration_count": "반복 {current}/{optimal}",
+  "grover_speedup_text": "고전: ~{classical}회 쿼리  |  Grover: {quantum}회 쿼리  |  속도 향상: {ratio}배",
+  "grover_compare_db_info": "데이터베이스: N = 2^{qubits} = {N}개 항목  |  대상: 1개",
+  "grover_queries_count": "{current}/{total}회 쿼리",
+  "grover_history_entry": "  {qubits}q 대상={targets} → |{measured}⟩ {mark} ({iters}회 반복)",
 
   "btn_qubit_chain": "3-1. 큐비트 연쇄 붕괴 (Entanglement Cascade)",
   "btn_tunneling": "3-2. 양자 중첩 및 터널링 (Tunneling)",

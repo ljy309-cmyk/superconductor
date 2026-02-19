@@ -223,6 +223,13 @@
   "grover_legend_normal": "Normal",
   "grover_input_err_invalid": "Invalid input — enter a number",
   "grover_speed_changed": "Speed: {speed}s / step",
+  "grover_bar_label": "P(x)  iter={current}/{optimal}",
+  "grover_n_target_info": "N = 2^{qubits} = {N}  target = {targets}",
+  "grover_iteration_count": "Iteration {current}/{optimal}",
+  "grover_speedup_text": "Classical: ~{classical} queries  |  Grover: {quantum} queries  |  Speedup: {ratio}×",
+  "grover_compare_db_info": "Database: N = 2^{qubits} = {N} items  |  Target: 1 item",
+  "grover_queries_count": "{current}/{total} queries",
+  "grover_history_entry": "  {qubits}q target={targets} → |{measured}⟩ {mark} ({iters} iters)",
 
   "btn_qubit_chain": "3-1. Qubit Entanglement Cascade",
   "btn_tunneling": "3-2. Quantum Superposition & Tunneling",
