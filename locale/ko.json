@@ -860,5 +860,6 @@
   "qec_event_log": "── 이벤트 로그 ──",
   "tn_event_log": "── 이벤트 로그 ──",
   "tn_notify_tunneled": "터널링! (#{n})",
-  "tn_notify_reflected": "반사 (#{n})"
+  "tn_notify_reflected": "반사 (#{n})",
+  "tn_notify_compare_done": "비교 완료!"
 }

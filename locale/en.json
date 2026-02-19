@@ -860,5 +860,6 @@
   "qec_event_log": "── Event Log ──",
   "tn_event_log": "── Event Log ──",
   "tn_notify_tunneled": "Tunneled! (#{n})",
-  "tn_notify_reflected": "Reflected (#{n})"
+  "tn_notify_reflected": "Reflected (#{n})",
+  "tn_notify_compare_done": "Comparison complete!"
 }

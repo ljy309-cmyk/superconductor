@@ -14,6 +14,7 @@ from achievements import check_achievements
 from config_loader import cfg
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
+    NotifyToast,
     draw_bar_pattern as _draw_bar_pattern,
     draw_circle_pattern as _draw_circle_pattern,
     draw_panel as _draw_ui_panel,
@@ -471,15 +472,12 @@ def run_simulation():
     tunnel_prob = _calc_tunnel_prob(barrier_width)
 
     # 알림 / 페이지네이션
-    notify_msg = ""
-    notify_timer = 0.0
+    notify_toast = NotifyToast()
     history_page = 0
     event_log: list[tuple[str, bool]] = []  # (message, is_tunnel)
 
-    def _notify(msg: str, duration: float = 2.0):
-        nonlocal notify_msg, notify_timer
-        notify_msg = msg
-        notify_timer = duration
+    def _notify(msg: str, category: str = "info", duration: float = 2.0):
+        notify_toast.show(msg, category, duration)
 
     # ── 모드 상태 ─────────────────────────────────────
     mode = MODE_AUTO
@@ -535,6 +533,7 @@ def run_simulation():
                 elif event.key == pygame.K_TAB:
                     mode = (mode + 1) % 3
                     _on_mode_change()
+                    _notify(t(_MODE_TAB_KEYS[mode]), "info", 1.0)
                     snd.play("click")
                 elif event.key == pygame.K_SPACE:
                     if mode == MODE_STEP:
@@ -564,7 +563,7 @@ def run_simulation():
                         cmp["thick_attempts"] = 0
                         cmp["running"] = False
                         cmp["done"] = False
-                    _notify(t("notify_reset"), 1.0)
+                    _notify(t("notify_reset"), "info", 1.0)
                 elif event.key == pygame.K_PAGEUP:
                     history_page = max(0, history_page - 1)
                 elif event.key == pygame.K_PAGEDOWN:
@@ -630,10 +629,10 @@ def run_simulation():
                 n = particle.total_attempts
                 if particle.tunneled is True:
                     event_log.append((t("tn_notify_tunneled", n=n), True))
-                    _notify(t("tn_notify_tunneled", n=n), 1.0)
+                    _notify(t("tn_notify_tunneled", n=n), "success", 1.0)
                 elif particle.tunneled is False:
                     event_log.append((t("tn_notify_reflected", n=n), False))
-                    _notify(t("tn_notify_reflected", n=n), 1.0)
+                    _notify(t("tn_notify_reflected", n=n), "warning", 1.0)
 
                 # 실시간 업적 체크
                 try:
@@ -684,6 +683,7 @@ def run_simulation():
                         and cmp["thick_attempts"] >= COMPARE_TARGET):
                     cmp["running"] = False
                     cmp["done"] = True
+                    _notify(t("tn_notify_compare_done"), "success", 2.0)
                     snd.play("achievement")
                     break
 
@@ -752,11 +752,9 @@ def run_simulation():
                 surf = info_font.render(h, True, TEXT_CLR)
                 screen.blit(surf, (SIM_LEFT, L.hint_y + i * 16))
 
-        # 알림 메시지 (페이드 아웃)
-        if notify_timer > 0:
-            notify_timer -= dt
-            render_notify(screen, notify_msg, notify_timer, info_font, ACCENT,
-                          L.W // 2, L.notify_y)
+        # 카테고리 토스트 알림
+        notify_toast.update(dt)
+        notify_toast.draw(screen, info_font, L.W // 2, L.notify_y)
 
         preset_hud.draw(screen, font)
 

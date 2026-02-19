@@ -921,5 +921,141 @@ class TestEdgeCases(unittest.TestCase):
         self.assertAlmostEqual(p.x, SIM_LEFT + 40.0)
 
 
+# ══════════════════════════════════════════════════════
+# 14. NotifyToast — 카테고리 토스트 알림
+# ══════════════════════════════════════════════════════
+
+# ui_common이 pygame을 top-level import 하므로 mock 필요
+from unittest.mock import MagicMock as _MagicMock
+
+_pg_mock = _MagicMock()
+sys.modules.setdefault("pygame", _pg_mock)
+sys.modules.setdefault("pygame.font", _pg_mock.font)
+sys.modules.setdefault("pygame.draw", _pg_mock.draw)
+sys.modules.setdefault("pygame.display", _pg_mock.display)
+
+from quantum.ui_common import NOTIFY_CATEGORIES, NotifyToast
+
+
+class TestNotifyToast(unittest.TestCase):
+    """NotifyToast 상태 머신 테스트 (렌더링 제외)."""
+
+    def test_initial_state_empty(self):
+        """초기 상태: 활성/대기열 모두 비어있음."""
+        nt = NotifyToast()
+        self.assertEqual(nt.active_count, 0)
+        self.assertEqual(nt.queue_count, 0)
+
+    def test_show_adds_active(self):
+        """show() 호출 시 활성 목록에 추가."""
+        nt = NotifyToast()
+        nt.show("hello", "info")
+        self.assertEqual(nt.active_count, 1)
+        self.assertEqual(nt.queue_count, 0)
+
+    def test_max_visible_limit(self):
+        """MAX_VISIBLE 초과 시 대기열로 이동."""
+        nt = NotifyToast()
+        for i in range(nt.MAX_VISIBLE + 2):
+            nt.show(f"msg{i}", "info")
+        self.assertEqual(nt.active_count, nt.MAX_VISIBLE)
+        self.assertEqual(nt.queue_count, 2)
+
+    def test_phase_transition_in_to_show(self):
+        """slide-in 완료 후 show 위상으로 전환."""
+        nt = NotifyToast()
+        nt.show("test", "success", duration=1.0)
+        # slide-in 시간만큼 진행
+        nt.update(nt.SLIDE_TIME + 0.01)
+        self.assertEqual(nt._active[0]["phase"], "show")
+
+    def test_phase_transition_show_to_out(self):
+        """표시 시간 경과 후 slide-out 위상으로 전환."""
+        nt = NotifyToast()
+        nt.show("test", "info", duration=0.5)
+        nt.update(nt.SLIDE_TIME + 0.01)  # in → show
+        nt.update(0.51)  # show → out
+        self.assertEqual(nt._active[0]["phase"], "out")
+
+    def test_toast_removed_after_out(self):
+        """slide-out 완료 후 제거."""
+        nt = NotifyToast()
+        nt.show("test", "info", duration=0.1)
+        nt.update(nt.SLIDE_TIME + 0.01)  # in → show
+        nt.update(0.11)  # show → out
+        nt.update(nt.SLIDE_TIME + 0.01)  # out → 제거
+        self.assertEqual(nt.active_count, 0)
+
+    def test_queue_promotes_after_removal(self):
+        """활성 토스트 제거 후 대기열에서 승격."""
+        nt = NotifyToast()
+        # 첫 MAX_VISIBLE개는 긴 지속, 대기열의 1개도 긴 지속
+        for i in range(nt.MAX_VISIBLE):
+            nt.show(f"msg{i}", "info", duration=5.0)
+        nt.show("queued", "info", duration=5.0)
+        self.assertEqual(nt.active_count, nt.MAX_VISIBLE)
+        self.assertEqual(nt.queue_count, 1)
+
+        # 첫 번째 토스트만 강제 만료: phase를 out으로 변경
+        nt._active[0]["phase"] = "out"
+        nt._active[0]["timer"] = nt.SLIDE_TIME + 0.01
+        nt.update(0.0)  # 만료 처리
+        # 대기열에서 승격되어 여전히 MAX_VISIBLE
+        self.assertEqual(nt.active_count, nt.MAX_VISIBLE)
+        self.assertEqual(nt.queue_count, 0)
+
+    def test_invalid_category_defaults_to_info(self):
+        """잘못된 카테고리는 'info'로 대체."""
+        nt = NotifyToast()
+        nt.show("test", "invalid_cat")
+        self.assertEqual(nt._active[0]["cat"], "info")
+
+    def test_all_valid_categories_accepted(self):
+        """모든 유효 카테고리가 올바르게 저장됨."""
+        for cat in NOTIFY_CATEGORIES:
+            nt = NotifyToast()
+            nt.show("test", cat)
+            self.assertEqual(nt._active[0]["cat"], cat)
+
+    def test_clear_removes_all(self):
+        """clear() 호출 시 모든 토스트 제거."""
+        nt = NotifyToast()
+        for i in range(5):
+            nt.show(f"msg{i}", "info")
+        nt.clear()
+        self.assertEqual(nt.active_count, 0)
+        self.assertEqual(nt.queue_count, 0)
+
+    def test_custom_duration(self):
+        """사용자 지정 표시 시간."""
+        nt = NotifyToast()
+        nt.show("test", "success", duration=5.0)
+        nt.update(nt.SLIDE_TIME + 0.01)  # in → show
+        # 2초 후 아직 show 상태
+        nt.update(2.0)
+        self.assertEqual(nt._active[0]["phase"], "show")
+        # 5초 경과 후 out으로 전환
+        nt.update(3.01)
+        self.assertEqual(nt._active[0]["phase"], "out")
+
+    def test_multiple_toasts_independent_timers(self):
+        """여러 토스트의 타이머는 독립적."""
+        nt = NotifyToast()
+        nt.show("fast", "info", duration=0.1)
+        nt.show("slow", "info", duration=5.0)
+        nt.update(nt.SLIDE_TIME + 0.01)  # 둘 다 in → show
+        nt.update(0.11)  # fast: show → out, slow: 아직 show
+        phases = [t["phase"] for t in nt._active]
+        self.assertIn("out", phases)
+        self.assertIn("show", phases)
+
+    def test_zero_dt_no_crash(self):
+        """dt=0 업데이트 시 크래시 없음."""
+        nt = NotifyToast()
+        nt.show("test", "info")
+        nt.update(0.0)
+        self.assertEqual(nt.active_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

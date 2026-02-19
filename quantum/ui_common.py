@@ -3,9 +3,11 @@
 모든 양자 시뮬레이션 모듈에서 공유하는 그리기·페이지네이션·알림 헬퍼.
 """
 
+from __future__ import annotations
+
 import pygame
 
-from theme import is_high_contrast, is_reduced_motion
+from theme import get_pg_theme, is_high_contrast, is_reduced_motion
 
 # ── 페이지네이션 ─────────────────────────────────────
 
@@ -101,6 +103,174 @@ def render_notify(screen, msg, timer, font, color, center_x, y):
         alpha = min(255, int(255 * min(1.0, timer / 0.3)))
         ns.set_alpha(alpha)
     screen.blit(ns, (center_x - ns.get_width() // 2, y))
+
+
+# ── 카테고리 토스트 알림 ──────────────────────────────
+
+# 유효한 카테고리 목록
+NOTIFY_CATEGORIES = ("success", "warning", "info", "error")
+
+_CATEGORY_ICONS = {
+    "success": "+",
+    "warning": "!",
+    "info": "i",
+    "error": "x",
+}
+
+
+class NotifyToast:
+    """카테고리별 큐 기반 토스트 알림.
+
+    카테고리:
+        success — 터널링, 완료 등 긍정적 이벤트 (초록)
+        warning — 반사, 주의 등 경고 이벤트 (노랑)
+        info    — 모드 변경, 리셋 등 정보성 알림 (파랑)
+        error   — 오류 상태 (빨강)
+
+    사용법::
+
+        toast = NotifyToast()
+        toast.show("터널링!", "success")
+
+        # 매 프레임:
+        toast.update(dt)
+        toast.draw(screen, font, center_x, base_y)
+    """
+
+    DISPLAY_TIME = 2.0
+    SLIDE_TIME = 0.15
+    TOAST_H = 28
+    MAX_VISIBLE = 3
+    GAP = 4
+    PAD_X = 12
+
+    def __init__(self):
+        self._active: list[dict] = []
+        self._queue: list[dict] = []
+
+    # ── public API ─────────────────────────────────────
+
+    def show(self, msg: str, category: str = "info", duration: float = 2.0):
+        """알림을 큐에 추가.
+
+        Args:
+            msg: 표시할 메시지.
+            category: "success" | "warning" | "info" | "error".
+            duration: 표시 시간 (초).
+        """
+        entry = {
+            "msg": msg,
+            "cat": category if category in NOTIFY_CATEGORIES else "info",
+            "dur": duration,
+            "timer": 0.0,
+            "phase": "in",  # in → show → out → (제거)
+        }
+        if len(self._active) < self.MAX_VISIBLE:
+            self._active.append(entry)
+        else:
+            self._queue.append(entry)
+
+    def update(self, dt: float):
+        """매 프레임 호출 — 타이머 진행 및 위상 전환."""
+        rm: list[int] = []
+        for i, t in enumerate(self._active):
+            t["timer"] += dt
+            if t["phase"] == "in" and t["timer"] >= self.SLIDE_TIME:
+                t["phase"] = "show"
+                t["timer"] = 0.0
+            elif t["phase"] == "show" and t["timer"] >= t["dur"]:
+                t["phase"] = "out"
+                t["timer"] = 0.0
+            elif t["phase"] == "out" and t["timer"] >= self.SLIDE_TIME:
+                rm.append(i)
+        for i in reversed(rm):
+            self._active.pop(i)
+            if self._queue:
+                self._active.append(self._queue.pop(0))
+
+    @property
+    def active_count(self) -> int:
+        """현재 표시 중인 토스트 수."""
+        return len(self._active)
+
+    @property
+    def queue_count(self) -> int:
+        """대기열에 있는 토스트 수."""
+        return len(self._queue)
+
+    def clear(self):
+        """모든 토스트 즉시 제거."""
+        self._active.clear()
+        self._queue.clear()
+
+    # ── rendering ──────────────────────────────────────
+
+    def draw(self, screen, font, center_x: int, base_y: int):
+        """토스트 렌더링 — 하단에서 위로 쌓임.
+
+        Args:
+            screen: Pygame 화면.
+            font: 렌더링용 폰트.
+            center_x: 토스트 수평 중심 X.
+            base_y: 가장 아래 토스트의 하단 Y.
+        """
+        if not self._active:
+            return
+        pg = get_pg_theme()
+        reduced = is_reduced_motion()
+        hc = is_high_contrast()
+
+        clr_map = {
+            "success": pg.GREEN,
+            "warning": pg.ACCENT_YELLOW,
+            "info": pg.ACCENT_BLUE,
+            "error": pg.RED,
+        }
+
+        for idx, toast in enumerate(self._active):
+            cat = toast["cat"]
+            accent = clr_map.get(cat, pg.TEXT)
+            icon = _CATEGORY_ICONS.get(cat, "")
+            text = f"[{icon}] {toast['msg']}"
+
+            ts = font.render(text, True, pg.TEXT)
+            tw = ts.get_width() + self.PAD_X * 2
+            th = self.TOAST_H
+
+            x = center_x - tw // 2
+            y = base_y - (idx + 1) * (th + self.GAP)
+
+            # 슬라이드 + 페이드 애니메이션
+            alpha = 255
+            if not reduced:
+                if toast["phase"] == "in":
+                    p = min(toast["timer"] / self.SLIDE_TIME, 1.0)
+                    alpha = int(255 * p)
+                    y += int(th * 0.5 * (1 - p))
+                elif toast["phase"] == "out":
+                    p = min(toast["timer"] / self.SLIDE_TIME, 1.0)
+                    alpha = int(255 * (1 - p))
+
+            surf = pygame.Surface((tw, th), pygame.SRCALPHA)
+            # 배경
+            pygame.draw.rect(
+                surf, (*pg.PANEL_BG[:3], min(alpha, 210)),
+                (0, 0, tw, th), border_radius=5)
+            # 테두리
+            bw = 2 if hc else 1
+            pygame.draw.rect(
+                surf, (*accent[:3], alpha),
+                (0, 0, tw, th), bw, border_radius=5)
+            # 왼쪽 카테고리 색상 스트라이프
+            pygame.draw.rect(
+                surf, (*accent[:3], alpha),
+                (0, 4, 3, th - 8), border_radius=1)
+
+            if alpha < 255:
+                ts.set_alpha(alpha)
+            surf.blit(ts, (self.PAD_X, (th - ts.get_height()) // 2))
+
+            screen.blit(surf, (x, y))
 
 
 # ── 패널 그리기 ──────────────────────────────────────
