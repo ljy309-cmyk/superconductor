@@ -581,6 +581,8 @@
   "colorblind_off": "Colorblind: OFF",
   "reduced_motion_on": "Reduced Motion: ON",
   "reduced_motion_off": "Reduced Motion: OFF",
+  "high_contrast_on": "High Contrast: ON",
+  "high_contrast_off": "High Contrast: OFF",
   "font_scale": "Font Size",
   "profile_title": "Profile Manager",
   "profile_heading": "Saved Profiles",

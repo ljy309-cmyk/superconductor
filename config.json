@@ -6,7 +6,8 @@
   },
   "accessibility": {
     "colorblind_mode": false,
-    "reduced_motion": false
+    "reduced_motion": false,
+    "high_contrast": false
   },
   "server": {
     "host": "127.0.0.1",

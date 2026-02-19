@@ -368,27 +368,300 @@ class PG_CB_LIGHT:
     TEAL = (32, 159, 181)
 
 
+# ── 고대비 다크 테마 (WCAG AAA 대비율 목표) ────────────
+class TK_HC:
+    """Tkinter 용 고대비 다크 테마."""
+
+    BG = "#000000"
+    PANEL_BG = "#0a0a12"
+    SURFACE = "#050510"
+    OVERLAY = "#5a5d72"
+    TEXT = "#ffffff"
+    SUBTEXT = "#aab0c8"
+    ACCENT_BLUE = "#a0c8ff"
+    ACCENT_PURPLE = "#dcc0ff"
+    ACCENT_GREEN = "#b8f0b0"
+    ACCENT_YELLOW = "#ffe8a0"
+    ACCENT_PEACH = "#ffc8a0"
+    RED = "#ff9ab0"
+    GREEN = "#b8f0b0"
+    YELLOW = "#ffe8a0"
+    GOLD = "#ffe8a0"
+    SILVER = "#d0d8f0"
+    BRONZE = "#ffc8a0"
+    GAUGE_BG = "#5a5d72"
+
+
+class PG_HC:
+    """Pygame 용 고대비 다크 테마 RGB 튜플."""
+
+    BG = (0, 0, 0)
+    PANEL_BG = (10, 10, 18)
+    SURFACE = (5, 5, 16)
+    OVERLAY = (90, 93, 114)
+    TEXT = (255, 255, 255)
+    SUBTEXT = (170, 176, 200)
+    ACCENT_BLUE = (160, 200, 255)
+    ACCENT_PURPLE = (220, 192, 255)
+    ACCENT_GREEN = (184, 240, 176)
+    ACCENT_YELLOW = (255, 232, 160)
+    ACCENT_PEACH = (255, 200, 160)
+    RED = (255, 154, 176)
+    GREEN = (184, 240, 176)
+    YELLOW = (255, 232, 160)
+    SHIELD_CLR = (160, 200, 255)
+    SHIELD_GLOW = (140, 220, 255)
+    SENSOR_CLR = (140, 220, 255)
+
+    MAGNET_N = (255, 110, 110)
+    MAGNET_S = (120, 150, 255)
+    SC_COLOR = (184, 240, 176)
+    SC_GLOW = (160, 200, 255)
+
+    STABLE = (184, 240, 176)
+    WARNING = (255, 232, 160)
+    DANGER = (255, 200, 160)
+    COLLAPSED = (255, 154, 176)
+
+    ALICE = (160, 200, 255)
+    BOB = (184, 240, 176)
+    EVE = (255, 154, 176)
+    QUBIT = (220, 192, 255)
+    DECOY = (255, 232, 160)
+
+    WHITE = (255, 255, 255)
+    INACTIVE = (130, 130, 130)
+    TEAL = (170, 240, 230)
+
+
+# ── 고대비 라이트 테마 ────────────────────────────────
+class TK_HC_LIGHT:
+    """Tkinter 용 고대비 라이트 테마."""
+
+    BG = "#ffffff"
+    PANEL_BG = "#f0f0f5"
+    SURFACE = "#e8e8f0"
+    OVERLAY = "#b0b4c0"
+    TEXT = "#000000"
+    SUBTEXT = "#282a38"
+    ACCENT_BLUE = "#0044cc"
+    ACCENT_PURPLE = "#6020c0"
+    ACCENT_GREEN = "#1a7a10"
+    ACCENT_YELLOW = "#a06800"
+    ACCENT_PEACH = "#c04000"
+    RED = "#b00020"
+    GREEN = "#1a7a10"
+    YELLOW = "#a06800"
+    GOLD = "#a06800"
+    SILVER = "#606880"
+    BRONZE = "#c04000"
+    GAUGE_BG = "#b0b4c0"
+
+
+class PG_HC_LIGHT:
+    """Pygame 용 고대비 라이트 테마 RGB 튜플."""
+
+    BG = (255, 255, 255)
+    PANEL_BG = (240, 240, 245)
+    SURFACE = (232, 232, 240)
+    OVERLAY = (176, 180, 192)
+    TEXT = (0, 0, 0)
+    SUBTEXT = (40, 42, 56)
+    ACCENT_BLUE = (0, 68, 204)
+    ACCENT_PURPLE = (96, 32, 192)
+    ACCENT_GREEN = (26, 122, 16)
+    ACCENT_YELLOW = (160, 104, 0)
+    ACCENT_PEACH = (192, 64, 0)
+    RED = (176, 0, 32)
+    GREEN = (26, 122, 16)
+    YELLOW = (160, 104, 0)
+    SHIELD_CLR = (0, 68, 204)
+    SHIELD_GLOW = (0, 130, 160)
+    SENSOR_CLR = (0, 130, 160)
+
+    MAGNET_N = (176, 0, 32)
+    MAGNET_S = (0, 68, 204)
+    SC_COLOR = (26, 122, 16)
+    SC_GLOW = (0, 68, 204)
+
+    STABLE = (26, 122, 16)
+    WARNING = (160, 104, 0)
+    DANGER = (192, 64, 0)
+    COLLAPSED = (176, 0, 32)
+
+    ALICE = (0, 68, 204)
+    BOB = (26, 122, 16)
+    EVE = (176, 0, 32)
+    QUBIT = (96, 32, 192)
+    DECOY = (160, 104, 0)
+
+    WHITE = (255, 255, 255)
+    INACTIVE = (80, 80, 80)
+    TEAL = (0, 130, 160)
+
+
+# ── 고대비 + 색맹 친화 다크 ───────────────────────────
+class TK_HC_CB:
+    """Tkinter 용 고대비 + 색맹 다크 테마."""
+
+    BG = "#000000"
+    PANEL_BG = "#0a0a12"
+    SURFACE = "#050510"
+    OVERLAY = "#5a5d72"
+    TEXT = "#ffffff"
+    SUBTEXT = "#aab0c8"
+    ACCENT_BLUE = "#a0c8ff"
+    ACCENT_PURPLE = "#dcc0ff"
+    ACCENT_GREEN = "#90d8ff"  # Sky Blue (green 대체)
+    ACCENT_YELLOW = "#ffe8a0"
+    ACCENT_PEACH = "#ffc8a0"
+    RED = "#ffc8a0"  # Peach/Orange (red 대체)
+    GREEN = "#90d8ff"  # Sky Blue
+    YELLOW = "#ffe8a0"
+    GOLD = "#ffe8a0"
+    SILVER = "#d0d8f0"
+    BRONZE = "#ffc8a0"
+    GAUGE_BG = "#5a5d72"
+
+
+class PG_HC_CB:
+    """Pygame 용 고대비 + 색맹 다크 테마 RGB 튜플."""
+
+    BG = (0, 0, 0)
+    PANEL_BG = (10, 10, 18)
+    SURFACE = (5, 5, 16)
+    OVERLAY = (90, 93, 114)
+    TEXT = (255, 255, 255)
+    SUBTEXT = (170, 176, 200)
+    ACCENT_BLUE = (160, 200, 255)
+    ACCENT_PURPLE = (220, 192, 255)
+    ACCENT_GREEN = (144, 216, 255)  # Sky Blue
+    ACCENT_YELLOW = (255, 232, 160)
+    ACCENT_PEACH = (255, 200, 160)
+    RED = (255, 200, 160)  # Peach/Orange
+    GREEN = (144, 216, 255)  # Sky Blue
+    YELLOW = (255, 232, 160)
+    SHIELD_CLR = (160, 200, 255)
+    SHIELD_GLOW = (144, 216, 255)
+    SENSOR_CLR = (144, 216, 255)
+
+    MAGNET_N = (255, 200, 160)
+    MAGNET_S = (120, 150, 255)
+    SC_COLOR = (144, 216, 255)
+    SC_GLOW = (160, 200, 255)
+
+    STABLE = (144, 216, 255)
+    WARNING = (255, 232, 160)
+    DANGER = (255, 200, 160)
+    COLLAPSED = (240, 170, 120)
+
+    ALICE = (160, 200, 255)
+    BOB = (144, 216, 255)
+    EVE = (255, 200, 160)
+    QUBIT = (220, 192, 255)
+    DECOY = (255, 232, 160)
+
+    WHITE = (255, 255, 255)
+    INACTIVE = (130, 130, 130)
+    TEAL = (144, 216, 255)
+
+
+# ── 고대비 + 색맹 친화 라이트 ─────────────────────────
+class TK_HC_CB_LIGHT:
+    """Tkinter 용 고대비 + 색맹 라이트 테마."""
+
+    BG = "#ffffff"
+    PANEL_BG = "#f0f0f5"
+    SURFACE = "#e8e8f0"
+    OVERLAY = "#b0b4c0"
+    TEXT = "#000000"
+    SUBTEXT = "#282a38"
+    ACCENT_BLUE = "#0044cc"
+    ACCENT_PURPLE = "#6020c0"
+    ACCENT_GREEN = "#007098"  # Teal (green 대체)
+    ACCENT_YELLOW = "#a06800"
+    ACCENT_PEACH = "#c04000"
+    RED = "#c04000"  # Orange (red 대체)
+    GREEN = "#007098"  # Teal
+    YELLOW = "#a06800"
+    GOLD = "#a06800"
+    SILVER = "#606880"
+    BRONZE = "#c04000"
+    GAUGE_BG = "#b0b4c0"
+
+
+class PG_HC_CB_LIGHT:
+    """Pygame 용 고대비 + 색맹 라이트 테마 RGB 튜플."""
+
+    BG = (255, 255, 255)
+    PANEL_BG = (240, 240, 245)
+    SURFACE = (232, 232, 240)
+    OVERLAY = (176, 180, 192)
+    TEXT = (0, 0, 0)
+    SUBTEXT = (40, 42, 56)
+    ACCENT_BLUE = (0, 68, 204)
+    ACCENT_PURPLE = (96, 32, 192)
+    ACCENT_GREEN = (0, 112, 152)  # Teal
+    ACCENT_YELLOW = (160, 104, 0)
+    ACCENT_PEACH = (192, 64, 0)
+    RED = (192, 64, 0)  # Orange
+    GREEN = (0, 112, 152)  # Teal
+    YELLOW = (160, 104, 0)
+    SHIELD_CLR = (0, 68, 204)
+    SHIELD_GLOW = (0, 112, 152)
+    SENSOR_CLR = (0, 112, 152)
+
+    MAGNET_N = (192, 64, 0)
+    MAGNET_S = (0, 68, 204)
+    SC_COLOR = (0, 112, 152)
+    SC_GLOW = (0, 68, 204)
+
+    STABLE = (0, 112, 152)
+    WARNING = (160, 104, 0)
+    DANGER = (192, 64, 0)
+    COLLAPSED = (160, 50, 0)
+
+    ALICE = (0, 68, 204)
+    BOB = (0, 112, 152)
+    EVE = (192, 64, 0)
+    QUBIT = (96, 32, 192)
+    DECOY = (160, 104, 0)
+
+    WHITE = (255, 255, 255)
+    INACTIVE = (80, 80, 80)
+    TEAL = (0, 112, 152)
+
+
 # ── 테마 & 색맹 모드 토글 ─────────────────────────────
 import weakref as _weakref
 
 _current_theme = "dark"
 _colorblind = False
 _reduced_motion = False
+_high_contrast = False
 _listeners: list = []  # (ref_or_callable, is_weak) 튜플 목록
 
-# 테마 조합 매핑
+# 테마 조합 매핑: (theme, colorblind, high_contrast) → 클래스
 _TK_THEMES = {
-    ("dark", False): TK,
-    ("dark", True): TK_CB,
-    ("light", False): TK_LIGHT,
-    ("light", True): TK_CB_LIGHT,
+    ("dark", False, False): TK,
+    ("dark", True, False): TK_CB,
+    ("light", False, False): TK_LIGHT,
+    ("light", True, False): TK_CB_LIGHT,
+    ("dark", False, True): TK_HC,
+    ("dark", True, True): TK_HC_CB,
+    ("light", False, True): TK_HC_LIGHT,
+    ("light", True, True): TK_HC_CB_LIGHT,
 }
 
 _PG_THEMES = {
-    ("dark", False): PG,
-    ("dark", True): PG_CB,
-    ("light", False): PG_LIGHT,
-    ("light", True): PG_CB_LIGHT,
+    ("dark", False, False): PG,
+    ("dark", True, False): PG_CB,
+    ("light", False, False): PG_LIGHT,
+    ("light", True, False): PG_CB_LIGHT,
+    ("dark", False, True): PG_HC,
+    ("dark", True, True): PG_HC_CB,
+    ("light", False, True): PG_HC_LIGHT,
+    ("light", True, True): PG_HC_CB_LIGHT,
 }
 
 
@@ -530,6 +803,28 @@ def toggle_reduced_motion() -> bool:
     return _reduced_motion
 
 
+def is_high_contrast() -> bool:
+    """고대비 모드 활성화 여부."""
+    return _high_contrast
+
+
+def set_high_contrast(enabled: bool):
+    """고대비 모드 설정."""
+    global _high_contrast
+    if enabled == _high_contrast:
+        return
+    _high_contrast = enabled
+    _notify_listeners()
+
+
+def toggle_high_contrast() -> bool:
+    """고대비 모드 토글. 새 상태 반환."""
+    global _high_contrast
+    _high_contrast = not _high_contrast
+    _notify_listeners()
+    return _high_contrast
+
+
 def get_font_scale() -> float:
     """현재 폰트 크기 배율 반환."""
     return _font_scale
@@ -556,13 +851,13 @@ def decrease_font_scale():
 
 
 def get_tk_theme():
-    """현재 Tkinter 테마 클래스 반환 (테마 + 색맹 모드 고려)."""
-    return _TK_THEMES[(_current_theme, _colorblind)]
+    """현재 Tkinter 테마 클래스 반환 (테마 + 색맹 + 고대비 모드 고려)."""
+    return _TK_THEMES[(_current_theme, _colorblind, _high_contrast)]
 
 
 def get_pg_theme():
-    """현재 Pygame 테마 클래스 반환 (테마 + 색맹 모드 고려)."""
-    return _PG_THEMES[(_current_theme, _colorblind)]
+    """현재 Pygame 테마 클래스 반환 (테마 + 색맹 + 고대비 모드 고려)."""
+    return _PG_THEMES[(_current_theme, _colorblind, _high_contrast)]
 
 
 def load_pg_colors(mapping: dict[str, str], target_globals: dict) -> None:
@@ -610,7 +905,9 @@ def save_preferences():
     cfg["theme"] = _current_theme
     cfg["colorblind_mode"] = _colorblind
     cfg["font_scale"] = _font_scale
-    cfg.setdefault("accessibility", {})["reduced_motion"] = _reduced_motion
+    acc = cfg.setdefault("accessibility", {})
+    acc["reduced_motion"] = _reduced_motion
+    acc["high_contrast"] = _high_contrast
     try:
         with open(cfg_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2, ensure_ascii=False)
@@ -623,7 +920,7 @@ def load_preferences():
     import json
     import os
 
-    global _current_theme, _colorblind, _font_scale, _reduced_motion
+    global _current_theme, _colorblind, _font_scale, _reduced_motion, _high_contrast
     cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     try:
         with open(cfg_path, encoding="utf-8") as f:
@@ -637,5 +934,7 @@ def load_preferences():
         acc = cfg.get("accessibility", {})
         if isinstance(acc.get("reduced_motion"), bool):
             _reduced_motion = acc["reduced_motion"]
+        if isinstance(acc.get("high_contrast"), bool):
+            _high_contrast = acc["high_contrast"]
     except (OSError, json.JSONDecodeError):
         pass

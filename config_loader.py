@@ -24,6 +24,7 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
     "accessibility": {
         "colorblind_mode": (bool, None, None),
         "reduced_motion": (bool, None, None),
+        "high_contrast": (bool, None, None),
     },
     "server": {
         "host": (str, None, None),

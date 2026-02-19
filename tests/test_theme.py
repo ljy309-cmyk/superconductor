@@ -319,19 +319,21 @@ class TestColorFormatValidation(unittest.TestCase):
 
 
 class TestThemeMappingConsistency(unittest.TestCase):
-    """_TK_THEMES / _PG_THEMES 매핑이 4가지 조합 모두 커버하는지 확인."""
+    """_TK_THEMES / _PG_THEMES 매핑이 모든 조합을 커버하는지 확인."""
 
     def test_tk_themes_has_all_combos(self):
         for t_name in ("dark", "light"):
             for cb in (True, False):
-                key = (t_name, cb)
-                self.assertIn(key, theme._TK_THEMES, f"Missing TK theme: {key}")
+                for hc in (True, False):
+                    key = (t_name, cb, hc)
+                    self.assertIn(key, theme._TK_THEMES, f"Missing TK theme: {key}")
 
     def test_pg_themes_has_all_combos(self):
         for t_name in ("dark", "light"):
             for cb in (True, False):
-                key = (t_name, cb)
-                self.assertIn(key, theme._PG_THEMES, f"Missing PG theme: {key}")
+                for hc in (True, False):
+                    key = (t_name, cb, hc)
+                    self.assertIn(key, theme._PG_THEMES, f"Missing PG theme: {key}")
 
 
 class TestLauncherAccents(unittest.TestCase):
