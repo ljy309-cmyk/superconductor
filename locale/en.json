@@ -861,5 +861,19 @@
   "tn_event_log": "── Event Log ──",
   "tn_notify_tunneled": "Tunneled! (#{n})",
   "tn_notify_reflected": "Reflected (#{n})",
-  "tn_notify_compare_done": "Comparison complete!"
+  "tn_notify_compare_done": "Comparison complete!",
+
+  "tn_tab_qc": "Quantum vs Classical",
+  "tn_qc_title": "Quantum vs Classical — Tunneling Probability Analysis",
+  "tn_qc_graph_title": "Tunneling Probability by Barrier Width",
+  "tn_qc_quantum": "Quantum",
+  "tn_qc_classical": "Classical",
+  "tn_qc_quantum_label": "Quantum: Exponential decay",
+  "tn_qc_classical_label": "Classical: Always 0%",
+  "tn_qc_barrier_prob": "Barrier width: {w}px  |  Quantum prob: {prob:.1f}%",
+  "tn_qc_result_quantum": "Quantum: {count}/{total} tunneled  ({pct:.1f}%)",
+  "tn_qc_result_classical": "Classical: {count}/{total} tunneled  ({pct:.1f}%)",
+  "tn_qc_done": "Analysis complete!",
+  "tn_hint_qc_1": "SPACE: Start Simulation  |  ↑/↓: Barrier Width  |  Tab: Mode",
+  "tn_hint_qc_2": "R: Reset  |  L: Language  |  ESC: Exit"
 }

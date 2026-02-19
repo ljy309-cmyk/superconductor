@@ -58,8 +58,11 @@ _log = get_module_logger("tunneling")
 MODE_STEP = 0
 MODE_AUTO = 1
 MODE_COMPARE = 2
-_MODE_TAB_KEYS = ["tn_tab_step", "tn_tab_auto", "tn_tab_compare"]
+MODE_QC = 3  # 양자 vs 고전 비교 분석
+_NUM_MODES = 4
+_MODE_TAB_KEYS = ["tn_tab_step", "tn_tab_auto", "tn_tab_compare", "tn_tab_qc"]
 COMPARE_TARGET = 50  # 비교 모드: 각 장벽당 총 시행 횟수
+QC_TARGET = 100  # QC 분석: 각 모델당 시행 횟수
 
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH = cfg("display", "width", 900)
@@ -118,7 +121,7 @@ class Layout:
         self.tab_y = int(8 * sy)
         self.tab_h = int(28 * sy)
         tab_total = SIM_W
-        self.tab_w = tab_total // 3
+        self.tab_w = tab_total // _NUM_MODES
         self.tab_label_offset_y = int(6 * sy)
 
         # 블로흐 구
@@ -177,6 +180,22 @@ class Layout:
         self.cmp_result_pad = int(15 * sy)        # 결과 패널 내부 패딩
         self.cmp_result_indent = int(20 * sx)     # 결과 텍스트 들여쓰기
         self.cmp_result_y = int(490 * sy)
+
+        # QC (양자 vs 고전) 모드 레이아웃
+        self.qc_title_y = int(50 * sy)
+        self.qc_graph_x = int(40 * sx)
+        self.qc_graph_y = int(90 * sy)
+        self.qc_graph_w = int(500 * sx)
+        self.qc_graph_h = int(200 * sy)
+        self.qc_race_y = int(320 * sy)
+        self.qc_race_panel_w = int(520 * sx)
+        self.qc_race_panel_h = int(80 * sy)
+        self.qc_race_bar_offset = int(35 * sy)
+        self.qc_race_text_offset = int(60 * sy)
+        self.qc_stats_x = int(40 * sx)
+        self.qc_stats_y = int(490 * sy)
+        self.qc_stats_w = int(520 * sx)
+        self.qc_stats_h = int(60 * sy)
 
 
 _layout = Layout()
@@ -445,6 +464,137 @@ def _draw_compare_mode(screen, font, title_font, info_font, cmp):
                              L.cmp_stats_y + L.cmp_result_pad + i * L.line_h_lg))
 
 
+# ── 양자 vs 고전 비교 분석 렌더링 ─────────────────────
+
+
+def _draw_qc_analysis(screen, font, title_font, info_font, qc):
+    """양자 vs 고전 터널링 확률 비교 분석 모드 렌더링.
+
+    Args:
+        qc: dict with barrier_w, q_tunnels, q_attempts,
+            c_tunnels, c_attempts, running, done.
+    """
+    L = _layout
+    hc = is_high_contrast()
+
+    # 타이틀
+    title = title_font.render(t("tn_qc_title"), True, ACCENT)
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.qc_title_y))
+
+    bw = qc["barrier_w"]
+    q_prob = _calc_tunnel_prob(bw)
+
+    # ── 확률 그래프 ──────────────────────────────────
+    gx, gy, gw, gh = L.qc_graph_x, L.qc_graph_y, L.qc_graph_w, L.qc_graph_h
+
+    # 배경 패널
+    _draw_ui_panel(screen, gx, gy, gw, gh, SURFACE_CLR, OVERLAY_CLR,
+                   t("tn_qc_graph_title"), font, ACCENT)
+
+    # 그래프 내부 영역 (여백)
+    pad_l, pad_r, pad_t, pad_b = 50, 10, 25, 20
+    ix, iy = gx + pad_l, gy + pad_t
+    iw, ih = gw - pad_l - pad_r, gh - pad_t - pad_b
+
+    # Y축 라벨 (확률 %)
+    for pct in (0, 25, 50, 75, 100):
+        yy = iy + ih - int(ih * pct / 100)
+        lbl = info_font.render(f"{pct}%", True, OVERLAY_CLR)
+        screen.blit(lbl, (ix - lbl.get_width() - 4, yy - lbl.get_height() // 2))
+        # 그리드 선
+        pygame.draw.line(screen, OVERLAY_CLR, (ix, yy), (ix + iw, yy), 1)
+
+    # X축 라벨 (장벽 두께)
+    for w_mark in range(BARRIER_WIDTH_MIN, BARRIER_WIDTH_MAX + 1, 40):
+        xx = ix + int(iw * (w_mark - BARRIER_WIDTH_MIN) / max(1, BARRIER_WIDTH_MAX - BARRIER_WIDTH_MIN))
+        lbl = info_font.render(str(w_mark), True, OVERLAY_CLR)
+        screen.blit(lbl, (xx - lbl.get_width() // 2, iy + ih + 2))
+
+    # 양자 확률 곡선 (녹색)
+    q_points = []
+    num_samples = min(iw, 100)
+    for i in range(num_samples + 1):
+        w_val = BARRIER_WIDTH_MIN + (BARRIER_WIDTH_MAX - BARRIER_WIDTH_MIN) * i / num_samples
+        prob = _calc_tunnel_prob(int(w_val))
+        px = ix + int(iw * i / num_samples)
+        py = iy + ih - int(ih * min(prob, 1.0))
+        q_points.append((px, py))
+    if len(q_points) > 1:
+        line_w = 3 if hc else 2
+        pygame.draw.lines(screen, TUNNEL_FLASH, False, q_points, line_w)
+
+    # 고전 확률 곡선 (빨강, 항상 0%)
+    c_y = iy + ih
+    line_w = 3 if hc else 2
+    pygame.draw.line(screen, REFLECT_CLR, (ix, c_y), (ix + iw, c_y), line_w)
+
+    # 현재 장벽 두께 마커 (수직 점선)
+    marker_x = ix + int(iw * (bw - BARRIER_WIDTH_MIN) / max(1, BARRIER_WIDTH_MAX - BARRIER_WIDTH_MIN))
+    for dy in range(0, ih, 6):
+        pygame.draw.line(screen, ACCENT, (marker_x, iy + dy), (marker_x, iy + min(dy + 3, ih)), 1)
+    # 마커 라벨
+    mk_lbl = info_font.render(f"w={bw}", True, ACCENT)
+    screen.blit(mk_lbl, (marker_x - mk_lbl.get_width() // 2, iy - mk_lbl.get_height() - 2))
+
+    # 범례
+    legend_y = gy + gh + 4
+    q_lbl = info_font.render(t("tn_qc_quantum_label"), True, TUNNEL_FLASH)
+    c_lbl = info_font.render(t("tn_qc_classical_label"), True, REFLECT_CLR)
+    screen.blit(q_lbl, (gx + 10, legend_y))
+    screen.blit(c_lbl, (gx + 10 + q_lbl.get_width() + 20, legend_y))
+
+    # ── 레이스 시뮬레이션 ─────────────────────────────
+    race_y = L.qc_race_y
+    prob_display = info_font.render(
+        t("tn_qc_barrier_prob", w=bw, prob=q_prob * 100), True, TEXT_CLR)
+    screen.blit(prob_display, (L.margin, race_y - L.line_h))
+
+    # 양자 트랙
+    _draw_ui_panel(screen, L.margin, race_y, L.qc_race_panel_w, L.qc_race_panel_h,
+                   SURFACE_CLR, OVERLAY_CLR,
+                   t("tn_qc_quantum"), font, TUNNEL_FLASH)
+    prog_q = qc["q_attempts"] / max(QC_TARGET, 1)
+    _draw_progress_bar(screen, L.qc_graph_x, race_y + L.qc_race_bar_offset,
+                       L.qc_graph_w, L.cmp_bar_h,
+                       prog_q, TUNNEL_FLASH, SURFACE_CLR, OVERLAY_CLR)
+    pct_q = qc["q_tunnels"] / max(qc["q_attempts"], 1) * 100
+    ts_q = info_font.render(
+        t("tn_compare_tunnels", count=qc["q_tunnels"],
+          total=qc["q_attempts"], pct=pct_q), True, TEXT_CLR)
+    screen.blit(ts_q, (L.qc_graph_x, race_y + L.qc_race_text_offset))
+
+    # 고전 트랙
+    c_race_y = race_y + L.qc_race_panel_h + 10
+    _draw_ui_panel(screen, L.margin, c_race_y, L.qc_race_panel_w, L.qc_race_panel_h,
+                   SURFACE_CLR, OVERLAY_CLR,
+                   t("tn_qc_classical"), font, REFLECT_CLR)
+    prog_c = qc["c_attempts"] / max(QC_TARGET, 1)
+    _draw_progress_bar(screen, L.qc_graph_x, c_race_y + L.qc_race_bar_offset,
+                       L.qc_graph_w, L.cmp_bar_h,
+                       prog_c, REFLECT_CLR, SURFACE_CLR, OVERLAY_CLR)
+    pct_c = qc["c_tunnels"] / max(qc["c_attempts"], 1) * 100
+    ts_c = info_font.render(
+        t("tn_compare_tunnels", count=qc["c_tunnels"],
+          total=qc["c_attempts"], pct=pct_c), True, TEXT_CLR)
+    screen.blit(ts_c, (L.qc_graph_x, c_race_y + L.qc_race_text_offset))
+
+    # ── 결과 통계 (완료 시) ──
+    if qc["done"]:
+        _draw_ui_panel(screen, L.qc_stats_x, L.qc_stats_y,
+                       L.qc_stats_w, L.qc_stats_h,
+                       SURFACE_CLR, OVERLAY_CLR)
+        lines = [
+            (t("tn_qc_result_quantum", count=qc["q_tunnels"],
+               total=QC_TARGET, pct=pct_q), TUNNEL_FLASH),
+            (t("tn_qc_result_classical", count=qc["c_tunnels"],
+               total=QC_TARGET, pct=pct_c), REFLECT_CLR),
+        ]
+        for i, (line, clr) in enumerate(lines):
+            ls = info_font.render(line, True, clr)
+            screen.blit(ls, (L.qc_stats_x + L.cmp_result_indent,
+                             L.qc_stats_y + L.cmp_result_pad + i * L.line_h_lg))
+
+
 # ── 해상도 비례 폰트 ─────────────────────────────────
 
 _BASE_W, _BASE_H = 900, 600
@@ -535,6 +685,12 @@ def run_simulation():
         "thick_tunnels": 0, "thick_attempts": 0,
         "running": False, "done": False,
     }
+    qc = {
+        "barrier_w": BARRIER_WIDTH_DEFAULT,
+        "q_tunnels": 0, "q_attempts": 0,
+        "c_tunnels": 0, "c_attempts": 0,
+        "running": False, "done": False,
+    }
 
     def _on_mode_change():
         nonlocal step_waiting, paused, history_page
@@ -551,6 +707,13 @@ def run_simulation():
             cmp["thick_attempts"] = 0
             cmp["running"] = False
             cmp["done"] = False
+        elif mode == MODE_QC:
+            qc["q_tunnels"] = 0
+            qc["q_attempts"] = 0
+            qc["c_tunnels"] = 0
+            qc["c_attempts"] = 0
+            qc["running"] = False
+            qc["done"] = False
 
     # ── 시작 시 난이도 선택 ──
     if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
@@ -565,7 +728,7 @@ def run_simulation():
         for event in pygame.event.get():
             if tutorial.handle_event(event):
                 continue
-            if mode != MODE_COMPARE:
+            if mode not in (MODE_COMPARE, MODE_QC):
                 panel.handle_event(event)
             preset_hud.handle_event(event)
             help_overlay.handle_event(event)
@@ -577,7 +740,7 @@ def run_simulation():
                     if confirm_quit(screen, font):
                         running = False
                 elif event.key == pygame.K_TAB:
-                    mode = (mode + 1) % 3
+                    mode = (mode + 1) % _NUM_MODES
                     _on_mode_change()
                     _notify(t(_MODE_TAB_KEYS[mode]), "info", 1.0)
                     snd.play("click")
@@ -594,6 +757,14 @@ def run_simulation():
                             cmp["thick_attempts"] = 0
                             cmp["done"] = False
                         cmp["running"] = not cmp["running"]
+                    elif mode == MODE_QC:
+                        if qc["done"]:
+                            qc["q_tunnels"] = 0
+                            qc["q_attempts"] = 0
+                            qc["c_tunnels"] = 0
+                            qc["c_attempts"] = 0
+                            qc["done"] = False
+                        qc["running"] = not qc["running"]
                 elif event.key == pygame.K_r:
                     if mode in (MODE_STEP, MODE_AUTO):
                         particle = QuantumParticle()
@@ -609,6 +780,13 @@ def run_simulation():
                         cmp["thick_attempts"] = 0
                         cmp["running"] = False
                         cmp["done"] = False
+                    elif mode == MODE_QC:
+                        qc["q_tunnels"] = 0
+                        qc["q_attempts"] = 0
+                        qc["c_tunnels"] = 0
+                        qc["c_attempts"] = 0
+                        qc["running"] = False
+                        qc["done"] = False
                     _notify(t("notify_reset"), "info", 1.0)
                 elif event.key == pygame.K_PAGEUP:
                     history_page = max(0, history_page - 1)
@@ -617,18 +795,22 @@ def run_simulation():
                 elif event.key == pygame.K_UP:
                     if mode == MODE_COMPARE:
                         cmp["thick_w"] = min(BARRIER_WIDTH_MAX, cmp["thick_w"] + 10)
+                    elif mode == MODE_QC:
+                        qc["barrier_w"] = min(BARRIER_WIDTH_MAX, qc["barrier_w"] + 10)
                     else:
                         sl_speed.value = sl_speed.value + 0.5
                 elif event.key == pygame.K_DOWN:
                     if mode == MODE_COMPARE:
                         cmp["thick_w"] = max(cmp["thin_w"] + 4, cmp["thick_w"] - 10)
+                    elif mode == MODE_QC:
+                        qc["barrier_w"] = max(BARRIER_WIDTH_MIN, qc["barrier_w"] - 10)
                     else:
                         sl_speed.value = sl_speed.value - 0.5
                 elif event.key == pygame.K_RIGHT:
-                    if mode != MODE_COMPARE:
+                    if mode not in (MODE_COMPARE, MODE_QC):
                         sl_barrier.value = sl_barrier.value + 10
                 elif event.key == pygame.K_LEFT:
-                    if mode != MODE_COMPARE:
+                    if mode not in (MODE_COMPARE, MODE_QC):
                         sl_barrier.value = sl_barrier.value - 10
                 elif event.key == pygame.K_l:
                     toggle_locale()
@@ -642,9 +824,11 @@ def run_simulation():
                     event.w - PANEL_W, event.h)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if mode in (MODE_STEP, MODE_AUTO):
-                    particle.reset()
-                    if mode == MODE_STEP:
-                        step_waiting = False
+                    mx, my = event.pos
+                    if mx < _layout.W:  # 슬라이더 패널 외부 클릭만
+                        particle.reset()
+                        if mode == MODE_STEP:
+                            step_waiting = False
 
         # ── 슬라이더 값 읽기 (Step / Auto) ────────────
         if mode in (MODE_STEP, MODE_AUTO):
@@ -735,6 +919,26 @@ def run_simulation():
                     snd.play("achievement")
                     break
 
+        # ── QC 모드 시뮬레이션 ─────────────────────────
+        if mode == MODE_QC and qc["running"] and not qc["done"]:
+            q_prob = _calc_tunnel_prob(qc["barrier_w"])
+            batch = max(1, int(30 * dt))
+            for _ in range(batch):
+                if qc["q_attempts"] < QC_TARGET:
+                    qc["q_attempts"] += 1
+                    if random.random() < q_prob:
+                        qc["q_tunnels"] += 1
+                if qc["c_attempts"] < QC_TARGET:
+                    qc["c_attempts"] += 1
+                    # 고전: 에너지 < 장벽이면 터널링 불가 → 항상 0%
+                if (qc["q_attempts"] >= QC_TARGET
+                        and qc["c_attempts"] >= QC_TARGET):
+                    qc["running"] = False
+                    qc["done"] = True
+                    _notify(t("tn_qc_done"), "success", 2.0)
+                    snd.play("achievement")
+                    break
+
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
         L = _layout
@@ -796,6 +1000,15 @@ def run_simulation():
 
             # 힌트
             hints = [t("tn_hint_compare_1"), t("tn_hint_compare_2")]
+            for i, h in enumerate(hints):
+                surf = info_font.render(h, True, TEXT_CLR)
+                screen.blit(surf, (SIM_LEFT, L.hint_y + i * L.line_h_md))
+
+        elif mode == MODE_QC:
+            _draw_qc_analysis(screen, font, title_font, info_font, qc)
+
+            # 힌트
+            hints = [t("tn_hint_qc_1"), t("tn_hint_qc_2")]
             for i, h in enumerate(hints):
                 surf = info_font.render(h, True, TEXT_CLR)
                 screen.blit(surf, (SIM_LEFT, L.hint_y + i * L.line_h_md))

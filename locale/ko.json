@@ -861,5 +861,19 @@
   "tn_event_log": "── 이벤트 로그 ──",
   "tn_notify_tunneled": "터널링! (#{n})",
   "tn_notify_reflected": "반사 (#{n})",
-  "tn_notify_compare_done": "비교 완료!"
+  "tn_notify_compare_done": "비교 완료!",
+
+  "tn_tab_qc": "양자 vs 고전",
+  "tn_qc_title": "양자 vs 고전 — 터널링 확률 비교 분석",
+  "tn_qc_graph_title": "장벽 두께별 터널링 확률",
+  "tn_qc_quantum": "양자 (Quantum)",
+  "tn_qc_classical": "고전 (Classical)",
+  "tn_qc_quantum_label": "양자: 지수 감쇠",
+  "tn_qc_classical_label": "고전: 항상 0%",
+  "tn_qc_barrier_prob": "장벽 두께: {w}px  |  양자 확률: {prob:.1f}%",
+  "tn_qc_result_quantum": "양자: {count}/{total} 터널링  ({pct:.1f}%)",
+  "tn_qc_result_classical": "고전: {count}/{total} 터널링  ({pct:.1f}%)",
+  "tn_qc_done": "분석 완료!",
+  "tn_hint_qc_1": "SPACE: 시뮬레이션 시작  |  ↑/↓: 장벽 두께  |  Tab: 모드",
+  "tn_hint_qc_2": "R: 초기화  |  L: 언어 전환  |  ESC: 종료"
 }
