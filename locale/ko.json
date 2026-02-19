@@ -579,6 +579,8 @@
 
   "colorblind_on": "색맹모드: ON",
   "colorblind_off": "색맹모드: OFF",
+  "reduced_motion_on": "모션 감소: ON",
+  "reduced_motion_off": "모션 감소: OFF",
   "font_scale": "글꼴 크기",
   "profile_title": "프로파일 관리",
   "profile_heading": "저장된 프로파일",

@@ -40,7 +40,7 @@ from quantum.tunneling_physics import (
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
-from theme import load_pg_colors, on_theme_change
+from theme import is_reduced_motion, load_pg_colors, on_theme_change
 from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("tunneling")
@@ -155,7 +155,7 @@ def _draw_particle(screen, p: QuantumParticle, font):
     time_ms = pygame.time.get_ticks()
 
     # 터널링/반사 플래시
-    if p.flash_timer > 0:
+    if p.flash_timer > 0 and not is_reduced_motion():
         flash_r = int(PARTICLE_RADIUS + 20 * p.flash_timer)
         flash_clr = TUNNEL_FLASH if p.tunneled else REFLECT_CLR
         glow = pygame.Surface((flash_r * 2, flash_r * 2), pygame.SRCALPHA)
@@ -205,7 +205,7 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     screen.blit(z1, (BCX + 8, BCY + BR + 4))
 
     # 상태 벡터 (θ 기반)
-    theta = p.superposition_alpha(time_ms)
+    theta = 0.0 if is_reduced_motion() else p.superposition_alpha(time_ms)
     tip_x = BCX + int(BR * 0.4 * math.sin(theta))
     tip_y = BCY - int(BR * math.cos(theta))
 

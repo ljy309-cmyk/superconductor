@@ -5,6 +5,8 @@
 
 import pygame
 
+from theme import is_reduced_motion
+
 # ── 페이지네이션 ─────────────────────────────────────
 
 HISTORY_PAGE_SIZE = 4
@@ -51,9 +53,10 @@ def draw_bar_pattern(screen, rect, clr, tier):
 
 def render_notify(screen, msg, timer, font, color, center_x, y):
     """페이드 아웃 알림 메시지 렌더링 (timer > 0 일 때 호출)."""
-    alpha = min(255, int(255 * min(1.0, timer / 0.3)))
     ns = font.render(msg, True, color)
-    ns.set_alpha(alpha)
+    if not is_reduced_motion():
+        alpha = min(255, int(255 * min(1.0, timer / 0.3)))
+        ns.set_alpha(alpha)
     screen.blit(ns, (center_x - ns.get_width() // 2, y))
 
 

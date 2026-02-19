@@ -5,7 +5,8 @@
     "height": 600
   },
   "accessibility": {
-    "colorblind_mode": false
+    "colorblind_mode": false,
+    "reduced_motion": false
   },
   "server": {
     "host": "127.0.0.1",

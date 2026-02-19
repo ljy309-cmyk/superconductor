@@ -36,7 +36,7 @@ from replay import ReplayRecorder
 from sim_speed import speed_label
 from sound_manager import get_sound_manager
 from theme import get_pg_theme as _get_pg_theme_init
-from theme import load_pg_colors, on_theme_change
+from theme import is_reduced_motion, load_pg_colors, on_theme_change
 
 _log = get_module_logger("gate_builder")
 
@@ -401,9 +401,10 @@ def run_simulation():
         # 알림 메시지 (페이드 아웃)
         if notify_timer > 0:
             notify_timer -= clock.get_time() / 1000.0
-            alpha = min(255, int(255 * min(1.0, notify_timer / 0.3)))
             ns = small_font.render(notify_msg, True, SC_GLOW)
-            ns.set_alpha(alpha)
+            if not is_reduced_motion():
+                alpha = min(255, int(255 * min(1.0, notify_timer / 0.3)))
+                ns.set_alpha(alpha)
             screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
 
         help_overlay.draw(screen, font)

@@ -373,6 +373,7 @@ import weakref as _weakref
 
 _current_theme = "dark"
 _colorblind = False
+_reduced_motion = False
 _listeners: list = []  # (ref_or_callable, is_weak) 튜플 목록
 
 # 테마 조합 매핑
@@ -509,6 +510,26 @@ def toggle_colorblind() -> bool:
     return _colorblind
 
 
+def is_reduced_motion() -> bool:
+    """감소된 모션 모드 활성화 여부."""
+    return _reduced_motion
+
+
+def set_reduced_motion(enabled: bool):
+    """감소된 모션 모드 설정."""
+    global _reduced_motion
+    if enabled == _reduced_motion:
+        return
+    _reduced_motion = enabled
+
+
+def toggle_reduced_motion() -> bool:
+    """감소된 모션 모드 토글. 새 상태 반환."""
+    global _reduced_motion
+    _reduced_motion = not _reduced_motion
+    return _reduced_motion
+
+
 def get_font_scale() -> float:
     """현재 폰트 크기 배율 반환."""
     return _font_scale
@@ -589,6 +610,7 @@ def save_preferences():
     cfg["theme"] = _current_theme
     cfg["colorblind_mode"] = _colorblind
     cfg["font_scale"] = _font_scale
+    cfg.setdefault("accessibility", {})["reduced_motion"] = _reduced_motion
     try:
         with open(cfg_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2, ensure_ascii=False)
@@ -601,7 +623,7 @@ def load_preferences():
     import json
     import os
 
-    global _current_theme, _colorblind, _font_scale
+    global _current_theme, _colorblind, _font_scale, _reduced_motion
     cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     try:
         with open(cfg_path, encoding="utf-8") as f:
@@ -612,5 +634,8 @@ def load_preferences():
             _colorblind = cfg["colorblind_mode"]
         if isinstance(cfg.get("font_scale"), (int, float)):
             _font_scale = round(max(_FONT_SCALE_MIN, min(_FONT_SCALE_MAX, cfg["font_scale"])), 1)
+        acc = cfg.get("accessibility", {})
+        if isinstance(acc.get("reduced_motion"), bool):
+            _reduced_motion = acc["reduced_motion"]
     except (OSError, json.JSONDecodeError):
         pass

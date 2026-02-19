@@ -33,7 +33,7 @@ from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from sound_manager import get_sound_manager
-from theme import load_pg_colors, on_theme_change
+from theme import is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
@@ -313,13 +313,15 @@ def _draw_node(
     color = STATE_COLORS[node.state]
     cx, cy = int(node.x), int(node.y)
 
+    _rm = is_reduced_motion()
+
     # 붕괴 애니메이션: 진동
-    if node.collapsed and node.collapse_timer > 0:
+    if node.collapsed and node.collapse_timer > 0 and not _rm:
         shake = int(4 * math.sin(t * 40))
         cx += shake
 
     # QEC 방어막 글로우 (미션3)
-    if shield_active and not node.collapsed:
+    if shield_active and not node.collapsed and not _rm:
         pulse_s = int(6 + 4 * math.sin(t * 4))
         glow_surf = pygame.Surface((2 * (NODE_RADIUS + pulse_s), 2 * (NODE_RADIUS + pulse_s)), pygame.SRCALPHA)
         pygame.draw.circle(
@@ -328,7 +330,7 @@ def _draw_node(
         screen.blit(glow_surf, (cx - NODE_RADIUS - pulse_s, cy - NODE_RADIUS - pulse_s))
 
     # 글로우 펄스 (stress 비례)
-    if not node.collapsed:
+    if not node.collapsed and not _rm:
         pulse = int(PULSE_MAX * (node.stress / STRESS_THRESHOLD))
         if pulse > 0:
             glow_surf = pygame.Surface((2 * (NODE_RADIUS + pulse), 2 * (NODE_RADIUS + pulse)), pygame.SRCALPHA)
@@ -633,7 +635,7 @@ def run_simulation():
         screen.fill(BG)
 
         # 방어막 배경 글로우 (미션3)
-        if gs.shield_active:
+        if gs.shield_active and not is_reduced_motion():
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             alpha = int(12 + 8 * math.sin(gs.t * 3))
             overlay.fill((*SHIELD_GLOW, alpha))

@@ -43,7 +43,7 @@ from quantum.qubit_physics import QubitState
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
-from theme import load_pg_colors, on_theme_change
+from theme import is_reduced_motion, load_pg_colors, on_theme_change
 from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("qec_shield")
@@ -160,7 +160,7 @@ def _draw_node(screen, node: QECQubit, font, shield_active: bool, t: float):
     color = STATE_COLORS[node.state]
 
     # QEC 방어막 글로우 (활성 상태일 때 안정 큐비트에만)
-    if shield_active and not node.collapsed:
+    if shield_active and not node.collapsed and not is_reduced_motion():
         pulse = int(6 + 4 * math.sin(t * 4))
         glow_surf = pygame.Surface((2 * (NODE_RADIUS + pulse), 2 * (NODE_RADIUS + pulse)), pygame.SRCALPHA)
         pygame.draw.circle(
@@ -508,7 +508,7 @@ def run_simulation():
         screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
         # 방어막 활성 시 전체 배경 글로우
-        if shield_active:
+        if shield_active and not is_reduced_motion():
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             alpha = int(12 + 8 * math.sin(anim_t * 3))
             overlay.fill((*SHIELD_GLOW, alpha))

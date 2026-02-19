@@ -46,7 +46,7 @@ from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from sound_manager import get_sound_manager
-from theme import load_pg_colors, on_theme_change
+from theme import is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 
 _log = get_module_logger("entanglement")
@@ -262,13 +262,14 @@ def _notify(gs: EntanglementState, msg: str, duration: float = 2.0):
 def _draw_qubit_sphere(screen, cx, cy, radius, state_label, color,
                        font, glow_t=0.0):
     """큐비트 시각화 (원 + 라벨)."""
-    pulse = int(4 * math.sin(glow_t * 3))
-    if pulse > 0:
-        glow_surf = pygame.Surface(
-            (2 * (radius + pulse), 2 * (radius + pulse)), pygame.SRCALPHA)
-        pygame.draw.circle(glow_surf, (*color, 40),
-                           (radius + pulse, radius + pulse), radius + pulse)
-        screen.blit(glow_surf, (cx - radius - pulse, cy - radius - pulse))
+    if not is_reduced_motion():
+        pulse = int(4 * math.sin(glow_t * 3))
+        if pulse > 0:
+            glow_surf = pygame.Surface(
+                (2 * (radius + pulse), 2 * (radius + pulse)), pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (*color, 40),
+                               (radius + pulse, radius + pulse), radius + pulse)
+            screen.blit(glow_surf, (cx - radius - pulse, cy - radius - pulse))
 
     pygame.draw.circle(screen, color, (cx, cy), radius)
     pygame.draw.circle(screen, TEXT_CLR, (cx, cy), radius, 2)
@@ -279,6 +280,10 @@ def _draw_qubit_sphere(screen, cx, cy, radius, state_label, color,
 def _draw_entanglement_line(screen, x1, y1, x2, y2, t_val,
                             color=PURPLE):
     """얽힘 연결선 (파동 효과)."""
+    if is_reduced_motion():
+        pygame.draw.line(screen, color, (int(x1), int(y1)),
+                         (int(x2), int(y2)), 2)
+        return
     segments = 20
     points = []
     for i in range(segments + 1):
@@ -701,10 +706,14 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
     # 고전 채널 (파선)
     if step >= 4:
         dash_y = q_y - 10
+        _rm = is_reduced_motion()
         for dx in range(0, bob_x - alice_x - 60, 15):
             px = alice_x + qr + dx
-            alpha = max(0, min(255, int(200 * (1 - abs(
-                math.sin(gs.t * 2 + dx * 0.05))))))
+            if _rm:
+                alpha = 200
+            else:
+                alpha = max(0, min(255, int(200 * (1 - abs(
+                    math.sin(gs.t * 2 + dx * 0.05))))))
             pygame.draw.line(screen, (*YELLOW, alpha),
                              (px, dash_y), (px + 8, dash_y), 2)
         cc_lbl = info_font.render(t("ent_tp_classical_channel"), True, YELLOW)

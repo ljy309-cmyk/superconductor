@@ -44,7 +44,7 @@ from quantum.shor_algorithm_engine import (
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
-from theme import load_pg_colors, on_theme_change
+from theme import is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 
 _log = get_module_logger("shor_algorithm")
@@ -908,7 +908,7 @@ def _draw_input_field(screen, ui, font, x, y):
     screen.blit(txt, (box_x + 5, y))
 
     # 커서
-    if ui.input_active and int(ui.t * 2) % 2 == 0:
+    if ui.input_active and (is_reduced_motion() or int(ui.t * 2) % 2 == 0):
         cx = box_x + 5 + txt.get_width()
         pygame.draw.line(screen, ACCENT, (cx, y), (cx, y + 16), 1)
 
@@ -1194,13 +1194,17 @@ def run_simulation():
 
         # 알림 메시지 (페이드 아웃)
         if ui.notify_timer > 0:
-            alpha = min(255, int(255 * min(ui.notify_timer, 1.0)))
             ns = info_font.render(ui.notify_msg, True, YELLOW)
-            notif_surf = pygame.Surface(ns.get_size(), pygame.SRCALPHA)
-            notif_surf.blit(ns, (0, 0))
-            notif_surf.set_alpha(alpha)
-            screen.blit(notif_surf, (L.W // 2 - ns.get_width() // 2,
-                                     L.hint_y1 - 20))
+            if is_reduced_motion():
+                screen.blit(ns, (L.W // 2 - ns.get_width() // 2,
+                                 L.hint_y1 - 20))
+            else:
+                alpha = min(255, int(255 * min(ui.notify_timer, 1.0)))
+                notif_surf = pygame.Surface(ns.get_size(), pygame.SRCALPHA)
+                notif_surf.blit(ns, (0, 0))
+                notif_surf.set_alpha(alpha)
+                screen.blit(notif_surf, (L.W // 2 - ns.get_width() // 2,
+                                         L.hint_y1 - 20))
 
         # 오버레이
         toast.update(dt)
@@ -1263,6 +1267,12 @@ def _update_bar_animation(ui, dt):
     # 타이머 기반 막대 추가
     mod_target = cur_mod_len
     qft_target = cur_qft_len
+
+    if is_reduced_motion():
+        ui.mod_exp_anim_count = mod_target
+        ui.qft_anim_count = qft_target
+        return
+
     need_anim = (ui.mod_exp_anim_count < mod_target
                  or ui.qft_anim_count < qft_target)
 
