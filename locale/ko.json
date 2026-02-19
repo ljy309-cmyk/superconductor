@@ -819,5 +819,24 @@
   "qa_bench_title": "벤치마크 — BB84 vs E91",
   "qa_bench_done": "벤치마크 완료!",
   "qa_bench_close": "B 키로 닫기",
-  "qa_sc_bench": "벤치마크"
+  "qa_sc_bench": "벤치마크",
+
+  "notify_reset": "초기화!",
+  "gb_measure_log": "측정 기록:",
+  "gb_notify_placed": "배치: {gate}",
+  "gb_notify_removed": "게이트 제거",
+  "gb_notify_cleared": "회로 초기화",
+  "gb_notify_measured": "측정: |{result}⟩",
+  "ent_notify_measured": "{count}회 측정",
+  "ent_notify_chsh_done": "S = {s} — {verdict}",
+  "ent_notify_tp_done": "텔레포테이션 완료!",
+  "qc_notify_shield": "QEC 방어막 ON!",
+  "qc_notify_healed": "힐링! 전체 -{amount} 하중",
+  "qc_notify_corrected": "Q{id} 오류 정정!",
+  "qec_notify_shield": "방어막 활성화!",
+  "qec_notify_healed": "힐링! -{amount} 하중",
+  "qec_event_log": "── 이벤트 로그 ──",
+  "tn_event_log": "── 이벤트 로그 ──",
+  "tn_notify_tunneled": "터널링! (#{n})",
+  "tn_notify_reflected": "반사 (#{n})"
 }

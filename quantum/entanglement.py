@@ -52,6 +52,7 @@ FPS = cfg("display", "fps", 60)
 CHSH_SHOTS = cfg("entanglement", "chsh_shots", 200)
 MEASURE_BATCH = cfg("entanglement", "measure_batch", 50)
 TELEPORT_ANIM_SPEED = cfg("entanglement", "teleport_anim_speed", 1.5)
+HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ────────────────────────
 BG = (30, 30, 46)
@@ -168,6 +169,9 @@ class Layout:
         self.tp_log_y = int(420 * sy)
         self.tp_log_x = int(60 * sx)
 
+        # 알림
+        self.notify_y = h - int(56 * sy)
+
         # 하단 힌트
         self.hint_y = h - int(38 * sy)
 
@@ -215,6 +219,11 @@ class EntanglementState:
     teleport_completions: int = 0
     start_time: float = field(default_factory=time.time)
 
+    # ── 알림 / 페이지네이션 ──
+    notify_msg: str = ""
+    notify_timer: float = 0.0
+    history_page: int = 0
+
     def reset_bell(self):
         self.bell_measurements.clear()
         self.bell_counts = {"00": 0, "01": 0, "10": 0, "11": 0}
@@ -229,6 +238,12 @@ class EntanglementState:
         self.teleport.reset(alpha, beta)
         self.teleport_log.clear()
         self.teleport_anim_t = 0.0
+
+
+def _notify(gs: EntanglementState, msg: str, duration: float = 2.0):
+    """화면 하단 알림 표시."""
+    gs.notify_msg = msg
+    gs.notify_timer = duration
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
@@ -433,16 +448,25 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
         _draw_bar_chart(screen, L.bell_prob_start, stat_y + 22, 400, 100,
                         counts, prob_colors, prob_labels, info_font)
 
-    # 최근 측정 결과 표시
+    # 최근 측정 결과 표시 (페이지네이션)
     if gs.bell_measurements:
-        recent = gs.bell_measurements[-10:]
+        history = gs.bell_measurements
+        total = len(history)
+        total_pages = max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
+        gs.history_page = max(0, min(gs.history_page, total_pages - 1))
+        start = gs.history_page * HISTORY_PAGE_SIZE
+        end = min(start + HISTORY_PAGE_SIZE, total)
+        page_items = history[start:end]
         rx = L.bell_recent_x
         ry = stat_y
-        r_title = info_font.render(t("ent_bell_recent"), True, YELLOW)
+        title_text = t("ent_bell_recent")
+        if total_pages > 1:
+            title_text += f"  ({gs.history_page + 1}/{total_pages})"
+        r_title = info_font.render(title_text, True, YELLOW)
         screen.blit(r_title, (rx, ry))
-        for i, (a, b) in enumerate(recent):
+        for i, (a, b) in enumerate(page_items):
             ms = info_font.render(f"|{a}{b}⟩", True, TEXT_CLR)
-            screen.blit(ms, (rx + 55 + i * 35, ry))
+            screen.blit(ms, (rx, ry + 16 + i * 14))
 
     # 벨 상태 선택 가이드
     sel_y = L.bell_sel_y
@@ -573,16 +597,27 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         hint = info_font.render(t("ent_chsh_press_space"), True, TEXT_CLR)
         screen.blit(hint, (L.W // 2 - hint.get_width() // 2, res_y + 40))
 
-    # S 값 히스토리
+    # S 값 히스토리 (페이지네이션)
     if gs.chsh_history:
         hist_y = L.chsh_hist_y
-        hist_title = info_font.render(
-            t("ent_chsh_history", count=len(gs.chsh_history)), True, ACCENT)
+        history = gs.chsh_history
+        total = len(history)
+        page_size = 15
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        gs.history_page = max(0, min(gs.history_page, total_pages - 1))
+        start = gs.history_page * page_size
+        end = min(start + page_size, total)
+        page_items = history[start:end]
+
+        title_text = t("ent_chsh_history", count=total)
+        if total_pages > 1:
+            title_text += f"  ({gs.history_page + 1}/{total_pages})"
+        hist_title = info_font.render(title_text, True, ACCENT)
         screen.blit(hist_title, (corr_x, hist_y))
 
         # 미니 히스토리 바
         hist_bar_w = L.chsh_hist_bar_w
-        for i, s_val in enumerate(gs.chsh_history[-15:]):
+        for i, s_val in enumerate(page_items):
             bx = corr_x + i * hist_bar_w
             by = hist_y + 20
             s_abs = abs(s_val)
@@ -743,11 +778,22 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
                 screen.blit(ps, (bx + 30 - ps.get_width() // 2,
                                  by - 14))
 
-    # 프로토콜 로그
+    # 프로토콜 로그 (페이지네이션)
     log_y = L.tp_log_y
-    log_title = info_font.render(t("ent_tp_protocol_log"), True, ACCENT)
+    history = gs.teleport_log
+    total = len(history)
+    total_pages = max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
+    gs.history_page = max(0, min(gs.history_page, total_pages - 1))
+    start = gs.history_page * HISTORY_PAGE_SIZE
+    end = min(start + HISTORY_PAGE_SIZE, total)
+    page_items = history[start:end]
+
+    title_text = t("ent_tp_protocol_log")
+    if total_pages > 1:
+        title_text += f"  ({gs.history_page + 1}/{total_pages})"
+    log_title = info_font.render(title_text, True, ACCENT)
     screen.blit(log_title, (L.tp_log_x, log_y))
-    for i, msg in enumerate(gs.teleport_log[-6:]):
+    for i, msg in enumerate(page_items):
         clr = GREEN if "Fidelity" in msg else TEXT_CLR
         ms = info_font.render(msg, True, clr)
         screen.blit(ms, (L.tp_log_x, log_y + 18 + i * 15))
@@ -801,7 +847,13 @@ def run_simulation():
                 elif event.key == pygame.K_TAB:
                     # 모드 전환
                     gs.mode = (gs.mode + 1) % 3
+                    gs.history_page = 0
                     snd.play("click")
+
+                elif event.key == pygame.K_PAGEUP:
+                    gs.history_page = max(0, gs.history_page - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    gs.history_page += 1
 
                 elif event.key == pygame.K_r:
                     # 리셋 (현재 모드)
@@ -811,6 +863,8 @@ def run_simulation():
                         gs.reset_chsh()
                     elif gs.mode == MODE_TELEPORT:
                         gs.reset_teleport()
+                    gs.history_page = 0
+                    _notify(gs, t("notify_reset"), 1.0)
                     snd.play("click")
 
                 elif event.key == pygame.K_l:
@@ -838,6 +892,8 @@ def run_simulation():
                             gs.bell_counts[f"{a}{b}"] += 1
                             gs.bell_total += 1
                             gs.total_measurements += 1
+                        _notify(gs, t("ent_notify_measured",
+                                      count=MEASURE_BATCH), 1.0)
                         snd.play("click")
                     elif event.key == pygame.K_m:
                         # 단일 측정
@@ -848,6 +904,7 @@ def run_simulation():
                         gs.bell_counts[f"{a}{b}"] += 1
                         gs.bell_total += 1
                         gs.total_measurements += 1
+                        _notify(gs, f"|{a}{b}⟩", 1.0)
                         snd.play("collapse")
 
                 # ── CHSH 모드 키 ──
@@ -861,6 +918,11 @@ def run_simulation():
                         gs.chsh_history.append(result["S"])
                         gs.chsh_experiments += 1
                         gs.chsh_running = False
+                        s_val = result["S"]
+                        verdict = t("ent_chsh_violated") if abs(s_val) > CHSH_CLASSICAL_BOUND else t("ent_chsh_not_violated")
+                        _notify(gs, t("ent_notify_chsh_done",
+                                      s=f"{s_val:+.3f}",
+                                      verdict=verdict), 2.0)
                         snd.play("click")
 
                 # ── Teleportation 모드 키 ──
@@ -871,10 +933,12 @@ def run_simulation():
                             gs.teleport_log.append(msg)
                             if gs.teleport.step >= 6:
                                 gs.teleport_completions += 1
+                                _notify(gs, t("ent_notify_tp_done"), 2.0)
                             snd.play("click")
                         else:
                             # 새로운 텔레포테이션 시작
                             gs.reset_teleport()
+                            gs.history_page = 0
                             snd.play("click")
                     elif event.key == pygame.K_n:
                         # 새 랜덤 상태
@@ -942,6 +1006,14 @@ def run_simulation():
             hs = info_font.render(hint, True, TEXT_CLR)
             screen.blit(hs, (L.W // 2 - hs.get_width() // 2,
                              L.hint_y + i * 16))
+
+        # 알림 메시지 (페이드 아웃)
+        if gs.notify_timer > 0:
+            gs.notify_timer -= dt
+            alpha = min(255, int(255 * min(1.0, gs.notify_timer / 0.3)))
+            ns = info_font.render(gs.notify_msg, True, ACCENT)
+            ns.set_alpha(alpha)
+            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
 
         # 오버레이
         toast.update(dt)

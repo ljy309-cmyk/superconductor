@@ -37,6 +37,7 @@ WIDTH = cfg("display", "width", 900)
 HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
 NUM_QUBITS = cfg("gate_builder", "num_qubits", 2)
+HISTORY_PAGE_SIZE = 4
 
 _pg = _get_pg_theme_init()
 BG = _pg.BG
@@ -118,7 +119,12 @@ class Layout:
         self.title_y = int(6 * sy)
         self.hint_x = int(12 * sx)
         self.hint_y = h - int(36 * sy)
+        self.notify_y = h - int(54 * sy)
         self.count_offset_y = int(10 * sy)
+
+        # 측정 기록
+        self.log_x = int(580 * sx)
+        self.log_y = int(430 * sy)
 
 
 _layout = Layout()
@@ -157,6 +163,17 @@ def run_simulation():
     start_time = time.time()
     running = True
 
+    # 알림 / 페이지네이션
+    notify_msg = ""
+    notify_timer = 0.0
+    history_page = 0
+    measure_log: list[str] = []
+
+    def _notify(msg: str, duration: float = 2.0):
+        nonlocal notify_msg, notify_timer
+        notify_msg = msg
+        notify_timer = duration
+
     # 팔레트 버튼 위치 계산
     L = _layout
     palette_rects: dict[str, pygame.Rect] = {}
@@ -179,18 +196,31 @@ def run_simulation():
                 elif event.key == pygame.K_BACKSPACE:
                     qc.remove_last_gate()
                     qc.run()
+                    _notify(t("gb_notify_removed"), 1.0)
                 elif event.key == pygame.K_DELETE:
                     qc.clear()
                     measure_counts.clear()
+                    measure_log.clear()
                     total_measures = 0
+                    history_page = 0
+                    _notify(t("gb_notify_cleared"), 1.0)
                 elif event.key == pygame.K_RETURN:
                     # 측정
                     qc.run()
                     result = qc.measure()
                     measure_counts[result] = measure_counts.get(result, 0) + 1
                     total_measures += 1
+                    labels = qc.basis_labels()
+                    result_label = labels[result] if result < len(labels) else str(result)
+                    measure_log.append(result_label)
+                    _notify(t("gb_notify_measured",
+                              result=result_label), 1.0)
                 elif event.key == pygame.K_TAB:
                     bloch_qubit = (bloch_qubit + 1) % qc.num_qubits
+                elif event.key == pygame.K_PAGEUP:
+                    history_page = max(0, history_page - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    history_page += 1
                 elif event.key == pygame.K_l:
                     toggle_locale()
             elif event.type == pygame.VIDEORESIZE:
@@ -224,9 +254,13 @@ def run_simulation():
                                 other_q = (q + 1) % qc.num_qubits
                                 if qc.add_gate("CNOT", q, other_q):
                                     qc.run()
+                                    _notify(t("gb_notify_placed",
+                                              gate="CNOT"), 1.0)
                             else:
                                 if qc.add_gate(selected_gate, q):
                                     qc.run()
+                                    _notify(t("gb_notify_placed",
+                                              gate=selected_gate), 1.0)
                             break
 
         # 마우스 호버
@@ -307,6 +341,24 @@ def run_simulation():
         # ── 블로흐 구 ────────────────────────────────
         _draw_bloch_sphere(screen, small_font, qc, bloch_qubit)
 
+        # ── 측정 기록 (페이지네이션) ──────────────────
+        if measure_log:
+            total_log = len(measure_log)
+            total_pages = max(1, (total_log + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
+            history_page = max(0, min(history_page, total_pages - 1))
+            pg_start = history_page * HISTORY_PAGE_SIZE
+            pg_end = min(pg_start + HISTORY_PAGE_SIZE, total_log)
+            page_items = measure_log[pg_start:pg_end]
+            title_text = t("gb_measure_log")
+            if total_pages > 1:
+                title_text += f"  ({history_page + 1}/{total_pages})"
+            lt = small_font.render(title_text, True, SC_GLOW)
+            screen.blit(lt, (L.log_x, L.log_y))
+            for li, entry in enumerate(page_items):
+                idx = pg_start + li + 1
+                es = small_font.render(f"  #{idx}: |{entry}⟩", True, TEXT_CLR)
+                screen.blit(es, (L.log_x, L.log_y + 16 + li * 14))
+
         # ── 하단 안내 ────────────────────────────────
         hints = [
             t("gb_hint_line1"),
@@ -321,6 +373,14 @@ def run_simulation():
             t("gb_gate_count", count=len(qc.gates), max=MAX_GATES), True, TEXT_CLR
         )
         screen.blit(count_text, (L.circuit_x, L.circuit_y + qc.num_qubits * L.wire_spacing + L.count_offset_y))
+
+        # 알림 메시지 (페이드 아웃)
+        if notify_timer > 0:
+            notify_timer -= clock.get_time() / 1000.0
+            alpha = min(255, int(255 * min(1.0, notify_timer / 0.3)))
+            ns = small_font.render(notify_msg, True, SC_GLOW)
+            ns.set_alpha(alpha)
+            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
 
         help_overlay.draw(screen, font)
         pygame.display.flip()

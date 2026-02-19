@@ -37,6 +37,7 @@ _log = get_module_logger("qubit_chain")
 WIDTH = cfg("display", "width", 900)
 HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
+HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
@@ -133,6 +134,9 @@ class Layout:
         # 타이틀
         self.title_y = int(12 * sy)
 
+        # 알림
+        self.notify_y = h - int(88 * sy)
+
         # 하단 힌트
         self.hint_y = h - int(70 * sy)
 
@@ -171,6 +175,11 @@ class QubitChainState:
     ach_checked_milestones: set[int] = field(default_factory=set)
     kb_focus: int = -1
 
+    # ── 알림 / 페이지네이션 ──
+    notify_msg: str = ""
+    notify_timer: float = 0.0
+    history_page: int = 0
+
     def reset(self):
         """게임 상태 리셋 (노드 제외)."""
         self.shield_active = False
@@ -182,6 +191,13 @@ class QubitChainState:
         self.survival_time = 0.0
         self.game_over = False
         self.cascade_log.clear()
+        self.history_page = 0
+
+
+def _notify(gs: QubitChainState, msg: str, duration: float = 2.0):
+    """화면 하단 알림 표시."""
+    gs.notify_msg = msg
+    gs.notify_timer = duration
 
 
 # ── 큐비트 노드 클래스 ───────────────────────────────
@@ -471,6 +487,11 @@ def run_simulation():
                         n.reset()
                     gs.reset()
                     panel.reset_all()
+                    _notify(gs, t("notify_reset"), 1.0)
+                elif event.key == pygame.K_PAGEUP:
+                    gs.history_page = max(0, gs.history_page - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    gs.history_page += 1
                 elif event.key == pygame.K_SPACE:
                     gs.paused = not gs.paused
                 elif event.key == pygame.K_UP:
@@ -489,6 +510,7 @@ def run_simulation():
                         gs.qec_uses += 1
                         snd.play("shield_on")
                         gs.cascade_log.append("QEC SHIELD ON!")
+                        _notify(gs, t("qc_notify_shield"), 1.5)
                 elif event.key == pygame.K_h:
                     # 힐링 (미션3)
                     if gs.heal_cooldown <= 0:
@@ -499,6 +521,8 @@ def run_simulation():
                         gs.heal_cooldown = HEAL_COOLDOWN_SEC
                         snd.play("heal")
                         gs.cascade_log.append(f"HEAL! All -{int(heal_amt)} stress")
+                        _notify(gs, t("qc_notify_healed",
+                                      amount=int(heal_amt)), 1.5)
                 elif event.key == pygame.K_n:
                     # 랜덤 큐비트에 즉시 큰 노이즈 주입
                     alive = [n for n in nodes if not n.collapsed]
@@ -521,6 +545,8 @@ def run_simulation():
                             n.stress = 0.0
                             snd.play("error_correct")
                             gs.cascade_log.append(f"Q{n.qid} 오류 정정! (stress → 0)")
+                            _notify(gs, t("qc_notify_corrected",
+                                          id=n.qid), 1.0)
                 elif event.key == pygame.K_l:
                     toggle_locale()
                 elif event.key == pygame.K_g:
@@ -615,9 +641,9 @@ def run_simulation():
                 }
             )
 
-        # 로그 길이 제한
-        if len(gs.cascade_log) > 8:
-            gs.cascade_log = gs.cascade_log[-8:]
+        # 알림 타이머
+        if gs.notify_timer > 0:
+            gs.notify_timer -= dt
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -654,15 +680,28 @@ def run_simulation():
         for i, n in enumerate(nodes):
             _draw_stress_bar(screen, n, font, panel_x, panel_y + i * 18)
 
-        # 이벤트 로그
+        # 이벤트 로그 (페이지네이션)
         log_x = L.panel_x
         log_y = panel_y + len(nodes) * 18 + 20
-        log_label = info_font.render(t("qc_event_log"), True, ACCENT)
-        screen.blit(log_label, (log_x, log_y - 16))
-        for i, msg in enumerate(gs.cascade_log):
-            clr = STATE_COLORS[QubitState.COLLAPSED] if "COLLAPSED" in msg else TEXT_CLR
-            surf = info_font.render(msg, True, clr)
-            screen.blit(surf, (log_x, log_y + i * 15))
+        if gs.cascade_log:
+            total_log = len(gs.cascade_log)
+            total_pages = max(1, (total_log + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
+            gs.history_page = max(0, min(gs.history_page, total_pages - 1))
+            pg_start = gs.history_page * HISTORY_PAGE_SIZE
+            pg_end = min(pg_start + HISTORY_PAGE_SIZE, total_log)
+            page_items = gs.cascade_log[pg_start:pg_end]
+            title_text = t("qc_event_log")
+            if total_pages > 1:
+                title_text += f"  ({gs.history_page + 1}/{total_pages})"
+            log_label = info_font.render(title_text, True, ACCENT)
+            screen.blit(log_label, (log_x, log_y - 16))
+            for i, msg in enumerate(page_items):
+                clr = STATE_COLORS[QubitState.COLLAPSED] if "COLLAPSED" in msg else TEXT_CLR
+                surf = info_font.render(msg, True, clr)
+                screen.blit(surf, (log_x, log_y + i * 15))
+        else:
+            log_label = info_font.render(t("qc_event_log"), True, ACCENT)
+            screen.blit(log_label, (log_x, log_y - 16))
 
         # 방어막 상태 HUD (미션3)
         hud_x, hud_y = L.hud_x, L.hud_y
@@ -764,6 +803,13 @@ def run_simulation():
         toast.update(dt)
         toast.draw(screen, info_font)
         toast.draw_history(screen, info_font)
+
+        # 알림 메시지 (페이드 아웃)
+        if gs.notify_timer > 0:
+            alpha = min(255, int(255 * min(1.0, gs.notify_timer / 0.3)))
+            ns = info_font.render(gs.notify_msg, True, ACCENT)
+            ns.set_alpha(alpha)
+            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
 
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, info_font)

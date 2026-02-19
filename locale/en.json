@@ -819,5 +819,24 @@
   "qa_bench_title": "Benchmark — BB84 vs E91",
   "qa_bench_done": "Benchmark complete!",
   "qa_bench_close": "Press B to close",
-  "qa_sc_bench": "Benchmark"
+  "qa_sc_bench": "Benchmark",
+
+  "notify_reset": "Reset!",
+  "gb_measure_log": "Measure Log:",
+  "gb_notify_placed": "Placed: {gate}",
+  "gb_notify_removed": "Gate removed",
+  "gb_notify_cleared": "Circuit cleared",
+  "gb_notify_measured": "Measured: |{result}⟩",
+  "ent_notify_measured": "Measured x{count}",
+  "ent_notify_chsh_done": "S = {s} — {verdict}",
+  "ent_notify_tp_done": "Teleportation complete!",
+  "qc_notify_shield": "QEC Shield ON!",
+  "qc_notify_healed": "Heal! All -{amount} stress",
+  "qc_notify_corrected": "Q{id} corrected!",
+  "qec_notify_shield": "Shield activated!",
+  "qec_notify_healed": "Healed! -{amount} stress",
+  "qec_event_log": "── Event Log ──",
+  "tn_event_log": "── Event Log ──",
+  "tn_notify_tunneled": "Tunneled! (#{n})",
+  "tn_notify_reflected": "Reflected (#{n})"
 }

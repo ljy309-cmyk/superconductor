@@ -43,6 +43,7 @@ _log = get_module_logger("tunneling")
 WIDTH = cfg("display", "width", 900)
 HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
+HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
@@ -97,6 +98,13 @@ class Layout:
 
         # 타이틀
         self.title_y = int(12 * sy)
+
+        # 이벤트 로그
+        self.log_x = int(580 * sx)
+        self.log_y = int(430 * sy)
+
+        # 알림
+        self.notify_y = h - int(70 * sy)
 
         # 하단 힌트
         self.hint_y = h - int(52 * sy)
@@ -291,6 +299,17 @@ def run_simulation():
     barrier_width = BARRIER_WIDTH_DEFAULT
     tunnel_prob = _calc_tunnel_prob(barrier_width)
 
+    # 알림 / 페이지네이션
+    notify_msg = ""
+    notify_timer = 0.0
+    history_page = 0
+    event_log: list[str] = []
+
+    def _notify(msg: str, duration: float = 2.0):
+        nonlocal notify_msg, notify_timer
+        notify_msg = msg
+        notify_timer = duration
+
     # ── 시작 시 난이도 선택 ──
     if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
@@ -316,6 +335,13 @@ def run_simulation():
                 elif event.key == pygame.K_r:
                     particle = QuantumParticle()
                     panel.reset_all()
+                    event_log.clear()
+                    history_page = 0
+                    _notify(t("notify_reset"), 1.0)
+                elif event.key == pygame.K_PAGEUP:
+                    history_page = max(0, history_page - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    history_page += 1
                 elif event.key == pygame.K_UP:
                     sl_speed.value = sl_speed.value + 0.5
                 elif event.key == pygame.K_DOWN:
@@ -341,10 +367,20 @@ def run_simulation():
 
         # ── 물리 업데이트 ────────────────────────────
         if not paused:
+            prev_attempts = particle.total_attempts
             orig_vx = particle.vx
             particle.vx = orig_vx * speed_mult if orig_vx > 0 else orig_vx
             particle.update(dt, barrier_width, tunnel_prob, sl_boost.value)
             particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
+
+            # ── 이벤트 로그 ──
+            if particle.total_attempts > prev_attempts:
+                n = particle.total_attempts
+                if particle.tunneled is True:
+                    event_log.append(t("tn_notify_tunneled", n=n))
+                    _notify(t("tn_notify_tunneled", n=n), 1.0)
+                elif particle.tunneled is False:
+                    event_log.append(t("tn_notify_reflected", n=n))
 
             # ── 사운드 ──
             if particle.tunneled is True and particle.flash_timer > 0.5:
@@ -383,6 +419,24 @@ def run_simulation():
         # 통계
         _draw_stats(screen, particle, font, tunnel_prob)
 
+        # ── 이벤트 로그 (페이지네이션) ──
+        if event_log:
+            total_log = len(event_log)
+            total_pages = max(1, (total_log + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
+            history_page = max(0, min(history_page, total_pages - 1))
+            pg_start = history_page * HISTORY_PAGE_SIZE
+            pg_end = min(pg_start + HISTORY_PAGE_SIZE, total_log)
+            page_items = event_log[pg_start:pg_end]
+            title_text = t("tn_event_log")
+            if total_pages > 1:
+                title_text += f"  ({history_page + 1}/{total_pages})"
+            lt = font.render(title_text, True, ACCENT)
+            screen.blit(lt, (L.log_x, L.log_y))
+            for li, entry in enumerate(page_items):
+                clr = TUNNEL_FLASH if "Tunnel" in entry or "터널링" in entry else TEXT_CLR
+                es = font.render(f"  {entry}", True, clr)
+                screen.blit(es, (L.log_x, L.log_y + 16 + li * 14))
+
         # 슬라이더 패널 그리기
         panel.draw(screen, font)
 
@@ -401,6 +455,14 @@ def run_simulation():
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
             screen.blit(surf, (SIM_LEFT, L.hint_y + i * 16))
+
+        # 알림 메시지 (페이드 아웃)
+        if notify_timer > 0:
+            notify_timer -= dt
+            alpha = min(255, int(255 * min(1.0, notify_timer / 0.3)))
+            ns = font.render(notify_msg, True, ACCENT)
+            ns.set_alpha(alpha)
+            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
 
         preset_hud.draw(screen, font)
         help_overlay.draw(screen, font)

@@ -46,6 +46,7 @@ _log = get_module_logger("qec_shield")
 WIDTH = cfg("display", "width", 900)
 HEIGHT = cfg("display", "height", 600)
 FPS = cfg("display", "fps", 60)
+HISTORY_PAGE_SIZE = 4
 
 # ── 색상 (테마에서 동적 로드) ─────────────────────────
 BG = (30, 30, 46)
@@ -110,6 +111,13 @@ class Layout:
 
         # 타이틀
         self.title_y = int(12 * sy)
+
+        # 이벤트 로그
+        self.log_x = int(660 * sx)
+        self.log_y = int(500 * sy)
+
+        # 알림
+        self.notify_y = h - int(58 * sy)
 
         # 하단 힌트
         self.hint_y = h - int(40 * sy)
@@ -353,6 +361,17 @@ def run_simulation():
     paused = False
     anim_t = 0.0
 
+    # 알림 / 페이지네이션
+    notify_msg = ""
+    notify_timer = 0.0
+    history_page = 0
+    event_log: list[str] = []
+
+    def _notify(msg: str, duration: float = 2.0):
+        nonlocal notify_msg, notify_timer
+        notify_msg = msg
+        notify_timer = duration
+
     # ── 비교 모드 ──
     compare_mode = False  # QEC/Heal 비활성화 모드
     best_with_qec = 0.0  # QEC ON 최고 생존 시간
@@ -389,6 +408,8 @@ def run_simulation():
                         shield_active = True
                         shield_timer = QEC_DURATION
                         qec_uses += 1
+                        event_log.append(t("qec_notify_shield"))
+                        _notify(t("qec_notify_shield"), 1.5)
                         snd.play("shield_on")
                 elif event.key == pygame.K_h:
                     # 미션2: 힐링 — 모든 생존 큐비트 stress -20
@@ -398,6 +419,10 @@ def run_simulation():
                                 n.stress = max(n.stress - HEAL_AMOUNT, 0.0)
                         heal_uses += 1
                         heal_cooldown = HEAL_COOLDOWN_SEC
+                        event_log.append(t("qec_notify_healed",
+                                           amount=int(HEAL_AMOUNT)))
+                        _notify(t("qec_notify_healed",
+                                  amount=int(HEAL_AMOUNT)), 1.5)
                         snd.play("heal")
                 elif event.key == pygame.K_c:
                     # 비교 모드 토글
@@ -406,6 +431,10 @@ def run_simulation():
                     sl_reduction.value = sl_reduction.value - QEC_REDUCTION_STEP
                 elif event.key == pygame.K_RIGHT:
                     sl_reduction.value = sl_reduction.value + QEC_REDUCTION_STEP
+                elif event.key == pygame.K_PAGEUP:
+                    history_page = max(0, history_page - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    history_page += 1
                 elif event.key == pygame.K_r:
                     for n in nodes:
                         n.reset()
@@ -417,6 +446,9 @@ def run_simulation():
                     qec_uses = 0
                     heal_uses = 0
                     elapsed = 0.0
+                    event_log.clear()
+                    history_page = 0
+                    _notify(t("notify_reset"), 1.0)
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
                 elif event.key == pygame.K_l:
@@ -467,6 +499,7 @@ def run_simulation():
                 for n in nodes:
                     if n.check_collapse(cascade_mult, cur_cascade):
                         changed = True
+                        event_log.append(f"Q{n.qid} COLLAPSED!")
                         snd.play("collapse")
 
             # ── 프리셋 HUD 업데이트 ──
@@ -543,6 +576,24 @@ def run_simulation():
             cmp_surf = big_font.render(t("comparison_hint"), True, WARNING_CLR)
             screen.blit(cmp_surf, (L.W // 2 - cmp_surf.get_width() // 2, 8))
 
+        # ── 이벤트 로그 (페이지네이션) ──
+        if event_log:
+            total_log = len(event_log)
+            total_pages = max(1, (total_log + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
+            history_page = max(0, min(history_page, total_pages - 1))
+            pg_start = history_page * HISTORY_PAGE_SIZE
+            pg_end = min(pg_start + HISTORY_PAGE_SIZE, total_log)
+            page_items = event_log[pg_start:pg_end]
+            title_text = t("qec_event_log")
+            if total_pages > 1:
+                title_text += f"  ({history_page + 1}/{total_pages})"
+            lt = font.render(title_text, True, ACCENT)
+            screen.blit(lt, (L.log_x, L.log_y))
+            for li, entry in enumerate(page_items):
+                clr = COLLAPSED_CLR if "COLLAPSED" in entry else TEXT_CLR
+                es = font.render(f"  {entry}", True, clr)
+                screen.blit(es, (L.log_x, L.log_y + 16 + li * 14))
+
         # 안내
         hints = [
             t(
@@ -557,6 +608,14 @@ def run_simulation():
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
             screen.blit(surf, (L.W // 2 - surf.get_width() // 2, L.hint_y + i * 16))
+
+        # 알림 메시지 (페이드 아웃)
+        if notify_timer > 0:
+            notify_timer -= dt
+            alpha = min(255, int(255 * min(1.0, notify_timer / 0.3)))
+            ns = font.render(notify_msg, True, ACCENT)
+            ns.set_alpha(alpha)
+            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
 
         preset_hud.draw(screen, font, 10, 50)
         help_overlay.draw(screen, font)
