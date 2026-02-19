@@ -44,7 +44,7 @@ from quantum.shor_algorithm_engine import (
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
-from theme import is_reduced_motion, load_pg_colors, on_theme_change
+from theme import is_high_contrast, is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 
 _log = get_module_logger("shor_algorithm")
@@ -298,7 +298,8 @@ class UIState:
 def _draw_panel(screen, x, y, w, h, title="", title_font=None, font=None):
     """둥근 패널."""
     pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=6)
-    pygame.draw.rect(screen, OVERLAY_CLR, (x, y, w, h), 1, border_radius=6)
+    _bw = 2 if is_high_contrast() else 1
+    pygame.draw.rect(screen, OVERLAY_CLR, (x, y, w, h), _bw, border_radius=6)
     if title and title_font:
         ts = title_font.render(title, True, ACCENT)
         screen.blit(ts, (x + 10, y + 6))
@@ -335,7 +336,8 @@ def _draw_progress_bar(screen, x, y, w, h, progress, color=None):
     fill_w = max(0, int(w * min(1.0, progress)))
     if fill_w > 0:
         pygame.draw.rect(screen, color, (x, y, fill_w, h), border_radius=3)
-    pygame.draw.rect(screen, TEXT_CLR, (x, y, w, h), 1, border_radius=3)
+    _prog_bw = 2 if is_high_contrast() else 1
+    pygame.draw.rect(screen, TEXT_CLR, (x, y, w, h), _prog_bw, border_radius=3)
 
 
 def _draw_phase_indicator(screen, phase, font, x, y):
@@ -408,7 +410,8 @@ def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h,
         for k in range(1, n // period + 1):
             lx = x + 10 + k * period * bar_w
             if lx < x + w:
-                pygame.draw.line(screen, RED, (lx, y + 5), (lx, y + h - 10), 1)
+                _per_w = 2 if is_high_contrast() else 1
+                pygame.draw.line(screen, RED, (lx, y + 5), (lx, y + h - 10), _per_w)
 
     # 타이틀
     if show >= n and period > 0:
@@ -531,8 +534,10 @@ def _draw_circuit_diagram(screen, shor, font, x, y, w, h):
     display_qubits = min(n_qubits, QFT_DISPLAY_QUBITS)
 
     # 배경 패널
+    _hc = is_high_contrast()
     pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=4)
-    pygame.draw.rect(screen, OVERLAY_CLR, (x, y, w, h), 1, border_radius=4)
+    _circ_bw = 2 if _hc else 1
+    pygame.draw.rect(screen, OVERLAY_CLR, (x, y, w, h), _circ_bw, border_radius=4)
 
     line_start_x = x + 60
     line_end_x = x + w - 20
@@ -540,6 +545,7 @@ def _draw_circuit_diagram(screen, shor, font, x, y, w, h):
     line_spacing = max(16, (h - 50) // display_qubits)
 
     # 큐빗 라인
+    _wire_w = 2 if _hc else 1
     for i in range(display_qubits):
         ly = line_y_start + i * line_spacing
         # |0⟩ 라벨
@@ -547,7 +553,7 @@ def _draw_circuit_diagram(screen, shor, font, x, y, w, h):
         screen.blit(ql, (x + 10, ly - 6))
         # 수평선
         pygame.draw.line(screen, SUBTEXT, (line_start_x, ly),
-                         (line_end_x, ly), 1)
+                         (line_end_x, ly), _wire_w)
 
     # 게이트 박스들
     gate_positions = [
@@ -570,7 +576,7 @@ def _draw_circuit_diagram(screen, shor, font, x, y, w, h):
         is_done = phase.value > gate_phase_map.get(gate_name, ShorPhase.DONE).value
 
         box_color = color if (is_active or is_done) else OVERLAY_CLR
-        border = 2 if is_active else 1
+        border = (3 if _hc else 2) if is_active else (2 if _hc else 1)
 
         for i in range(display_qubits):
             ly = line_y_start + i * line_spacing

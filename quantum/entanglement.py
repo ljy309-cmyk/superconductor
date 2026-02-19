@@ -46,7 +46,7 @@ from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from sound_manager import get_sound_manager
-from theme import is_reduced_motion, load_pg_colors, on_theme_change
+from theme import is_high_contrast, is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 
 _log = get_module_logger("entanglement")
@@ -262,6 +262,7 @@ def _notify(gs: EntanglementState, msg: str, duration: float = 2.0):
 def _draw_qubit_sphere(screen, cx, cy, radius, state_label, color,
                        font, glow_t=0.0):
     """큐비트 시각화 (원 + 라벨)."""
+    hc = is_high_contrast()
     if not is_reduced_motion():
         pulse = int(4 * math.sin(glow_t * 3))
         if pulse > 0:
@@ -272,7 +273,8 @@ def _draw_qubit_sphere(screen, cx, cy, radius, state_label, color,
             screen.blit(glow_surf, (cx - radius - pulse, cy - radius - pulse))
 
     pygame.draw.circle(screen, color, (cx, cy), radius)
-    pygame.draw.circle(screen, TEXT_CLR, (cx, cy), radius, 2)
+    outline_w = 3 if hc else 2
+    pygame.draw.circle(screen, TEXT_CLR, (cx, cy), radius, outline_w)
     lbl = font.render(state_label, True, BG)
     screen.blit(lbl, (cx - lbl.get_width() // 2, cy - lbl.get_height() // 2))
 
@@ -280,9 +282,11 @@ def _draw_qubit_sphere(screen, cx, cy, radius, state_label, color,
 def _draw_entanglement_line(screen, x1, y1, x2, y2, t_val,
                             color=PURPLE):
     """얽힘 연결선 (파동 효과)."""
+    hc = is_high_contrast()
+    line_w = 3 if hc else 2
     if is_reduced_motion():
         pygame.draw.line(screen, color, (int(x1), int(y1)),
-                         (int(x2), int(y2)), 2)
+                         (int(x2), int(y2)), line_w)
         return
     segments = 20
     points = []
@@ -301,7 +305,7 @@ def _draw_entanglement_line(screen, x1, y1, x2, y2, t_val,
         y += ny * wave
         points.append((int(x), int(y)))
     if len(points) > 1:
-        pygame.draw.lines(screen, color, False, points, 2)
+        pygame.draw.lines(screen, color, False, points, line_w)
 
 
 def _draw_bar_chart(screen, x, y, w, h, data, colors, labels,
@@ -325,7 +329,8 @@ def _draw_bar_chart(screen, x, y, w, h, data, colors, labels,
         pygame.draw.rect(screen, color, (bar_x, bar_y, bar_w, bar_h))
         tier = "high" if i % 2 == 0 else "mid"
         _draw_bar_pattern(screen, (bar_x, bar_y, bar_w, bar_h), color, tier)
-        pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, w - 100, bar_h), 1)
+        border_w = 2 if is_high_contrast() else 1
+        pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, w - 100, bar_h), border_w)
         # 값
         v_surf = font.render(f"{val}", True, TEXT_CLR)
         screen.blit(v_surf, (x + w - 45, bar_y))
@@ -336,25 +341,29 @@ def _draw_bar_chart(screen, x, y, w, h, data, colors, labels,
 def _draw_bloch_mini(screen, cx, cy, radius, alpha, beta, font,
                      label=""):
     """미니 블로흐 구 시각화."""
+    hc = is_high_contrast()
     bx, by, bz = bloch_xyz(alpha, beta)
 
     # 원 (적도)
-    pygame.draw.circle(screen, OVERLAY_CLR, (cx, cy), radius, 1)
+    ring_w = 2 if hc else 1
+    pygame.draw.circle(screen, OVERLAY_CLR, (cx, cy), radius, ring_w)
     # 타원 (측면)
     pygame.draw.ellipse(screen, OVERLAY_CLR,
                         (cx - radius, cy - radius // 3,
-                         2 * radius, 2 * radius // 3), 1)
+                         2 * radius, 2 * radius // 3), ring_w)
     # 축
+    axis_w = 2 if hc else 1
     pygame.draw.line(screen, (*TEXT_CLR, 80), (cx, cy - radius),
-                     (cx, cy + radius), 1)
+                     (cx, cy + radius), axis_w)
     pygame.draw.line(screen, (*TEXT_CLR, 80), (cx - radius, cy),
-                     (cx + radius, cy), 1)
+                     (cx + radius, cy), axis_w)
 
     # 상태 벡터 포인트 (3D → 2D 사영)
     px = cx + int(bx * radius * 0.9)
     py = cy - int(bz * radius * 0.9)
+    vec_w = 3 if hc else 2
     pygame.draw.circle(screen, GREEN, (px, py), 5)
-    pygame.draw.line(screen, GREEN, (cx, cy), (px, py), 2)
+    pygame.draw.line(screen, GREEN, (cx, cy), (px, py), vec_w)
 
     if label:
         lbl = font.render(label, True, TEXT_CLR)
@@ -423,8 +432,9 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
         tier = "high" if i % 2 == 0 else "mid"
         _draw_bar_pattern(screen, (bx + 30, bar_top, inner_w, bar_h),
                           clr, tier)
+        _bw = 2 if is_high_contrast() else 1
         pygame.draw.rect(screen, TEXT_CLR,
-                         (bx + 30, by + 18, inner_w, max_h), 1)
+                         (bx + 30, by + 18, inner_w, max_h), _bw)
 
         # 확률값
         ps = info_font.render(f"{p:.3f}", True, clr)
@@ -557,15 +567,17 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         pygame.draw.rect(screen, OVERLAY_CLR,
                          (gauge_x, gauge_y, gauge_w, gauge_h))
         # 고전 한계 마커
+        _hc = is_high_contrast()
+        marker_w = 3 if _hc else 2
         cl_x = gauge_x + int(gauge_w * CHSH_CLASSICAL_BOUND / 4.0)
         pygame.draw.line(screen, YELLOW, (cl_x, gauge_y - 4),
-                         (cl_x, gauge_y + gauge_h + 4), 2)
+                         (cl_x, gauge_y + gauge_h + 4), marker_w)
         cl_lbl = info_font.render("2.0", True, YELLOW)
         screen.blit(cl_lbl, (cl_x - 8, gauge_y - 16))
         # 양자 한계 마커
         qm_x = gauge_x + int(gauge_w * CHSH_QUANTUM_BOUND / 4.0)
         pygame.draw.line(screen, PURPLE, (qm_x, gauge_y - 4),
-                         (qm_x, gauge_y + gauge_h + 4), 2)
+                         (qm_x, gauge_y + gauge_h + 4), marker_w)
         qm_lbl = info_font.render("2√2", True, PURPLE)
         screen.blit(qm_lbl, (qm_x - 10, gauge_y - 16))
         # S 포인터
@@ -573,8 +585,9 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         sp_x = gauge_x + int(gauge_w * s_clamped / 4.0)
         fill_w = sp_x - gauge_x
         pygame.draw.rect(screen, s_clr, (gauge_x, gauge_y, fill_w, gauge_h))
+        gauge_border = 2 if _hc else 1
         pygame.draw.rect(screen, TEXT_CLR,
-                         (gauge_x, gauge_y, gauge_w, gauge_h), 1)
+                         (gauge_x, gauge_y, gauge_w, gauge_h), gauge_border)
         # S 마커
         pygame.draw.circle(screen, WHITE, (sp_x, gauge_y + gauge_h // 2), 6)
         pygame.draw.circle(screen, s_clr, (sp_x, gauge_y + gauge_h // 2), 4)
@@ -611,7 +624,8 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
             bar_top = by + 40 - bar_h
             pygame.draw.rect(screen, clr, (bx, bar_top, 40, bar_h))
             _draw_bar_pattern(screen, (bx, bar_top, 40, bar_h), clr, tier)
-            pygame.draw.rect(screen, TEXT_CLR, (bx, by, 40, 40), 1)
+            _hist_bw = 2 if is_high_contrast() else 1
+            pygame.draw.rect(screen, TEXT_CLR, (bx, by, 40, 40), _hist_bw)
             vs = info_font.render(f"{s_val:.1f}", True, TEXT_CLR)
             screen.blit(vs, (bx + 20 - vs.get_width() // 2, by + 42))
 
@@ -649,8 +663,9 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
         step_surf = pygame.Surface((L.tp_step_w, L.tp_step_h), pygame.SRCALPHA)
         step_surf.fill(bg_clr)
         screen.blit(step_surf, (sx, steps_y))
+        _step_bw = 2 if is_high_contrast() else 1
         pygame.draw.rect(screen, clr, (sx, steps_y, L.tp_step_w, L.tp_step_h),
-                         1, border_radius=3)
+                         _step_bw, border_radius=3)
         ss = info_font.render(f"{i + 1}. {sl}", True, clr)
         screen.blit(ss, (sx + L.tp_step_w // 2 - ss.get_width() // 2,
                          steps_y + 3))
@@ -714,8 +729,9 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
             else:
                 alpha = max(0, min(255, int(200 * (1 - abs(
                     math.sin(gs.t * 2 + dx * 0.05))))))
+            _cc_w = 3 if is_high_contrast() else 2
             pygame.draw.line(screen, (*YELLOW, alpha),
-                             (px, dash_y), (px + 8, dash_y), 2)
+                             (px, dash_y), (px + 8, dash_y), _cc_w)
         cc_lbl = info_font.render(t("ent_tp_classical_channel"), True, YELLOW)
         screen.blit(cc_lbl, (L.W // 2 - cc_lbl.get_width() // 2,
                               dash_y - 16))
@@ -758,8 +774,9 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
                     tier = "high" if p > 0.3 else "mid"
                     _draw_bar_pattern(screen, (bx + 10, bar_top, 40, bar_h),
                                       clr, tier)
+            _pv_bw = 2 if is_high_contrast() else 1
             pygame.draw.rect(screen, TEXT_CLR,
-                             (bx + 10, by, 40, max_h), 1)
+                             (bx + 10, by, 40, max_h), _pv_bw)
 
             if p > 0.01:
                 ps = info_font.render(f"{p:.2f}", True, GREEN)

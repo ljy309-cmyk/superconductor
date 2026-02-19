@@ -43,7 +43,7 @@ from quantum.qubit_physics import QubitState
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
-from theme import is_reduced_motion, load_pg_colors, on_theme_change
+from theme import is_high_contrast, is_reduced_motion, load_pg_colors, on_theme_change
 from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("qec_shield")
@@ -152,7 +152,8 @@ def _draw_link(screen, a: QECQubit, b: QECQubit):
     color = SUBTEXT_CLR
     if a.collapsed or b.collapsed:
         color = COLLAPSED_CLR
-    pygame.draw.line(screen, color, (int(a.x), int(a.y)), (int(b.x), int(b.y)), 1)
+    _w = 2 if is_high_contrast() else 1
+    pygame.draw.line(screen, color, (int(a.x), int(a.y)), (int(b.x), int(b.y)), _w)
 
 
 def _draw_node(screen, node: QECQubit, font, shield_active: bool, t: float):
@@ -170,7 +171,8 @@ def _draw_node(screen, node: QECQubit, font, shield_active: bool, t: float):
 
     # 본체
     pygame.draw.circle(screen, color, (cx, cy), NODE_RADIUS)
-    pygame.draw.circle(screen, TEXT_CLR, (cx, cy), NODE_RADIUS, 2)
+    _outline_w = 3 if is_high_contrast() else 2
+    pygame.draw.circle(screen, TEXT_CLR, (cx, cy), NODE_RADIUS, _outline_w)
 
     # 하중 텍스트
     txt = "X" if node.collapsed else f"{int(node.stress)}%"
@@ -197,8 +199,10 @@ def _draw_shield_hud(
     hud_x, hud_y = L.hud_x, L.hud_y
     hud_w, hud_h = L.hud_w, L.hud_h
 
+    _hc = is_high_contrast()
     pygame.draw.rect(screen, PANEL_BG, (hud_x, hud_y, hud_w, hud_h), border_radius=8)
-    pygame.draw.rect(screen, ACCENT, (hud_x, hud_y, hud_w, hud_h), 2, border_radius=8)
+    _hud_bw = 3 if _hc else 2
+    pygame.draw.rect(screen, ACCENT, (hud_x, hud_y, hud_w, hud_h), _hud_bw, border_radius=8)
 
     title = big_font.render(t("qec_shield_title"), True, ACCENT)
     screen.blit(title, (hud_x + hud_w // 2 - title.get_width() // 2, hud_y + 10))
@@ -216,7 +220,8 @@ def _draw_shield_hud(
         pygame.draw.rect(screen, SHIELD_GLOW, (bar_x, bar_y, fill_w, bar_h))
         _draw_bar_pattern(screen, (bar_x, bar_y, fill_w, bar_h),
                           SHIELD_GLOW, "high")
-        pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), 1)
+        _bar_bw = 2 if _hc else 1
+        pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), _bar_bw)
 
         time_txt = font.render(t("qec_remaining", time=shield_timer), True, TEXT_CLR)
         screen.blit(time_txt, (bar_x, bar_y + 20))
@@ -248,7 +253,8 @@ def _draw_shield_hud(
         pygame.draw.rect(screen, WARNING_CLR, (bar_x, bar_y, fill_w, bar_h))
         _draw_bar_pattern(screen, (bar_x, bar_y, fill_w, bar_h),
                           WARNING_CLR, "mid")
-        pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), 1)
+        _cd_bw = 2 if _hc else 1
+        pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), _cd_bw)
 
         time_txt = font.render(t("qec_until_ready", time=cooldown_timer), True, TEXT_CLR)
         screen.blit(time_txt, (bar_x, bar_y + 20))

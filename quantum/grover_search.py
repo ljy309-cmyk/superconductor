@@ -39,7 +39,7 @@ from presets import get_preset
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
-from theme import is_reduced_motion, load_pg_colors, on_theme_change
+from theme import is_high_contrast, is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 
 _log = get_module_logger("grover_search")
@@ -281,7 +281,8 @@ def _notify(ui: UIState, msg: str, duration: float = 2.0):
 def _draw_panel(screen, x, y, w, h, title="", title_font=None, font=None):
     """둥근 패널."""
     pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=6)
-    pygame.draw.rect(screen, OVERLAY_CLR, (x, y, w, h), 1, border_radius=6)
+    _bw = 2 if is_high_contrast() else 1
+    pygame.draw.rect(screen, OVERLAY_CLR, (x, y, w, h), _bw, border_radius=6)
     if title and title_font:
         ts = title_font.render(title, True, ACCENT)
         screen.blit(ts, (x + 10, y + 6))
@@ -295,7 +296,8 @@ def _draw_progress_bar(screen, x, y, w, h, progress, color=None):
     fill_w = max(0, int(w * min(1.0, progress)))
     if fill_w > 0:
         pygame.draw.rect(screen, color, (x, y, fill_w, h), border_radius=3)
-    pygame.draw.rect(screen, TEXT_CLR, (x, y, w, h), 1, border_radius=3)
+    _prog_bw = 2 if is_high_contrast() else 1
+    pygame.draw.rect(screen, TEXT_CLR, (x, y, w, h), _prog_bw, border_radius=3)
 
 
 def _draw_bar_pattern(screen, rect, clr, tier):
@@ -430,11 +432,13 @@ def _draw_probability_evolution(screen, prob_history, font, x, y, w, h):
         points.append((px, py_val))
 
     if len(points) >= 2:
-        pygame.draw.lines(screen, GREEN, False, points, 2)
+        _line_w = 3 if is_high_contrast() else 2
+        pygame.draw.lines(screen, GREEN, False, points, _line_w)
 
     # 점 표시
+    _dot_r = 4 if is_high_contrast() else 3
     for px, py_val in points:
-        pygame.draw.circle(screen, YELLOW, (px, py_val), 3)
+        pygame.draw.circle(screen, YELLOW, (px, py_val), _dot_r)
 
     label = font.render(t("grover_chart_prob_evolution"), True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
@@ -445,20 +449,23 @@ def _draw_circuit_diagram(screen, grover, font, x, y, w, h):
     n_qubits = grover.n_qubits
     display_qubits = min(n_qubits, 6)
 
+    _hc = is_high_contrast()
     pygame.draw.rect(screen, PANEL_BG, (x, y, w, h), border_radius=4)
-    pygame.draw.rect(screen, OVERLAY_CLR, (x, y, w, h), 1, border_radius=4)
+    _circ_bw = 2 if _hc else 1
+    pygame.draw.rect(screen, OVERLAY_CLR, (x, y, w, h), _circ_bw, border_radius=4)
 
     line_start_x = x + 60
     line_end_x = x + w - 20
     line_y_start = y + 30
     line_spacing = max(16, (h - 50) // max(1, display_qubits))
 
+    _wire_w = 2 if _hc else 1
     for i in range(display_qubits):
         ly = line_y_start + i * line_spacing
         ql = font.render("|0⟩", True, TEXT_CLR)
         screen.blit(ql, (x + 10, ly - 6))
         pygame.draw.line(screen, SUBTEXT, (line_start_x, ly),
-                         (line_end_x, ly), 1)
+                         (line_end_x, ly), _wire_w)
 
     gate_positions = [
         (line_start_x + 30, "H", ACCENT),
@@ -481,7 +488,7 @@ def _draw_circuit_diagram(screen, grover, font, x, y, w, h):
         is_done = phase.value > active_phase.value if active_phase else False
 
         box_color = color if (is_active or is_done) else OVERLAY_CLR
-        border = 2 if is_active else 1
+        border = (3 if _hc else 2) if is_active else (2 if _hc else 1)
 
         for i in range(display_qubits):
             ly = line_y_start + i * line_spacing
@@ -499,7 +506,8 @@ def _draw_circuit_diagram(screen, grover, font, x, y, w, h):
         arrow_y = line_y_start + display_qubits * line_spacing + 5
         o_x = line_start_x + 100
         d_x = line_start_x + 170
-        pygame.draw.line(screen, YELLOW, (d_x, arrow_y), (o_x, arrow_y), 1)
+        _arr_w = 2 if _hc else 1
+        pygame.draw.line(screen, YELLOW, (d_x, arrow_y), (o_x, arrow_y), _arr_w)
         pygame.draw.polygon(screen, YELLOW, [
             (o_x, arrow_y), (o_x + 6, arrow_y - 4), (o_x + 6, arrow_y + 4)])
         iter_text = font.render(

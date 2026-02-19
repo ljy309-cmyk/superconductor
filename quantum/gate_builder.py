@@ -36,7 +36,7 @@ from replay import ReplayRecorder
 from sim_speed import speed_label
 from sound_manager import get_sound_manager
 from theme import get_pg_theme as _get_pg_theme_init
-from theme import is_reduced_motion, load_pg_colors, on_theme_change
+from theme import is_high_contrast, is_reduced_motion, load_pg_colors, on_theme_change
 
 _log = get_module_logger("gate_builder")
 
@@ -308,11 +308,13 @@ def run_simulation():
         screen.blit(title_surf, (L.W // 2 - title_surf.get_width() // 2, L.title_y))
 
         # ── 게이트 팔레트 ────────────────────────────
+        _hc = is_high_contrast()
         for g, rect in palette_rects.items():
             color = GATE_HOVER if (g == selected_gate or g == hover_gate) else GATE_BG
             border = GATE_HOVER if g == selected_gate else GATE_BORDER
             pygame.draw.rect(screen, color, rect, border_radius=4)
-            pygame.draw.rect(screen, border, rect, 2, border_radius=4)
+            _pal_bw = 3 if _hc else 2
+            pygame.draw.rect(screen, border, rect, _pal_bw, border_radius=4)
             label = gate_font.render(g, True, GATE_TEXT)
             screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
 
@@ -324,9 +326,10 @@ def run_simulation():
 
         # ── 회로 와이어 ──────────────────────────────
         wire_end_x = L.circuit_x + max(len(qc.gates) + 2, 8) * L.gate_spacing
+        _wire_w = 3 if _hc else 2
         for q in range(qc.num_qubits):
             wy = L.circuit_y + q * L.wire_spacing
-            pygame.draw.line(screen, WIRE_COLOR, (L.circuit_x, wy), (min(wire_end_x, int(540 * L.W / 900)), wy), 2)
+            pygame.draw.line(screen, WIRE_COLOR, (L.circuit_x, wy), (min(wire_end_x, int(540 * L.W / 900)), wy), _wire_w)
             # 큐비트 라벨
             q_label = small_font.render(f"q{q}: |0⟩", True, TEXT_CLR)
             screen.blit(q_label, (L.circuit_x - 38, wy - 6))
@@ -334,21 +337,22 @@ def run_simulation():
         # ── 배치된 게이트 ────────────────────────────
         for i, gate in enumerate(qc.gates):
             gx = L.circuit_x + (i + 1) * L.gate_spacing
+            _gate_w = 3 if _hc else 2
             if gate.name == "CNOT":
                 # 제어 큐비트: 점
                 cy = L.circuit_y + gate.qubit * L.wire_spacing
                 ty = L.circuit_y + gate.target * L.wire_spacing
-                pygame.draw.line(screen, GATE_BORDER, (gx, cy), (gx, ty), 2)
+                pygame.draw.line(screen, GATE_BORDER, (gx, cy), (gx, ty), _gate_w)
                 pygame.draw.circle(screen, GATE_BORDER, (gx, cy), 5)
                 # 타겟 큐비트: ⊕
-                pygame.draw.circle(screen, GATE_BORDER, (gx, ty), 12, 2)
-                pygame.draw.line(screen, GATE_BORDER, (gx - 8, ty), (gx + 8, ty), 2)
-                pygame.draw.line(screen, GATE_BORDER, (gx, ty - 8), (gx, ty + 8), 2)
+                pygame.draw.circle(screen, GATE_BORDER, (gx, ty), 12, _gate_w)
+                pygame.draw.line(screen, GATE_BORDER, (gx - 8, ty), (gx + 8, ty), _gate_w)
+                pygame.draw.line(screen, GATE_BORDER, (gx, ty - 8), (gx, ty + 8), _gate_w)
             else:
                 gy = L.circuit_y + gate.qubit * L.wire_spacing
                 rect = pygame.Rect(gx - L.gate_size // 2, gy - L.gate_size // 2, L.gate_size, L.gate_size)
                 pygame.draw.rect(screen, GATE_BG, rect, border_radius=4)
-                pygame.draw.rect(screen, GATE_BORDER, rect, 2, border_radius=4)
+                pygame.draw.rect(screen, GATE_BORDER, rect, _gate_w, border_radius=4)
                 label = gate_font.render(gate.name, True, GATE_TEXT)
                 screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
 
@@ -461,8 +465,10 @@ def _draw_measure_hist(screen, font, counts, total, labels):
     title = font.render(t("gb_measurements", n=total), True, TEXT_CLR)
     screen.blit(title, (x, y - 16))
 
+    _hc = is_high_contrast()
     pygame.draw.rect(screen, (30, 30, 46), (x, y, w, h), border_radius=4)
-    pygame.draw.rect(screen, (69, 71, 90), (x, y, w, h), 1, border_radius=4)
+    _hist_bw = 2 if _hc else 1
+    pygame.draw.rect(screen, (69, 71, 90), (x, y, w, h), _hist_bw, border_radius=4)
 
     if total == 0:
         hint = font.render(t("gb_press_enter"), True, SUBTEXT_CLR)
@@ -498,12 +504,14 @@ def _draw_bloch_sphere(screen, font, qc, qubit):
     screen.blit(title, (cx - title.get_width() // 2, cy - r - 20))
 
     # 원 (XZ 평면 투영)
-    pygame.draw.circle(screen, BLOCH_RING, (cx, cy), r, 1)
+    _hc = is_high_contrast()
+    ring_w = 2 if _hc else 1
+    pygame.draw.circle(screen, BLOCH_RING, (cx, cy), r, ring_w)
     # 축
-    pygame.draw.line(screen, BLOCH_RING, (cx - r, cy), (cx + r, cy), 1)  # X
-    pygame.draw.line(screen, BLOCH_RING, (cx, cy - r), (cx, cy + r), 1)  # Z
+    pygame.draw.line(screen, BLOCH_RING, (cx - r, cy), (cx + r, cy), ring_w)  # X
+    pygame.draw.line(screen, BLOCH_RING, (cx, cy - r), (cx, cy + r), ring_w)  # Z
     # 타원 (Y축 깊이)
-    pygame.draw.ellipse(screen, BLOCH_RING, (cx - r, cy - r // 3, r * 2, r * 2 // 3), 1)
+    pygame.draw.ellipse(screen, BLOCH_RING, (cx - r, cy - r // 3, r * 2, r * 2 // 3), ring_w)
 
     # 축 라벨
     lbl_0 = font.render("|0⟩", True, SUBTEXT_CLR)
@@ -518,13 +526,15 @@ def _draw_bloch_sphere(screen, font, qc, qubit):
     py = cy - int(bz * r)
 
     # 벡터선
-    pygame.draw.line(screen, BLOCH_VEC, (cx, cy), (px, py), 2)
+    vec_w = 3 if _hc else 2
+    pygame.draw.line(screen, BLOCH_VEC, (cx, cy), (px, py), vec_w)
     pygame.draw.circle(screen, BLOCH_VEC, (px, py), 5)
 
     # XY 평면 그림자
     shadow_px = cx + int(bx * r)
     shadow_py = cy
-    pygame.draw.line(screen, BLOCH_XY, (cx, cy), (shadow_px, shadow_py), 1)
+    shadow_w = 2 if _hc else 1
+    pygame.draw.line(screen, BLOCH_XY, (cx, cy), (shadow_px, shadow_py), shadow_w)
 
     # 좌표 텍스트
     coord = font.render(f"({bx:.2f}, {by:.2f}, {bz:.2f})", True, SUBTEXT_CLR)

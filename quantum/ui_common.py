@@ -5,7 +5,7 @@
 
 import pygame
 
-from theme import is_reduced_motion
+from theme import is_high_contrast, is_reduced_motion
 
 # ── 페이지네이션 ─────────────────────────────────────
 
@@ -109,8 +109,10 @@ def render_notify(screen, msg, timer, font, color, center_x, y):
 def draw_panel(screen, x, y, w, h, bg_clr, border_clr,
                title="", title_font=None, accent_clr=None):
     """둥근 패널."""
+    hc = is_high_contrast()
     pygame.draw.rect(screen, bg_clr, (x, y, w, h), border_radius=6)
-    pygame.draw.rect(screen, border_clr, (x, y, w, h), 1, border_radius=6)
+    border_w = 2 if hc else 1
+    pygame.draw.rect(screen, border_clr, (x, y, w, h), border_w, border_radius=6)
     if title and title_font and accent_clr:
         ts = title_font.render(title, True, accent_clr)
         screen.blit(ts, (x + 10, y + 6))
@@ -121,11 +123,13 @@ def draw_panel(screen, x, y, w, h, bg_clr, border_clr,
 
 def draw_progress_bar(screen, x, y, w, h, progress, color, bg_clr, border_clr):
     """진행률 바 (0.0 ~ 1.0)."""
+    hc = is_high_contrast()
     pygame.draw.rect(screen, bg_clr, (x, y, w, h), border_radius=3)
     fill_w = max(0, int(w * min(1.0, progress)))
     if fill_w > 0:
         pygame.draw.rect(screen, color, (x, y, fill_w, h), border_radius=3)
-    pygame.draw.rect(screen, border_clr, (x, y, w, h), 1, border_radius=3)
+    border_w = 2 if hc else 1
+    pygame.draw.rect(screen, border_clr, (x, y, w, h), border_w, border_radius=3)
 
 
 # ── 텍스트 줄바꿈 ────────────────────────────────────

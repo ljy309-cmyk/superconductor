@@ -33,7 +33,7 @@ from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from sound_manager import get_sound_manager
-from theme import is_reduced_motion, load_pg_colors, on_theme_change
+from theme import is_high_contrast, is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
@@ -301,8 +301,12 @@ def _build_network() -> list[QubitNode]:
 
 def _draw_link(screen, a: QubitNode, b: QubitNode):
     """큐비트 간 얽힘 연결선."""
+    _hc = is_high_contrast()
     color = LINK_ENTANGLED if (a.collapsed or b.collapsed) else LINK_CLR
-    width = 3 if (a.collapsed or b.collapsed) else 1
+    if a.collapsed or b.collapsed:
+        width = 4 if _hc else 3
+    else:
+        width = 2 if _hc else 1
     pygame.draw.line(screen, color, (int(a.x), int(a.y)), (int(b.x), int(b.y)), width)
 
 
@@ -338,13 +342,16 @@ def _draw_node(
             screen.blit(glow_surf, (cx - NODE_RADIUS - pulse, cy - NODE_RADIUS - pulse))
 
     # 본체 원
+    _hc = is_high_contrast()
     pygame.draw.circle(screen, color, (cx, cy), NODE_RADIUS)
-    pygame.draw.circle(screen, TEXT_CLR, (cx, cy), NODE_RADIUS, 2)
+    _outline_w = 3 if _hc else 2
+    pygame.draw.circle(screen, TEXT_CLR, (cx, cy), NODE_RADIUS, _outline_w)
 
     # 키보드 포커스 링
     if focused:
         ring_r = NODE_RADIUS + 5
-        pygame.draw.circle(screen, ACCENT, (cx, cy), ring_r, 3)
+        _focus_w = 4 if _hc else 3
+        pygame.draw.circle(screen, ACCENT, (cx, cy), ring_r, _focus_w)
 
     # 하중 텍스트
     pct_text = "X" if node.collapsed else f"{int(node.stress)}%"
@@ -382,7 +389,8 @@ def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y:
     color = STATE_COLORS[node.state]
     pygame.draw.rect(screen, color, (bar_x, y + 2, fill_w, bar_h))
     _draw_bar_pattern(screen, (bar_x, y + 2, fill_w, bar_h), color, _STATE_TIER[node.state])
-    pygame.draw.rect(screen, TEXT_CLR, (bar_x, y + 2, bar_w, bar_h), 1)
+    _bar_bw = 2 if is_high_contrast() else 1
+    pygame.draw.rect(screen, TEXT_CLR, (bar_x, y + 2, bar_w, bar_h), _bar_bw)
 
     # 상태 라벨
     sl = font.render(node.state.label, True, color)
