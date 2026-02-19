@@ -386,13 +386,17 @@ def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h,
         bar_h = int((h - 30) * entry.value / max_val)
         by = y + h - 10 - bar_h
 
-        # 주기 강조: 주기 시작점마다 다른 색
+        # 주기 강조: 주기 시작점마다 다른 색 + 패턴
+        bw = max(1, bar_w - 1)
         if period > 0 and i % period == 0:
             clr = YELLOW
+            tier = "high"
         else:
             clr = ACCENT
+            tier = "mid"
 
-        pygame.draw.rect(screen, clr, (bx, by, max(1, bar_w - 1), bar_h))
+        pygame.draw.rect(screen, clr, (bx, by, bw, bar_h))
+        _draw_bar_pattern(screen, (bx, by, bw, bar_h), clr, tier)
 
     # 주기 구분선 (전체 표시 후에만)
     if period > 0 and show >= n:
@@ -403,9 +407,9 @@ def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h,
 
     # 타이틀
     if show >= n and period > 0:
-        label = font.render(f"a^x mod N  (period={period})", True, TEXT_CLR)
+        label = font.render(t("shor_mod_exp_period", period=period), True, TEXT_CLR)
     else:
-        label = font.render(f"a^x mod N  ({show}/{n})", True, TEXT_CLR)
+        label = font.render(t("shor_mod_exp_progress", show=show, total=n), True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
 
     # Y축 라벨 (최대값)
@@ -432,7 +436,7 @@ def _draw_bar_pattern(screen, rect, clr, tier):
     bx, by, bw, bh = rect
     if bh < 4 or bw < 2:
         return
-    # 패턴 색상: 원색을 밝게/어둡게 변형
+    # 패턴 색상: 원색을 밝게 변형
     pc = tuple(min(255, c + 60) for c in clr[:3])
     if tier == "high":
         spacing = 4
@@ -440,13 +444,15 @@ def _draw_bar_pattern(screen, rect, clr, tier):
             pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
     elif tier == "mid":
         spacing = 5
-        for offset in range(-bh, bw + bh, spacing):
-            x1 = bx + max(0, offset)
-            y1 = by + max(0, -offset)
-            x2 = bx + min(bw - 1, offset + bh)
-            y2 = by + min(bh - 1, -offset + bw)
-            if x1 <= bx + bw - 1 and y1 <= by + bh - 1:
-                pygame.draw.line(screen, pc, (x1, y1), (x2, y2))
+        # 대각선을 사각형 내부로 클리핑
+        for offset in range(-bh, bw, spacing):
+            x1 = max(0, offset)
+            y1 = max(0, -offset)
+            diag_len = min(bw - 1 - x1, bh - 1 - y1)
+            if diag_len > 0:
+                pygame.draw.line(screen, pc,
+                                 (bx + x1, by + y1),
+                                 (bx + x1 + diag_len, by + y1 + diag_len))
 
 
 def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h,
@@ -487,18 +493,18 @@ def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h,
         _draw_bar_pattern(screen, (bx, by, bw, bar_h), clr, tier)
         bar_idx += 1
 
-    label = font.render("QFT Probability Distribution", True, TEXT_CLR)
+    label = font.render(t("shor_qft_title"), True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
 
     # ── 범례 (legend) ──
-    _LEGEND = [
+    legend = [
         (YELLOW, "high", t("shor_qft_legend_high")),
         (PURPLE, "mid", t("shor_qft_legend_mid")),
         (OVERLAY_CLR, "low", t("shor_qft_legend_low")),
     ]
     lx = x + w - 10
     ly = y + 4
-    for clr, tier, lbl in reversed(_LEGEND):
+    for clr, tier, lbl in reversed(legend):
         ls = font.render(lbl, True, clr)
         lx -= ls.get_width()
         screen.blit(ls, (lx, ly))
