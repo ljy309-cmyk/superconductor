@@ -95,6 +95,60 @@ class TestAchievements(unittest.TestCase):
         self.assertIn("bb84_first_play", ids)
         self.assertIn("bb84_score_500", ids)
 
+    def test_shor_first_factorization(self):
+        from achievements import check_achievements
+
+        new = check_achievements("shor_algorithm", {"numbers_factored": 1})
+        ids = [a["id"] for a in new]
+        self.assertIn("shor_first_factorization", ids)
+
+    def test_shor_first_factorization_zero(self):
+        from achievements import check_achievements
+
+        new = check_achievements("shor_algorithm", {"numbers_factored": 0})
+        ids = [a["id"] for a in new]
+        self.assertNotIn("shor_first_factorization", ids)
+
+    def test_shor_large_number(self):
+        from achievements import check_achievements
+
+        new = check_achievements("shor_algorithm", {
+            "numbers_factored": 1,
+            "largest_factored": 143,
+        })
+        ids = [a["id"] for a in new]
+        self.assertIn("shor_large_number", ids)
+
+    def test_shor_large_number_too_small(self):
+        from achievements import check_achievements
+
+        new = check_achievements("shor_algorithm", {
+            "numbers_factored": 1,
+            "largest_factored": 15,
+        })
+        ids = [a["id"] for a in new]
+        self.assertNotIn("shor_large_number", ids)
+
+    def test_shor_speed_run(self):
+        from achievements import check_achievements
+
+        new = check_achievements("shor_algorithm", {
+            "numbers_factored": 1,
+            "play_time": 10.0,
+        })
+        ids = [a["id"] for a in new]
+        self.assertIn("shor_speed_run", ids)
+
+    def test_shor_speed_run_too_slow(self):
+        from achievements import check_achievements
+
+        new = check_achievements("shor_algorithm", {
+            "numbers_factored": 1,
+            "play_time": 60.0,
+        })
+        ids = [a["id"] for a in new]
+        self.assertNotIn("shor_speed_run", ids)
+
 
 # ── Replay 테스트 ───────────────────────────────────────────
 

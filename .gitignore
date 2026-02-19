@@ -210,5 +210,6 @@ __marimo__/
 data_ai/ranking_data.json
 data_ai/ranking_data.json.bak
 data_ai/ranking_data.json.tmp
+data_ai/play_history.csv
 replays/
 exports/

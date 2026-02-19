@@ -106,6 +106,19 @@ class PlayLogger:
             "play_time",
             "final_temp",
         ],
+        "grover_search": [
+            "play_time",
+            "searches_completed",
+            "total_steps",
+            "last_n_qubits",
+            "largest_db",
+        ],
+        "shor_algorithm": [
+            "play_time",
+            "numbers_factored",
+            "largest_factored",
+            "total_steps",
+        ],
     }
 
     def __init__(self):

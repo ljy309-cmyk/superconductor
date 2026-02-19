@@ -35,6 +35,12 @@ _T = {
     "qa_ghz_consistency": cfg("achievements", "qa_ghz_consistency", 0.9),
     "qa_ghz_rounds": cfg("achievements", "qa_ghz_rounds", 100),
     "all_modules": cfg("achievements", "all_modules_count", 6),
+    "shor_large_number": cfg("achievements", "shor_large_number", 100),
+    "shor_speed_run_sec": cfg("achievements", "shor_speed_run_sec", 30),
+    "grover_large_db": cfg("achievements", "grover_large_db", 6),
+    "grover_speed_run_sec": cfg("achievements", "grover_speed_run_sec", 30),
+    "grover_multi_search": cfg("achievements", "grover_multi_search", 5),
+    "grover_perfect_prob": cfg("achievements", "grover_perfect_prob", 0.9),
 }
 
 # ── 업적 정의 ───────────────────────────────────────────────
@@ -214,6 +220,78 @@ ACHIEVEMENTS = [
             d.get("ghz_consistency_rate", 0) >= _T["qa_ghz_consistency"]
             and d.get("ghz_rounds", 0) >= _T["qa_ghz_rounds"]
         ),
+    },
+    # Shor's Algorithm
+    {
+        "id": "shor_first_factorization",
+        "module": "shor_algorithm",
+        "title": "Quantum Factorizer",
+        "desc": "Shor 알고리즘으로 첫 소인수분해에 성공했습니다!",
+        "icon": "F",
+        "condition": lambda d: d.get("numbers_factored", 0) >= 1,
+    },
+    {
+        "id": "shor_large_number",
+        "module": "shor_algorithm",
+        "title": "Big Number Breaker",
+        "desc": f"{_T['shor_large_number']} 이상의 큰 수를 소인수분해했습니다!",
+        "icon": "N",
+        "condition": lambda d: d.get("largest_factored", 0) >= _T["shor_large_number"],
+    },
+    {
+        "id": "shor_speed_run",
+        "module": "shor_algorithm",
+        "title": "Speed Cracker",
+        "desc": f"{_T['shor_speed_run_sec']}초 내에 소인수분해를 완료했습니다!",
+        "icon": "Z",
+        "condition": lambda d: (
+            d.get("numbers_factored", 0) >= 1
+            and d.get("play_time", 999) <= _T["shor_speed_run_sec"]
+        ),
+    },
+    # Grover's Search
+    {
+        "id": "grover_first_search",
+        "module": "grover_search",
+        "title": "Quantum Searcher",
+        "desc": "Grover 알고리즘으로 첫 양자 탐색에 성공했습니다!",
+        "icon": "G",
+        "condition": lambda d: d.get("searches_completed", 0) >= 1,
+    },
+    {
+        "id": "grover_large_db",
+        "module": "grover_search",
+        "title": "Big Database",
+        "desc": f"{_T['grover_large_db']}큐빗 이상의 큰 DB에서 탐색했습니다!",
+        "icon": "D",
+        "condition": lambda d: d.get("largest_db", 0) >= _T["grover_large_db"],
+    },
+    {
+        "id": "grover_speed_run",
+        "module": "grover_search",
+        "title": "Speed Searcher",
+        "desc": f"{_T['grover_speed_run_sec']}초 내에 탐색을 완료했습니다!",
+        "icon": "S",
+        "condition": lambda d: (
+            d.get("searches_completed", 0) >= 1
+            and d.get("play_time", 999) <= _T["grover_speed_run_sec"]
+        ),
+    },
+    {
+        "id": "grover_multi_search",
+        "module": "grover_search",
+        "title": "Search Expert",
+        "desc": f"한 세션에서 {_T['grover_multi_search']}회 이상 탐색을 완료했습니다!",
+        "icon": "M",
+        "condition": lambda d: d.get("searches_completed", 0) >= _T["grover_multi_search"],
+    },
+    {
+        "id": "grover_high_prob",
+        "module": "grover_search",
+        "title": "Quantum Precision",
+        "desc": "측정 직전 목표 확률이 90% 이상이었습니다!",
+        "icon": "P",
+        "condition": lambda d: d.get("best_target_prob", 0) >= _T["grover_perfect_prob"],
     },
     # 플럭스 피닝
     {

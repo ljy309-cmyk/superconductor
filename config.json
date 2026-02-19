@@ -121,7 +121,13 @@
     "qa_bell_violation": true,
     "qa_ghz_consistency": 0.9,
     "qa_ghz_rounds": 100,
-    "all_modules_count": 6
+    "all_modules_count": 6,
+    "shor_large_number": 100,
+    "shor_speed_run_sec": 30,
+    "grover_large_db": 6,
+    "grover_speed_run_sec": 30,
+    "grover_multi_search": 5,
+    "grover_perfect_prob": 0.9
   },
   "entanglement": {
     "chsh_shots": 200,
@@ -199,6 +205,10 @@
       "squid_mines": {
         "num_mines": 5,
         "sensitivity_default": 5.0
+      },
+      "grover": {
+        "default_qubits": 3,
+        "animation_speed": 0.8
       }
     },
     "normal": {
@@ -225,6 +235,10 @@
       "squid_mines": {
         "num_mines": 8,
         "sensitivity_default": 3.0
+      },
+      "grover": {
+        "default_qubits": 4,
+        "animation_speed": 0.5
       }
     },
     "hard": {
@@ -251,6 +265,10 @@
       "squid_mines": {
         "num_mines": 14,
         "sensitivity_default": 1.5
+      },
+      "grover": {
+        "default_qubits": 6,
+        "animation_speed": 0.3
       }
     }
   },
@@ -266,6 +284,23 @@
     "warning_threshold": 0.1,
     "decoy_chance": 0.15,
     "decoy_error_mult": 2.0
+  },
+  "grover": {
+    "max_qubits": 10,
+    "default_qubits": 4,
+    "animation_speed": 0.5,
+    "auto_batch_size": 1,
+    "display_states": 32
+  },
+  "shor": {
+    "max_number": 10000,
+    "qft_precision_bits": 8,
+    "max_period_attempts": 20,
+    "mod_exp_steps": 32,
+    "animation_speed": 0.6,
+    "qft_display_qubits": 6,
+    "auto_batch_size": 1,
+    "rsa_default_difficulty": 0
   },
   "theme": "dark",
   "colorblind_mode": false,

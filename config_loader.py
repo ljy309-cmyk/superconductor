@@ -115,6 +115,13 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
         "levitation_freq": (float, 0.1, 10.0),
         "gravity": (float, 100.0, 2000.0),
     },
+    "grover": {
+        "max_qubits": (int, 1, 20),
+        "default_qubits": (int, 1, 20),
+        "animation_speed": (float, 0.05, 5.0),
+        "auto_batch_size": (int, 1, 100),
+        "display_states": (int, 4, 1024),
+    },
     "achievements": {
         "qc_survive_short": (int, 1, 600),
         "qc_survive_long": (int, 1, 600),
@@ -130,6 +137,12 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
         "bb84_manual_blocks": (int, 1, 1000),
         "bb84_decoy_trapped": (int, 1, 1000),
         "all_modules_count": (int, 1, 20),
+        "grover_large_db": (int, 1, 20),
+        "grover_speed_run_sec": (int, 1, 600),
+        "grover_multi_search": (int, 1, 100),
+        "grover_perfect_prob": (float, 0.0, 1.0),
+        "shor_large_number": (int, 1, 100000),
+        "shor_speed_run_sec": (int, 1, 600),
     },
     "phase_transition": {
         "t_range_min": (float, -300.0, -100.0),
