@@ -141,8 +141,10 @@ def _draw_panel(screen, x, y, w, h, title="", title_font=None, font=None):
         screen.blit(ts, (x + 10, y + 6))
 
 
-def _draw_progress_bar(screen, x, y, w, h, progress, color=ACCENT):
+def _draw_progress_bar(screen, x, y, w, h, progress, color=None):
     """진행률 바 (0.0 ~ 1.0)."""
+    if color is None:
+        color = ACCENT
     pygame.draw.rect(screen, OVERLAY_CLR, (x, y, w, h), border_radius=3)
     fill_w = max(0, int(w * min(1.0, progress)))
     if fill_w > 0:
