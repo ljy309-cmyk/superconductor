@@ -97,6 +97,137 @@ MODE_RSA = 2
 MODE_NAMES = ["Step-by-Step", "Auto Run", "RSA Threat"]
 
 
+# ── 레이아웃 (해상도 적응) ─────────────────────────────
+
+class Layout:
+    """해상도 기반 레이아웃 좌표 계산.
+
+    기준 해상도 900×600에 대한 비례식으로 좌표를 산출합니다.
+    """
+
+    def __init__(self, w: int = 900, h: int = 600):
+        self.W = w
+        self.H = h
+        sx = w / 900       # 수평 스케일
+        sy = h / 600       # 수직 스케일
+
+        # 마진
+        self.margin = int(20 * sx)
+
+        # 상단: 모드 탭 바
+        self.tab_y = int(8 * sy)
+        self.tab_h = int(28 * sy)
+        tab_total = w - 2 * self.margin
+        self.tab_w = tab_total // 3
+        self.tab_label_offset_y = int(6 * sy)
+
+        # 제목 / N 표시 줄
+        self.title_y = int(42 * sy)
+        self.n_row_y = int(70 * sy)
+
+        # Step/Auto 공통: 단계 인디케이터, 회로, 상태 패널
+        self.indicator_x = self.margin
+        self.indicator_y = int(100 * sy)
+
+        col2_x = int(200 * sx)              # 좌측 기둥 끝
+        col3_x = int(600 * sx)              # 우측 패널 시작
+        panel_row_y = int(90 * sy)
+        panel_row_h = int(130 * sy)
+
+        self.circuit_x = col2_x
+        self.circuit_y = panel_row_y
+        self.circuit_w = col3_x - col2_x - self.margin
+        self.circuit_h = panel_row_h
+
+        self.status_x = col3_x
+        self.status_y = panel_row_y
+        self.status_w = w - col3_x - self.margin
+        self.status_h = panel_row_h
+        self.status_text_x = col3_x + int(10 * sx)
+        self.status_msg_y = panel_row_y + int(25 * sy)
+        self.status_desc_y = panel_row_y + int(80 * sy)
+
+        # 중앙 하단: 그래프 영역
+        graph_y = int(240 * sy)
+        graph_h = int(150 * sy)
+        self.graph_x = self.margin
+        self.graph_y = graph_y
+        self.graph_w_step = int(420 * sx)   # Step 모드 (우측 연분수 여유)
+        self.graph_w_auto = int(560 * sx)   # Auto 모드 (넓게)
+        self.graph_h = graph_h
+        self.graph_h_auto = int(160 * sy)
+
+        # 연분수 위치
+        self.cf_x_step = int(460 * sx)
+        self.cf_x_auto = col3_x
+        self.cf_y = int(250 * sy)
+
+        # 결과 / 히스토리
+        self.result_y = int(410 * sy)
+        self.method_y = int(440 * sy)
+        self.result_y_auto = int(420 * sy)
+        self.history_y = int(470 * sy)
+
+        # 진행률 바 (Auto)
+        self.prog_x = int(300 * sx)
+        self.prog_w = int(200 * sx)
+        self.prog_h = int(14 * sy)
+
+        # 입력 필드
+        self.input_y = h - int(70 * sy)
+
+        # 하단 힌트
+        self.hint_y1 = h - int(38 * sy)
+        self.hint_y2 = h - int(22 * sy)
+        self.badge_y = h - int(16 * sy)
+
+        # ── RSA 모드 ──
+        rsa_panel_h = int(120 * sy)
+        rsa_panel_y = int(95 * sy)
+        self.rsa_pub_x = self.margin
+        self.rsa_pub_y = rsa_panel_y
+        self.rsa_pub_w = int(420 * sx)
+        self.rsa_pub_h = rsa_panel_h
+        self.rsa_sec_x = int(460 * sx)
+        self.rsa_sec_y = rsa_panel_y
+        self.rsa_sec_w = w - int(460 * sx) - self.margin
+        self.rsa_sec_h = rsa_panel_h
+        self.rsa_info_x = self.margin + int(10 * sx)
+        self.rsa_info_y = rsa_panel_y + int(23 * sy)
+        self.rsa_sec_text_x = int(470 * sx)
+
+        self.rsa_status_y = int(240 * sy)
+
+        # RSA 크래킹 패널
+        self.rsa_crack_panel_y = int(228 * sy)
+        self.rsa_crack_panel_h = int(240 * sy)
+        self.rsa_crack_title_y = int(236 * sy)
+        self.rsa_crack_prog_y = int(262 * sy)
+        self.rsa_crack_indicator_x = int(60 * sx)
+        self.rsa_crack_indicator_y = int(286 * sy)
+        self.rsa_crack_msg_x = int(260 * sx)
+        self.rsa_crack_msg_y = int(290 * sy)
+        self.rsa_crack_attempt_y = int(345 * sy)
+
+        # RSA 결과 / QKD
+        self.rsa_cracked_y = int(242 * sy)
+        self.rsa_method_y = int(268 * sy)
+        self.rsa_arrow_y = int(285 * sy)
+        self.rsa_qkd_y = int(300 * sy)
+        self.rsa_qkd_h = int(170 * sy)
+        self.rsa_qkd_text_x = int(55 * sx)
+        self.rsa_qkd_text_y = int(325 * sy)
+        self.rsa_hint_y = h - int(55 * sy)
+
+        # wrap 문자 수 (해상도 비례)
+        self.wrap_status = max(20, int(35 * sx))
+        self.wrap_rsa_msg = max(25, int(45 * sx))
+        self.wrap_qkd = max(40, int(80 * sx))
+
+
+_layout = Layout(WIDTH, HEIGHT)
+
+
 # ── UI 상태 ──────────────────────────────────────────
 
 @dataclass
@@ -390,155 +521,161 @@ def _draw_circuit_diagram(screen, shor, font, x, y, w, h):
 
 def _draw_step_mode(screen, ui, font, title_font, info_font):
     """Step-by-Step 모드."""
+    L = _layout
     shor = ui.shor
 
     # 제목
     title = title_font.render(t("shor_title_step"), True, ACCENT)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 42))
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     # N 표시
     n_text = font.render(f"N = {shor.number}", True, TEXT_CLR)
-    screen.blit(n_text, (20, 70))
+    screen.blit(n_text, (L.margin, L.n_row_y))
 
     # 시도 횟수
     if shor.attempt > 0:
         att = font.render(f"Attempt #{shor.attempt}  a = {shor.a}", True, TEAL)
-        screen.blit(att, (150, 70))
+        screen.blit(att, (L.margin + 130, L.n_row_y))
 
     # 좌측: 단계 인디케이터
-    _draw_phase_indicator(screen, shor.phase, font, 20, 100)
+    _draw_phase_indicator(screen, shor.phase, font, L.indicator_x, L.indicator_y)
 
     # 중앙 상단: 양자 회로 다이어그램
-    _draw_circuit_diagram(screen, shor, info_font, 200, 90, 380, 130)
+    _draw_circuit_diagram(screen, shor, info_font,
+                          L.circuit_x, L.circuit_y, L.circuit_w, L.circuit_h)
 
     # 우측 상단: 상태 메시지
-    _draw_panel(screen, 600, 90, 280, 130, "Status", font, info_font)
-    # 현재 메시지
-    msg_lines = _wrap_text(shor.step_message, 35)
+    _draw_panel(screen, L.status_x, L.status_y, L.status_w, L.status_h,
+                "Status", font, info_font)
+    msg_lines = _wrap_text(shor.step_message, L.wrap_status)
     for i, line in enumerate(msg_lines):
         clr = GREEN if shor.phase == ShorPhase.SUCCESS else TEXT_CLR
         ms = info_font.render(line, True, clr)
-        screen.blit(ms, (610, 115 + i * 16))
-    # 단계 설명
-    desc_lines = _wrap_text(get_phase_description(shor.phase), 35)
+        screen.blit(ms, (L.status_text_x, L.status_msg_y + i * 16))
+    desc_lines = _wrap_text(get_phase_description(shor.phase), L.wrap_status)
     for i, line in enumerate(desc_lines[:3]):
         ds = info_font.render(line, True, SUBTEXT)
-        screen.blit(ds, (610, 170 + i * 14))
+        screen.blit(ds, (L.status_text_x, L.status_desc_y + i * 14))
 
     # 중앙 하단: 모듈러 지수 그래프 / QFT 히스토그램
     if shor.qft_amplitudes:
         _draw_qft_histogram(screen, shor.qft_amplitudes, info_font,
-                            20, 240, 420, 150,
+                            L.graph_x, L.graph_y, L.graph_w_step, L.graph_h,
                             visible_count=ui.qft_anim_count)
     elif shor.mod_exp_table:
         _draw_mod_exp_graph(screen, shor.mod_exp_table,
                             shor.mod_exp_period_visual, info_font,
-                            20, 240, 420, 150,
+                            L.graph_x, L.graph_y, L.graph_w_step, L.graph_h,
                             visible_count=ui.mod_exp_anim_count)
 
     # 우측 하단: 연분수 / 결과
     if shor.qft_current:
         _draw_continued_fraction(screen, shor.qft_current, info_font,
-                                 460, 250)
+                                 L.cf_x_step, L.cf_y)
 
     # 최종 결과
     if shor.factors:
         p, q = shor.factors
         result = title_font.render(f"{shor.number} = {p} × {q}", True, GREEN)
-        screen.blit(result, (WIDTH // 2 - result.get_width() // 2, 410))
+        screen.blit(result, (L.W // 2 - result.get_width() // 2, L.result_y))
         method = info_font.render(f"Method: {shor.factor_method}", True, PURPLE)
-        screen.blit(method, (WIDTH // 2 - method.get_width() // 2, 440))
+        screen.blit(method, (L.W // 2 - method.get_width() // 2, L.method_y))
     elif shor.is_prime:
         result = title_font.render(f"{shor.number} is PRIME", True, RED)
-        screen.blit(result, (WIDTH // 2 - result.get_width() // 2, 410))
+        screen.blit(result, (L.W // 2 - result.get_width() // 2, L.result_y))
 
     # 시도 히스토리
     if shor.attempt_history:
-        hy = 470
+        hy = L.history_y
         hist_title = info_font.render(t("shor_attempt_history"), True, ACCENT)
-        screen.blit(hist_title, (20, hy))
+        screen.blit(hist_title, (L.margin, hy))
         for i, h in enumerate(shor.attempt_history[-4:]):
             reason = h.get("reason", "")
             clr = GREEN if reason == "success" else YELLOW
             hs = info_font.render(
                 f"  #{h['attempt']}: a={h['a']}, r={h.get('r','?')} → {reason}",
                 True, clr)
-            screen.blit(hs, (20, hy + 16 + i * 14))
+            screen.blit(hs, (L.margin, hy + 16 + i * 14))
 
     # 입력 필드 (DONE 또는 INPUT 상태일 때)
     if shor.phase in (ShorPhase.INPUT, ShorPhase.DONE, ShorPhase.SUCCESS):
-        _draw_input_field(screen, ui, font, 20, HEIGHT - 70)
+        _draw_input_field(screen, ui, font, L.margin, L.input_y)
 
 
 def _draw_auto_mode(screen, ui, font, title_font, info_font):
     """Auto 모드."""
+    L = _layout
     shor = ui.shor
 
     # 제목
     title = title_font.render(t("shor_title_auto"), True, ACCENT)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 42))
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     # N 표시 + 진행 상태
     n_text = font.render(f"N = {shor.number}", True, TEXT_CLR)
-    screen.blit(n_text, (20, 70))
+    screen.blit(n_text, (L.margin, L.n_row_y))
 
     status = t("shor_auto_running") if ui.auto_running else t("shor_auto_paused")
     status_clr = GREEN if ui.auto_running else YELLOW
     st = font.render(status, True, status_clr)
-    screen.blit(st, (150, 70))
+    screen.blit(st, (L.margin + 130, L.n_row_y))
 
     # 진행률
-    _draw_progress_bar(screen, 300, 72, 200, 14, _calc_shor_progress(ui))
+    _draw_progress_bar(screen, L.prog_x, L.n_row_y + 2,
+                       L.prog_w, L.prog_h, _calc_shor_progress(ui))
 
     # 단계 인디케이터
-    _draw_phase_indicator(screen, shor.phase, font, 20, 100)
+    _draw_phase_indicator(screen, shor.phase, font, L.indicator_x, L.indicator_y)
 
     # 회로 다이어그램
-    _draw_circuit_diagram(screen, shor, info_font, 200, 90, 380, 130)
+    _draw_circuit_diagram(screen, shor, info_font,
+                          L.circuit_x, L.circuit_y, L.circuit_w, L.circuit_h)
 
     # 상태 메시지
-    _draw_panel(screen, 600, 90, 280, 130, "Status", font, info_font)
-    msg_lines = _wrap_text(shor.step_message, 35)
+    _draw_panel(screen, L.status_x, L.status_y, L.status_w, L.status_h,
+                "Status", font, info_font)
+    msg_lines = _wrap_text(shor.step_message, L.wrap_status)
     for i, line in enumerate(msg_lines):
         clr = GREEN if shor.phase == ShorPhase.SUCCESS else TEXT_CLR
         ms = info_font.render(line, True, clr)
-        screen.blit(ms, (610, 115 + i * 16))
+        screen.blit(ms, (L.status_text_x, L.status_msg_y + i * 16))
 
     # 그래프
     if shor.qft_amplitudes:
         _draw_qft_histogram(screen, shor.qft_amplitudes, info_font,
-                            20, 240, 560, 160,
+                            L.graph_x, L.graph_y, L.graph_w_auto, L.graph_h_auto,
                             visible_count=ui.qft_anim_count)
     elif shor.mod_exp_table:
         _draw_mod_exp_graph(screen, shor.mod_exp_table,
                             shor.mod_exp_period_visual, info_font,
-                            20, 240, 560, 160,
+                            L.graph_x, L.graph_y, L.graph_w_auto, L.graph_h_auto,
                             visible_count=ui.mod_exp_anim_count)
 
     # 연분수
     if shor.qft_current:
         _draw_continued_fraction(screen, shor.qft_current, info_font,
-                                 600, 250)
+                                 L.cf_x_auto, L.cf_y)
 
     # 결과
     if shor.factors:
         p, q = shor.factors
         result = title_font.render(f"{shor.number} = {p} × {q}", True, GREEN)
-        screen.blit(result, (WIDTH // 2 - result.get_width() // 2, 420))
+        screen.blit(result, (L.W // 2 - result.get_width() // 2, L.result_y_auto))
 
     # 입력 필드
     if shor.phase in (ShorPhase.INPUT, ShorPhase.DONE, ShorPhase.SUCCESS):
-        _draw_input_field(screen, ui, font, 20, HEIGHT - 70)
+        _draw_input_field(screen, ui, font, L.margin, L.input_y)
 
 
 def _draw_rsa_mode(screen, ui, font, title_font, info_font):
     """RSA Threat 모드."""
+    L = _layout
     shor = ui.shor
     rsa = shor.rsa
 
     # 제목
     title = title_font.render(t("shor_title_rsa"), True, RED)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 42))
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     # 난이도 표시
     diff_keys = ["shor_rsa_diff_easy", "shor_rsa_diff_medium",
@@ -546,11 +683,11 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
     dk = diff_keys[min(ui.rsa_difficulty, len(diff_keys) - 1)]
     diff = font.render(t("shor_rsa_difficulty", name=t(dk), n=rsa.rsa_n),
                        True, YELLOW)
-    screen.blit(diff, (20, 70))
+    screen.blit(diff, (L.margin, L.n_row_y))
 
     # RSA 키 정보 패널
-    _draw_panel(screen, 20, 95, 420, 120, t("shor_rsa_public_key"),
-                title_font, info_font)
+    _draw_panel(screen, L.rsa_pub_x, L.rsa_pub_y, L.rsa_pub_w, L.rsa_pub_h,
+                t("shor_rsa_public_key"), title_font, info_font)
     info_lines = [
         t("shor_rsa_n_line", n=rsa.rsa_n),
         t("shor_rsa_e_line", e=rsa.rsa_e),
@@ -559,11 +696,11 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
     ]
     for i, line in enumerate(info_lines):
         ls = info_font.render(line, True, TEXT_CLR)
-        screen.blit(ls, (30, 118 + i * 18))
+        screen.blit(ls, (L.rsa_info_x, L.rsa_info_y + i * 18))
 
     # 비밀키 (크랙 전 숨김)
-    _draw_panel(screen, 460, 95, 420, 120, t("shor_rsa_secret_key"),
-                title_font, info_font)
+    _draw_panel(screen, L.rsa_sec_x, L.rsa_sec_y, L.rsa_sec_w, L.rsa_sec_h,
+                t("shor_rsa_secret_key"), title_font, info_font)
     if rsa.cracked:
         match_str = t("shor_rsa_match_yes") if rsa.decrypted == rsa.plaintext \
             else t("shor_rsa_match_no")
@@ -576,74 +713,76 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
         for i, line in enumerate(secret_lines):
             clr = GREEN if i == 3 and rsa.decrypted == rsa.plaintext else TEXT_CLR
             ls = info_font.render(line, True, clr)
-            screen.blit(ls, (470, 118 + i * 18))
+            screen.blit(ls, (L.rsa_sec_text_x, L.rsa_info_y + i * 18))
     else:
         for i in range(4):
             ls = info_font.render("? ? ? ? ? ? ? ?", True, SUBTEXT)
-            screen.blit(ls, (470, 118 + i * 18))
+            screen.blit(ls, (L.rsa_sec_text_x, L.rsa_info_y + i * 18))
 
     # 크래킹 상태
     if ui.rsa_phase == 0:
-        # 대기
         msg = title_font.render(t("shor_rsa_press_space"), True, YELLOW)
-        screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 240))
+        screen.blit(msg, (L.W // 2 - msg.get_width() // 2, L.rsa_status_y))
     elif ui.rsa_phase == 1:
         # 크래킹 중 — Shor 알고리즘 진행 표시
-        _draw_panel(screen, 40, 228, WIDTH - 80, 240, "", title_font, info_font)
+        _draw_panel(screen, L.margin * 2, L.rsa_crack_panel_y,
+                    L.W - L.margin * 4, L.rsa_crack_panel_h,
+                    "", title_font, info_font)
 
         msg = title_font.render(t("shor_rsa_cracking"), True, RED)
-        screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 236))
+        screen.blit(msg, (L.W // 2 - msg.get_width() // 2,
+                          L.rsa_crack_title_y))
 
-        # 진행률 바
-        _draw_progress_bar(screen, 200, 262, WIDTH - 400, 12,
+        _draw_progress_bar(screen, L.prog_x, L.rsa_crack_prog_y,
+                           L.W - L.prog_x * 2, 12,
                            _calc_shor_progress(ui), RED)
 
-        # 단계 인디케이터 (왼쪽)
-        _draw_phase_indicator(screen, shor.phase, info_font, 60, 286)
+        _draw_phase_indicator(screen, shor.phase, info_font,
+                              L.rsa_crack_indicator_x, L.rsa_crack_indicator_y)
 
-        # 상태 메시지 (오른쪽)
         if shor.step_message:
-            msg_lines = _wrap_text(shor.step_message, 45)
+            msg_lines = _wrap_text(shor.step_message, L.wrap_rsa_msg)
             for i, line in enumerate(msg_lines[:3]):
                 ms = info_font.render(line, True, TEXT_CLR)
-                screen.blit(ms, (260, 290 + i * 16))
+                screen.blit(ms, (L.rsa_crack_msg_x,
+                                 L.rsa_crack_msg_y + i * 16))
 
-        # 시도 카운터
         if shor.attempt > 0:
             att = info_font.render(
                 f"Attempt #{shor.attempt}  a = {shor.a}", True, TEAL)
-            screen.blit(att, (260, 345))
+            screen.blit(att, (L.rsa_crack_msg_x, L.rsa_crack_attempt_y))
     elif ui.rsa_phase >= 2:
-        # 크래킹 완료
-        _draw_panel(screen, 40, 230, WIDTH - 80, 50, "", title_font, info_font)
+        _draw_panel(screen, L.margin * 2, L.rsa_crack_panel_y,
+                    L.W - L.margin * 4, 50, "", title_font, info_font)
         cracked = title_font.render(
             t("shor_rsa_cracked", n=rsa.rsa_n, p=rsa.cracked_p,
               q=rsa.cracked_q),
             True, GREEN)
-        screen.blit(cracked, (WIDTH // 2 - cracked.get_width() // 2, 242))
+        screen.blit(cracked, (L.W // 2 - cracked.get_width() // 2,
+                               L.rsa_cracked_y))
 
-        # Shor 결과
         if shor.factors:
             method = info_font.render(
                 t("shor_rsa_method", method=shor.factor_method,
                   attempts=shor.attempt),
                 True, PURPLE)
-            screen.blit(method, (WIDTH // 2 - method.get_width() // 2, 268))
+            screen.blit(method, (L.W // 2 - method.get_width() // 2,
+                                 L.rsa_method_y))
 
     # QKD 동기 메시지
     if ui.rsa_phase >= 3:
-        _draw_panel(screen, 40, 300, WIDTH - 80, 170, t("shor_rsa_why_qkd"),
-                    title_font, info_font)
-        msg_lines = _wrap_text(get_qkd_motivation(), 80)
+        _draw_panel(screen, L.margin * 2, L.rsa_qkd_y,
+                    L.W - L.margin * 4, L.rsa_qkd_h,
+                    t("shor_rsa_why_qkd"), title_font, info_font)
+        msg_lines = _wrap_text(get_qkd_motivation(), L.wrap_qkd)
         for i, line in enumerate(msg_lines[:7]):
             ms = info_font.render(line, True, YELLOW)
-            screen.blit(ms, (55, 325 + i * 18))
+            screen.blit(ms, (L.rsa_qkd_text_x, L.rsa_qkd_text_y + i * 18))
 
     # 화살표 (시각적)
     if rsa.cracked:
-        # Shor → RSA broken 화살표
-        ax = WIDTH // 2
-        ay = 285
+        ax = L.W // 2
+        ay = L.rsa_arrow_y
         for i in range(3):
             pygame.draw.polygon(screen, RED, [
                 (ax - 8, ay + i * 6), (ax + 8, ay + i * 6),
@@ -651,7 +790,7 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
 
     # 하단 힌트: 난이도 변경
     hint = info_font.render(t("shor_rsa_hint"), True, SUBTEXT)
-    screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, HEIGHT - 55))
+    screen.blit(hint, (L.W // 2 - hint.get_width() // 2, L.rsa_hint_y))
 
 
 def _draw_input_field(screen, ui, font, x, y):
@@ -916,15 +1055,19 @@ def run_simulation():
         screen.fill(BG)
 
         # 상단: 모드 탭
+        L = _layout
         for i, name in enumerate(MODE_NAMES):
-            tab_x = 20 + i * 280
+            tab_x = L.margin + i * L.tab_w
             is_sel = (i == ui.mode)
             tab_clr = ACCENT if is_sel else OVERLAY_CLR
+            tw = L.tab_w - int(L.margin * 0.5)
             pygame.draw.rect(screen, tab_clr,
-                             (tab_x, 8, 260, 28), 0 if is_sel else 1,
+                             (tab_x, L.tab_y, tw, L.tab_h),
+                             0 if is_sel else 1,
                              border_radius=4)
             ts_text = font.render(name, True, BG if is_sel else TEXT_CLR)
-            screen.blit(ts_text, (tab_x + 130 - ts_text.get_width() // 2, 14))
+            screen.blit(ts_text, (tab_x + tw // 2 - ts_text.get_width() // 2,
+                                  L.tab_y + L.tab_label_offset_y))
 
         # 모드별 렌더링
         if ui.mode == MODE_STEP:
@@ -943,14 +1086,14 @@ def run_simulation():
             hints = [t("shor_hint_rsa_1"), t("shor_hint_rsa_2")]
         for i, hint in enumerate(hints):
             hs = info_font.render(hint, True, TEXT_CLR)
-            screen.blit(hs, (WIDTH // 2 - hs.get_width() // 2,
-                             HEIGHT - 38 + i * 16))
+            screen.blit(hs, (L.W // 2 - hs.get_width() // 2,
+                             L.hint_y1 + i * 16))
 
         # 난이도 뱃지
         diff_colors = {"easy": GREEN, "normal": YELLOW, "hard": RED}
         badge_clr = diff_colors.get(ui.difficulty, TEXT_CLR)
         badge = info_font.render(f"[{ui.difficulty.upper()}]", True, badge_clr)
-        screen.blit(badge, (WIDTH - badge.get_width() - 8, HEIGHT - 16))
+        screen.blit(badge, (L.W - badge.get_width() - 8, L.badge_y))
 
         # 오버레이
         toast.update(dt)
@@ -958,7 +1101,7 @@ def run_simulation():
         toast.draw_history(screen, info_font)
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, font)
-        perf.draw_overlay(screen, info_font, x=WIDTH - 250, y=4)
+        perf.draw_overlay(screen, info_font, x=L.W - 250, y=4)
 
         pygame.display.flip()
 
