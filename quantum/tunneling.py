@@ -5,6 +5,7 @@
 """
 
 import math
+import random
 
 import pygame
 
@@ -15,6 +16,8 @@ from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
     draw_bar_pattern as _draw_bar_pattern,
     draw_circle_pattern as _draw_circle_pattern,
+    draw_panel as _draw_ui_panel,
+    draw_progress_bar as _draw_progress_bar,
     paginate,
     render_notify,
 )
@@ -49,6 +52,13 @@ from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("tunneling")
+
+# ── 모드 ─────────────────────────────────────────────
+MODE_STEP = 0
+MODE_AUTO = 1
+MODE_COMPARE = 2
+_MODE_TAB_KEYS = ["tn_tab_step", "tn_tab_auto", "tn_tab_compare"]
+COMPARE_TARGET = 50  # 비교 모드: 각 장벽당 총 시행 횟수
 
 # ── 화면 설정 ────────────────────────────────────────
 WIDTH = cfg("display", "width", 900)
@@ -101,6 +111,14 @@ class Layout:
         sx = w / 900
         sy = h / 600
 
+        # 탭 바
+        self.margin = int(20 * sx)
+        self.tab_y = int(8 * sy)
+        self.tab_h = int(28 * sy)
+        tab_total = SIM_W
+        self.tab_w = tab_total // 3
+        self.tab_label_offset_y = int(6 * sy)
+
         # 블로흐 구
         self.bloch_cx = int(730 * sx)
         self.bloch_cy = int(280 * sy)
@@ -122,8 +140,26 @@ class Layout:
         # 성능 모니터
         self.perf_x = w - int(250 * sx)
 
+        # Compare 모드 레이아웃
+        self.cmp_title_y = int(50 * sy)
+        self.cmp_track_x = int(60 * sx)
+        self.cmp_track_w = int(460 * sx)
+        self.cmp_thin_y = int(120 * sy)
+        self.cmp_thick_y = int(240 * sy)
+        self.cmp_panel_w = int(520 * sx)
+        self.cmp_panel_h = int(80 * sy)
+        self.cmp_bar_h = int(20 * sy)
+        self.cmp_stats_x = int(40 * sx)
+        self.cmp_stats_y = int(370 * sy)
+        self.cmp_stats_w = int(520 * sx)
+        self.cmp_stats_h = int(100 * sy)
+        self.cmp_result_y = int(490 * sy)
+
 
 _layout = Layout()
+
+# Reduced-motion 블로흐 구 보간용 상태
+_bloch_smooth_theta = math.pi / 2
 
 
 def _rebuild_layout(w: int, h: int):
@@ -242,8 +278,16 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     screen.blit(z0, (BCX + 8, BCY - BR - 18))
     screen.blit(z1, (BCX + 8, BCY + BR + 4))
 
-    # 상태 벡터 (θ 기반)
-    theta = 0.0 if is_reduced_motion() else p.superposition_alpha(time_ms)
+    # 상태 벡터 (θ 기반) — reduced motion 시 부드러운 보간
+    global _bloch_smooth_theta
+    if is_reduced_motion():
+        target = math.pi / 2  # 등확률 중첩 위치 (적도)
+        lerp = 0.05
+    else:
+        target = p.superposition_alpha(time_ms)
+        lerp = 0.3
+    _bloch_smooth_theta += (target - _bloch_smooth_theta) * lerp
+    theta = _bloch_smooth_theta
     tip_x = BCX + int(BR * 0.4 * math.sin(theta))
     tip_y = BCY - int(BR * math.cos(theta))
 
@@ -279,6 +323,102 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
     for i, (line, color) in enumerate(lines):
         surf = font.render(line, True, color)
         screen.blit(surf, (stats_x, stats_y + i * 17))
+
+
+# ── 모드 탭 / 비교 모드 렌더링 ────────────────────────
+
+
+def _draw_mode_tabs(screen, font, mode: int):
+    """상단 모드 탭 바 렌더링."""
+    L = _layout
+    tab_start = SIM_LEFT
+    for i, key in enumerate(_MODE_TAB_KEYS):
+        tab_x = tab_start + i * L.tab_w
+        is_sel = (i == mode)
+        tab_clr = ACCENT if is_sel else OVERLAY_CLR
+        pygame.draw.rect(screen, tab_clr,
+                         (tab_x, L.tab_y, L.tab_w - 4, L.tab_h),
+                         0 if is_sel else 1, border_radius=4)
+        ts = font.render(t(key), True, BG if is_sel else TEXT_CLR)
+        screen.blit(ts, (tab_x + (L.tab_w - 4) // 2 - ts.get_width() // 2,
+                         L.tab_y + L.tab_label_offset_y))
+
+
+def _draw_compare_mode(screen, font, title_font, info_font, cmp):
+    """얇은 장벽 vs 두꺼운 장벽 — 비교 모드 렌더링.
+
+    Args:
+        cmp: dict with thin_w, thick_w, thin_tunnels, thin_attempts,
+             thick_tunnels, thick_attempts, running, done.
+    """
+    L = _layout
+
+    # 타이틀
+    title = title_font.render(t("tn_compare_title"), True, ACCENT)
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.cmp_title_y))
+
+    thin_w = cmp["thin_w"]
+    thick_w = cmp["thick_w"]
+    thin_prob = _calc_tunnel_prob(thin_w)
+    thick_prob = _calc_tunnel_prob(thick_w)
+
+    # ── 얇은 장벽 트랙 ──
+    _draw_ui_panel(screen, L.margin, L.cmp_thin_y, L.cmp_panel_w, L.cmp_panel_h,
+                   SURFACE_CLR, OVERLAY_CLR,
+                   t("tn_compare_thin", w=thin_w), font, TUNNEL_FLASH)
+    prog_thin = cmp["thin_attempts"] / max(COMPARE_TARGET, 1)
+    _draw_progress_bar(screen, L.cmp_track_x, L.cmp_thin_y + 35,
+                       L.cmp_track_w, L.cmp_bar_h,
+                       prog_thin, TUNNEL_FLASH, SURFACE_CLR, OVERLAY_CLR)
+    # 통계 텍스트
+    pct_thin = cmp["thin_tunnels"] / max(cmp["thin_attempts"], 1) * 100
+    ts_thin = info_font.render(
+        t("tn_compare_tunnels", count=cmp["thin_tunnels"],
+          total=cmp["thin_attempts"], pct=pct_thin), True, TEXT_CLR)
+    screen.blit(ts_thin, (L.cmp_track_x, L.cmp_thin_y + 60))
+    prob_thin = info_font.render(
+        t("tn_compare_prob", prob=thin_prob * 100), True, OVERLAY_CLR)
+    screen.blit(prob_thin, (L.cmp_track_x + L.cmp_track_w - prob_thin.get_width(),
+                            L.cmp_thin_y + 60))
+
+    # ── 두꺼운 장벽 트랙 ──
+    _draw_ui_panel(screen, L.margin, L.cmp_thick_y, L.cmp_panel_w, L.cmp_panel_h,
+                   SURFACE_CLR, OVERLAY_CLR,
+                   t("tn_compare_thick", w=thick_w), font, REFLECT_CLR)
+    prog_thick = cmp["thick_attempts"] / max(COMPARE_TARGET, 1)
+    _draw_progress_bar(screen, L.cmp_track_x, L.cmp_thick_y + 35,
+                       L.cmp_track_w, L.cmp_bar_h,
+                       prog_thick, REFLECT_CLR, SURFACE_CLR, OVERLAY_CLR)
+    pct_thick = cmp["thick_tunnels"] / max(cmp["thick_attempts"], 1) * 100
+    ts_thick = info_font.render(
+        t("tn_compare_tunnels", count=cmp["thick_tunnels"],
+          total=cmp["thick_attempts"], pct=pct_thick), True, TEXT_CLR)
+    screen.blit(ts_thick, (L.cmp_track_x, L.cmp_thick_y + 60))
+    prob_thick = info_font.render(
+        t("tn_compare_prob", prob=thick_prob * 100), True, OVERLAY_CLR)
+    screen.blit(prob_thick, (L.cmp_track_x + L.cmp_track_w - prob_thick.get_width(),
+                             L.cmp_thick_y + 60))
+
+    # ── 결과 통계 (완료 시) ──
+    if cmp["done"]:
+        _draw_ui_panel(screen, L.cmp_stats_x, L.cmp_stats_y,
+                       L.cmp_stats_w, L.cmp_stats_h,
+                       SURFACE_CLR, OVERLAY_CLR)
+        lines = [
+            (t("tn_compare_thin", w=thin_w) + f":  {cmp['thin_tunnels']}/{COMPARE_TARGET}"
+             f"  ({pct_thin:.1f}%)", TUNNEL_FLASH),
+            (t("tn_compare_thick", w=thick_w) + f":  {cmp['thick_tunnels']}/{COMPARE_TARGET}"
+             f"  ({pct_thick:.1f}%)", REFLECT_CLR),
+        ]
+        if cmp["thick_tunnels"] > 0:
+            ratio = cmp["thin_tunnels"] / max(cmp["thick_tunnels"], 1)
+            lines.append((t("tn_compare_result", ratio=ratio), ACCENT))
+        elif cmp["thin_tunnels"] == cmp["thick_tunnels"]:
+            lines.append((t("tn_compare_equal"), ACCENT))
+        for i, (line, clr) in enumerate(lines):
+            ls = info_font.render(line, True, clr)
+            screen.blit(ls, (L.cmp_stats_x + 20,
+                             L.cmp_stats_y + 15 + i * 22))
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
@@ -341,6 +481,33 @@ def run_simulation():
         notify_msg = msg
         notify_timer = duration
 
+    # ── 모드 상태 ─────────────────────────────────────
+    mode = MODE_AUTO
+    step_waiting = True  # Step 모드: 입자 발사 대기 중
+    cmp = {
+        "thin_w": BARRIER_WIDTH_MIN,
+        "thick_w": 80,
+        "thin_tunnels": 0, "thin_attempts": 0,
+        "thick_tunnels": 0, "thick_attempts": 0,
+        "running": False, "done": False,
+    }
+
+    def _on_mode_change():
+        nonlocal step_waiting, paused, history_page
+        history_page = 0
+        if mode == MODE_STEP:
+            step_waiting = True
+            paused = False
+        elif mode == MODE_AUTO:
+            paused = False
+        elif mode == MODE_COMPARE:
+            cmp["thin_tunnels"] = 0
+            cmp["thin_attempts"] = 0
+            cmp["thick_tunnels"] = 0
+            cmp["thick_attempts"] = 0
+            cmp["running"] = False
+            cmp["done"] = False
+
     # ── 시작 시 난이도 선택 ──
     if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
@@ -354,7 +521,8 @@ def run_simulation():
         for event in pygame.event.get():
             if tutorial.handle_event(event):
                 continue
-            panel.handle_event(event)
+            if mode != MODE_COMPARE:
+                panel.handle_event(event)
             preset_hud.handle_event(event)
             help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
@@ -364,26 +532,59 @@ def run_simulation():
                 if event.key == pygame.K_ESCAPE:
                     if confirm_quit(screen, font):
                         running = False
+                elif event.key == pygame.K_TAB:
+                    mode = (mode + 1) % 3
+                    _on_mode_change()
+                    snd.play("click")
                 elif event.key == pygame.K_SPACE:
-                    paused = not paused
+                    if mode == MODE_STEP:
+                        step_waiting = False
+                    elif mode == MODE_AUTO:
+                        paused = not paused
+                    elif mode == MODE_COMPARE:
+                        if cmp["done"]:
+                            cmp["thin_tunnels"] = 0
+                            cmp["thin_attempts"] = 0
+                            cmp["thick_tunnels"] = 0
+                            cmp["thick_attempts"] = 0
+                            cmp["done"] = False
+                        cmp["running"] = not cmp["running"]
                 elif event.key == pygame.K_r:
-                    particle = QuantumParticle()
-                    panel.reset_all()
-                    event_log.clear()
-                    history_page = 0
+                    if mode in (MODE_STEP, MODE_AUTO):
+                        particle = QuantumParticle()
+                        panel.reset_all()
+                        event_log.clear()
+                        history_page = 0
+                        if mode == MODE_STEP:
+                            step_waiting = True
+                    elif mode == MODE_COMPARE:
+                        cmp["thin_tunnels"] = 0
+                        cmp["thin_attempts"] = 0
+                        cmp["thick_tunnels"] = 0
+                        cmp["thick_attempts"] = 0
+                        cmp["running"] = False
+                        cmp["done"] = False
                     _notify(t("notify_reset"), 1.0)
                 elif event.key == pygame.K_PAGEUP:
                     history_page = max(0, history_page - 1)
                 elif event.key == pygame.K_PAGEDOWN:
                     history_page += 1
                 elif event.key == pygame.K_UP:
-                    sl_speed.value = sl_speed.value + 0.5
+                    if mode == MODE_COMPARE:
+                        cmp["thick_w"] = min(BARRIER_WIDTH_MAX, cmp["thick_w"] + 10)
+                    else:
+                        sl_speed.value = sl_speed.value + 0.5
                 elif event.key == pygame.K_DOWN:
-                    sl_speed.value = sl_speed.value - 0.5
+                    if mode == MODE_COMPARE:
+                        cmp["thick_w"] = max(cmp["thin_w"] + 4, cmp["thick_w"] - 10)
+                    else:
+                        sl_speed.value = sl_speed.value - 0.5
                 elif event.key == pygame.K_RIGHT:
-                    sl_barrier.value = sl_barrier.value + 10
+                    if mode != MODE_COMPARE:
+                        sl_barrier.value = sl_barrier.value + 10
                 elif event.key == pygame.K_LEFT:
-                    sl_barrier.value = sl_barrier.value - 10
+                    if mode != MODE_COMPARE:
+                        sl_barrier.value = sl_barrier.value - 10
                 elif event.key == pygame.K_l:
                     toggle_locale()
                 elif event.key == pygame.K_g:
@@ -393,21 +594,36 @@ def run_simulation():
                     (event.w, event.h), pygame.RESIZABLE)
                 _rebuild_layout(event.w - PANEL_W, event.h)
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                # 클릭으로 입자 재발사
-                particle.reset()
+                if mode in (MODE_STEP, MODE_AUTO):
+                    particle.reset()
+                    if mode == MODE_STEP:
+                        step_waiting = False
 
-        # ── 슬라이더 값 읽기 ─────────────────────────
-        speed_mult = sl_speed.value
-        barrier_width = int(sl_barrier.value)
-        tunnel_prob = _calc_tunnel_prob(barrier_width)
+        # ── 슬라이더 값 읽기 (Step / Auto) ────────────
+        if mode in (MODE_STEP, MODE_AUTO):
+            speed_mult = sl_speed.value
+            barrier_width = int(sl_barrier.value)
+            tunnel_prob = _calc_tunnel_prob(barrier_width)
 
         # ── 물리 업데이트 ────────────────────────────
-        if not paused:
+        should_update = False
+        if mode == MODE_STEP:
+            should_update = not step_waiting
+        elif mode == MODE_AUTO:
+            should_update = not paused
+
+        if should_update:
             prev_attempts = particle.total_attempts
+            prev_tunneled = particle.tunneled
             orig_vx = particle.vx
             particle.vx = orig_vx * speed_mult if orig_vx > 0 else orig_vx
             particle.update(dt, barrier_width, tunnel_prob, sl_boost.value)
             particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
+
+            # Step 모드: 입자가 리스폰되면 다음 발사 대기
+            if mode == MODE_STEP:
+                if prev_tunneled is not None and particle.tunneled is None:
+                    step_waiting = True
 
             # ── 이벤트 로그 ──
             if particle.total_attempts > prev_attempts:
@@ -450,57 +666,91 @@ def run_simulation():
                 }
             )
 
+        # ── Compare 모드 시뮬레이션 ──────────────────
+        if mode == MODE_COMPARE and cmp["running"] and not cmp["done"]:
+            thin_prob = _calc_tunnel_prob(cmp["thin_w"])
+            thick_prob = _calc_tunnel_prob(cmp["thick_w"])
+            batch = max(1, int(30 * dt))  # ~30 trials/sec at 60fps → ~0.5/frame
+            for _ in range(batch):
+                if cmp["thin_attempts"] < COMPARE_TARGET:
+                    cmp["thin_attempts"] += 1
+                    if random.random() < thin_prob:
+                        cmp["thin_tunnels"] += 1
+                if cmp["thick_attempts"] < COMPARE_TARGET:
+                    cmp["thick_attempts"] += 1
+                    if random.random() < thick_prob:
+                        cmp["thick_tunnels"] += 1
+                if (cmp["thin_attempts"] >= COMPARE_TARGET
+                        and cmp["thick_attempts"] >= COMPARE_TARGET):
+                    cmp["running"] = False
+                    cmp["done"] = True
+                    snd.play("achievement")
+                    break
+
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
-
-        # 타이틀
         L = _layout
-        t_surf = big_font.render(t("game_title_tunneling"), True, ACCENT)
-        screen.blit(t_surf, (L.W // 2 - t_surf.get_width() // 2, L.title_y))
 
-        # 시뮬레이션 영역
-        _draw_sim_area(screen, font, barrier_width)
+        # 탭 바 (항상 표시)
+        _draw_mode_tabs(screen, font, mode)
 
-        # 입자
-        _draw_particle(screen, particle, font)
+        if mode in (MODE_STEP, MODE_AUTO):
+            # 타이틀
+            t_surf = big_font.render(t("game_title_tunneling"), True, ACCENT)
+            screen.blit(t_surf, (L.W // 2 - t_surf.get_width() // 2, L.title_y + 28))
 
-        # 블로흐 구
-        _draw_bloch_sphere(screen, particle, font, title_font)
+            # 시뮬레이션 영역
+            _draw_sim_area(screen, font, barrier_width)
 
-        # 통계
-        _draw_stats(screen, particle, font, tunnel_prob)
+            # 입자
+            _draw_particle(screen, particle, font)
 
-        # ── 이벤트 로그 (페이지네이션) ──
-        if event_log:
-            page_items, history_page, total_pages = paginate(event_log, history_page)
-            title_text = t("tn_event_log")
-            if total_pages > 1:
-                title_text += f"  ({history_page + 1}/{total_pages})"
-            lt = font.render(title_text, True, ACCENT)
-            screen.blit(lt, (L.log_x, L.log_y))
-            for li, (entry, is_tunnel) in enumerate(page_items):
-                clr = TUNNEL_FLASH if is_tunnel else TEXT_CLR
-                es = font.render(f"  {entry}", True, clr)
-                screen.blit(es, (L.log_x, L.log_y + 16 + li * 14))
+            # 블로흐 구
+            _draw_bloch_sphere(screen, particle, font, title_font)
 
-        # 슬라이더 패널 그리기
-        panel.draw(screen, font)
+            # 통계
+            _draw_stats(screen, particle, font, tunnel_prob)
 
-        # 안내
-        hints = [
-            t(
-                "hint_speed_info",
-                speed=speed_mult,
-                width=barrier_width,
-                prob=tunnel_prob * 100,
-                pause_state=t("paused") if paused else t("running_state"),
-            ),
-            t("hint_click_launch"),
-            t("hint_pause_reset"),
-        ]
-        for i, h in enumerate(hints):
-            surf = font.render(h, True, TEXT_CLR)
-            screen.blit(surf, (SIM_LEFT, L.hint_y + i * 16))
+            # ── 이벤트 로그 (페이지네이션) ──
+            if event_log:
+                page_items, history_page, total_pages = paginate(event_log, history_page)
+                title_text = t("tn_event_log")
+                if total_pages > 1:
+                    title_text += f"  ({history_page + 1}/{total_pages})"
+                lt = font.render(title_text, True, ACCENT)
+                screen.blit(lt, (L.log_x, L.log_y))
+                for li, (entry, is_tunnel) in enumerate(page_items):
+                    clr = TUNNEL_FLASH if is_tunnel else TEXT_CLR
+                    es = font.render(f"  {entry}", True, clr)
+                    screen.blit(es, (L.log_x, L.log_y + 16 + li * 14))
+
+            # 슬라이더 패널
+            panel.draw(screen, font)
+
+            # Step 모드 상태 표시
+            if mode == MODE_STEP and step_waiting:
+                wait_surf = info_font.render(t("tn_step_waiting"), True, ACCENT)
+                screen.blit(wait_surf,
+                            (SIM_LEFT + SIM_W // 2 - wait_surf.get_width() // 2,
+                             SIM_TOP + SIM_H + 5))
+
+            # 힌트
+            if mode == MODE_STEP:
+                hints = [t("tn_hint_step_1"), t("tn_hint_step_2")]
+            else:
+                hints = [t("tn_hint_auto_1"), t("tn_hint_auto_2")]
+            for i, h in enumerate(hints):
+                surf = info_font.render(h, True, TEXT_CLR)
+                screen.blit(surf, (SIM_LEFT, L.hint_y + i * 16))
+
+        elif mode == MODE_COMPARE:
+            _draw_compare_mode(screen, font, title_font, info_font, cmp)
+
+            # 힌트
+            hints = [t("tn_hint_compare_1"), t("tn_hint_compare_2")]
+            for i, h in enumerate(hints):
+                surf = info_font.render(h, True, TEXT_CLR)
+                screen.blit(surf, (SIM_LEFT, L.hint_y + i * 16))
 
         # 알림 메시지 (페이드 아웃)
         if notify_timer > 0:
