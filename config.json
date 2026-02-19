@@ -209,6 +209,11 @@
       "grover": {
         "default_qubits": 3,
         "animation_speed": 0.8
+      },
+      "shor": {
+        "default_number": 15,
+        "animation_speed": 0.8,
+        "rsa_default_difficulty": 0
       }
     },
     "normal": {
@@ -239,6 +244,11 @@
       "grover": {
         "default_qubits": 4,
         "animation_speed": 0.5
+      },
+      "shor": {
+        "default_number": 91,
+        "animation_speed": 0.5,
+        "rsa_default_difficulty": 1
       }
     },
     "hard": {
@@ -269,6 +279,11 @@
       "grover": {
         "default_qubits": 6,
         "animation_speed": 0.3
+      },
+      "shor": {
+        "default_number": 437,
+        "animation_speed": 0.3,
+        "rsa_default_difficulty": 3
       }
     }
   },

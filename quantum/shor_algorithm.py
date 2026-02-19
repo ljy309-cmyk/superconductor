@@ -15,10 +15,12 @@ import pygame
 from achievement_toast import AchievementToast
 from config_loader import cfg
 from game_base import finalize_session
+from difficulty_dialog import choose_difficulty
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
 from perf_monitor import PerfMonitor
+from presets import get_preset
 from quantum.shor_algorithm_engine import (
     PHASE_DESCRIPTIONS,
     QKD_MOTIVATION_MESSAGE,
@@ -100,6 +102,7 @@ MODE_NAMES = ["Step-by-Step", "Auto Run", "RSA Threat"]
 class UIState:
     """UI 전체 상태."""
     mode: int = MODE_STEP
+    difficulty: str = "normal"
     t: float = 0.0
     start_time: float = field(default_factory=time.time)
 
@@ -664,7 +667,24 @@ def run_simulation():
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
     info_font = pygame.font.SysFont("Consolas", 11)
 
+    # 난이도 선택
+    chosen = choose_difficulty(screen, font)
+    if chosen is None:
+        on_theme_change(_load_theme_colors)  # cleanup
+        pygame.quit()
+        return
+    preset = get_preset(chosen)
+    shor_preset = preset.get("shor", {})
+    default_number = shor_preset.get("default_number", 15)
+    anim_speed = shor_preset.get("animation_speed", ANIMATION_SPEED)
+    rsa_diff = shor_preset.get("rsa_default_difficulty", RSA_DEFAULT_DIFFICULTY)
+
     ui = UIState()
+    ui.difficulty = chosen
+    ui.shor = ShorState(number=default_number)
+    ui.input_buffer = str(default_number)
+    ui.auto_interval = anim_speed
+    ui.rsa_difficulty = rsa_diff
     # 초기 상태 시작
     shor_step(ui.shor)  # INPUT → CLASSICAL_PRECHECK
 
@@ -738,6 +758,14 @@ def run_simulation():
                 elif event.key == pygame.K_n:
                     # 숫자 입력 활성화
                     ui.input_active = True
+
+                # ── 프리셋 키 (1/2/3) ──
+                elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3):
+                    _apply_difficulty(ui, {
+                        pygame.K_1: "easy",
+                        pygame.K_2: "normal",
+                        pygame.K_3: "hard",
+                    }[event.key], snd)
 
                 # ── Step 모드 키 ──
                 elif ui.mode == MODE_STEP:
@@ -869,6 +897,12 @@ def run_simulation():
             screen.blit(hs, (WIDTH // 2 - hs.get_width() // 2,
                              HEIGHT - 38 + i * 16))
 
+        # 난이도 뱃지
+        diff_colors = {"easy": GREEN, "normal": YELLOW, "hard": RED}
+        badge_clr = diff_colors.get(ui.difficulty, TEXT_CLR)
+        badge = info_font.render(f"[{ui.difficulty.upper()}]", True, badge_clr)
+        screen.blit(badge, (WIDTH - badge.get_width() - 8, HEIGHT - 16))
+
         # 오버레이
         toast.update(dt)
         toast.draw(screen, info_font)
@@ -907,6 +941,35 @@ def run_simulation():
         snd=snd,
         theme_callback=_load_theme_colors,
     )
+
+
+def _apply_difficulty(ui, name, snd):
+    """프리셋 난이도 적용 (1/2/3 키)."""
+    preset = get_preset(name)
+    shor_preset = preset.get("shor", {})
+    if not shor_preset:
+        return
+
+    default_number = shor_preset.get("default_number", 15)
+    anim_speed = shor_preset.get("animation_speed", ANIMATION_SPEED)
+    rsa_diff = shor_preset.get("rsa_default_difficulty", RSA_DEFAULT_DIFFICULTY)
+
+    ui.difficulty = name
+    ui.auto_interval = anim_speed
+    ui.rsa_difficulty = rsa_diff
+    ui.auto_running = False
+
+    # 현재 모드에 맞게 리셋
+    if ui.mode == MODE_RSA:
+        setup_rsa_demo(ui.shor, ui.rsa_difficulty)
+        ui.rsa_phase = 0
+    else:
+        ui.shor = ShorState(number=default_number)
+        ui.input_buffer = str(default_number)
+        reset_state(ui.shor, default_number)
+        shor_step(ui.shor)
+
+    snd.play("click")
 
 
 def _submit_input(ui, snd):
