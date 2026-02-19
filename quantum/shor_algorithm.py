@@ -424,6 +424,31 @@ def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h,
             screen.blit(xn_label, (xn_x, y + h - 2))
 
 
+def _draw_bar_pattern(screen, rect, clr, tier):
+    """막대에 패턴을 그려 색상 외에도 시각적으로 구분.
+
+    tier: "high" → 수평선, "mid" → 대각선, "low" → 패턴 없음
+    """
+    bx, by, bw, bh = rect
+    if bh < 4 or bw < 2:
+        return
+    # 패턴 색상: 원색을 밝게/어둡게 변형
+    pc = tuple(min(255, c + 60) for c in clr[:3])
+    if tier == "high":
+        spacing = 4
+        for ly in range(by + 2, by + bh - 1, spacing):
+            pygame.draw.line(screen, pc, (bx, ly), (bx + bw - 1, ly))
+    elif tier == "mid":
+        spacing = 5
+        for offset in range(-bh, bw + bh, spacing):
+            x1 = bx + max(0, offset)
+            y1 = by + max(0, -offset)
+            x2 = bx + min(bw - 1, offset + bh)
+            y2 = by + min(bh - 1, -offset + bw)
+            if x1 <= bx + bw - 1 and y1 <= by + bh - 1:
+                pygame.draw.line(screen, pc, (x1, y1), (x2, y2))
+
+
 def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h,
                         visible_count=0):
     """QFT 확률 분포 히스토그램 (막대가 하나씩 나타나는 애니메이션)."""
@@ -444,31 +469,36 @@ def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h,
         if bar_idx >= show:
             break
         bx = x + 10 + bar_idx * bar_w
+        bw = max(1, bar_w - 1)
         bar_h = int((h - 30) * amplitudes[i] / max_val)
         by = y + h - 10 - bar_h
 
         if amplitudes[i] > max_val * 0.5:
             clr = YELLOW
+            tier = "high"
         elif amplitudes[i] > max_val * 0.1:
             clr = PURPLE
+            tier = "mid"
         else:
             clr = OVERLAY_CLR
+            tier = "low"
 
-        pygame.draw.rect(screen, clr, (bx, by, max(1, bar_w - 1), bar_h))
+        pygame.draw.rect(screen, clr, (bx, by, bw, bar_h))
+        _draw_bar_pattern(screen, (bx, by, bw, bar_h), clr, tier)
         bar_idx += 1
 
     label = font.render("QFT Probability Distribution", True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
 
     # ── 범례 (legend) ──
-    legend_items = [
-        (YELLOW, t("shor_qft_legend_high")),
-        (PURPLE, t("shor_qft_legend_mid")),
-        (OVERLAY_CLR, t("shor_qft_legend_low")),
+    _LEGEND = [
+        (YELLOW, "high", t("shor_qft_legend_high")),
+        (PURPLE, "mid", t("shor_qft_legend_mid")),
+        (OVERLAY_CLR, "low", t("shor_qft_legend_low")),
     ]
     lx = x + w - 10
     ly = y + 4
-    for clr, lbl in reversed(legend_items):
+    for clr, tier, lbl in reversed(_LEGEND):
         ls = font.render(lbl, True, clr)
         lx -= ls.get_width()
         screen.blit(ls, (lx, ly))
@@ -476,6 +506,8 @@ def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h,
         sw_y = ly + ls.get_height() // 2 - swatch_size // 2
         lx -= swatch_size + 4
         pygame.draw.rect(screen, clr, (lx, sw_y, swatch_size, swatch_size))
+        _draw_bar_pattern(screen, (lx, sw_y, swatch_size, swatch_size),
+                          clr, tier)
         lx -= 12
 
 
