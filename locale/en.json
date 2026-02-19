@@ -185,6 +185,13 @@
   "grover_compare_quantum": "Grover: O(√N)",
   "grover_compare_speedup": "Speedup: {ratio}×",
   "grover_quantum_advantage": "Grover's algorithm provides a quadratic speedup for unstructured search. While a classical computer needs O(N) queries to find a marked item in a database of N entries, Grover's algorithm needs only O(√N) quantum queries. This is provably optimal — no quantum algorithm can do better for unstructured search.",
+  "grover_chart_prob_evolution": "Target P(x) vs Iteration",
+  "grover_result_found": "Found |{result}⟩ in {iter} iterations!",
+  "grover_result_not_target": "Measured |{result}⟩ — not a target",
+  "grover_compare_found": "FOUND!",
+  "grover_compare_hint_db": "↑/↓: Database size (current: {n} qubits)",
+  "grover_compare_stat_classical": "Classical search: O(N) = O({N}) → ~{N} queries",
+  "grover_compare_stat_quantum": "Grover search: O(√N) = O(√{N}) → ~{opt} queries",
 
   "btn_qubit_chain": "3-1. Qubit Entanglement Cascade",
   "btn_tunneling": "3-2. Quantum Superposition & Tunneling",

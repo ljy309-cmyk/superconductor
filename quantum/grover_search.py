@@ -236,7 +236,7 @@ def _draw_probability_evolution(screen, prob_history, font, x, y, w, h):
     for px, py_val in points:
         pygame.draw.circle(screen, YELLOW, (px, py_val), 3)
 
-    label = font.render("Target P(x) vs Iteration", True, TEXT_CLR)
+    label = font.render(t("grover_chart_prob_evolution"), True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
 
 
@@ -415,7 +415,8 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
     # 최종 결과
     if grover.phase == GroverPhase.SUCCESS:
         result = title_font.render(
-            f"Found |{grover.measured}⟩ in {grover.current_iteration} iterations!",
+            t("grover_result_found", result=grover.measured,
+              iter=grover.current_iteration),
             True, GREEN)
         screen.blit(result, (WIDTH // 2 - result.get_width() // 2, 405))
         if grover.comparison:
@@ -429,7 +430,8 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
                         (WIDTH // 2 - speedup.get_width() // 2, 432))
     elif grover.phase == GroverPhase.FAIL:
         result = title_font.render(
-            f"Measured |{grover.measured}⟩ — not a target", True, RED)
+            t("grover_result_not_target", result=grover.measured),
+            True, RED)
         screen.blit(result, (WIDTH // 2 - result.get_width() // 2, 405))
 
     # 탐색 히스토리
@@ -505,7 +507,8 @@ def _draw_auto_mode(screen, ui, font, title_font, info_font):
     # 결과
     if grover.phase == GroverPhase.SUCCESS:
         result = title_font.render(
-            f"Found |{grover.measured}⟩ in {grover.current_iteration} iterations!",
+            t("grover_result_found", result=grover.measured,
+              iter=grover.current_iteration),
             True, GREEN)
         screen.blit(result, (WIDTH // 2 - result.get_width() // 2, 420))
 
@@ -556,11 +559,11 @@ def _draw_compare_mode(screen, ui, font, title_font, info_font):
 
     # 완료 마커
     if ui.compare_classical_done:
-        done_c = font.render("FOUND!", True, RED)
+        done_c = font.render(t("grover_compare_found"), True, RED)
         screen.blit(done_c, (track_x + track_w - 55,
                              track_y_classical + 2))
     if ui.compare_quantum_done:
-        done_q = font.render("FOUND!", True, GREEN)
+        done_q = font.render(t("grover_compare_found"), True, GREEN)
         screen.blit(done_q, (track_x + track_w - 55,
                              track_y_quantum + 2))
 
@@ -571,8 +574,8 @@ def _draw_compare_mode(screen, ui, font, title_font, info_font):
 
         speedup = n_states / max(1, opt_iter)
         stats = [
-            f"Classical search: O(N) = O({n_states}) → ~{n_states} queries",
-            f"Grover search: O(√N) = O(√{n_states}) → ~{opt_iter} queries",
+            t("grover_compare_stat_classical", N=n_states),
+            t("grover_compare_stat_quantum", N=n_states, opt=opt_iter),
             t("grover_compare_speedup", ratio=f"{speedup:.1f}"),
         ]
         for i, line in enumerate(stats):
@@ -591,7 +594,7 @@ def _draw_compare_mode(screen, ui, font, title_font, info_font):
 
     # 하단 힌트
     hint = info_font.render(
-        f"↑/↓: Database size (current: {n_qubits} qubits)", True, SUBTEXT)
+        t("grover_compare_hint_db", n=n_qubits), True, SUBTEXT)
     screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, HEIGHT - 55))
 
 
@@ -911,8 +914,9 @@ def _submit_input(ui, snd):
         n_qubits = int(ui.input_buffer)
         if n_qubits < 1:
             n_qubits = 1
-        if n_qubits > 10:
-            n_qubits = 10
+        max_q = cfg("grover", "max_qubits", 10)
+        if n_qubits > max_q:
+            n_qubits = max_q
 
         # 대상 파싱 (쉼표 구분)
         parts = ui.input_target_buffer.replace(" ", "").split(",")

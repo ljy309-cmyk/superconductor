@@ -123,7 +123,11 @@
     "qa_ghz_rounds": 100,
     "all_modules_count": 6,
     "shor_large_number": 100,
-    "shor_speed_run_sec": 30
+    "shor_speed_run_sec": 30,
+    "grover_large_db": 6,
+    "grover_speed_run_sec": 30,
+    "grover_multi_search": 5,
+    "grover_perfect_prob": 0.9
   },
   "entanglement": {
     "chsh_shots": 200,

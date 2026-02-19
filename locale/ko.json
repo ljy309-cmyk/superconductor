@@ -185,6 +185,13 @@
   "grover_compare_quantum": "Grover: O(√N)",
   "grover_compare_speedup": "속도 향상: {ratio}배",
   "grover_quantum_advantage": "Grover 알고리즘은 비정형 탐색에 2차 속도 향상을 제공합니다. 고전 컴퓨터가 N개 항목에서 마킹된 항목을 찾으려면 O(N) 쿼리가 필요하지만, Grover 알고리즘은 O(√N) 양자 쿼리만 필요합니다. 이것은 증명 가능한 최적값으로, 비정형 탐색에서 이보다 빠른 양자 알고리즘은 존재하지 않습니다.",
+  "grover_chart_prob_evolution": "목표 P(x) vs 반복",
+  "grover_result_found": "|{result}⟩ 발견 — {iter}회 반복!",
+  "grover_result_not_target": "|{result}⟩ 측정 — 대상 아님",
+  "grover_compare_found": "발견!",
+  "grover_compare_hint_db": "↑/↓: DB 크기 (현재: {n} 큐빗)",
+  "grover_compare_stat_classical": "고전 탐색: O(N) = O({N}) → ~{N}회 쿼리",
+  "grover_compare_stat_quantum": "Grover 탐색: O(√N) = O(√{N}) → ~{opt}회 쿼리",
 
   "btn_qubit_chain": "3-1. 큐비트 연쇄 붕괴 (Entanglement Cascade)",
   "btn_tunneling": "3-2. 양자 중첩 및 터널링 (Tunneling)",
