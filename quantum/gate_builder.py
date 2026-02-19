@@ -12,14 +12,18 @@ import time
 
 import pygame
 
-from achievement_toast import AchievementToast
 from config_loader import cfg
+from difficulty_dialog import choose_difficulty
+from quantum.ui_common import (
+    HISTORY_PAGE_SIZE,
+    draw_bar_pattern as _draw_bar_pattern,
+    paginate,
+)
 from game_base import finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
-from perf_monitor import PerfMonitor
-from tutorial import TutorialOverlay
+from presets import get_preset
 from quantum.gate_builder_engine import (
     ALL_GATES,
     GATE_INFO,
@@ -32,7 +36,7 @@ from replay import ReplayRecorder
 from sim_speed import speed_label
 from sound_manager import get_sound_manager
 from theme import get_pg_theme as _get_pg_theme_init
-from theme import load_pg_colors, on_theme_change
+from theme import is_reduced_motion, load_pg_colors, on_theme_change
 
 _log = get_module_logger("gate_builder")
 
@@ -74,29 +78,71 @@ def _load_theme_colors():
 
 
 # ── 레이아웃 ─────────────────────────────────────────
-CIRCUIT_X = 40
-CIRCUIT_Y = 100
-WIRE_SPACING = 60
-GATE_SIZE = 40
-GATE_SPACING = 55
 
-PALETTE_X = 40
-PALETTE_Y = 30
-PALETTE_GAP = 52
 
-PROB_X = 580
-PROB_Y = 100
-PROB_W = 140
-PROB_H = 180
+class Layout:
+    """해상도 기반 레이아웃 좌표 계산.
 
-BLOCH_CX = 720
-BLOCH_CY = 400
-BLOCH_R = 70
+    기준 해상도 900×600에 대한 비례식으로 좌표를 산출합니다.
+    """
 
-HIST_X = 580
-HIST_Y = 310
-HIST_W = 140
-HIST_H = 100
+    def __init__(self, w: int = 900, h: int = 600):
+        self.W = w
+        self.H = h
+        sx = w / 900
+        sy = h / 600
+
+        # 게이트 팔레트
+        self.palette_x = int(40 * sx)
+        self.palette_y = int(30 * sy)
+        self.palette_gap = int(52 * sx)
+        self.gate_size = int(40 * min(sx, sy))
+
+        # 회로
+        self.circuit_x = int(40 * sx)
+        self.circuit_y = int(100 * sy)
+        self.wire_spacing = int(60 * sy)
+        self.gate_spacing = int(55 * sx)
+
+        # 확률 바
+        self.prob_x = int(580 * sx)
+        self.prob_y = int(100 * sy)
+        self.prob_w = int(140 * sx)
+        self.prob_h = int(180 * sy)
+
+        # 블로흐 구
+        self.bloch_cx = int(720 * sx)
+        self.bloch_cy = int(400 * sy)
+        self.bloch_r = int(70 * min(sx, sy))
+
+        # 측정 히스토그램
+        self.hist_x = int(580 * sx)
+        self.hist_y = int(310 * sy)
+        self.hist_w = int(140 * sx)
+        self.hist_h = int(100 * sy)
+
+        # 타이틀 & 하단
+        self.title_y = int(6 * sy)
+        self.hint_x = int(12 * sx)
+        self.hint_y = h - int(36 * sy)
+        self.notify_y = h - int(54 * sy)
+        self.count_offset_y = int(10 * sy)
+
+        # 측정 기록
+        self.log_x = int(580 * sx)
+        self.log_y = int(430 * sy)
+
+        # 난이도 뱃지
+        self.badge_y = h - int(16 * sy)
+
+
+_layout = Layout()
+
+
+def _rebuild_layout(w: int, h: int):
+    """리사이즈 시 레이아웃 재계산."""
+    global _layout
+    _layout = Layout(w, h)
 
 
 def run_simulation():
@@ -104,7 +150,7 @@ def run_simulation():
     _load_theme_colors()
     on_theme_change(_load_theme_colors)
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption(t("game_title_gate_builder"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 13)
@@ -112,15 +158,25 @@ def run_simulation():
     small_font = pygame.font.SysFont("Consolas", 11)
     gate_font = pygame.font.SysFont("Consolas", 14, bold=True)
 
+    # 난이도 선택
+    chosen = choose_difficulty(screen, font)
+    if chosen is None:
+        on_theme_change(_load_theme_colors)
+        pygame.quit()
+        return
+    preset = get_preset(chosen)
+    gb_preset = preset.get("gate_builder", {})
+    num_qubits = gb_preset.get("num_qubits", NUM_QUBITS)
+    max_gates = gb_preset.get("max_gates", MAX_GATES)
+    difficulty = chosen
+
     help_overlay = HelpOverlay("gate_builder")
-    toast = AchievementToast()
-    tutorial = TutorialOverlay("gate_builder")
-    perf = PerfMonitor(target_fps=FPS)
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("gate_builder")
 
-    qc = QuantumCircuit(NUM_QUBITS)
+    qc = QuantumCircuit(num_qubits)
+    qc.max_gates = max_gates
     selected_gate: str | None = None
     hover_gate: str | None = None
     measure_counts: dict[int, int] = {}
@@ -129,19 +185,28 @@ def run_simulation():
     start_time = time.time()
     running = True
 
+    # 알림 / 페이지네이션
+    notify_msg = ""
+    notify_timer = 0.0
+    history_page = 0
+    measure_log: list[str] = []
+
+    def _notify(msg: str, duration: float = 2.0):
+        nonlocal notify_msg, notify_timer
+        notify_msg = msg
+        notify_timer = duration
+
     # 팔레트 버튼 위치 계산
+    L = _layout
     palette_rects: dict[str, pygame.Rect] = {}
     for i, g in enumerate(ALL_GATES):
-        px = PALETTE_X + i * PALETTE_GAP
-        palette_rects[g] = pygame.Rect(px, PALETTE_Y, GATE_SIZE, GATE_SIZE)
+        px = L.palette_x + i * L.palette_gap
+        palette_rects[g] = pygame.Rect(px, L.palette_y, L.gate_size, L.gate_size)
 
     while running:
-        raw_dt = clock.tick(FPS) / 1000.0
-        perf.tick(raw_dt)
+        clock.tick(FPS)
 
         for event in pygame.event.get():
-            if tutorial.handle_event(event):
-                continue
             help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
@@ -153,23 +218,43 @@ def run_simulation():
                 elif event.key == pygame.K_BACKSPACE:
                     qc.remove_last_gate()
                     qc.run()
-                    snd.play("click")
+                    _notify(t("gb_notify_removed"), 1.0)
                 elif event.key == pygame.K_DELETE:
                     qc.clear()
                     measure_counts.clear()
+                    measure_log.clear()
                     total_measures = 0
-                    snd.play("click")
+                    history_page = 0
+                    _notify(t("gb_notify_cleared"), 1.0)
                 elif event.key == pygame.K_RETURN:
                     # 측정
                     qc.run()
                     result = qc.measure()
                     measure_counts[result] = measure_counts.get(result, 0) + 1
                     total_measures += 1
-                    snd.play("click")
+                    labels = qc.basis_labels()
+                    result_label = labels[result] if result < len(labels) else str(result)
+                    measure_log.append(result_label)
+                    _notify(t("gb_notify_measured",
+                              result=result_label), 1.0)
                 elif event.key == pygame.K_TAB:
                     bloch_qubit = (bloch_qubit + 1) % qc.num_qubits
+                elif event.key == pygame.K_PAGEUP:
+                    history_page = max(0, history_page - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    history_page += 1
                 elif event.key == pygame.K_l:
                     toggle_locale()
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode(
+                    (event.w, event.h), pygame.RESIZABLE)
+                _rebuild_layout(event.w, event.h)
+                # 팔레트 버튼 위치 재계산
+                L = _layout
+                for i, g in enumerate(ALL_GATES):
+                    px = L.palette_x + i * L.palette_gap
+                    palette_rects[g] = pygame.Rect(
+                        px, L.palette_y, L.gate_size, L.gate_size)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 # 팔레트 클릭 → 게이트 선택
@@ -182,17 +267,22 @@ def run_simulation():
 
                 # 와이어 클릭 → 게이트 배치
                 if not clicked_palette and selected_gate:
+                    L = _layout
                     for q in range(qc.num_qubits):
-                        wy = CIRCUIT_Y + q * WIRE_SPACING
-                        if abs(my - wy) < WIRE_SPACING // 2:
+                        wy = L.circuit_y + q * L.wire_spacing
+                        if abs(my - wy) < L.wire_spacing // 2:
                             if selected_gate == "CNOT":
                                 # CNOT: 첫 클릭=제어, 두번째=타겟
                                 other_q = (q + 1) % qc.num_qubits
                                 if qc.add_gate("CNOT", q, other_q):
                                     qc.run()
+                                    _notify(t("gb_notify_placed",
+                                              gate="CNOT"), 1.0)
                             else:
                                 if qc.add_gate(selected_gate, q):
                                     qc.run()
+                                    _notify(t("gb_notify_placed",
+                                              gate=selected_gate), 1.0)
                             break
 
         # 마우스 호버
@@ -210,11 +300,12 @@ def run_simulation():
         })
 
         # ── 렌더링 ───────────────────────────────────
+        L = _layout
         screen.fill(BG)
 
         # 타이틀
         title_surf = title_font.render(t("game_title_gate_builder"), True, SC_GLOW)
-        screen.blit(title_surf, (WIDTH // 2 - title_surf.get_width() // 2, 6))
+        screen.blit(title_surf, (L.W // 2 - title_surf.get_width() // 2, L.title_y))
 
         # ── 게이트 팔레트 ────────────────────────────
         for g, rect in palette_rects.items():
@@ -229,24 +320,24 @@ def run_simulation():
         desc_gate = hover_gate or selected_gate
         if desc_gate and desc_gate in GATE_INFO:
             info_surf = small_font.render(GATE_INFO[desc_gate], True, SUBTEXT_CLR)
-            screen.blit(info_surf, (PALETTE_X, PALETTE_Y + GATE_SIZE + 6))
+            screen.blit(info_surf, (L.palette_x, L.palette_y + L.gate_size + 6))
 
         # ── 회로 와이어 ──────────────────────────────
-        wire_end_x = CIRCUIT_X + max(len(qc.gates) + 2, 8) * GATE_SPACING
+        wire_end_x = L.circuit_x + max(len(qc.gates) + 2, 8) * L.gate_spacing
         for q in range(qc.num_qubits):
-            wy = CIRCUIT_Y + q * WIRE_SPACING
-            pygame.draw.line(screen, WIRE_COLOR, (CIRCUIT_X, wy), (min(wire_end_x, 540), wy), 2)
+            wy = L.circuit_y + q * L.wire_spacing
+            pygame.draw.line(screen, WIRE_COLOR, (L.circuit_x, wy), (min(wire_end_x, int(540 * L.W / 900)), wy), 2)
             # 큐비트 라벨
             q_label = small_font.render(f"q{q}: |0⟩", True, TEXT_CLR)
-            screen.blit(q_label, (CIRCUIT_X - 38, wy - 6))
+            screen.blit(q_label, (L.circuit_x - 38, wy - 6))
 
         # ── 배치된 게이트 ────────────────────────────
         for i, gate in enumerate(qc.gates):
-            gx = CIRCUIT_X + (i + 1) * GATE_SPACING
+            gx = L.circuit_x + (i + 1) * L.gate_spacing
             if gate.name == "CNOT":
                 # 제어 큐비트: 점
-                cy = CIRCUIT_Y + gate.qubit * WIRE_SPACING
-                ty = CIRCUIT_Y + gate.target * WIRE_SPACING
+                cy = L.circuit_y + gate.qubit * L.wire_spacing
+                ty = L.circuit_y + gate.target * L.wire_spacing
                 pygame.draw.line(screen, GATE_BORDER, (gx, cy), (gx, ty), 2)
                 pygame.draw.circle(screen, GATE_BORDER, (gx, cy), 5)
                 # 타겟 큐비트: ⊕
@@ -254,8 +345,8 @@ def run_simulation():
                 pygame.draw.line(screen, GATE_BORDER, (gx - 8, ty), (gx + 8, ty), 2)
                 pygame.draw.line(screen, GATE_BORDER, (gx, ty - 8), (gx, ty + 8), 2)
             else:
-                gy = CIRCUIT_Y + gate.qubit * WIRE_SPACING
-                rect = pygame.Rect(gx - GATE_SIZE // 2, gy - GATE_SIZE // 2, GATE_SIZE, GATE_SIZE)
+                gy = L.circuit_y + gate.qubit * L.wire_spacing
+                rect = pygame.Rect(gx - L.gate_size // 2, gy - L.gate_size // 2, L.gate_size, L.gate_size)
                 pygame.draw.rect(screen, GATE_BG, rect, border_radius=4)
                 pygame.draw.rect(screen, GATE_BORDER, rect, 2, border_radius=4)
                 label = gate_font.render(gate.name, True, GATE_TEXT)
@@ -272,6 +363,20 @@ def run_simulation():
         # ── 블로흐 구 ────────────────────────────────
         _draw_bloch_sphere(screen, small_font, qc, bloch_qubit)
 
+        # ── 측정 기록 (페이지네이션) ──────────────────
+        if measure_log:
+            page_items, history_page, total_pages = paginate(measure_log, history_page)
+            pg_start = history_page * HISTORY_PAGE_SIZE
+            title_text = t("gb_measure_log")
+            if total_pages > 1:
+                title_text += f"  ({history_page + 1}/{total_pages})"
+            lt = small_font.render(title_text, True, SC_GLOW)
+            screen.blit(lt, (L.log_x, L.log_y))
+            for li, entry in enumerate(page_items):
+                idx = pg_start + li + 1
+                es = small_font.render(f"  #{idx}: |{entry}⟩", True, TEXT_CLR)
+                screen.blit(es, (L.log_x, L.log_y + 16 + li * 14))
+
         # ── 하단 안내 ────────────────────────────────
         hints = [
             t("gb_hint_line1"),
@@ -279,30 +384,38 @@ def run_simulation():
         ]
         for i, hint in enumerate(hints):
             surf = small_font.render(hint, True, SUBTEXT_CLR)
-            screen.blit(surf, (12, HEIGHT - 36 + i * 16))
+            screen.blit(surf, (L.hint_x, L.hint_y + i * 16))
 
         # 게이트 수 표시
         count_text = small_font.render(
-            t("gb_gate_count", count=len(qc.gates), max=MAX_GATES), True, TEXT_CLR
+            t("gb_gate_count", count=len(qc.gates), max=max_gates), True, TEXT_CLR
         )
-        screen.blit(count_text, (CIRCUIT_X, CIRCUIT_Y + qc.num_qubits * WIRE_SPACING + 10))
+        screen.blit(count_text, (L.circuit_x, L.circuit_y + qc.num_qubits * L.wire_spacing + L.count_offset_y))
 
-        # ── 오버레이 ──
-        toast.update(raw_dt)
-        toast.draw(screen, small_font)
-        toast.draw_history(screen, small_font)
-        help_overlay.draw(screen, small_font)
-        tutorial.draw(screen, font)
-        perf.draw_overlay(screen, small_font, x=WIDTH - 250, y=4)
+        # 난이도 뱃지
+        diff_colors = {"easy": (166, 227, 161), "normal": (249, 226, 175), "hard": (243, 139, 168)}
+        badge_clr = diff_colors.get(difficulty, TEXT_CLR)
+        badge = small_font.render(f"[{difficulty.upper()}]", True, badge_clr)
+        screen.blit(badge, (L.W - badge.get_width() - 8, L.badge_y))
 
+        # 알림 메시지 (페이드 아웃)
+        if notify_timer > 0:
+            notify_timer -= clock.get_time() / 1000.0
+            ns = small_font.render(notify_msg, True, SC_GLOW)
+            if not is_reduced_motion():
+                alpha = min(255, int(255 * min(1.0, notify_timer / 0.3)))
+                ns.set_alpha(alpha)
+            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
+
+        help_overlay.draw(screen, font)
         pygame.display.flip()
 
-    perf.log_summary()
     play_time = round(time.time() - start_time, 1)
     finalize_session(
         "gate_builder",
         {
             "play_time": play_time,
+            "difficulty": difficulty,
             "gates_used": len(qc.gates),
             "total_measures": total_measures,
         },
@@ -313,9 +426,12 @@ def run_simulation():
     )
 
 
+
+
 def _draw_prob_bars(screen, font, probs, labels):
     """확률 막대 그래프."""
-    x, y, w, h = PROB_X, PROB_Y, PROB_W, PROB_H
+    L = _layout
+    x, y, w, h = L.prob_x, L.prob_y, L.prob_w, L.prob_h
     title = font.render(t("gb_probabilities"), True, TEXT_CLR)
     screen.blit(title, (x, y - 16))
 
@@ -330,6 +446,9 @@ def _draw_prob_bars(screen, font, probs, labels):
         fill_w = int(prob * w)
         if fill_w > 0:
             pygame.draw.rect(screen, PROB_BAR, (x, by, fill_w, bar_h - 2), border_radius=2)
+            tier = "high" if prob > 0.3 else "mid" if prob > 0.05 else "low"
+            _draw_bar_pattern(screen, (x, by, fill_w, bar_h - 2),
+                              PROB_BAR, tier)
         # 라벨
         lbl = font.render(f"{label} {prob:.1%}", True, TEXT_CLR)
         screen.blit(lbl, (x + 4, by + 1))
@@ -337,7 +456,8 @@ def _draw_prob_bars(screen, font, probs, labels):
 
 def _draw_measure_hist(screen, font, counts, total, labels):
     """측정 히스토그램."""
-    x, y, w, h = HIST_X, HIST_Y, HIST_W, HIST_H
+    L = _layout
+    x, y, w, h = L.hist_x, L.hist_y, L.hist_w, L.hist_h
     title = font.render(t("gb_measurements", n=total), True, TEXT_CLR)
     screen.blit(title, (x, y - 16))
 
@@ -359,7 +479,11 @@ def _draw_measure_hist(screen, font, counts, total, labels):
         bar_h_val = int((c / max_count) * (h - 30)) if max_count > 0 else 0
         # 바
         if bar_h_val > 0:
-            pygame.draw.rect(screen, MEASURE_COLOR, (bx, y + h - 10 - bar_h_val, bar_w - 2, bar_h_val), border_radius=2)
+            bar_top = y + h - 10 - bar_h_val
+            pygame.draw.rect(screen, MEASURE_COLOR, (bx, bar_top, bar_w - 2, bar_h_val), border_radius=2)
+            tier = "high" if c == max_count else "mid"
+            _draw_bar_pattern(screen, (bx, bar_top, bar_w - 2, bar_h_val),
+                              MEASURE_COLOR, tier)
         # 라벨
         lbl = font.render(labels[i], True, SUBTEXT_CLR)
         screen.blit(lbl, (bx, y + h - 8))
@@ -367,7 +491,8 @@ def _draw_measure_hist(screen, font, counts, total, labels):
 
 def _draw_bloch_sphere(screen, font, qc, qubit):
     """블로흐 구 시각화."""
-    cx, cy, r = BLOCH_CX, BLOCH_CY, BLOCH_R
+    L = _layout
+    cx, cy, r = L.bloch_cx, L.bloch_cy, L.bloch_r
 
     title = font.render(t("gb_bloch", q=qubit), True, TEXT_CLR)
     screen.blit(title, (cx - title.get_width() // 2, cy - r - 20))

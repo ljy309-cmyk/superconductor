@@ -13,6 +13,12 @@ from dataclasses import dataclass, field
 import pygame
 
 from achievement_toast import AchievementToast
+from quantum.ui_common import (
+    HISTORY_PAGE_SIZE,
+    draw_bar_pattern as _draw_bar_pattern,
+    paginate,
+    render_notify,
+)
 from achievements import check_achievements
 from config_loader import cfg
 from game_base import choose_difficulty_or_quit, finalize_session
@@ -27,7 +33,7 @@ from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from sound_manager import get_sound_manager
-from theme import load_pg_colors, on_theme_change
+from theme import is_reduced_motion, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
@@ -102,6 +108,56 @@ NODE_RADIUS = cfg("qubit_chain", "node_radius", 28)
 PULSE_MAX = 8  # 글로우 펄스 최대 크기
 
 
+# ── 레이아웃 ─────────────────────────────────────────
+
+
+class Layout:
+    """해상도 기반 레이아웃 좌표 계산.
+
+    기준 해상도 900×600에 대한 비례식으로 좌표를 산출합니다.
+    """
+
+    def __init__(self, w: int = 900, h: int = 600):
+        self.W = w
+        self.H = h
+        sx = w / 900
+        sy = h / 600
+
+        # 네트워크 중심
+        self.net_cx = w // 2
+        self.net_cy = h // 2 + int(20 * sy)
+        self.ring_r = int(cfg("qubit_chain", "ring_radius", 150) * min(sx, sy))
+
+        # 하중 바 패널
+        self.panel_x = int(15 * sx)
+        self.panel_y = int(50 * sy)
+
+        # HUD (방어막 상태)
+        self.hud_x = int(720 * sx)
+        self.hud_y = int(50 * sy)
+
+        # 타이틀
+        self.title_y = int(12 * sy)
+
+        # 알림
+        self.notify_y = h - int(88 * sy)
+
+        # 하단 힌트
+        self.hint_y = h - int(70 * sy)
+
+        # 퍼포먼스
+        self.perf_x = w - int(250 * sx)
+
+
+_layout = Layout()
+
+
+def _rebuild_layout(w: int, h: int):
+    """리사이즈 시 레이아웃 재계산."""
+    global _layout
+    _layout = Layout(w, h)
+
+
 # ── 게임 상태 데이터클래스 ────────────────────────────
 
 
@@ -124,6 +180,11 @@ class QubitChainState:
     ach_checked_milestones: set[int] = field(default_factory=set)
     kb_focus: int = -1
 
+    # ── 알림 / 페이지네이션 ──
+    notify_msg: str = ""
+    notify_timer: float = 0.0
+    history_page: int = 0
+
     def reset(self):
         """게임 상태 리셋 (노드 제외)."""
         self.shield_active = False
@@ -135,6 +196,13 @@ class QubitChainState:
         self.survival_time = 0.0
         self.game_over = False
         self.cascade_log.clear()
+        self.history_page = 0
+
+
+def _notify(gs: QubitChainState, msg: str, duration: float = 2.0):
+    """화면 하단 알림 표시."""
+    gs.notify_msg = msg
+    gs.notify_timer = duration
 
 
 # ── 큐비트 노드 클래스 ───────────────────────────────
@@ -202,8 +270,9 @@ class QubitNode:
 
 def _build_network() -> list[QubitNode]:
     """큐비트 네트워크 생성 (육각형 + 중앙)."""
-    cx, cy = WIDTH // 2, HEIGHT // 2 + 20
-    ring_r = cfg("qubit_chain", "ring_radius", 150)
+    L = _layout
+    cx, cy = L.net_cx, L.net_cy
+    ring_r = L.ring_r
     nodes: list[QubitNode] = []
 
     # 중앙 노드
@@ -244,13 +313,15 @@ def _draw_node(
     color = STATE_COLORS[node.state]
     cx, cy = int(node.x), int(node.y)
 
+    _rm = is_reduced_motion()
+
     # 붕괴 애니메이션: 진동
-    if node.collapsed and node.collapse_timer > 0:
+    if node.collapsed and node.collapse_timer > 0 and not _rm:
         shake = int(4 * math.sin(t * 40))
         cx += shake
 
     # QEC 방어막 글로우 (미션3)
-    if shield_active and not node.collapsed:
+    if shield_active and not node.collapsed and not _rm:
         pulse_s = int(6 + 4 * math.sin(t * 4))
         glow_surf = pygame.Surface((2 * (NODE_RADIUS + pulse_s), 2 * (NODE_RADIUS + pulse_s)), pygame.SRCALPHA)
         pygame.draw.circle(
@@ -259,7 +330,7 @@ def _draw_node(
         screen.blit(glow_surf, (cx - NODE_RADIUS - pulse_s, cy - NODE_RADIUS - pulse_s))
 
     # 글로우 펄스 (stress 비례)
-    if not node.collapsed:
+    if not node.collapsed and not _rm:
         pulse = int(PULSE_MAX * (node.stress / STRESS_THRESHOLD))
         if pulse > 0:
             glow_surf = pygame.Surface((2 * (NODE_RADIUS + pulse), 2 * (NODE_RADIUS + pulse)), pygame.SRCALPHA)
@@ -289,6 +360,16 @@ def _draw_node(
     screen.blit(state_label, (cx - state_label.get_width() // 2, cy + NODE_RADIUS + 16))
 
 
+
+
+_STATE_TIER = {
+    QubitState.COLLAPSED: "high",
+    QubitState.DANGER: "high",
+    QubitState.WARNING: "mid",
+    QubitState.STABLE: "low",
+}
+
+
 def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y: int):
     """개별 큐비트 하중 바."""
     bar_w, bar_h = 90, 10
@@ -300,6 +381,7 @@ def _draw_stress_bar(screen, node: QubitNode, font: pygame.font.Font, x: int, y:
     fill_w = int(bar_w * min(node.stress, 100) / 100)
     color = STATE_COLORS[node.state]
     pygame.draw.rect(screen, color, (bar_x, y + 2, fill_w, bar_h))
+    _draw_bar_pattern(screen, (bar_x, y + 2, fill_w, bar_h), color, _STATE_TIER[node.state])
     pygame.draw.rect(screen, TEXT_CLR, (bar_x, y + 2, bar_w, bar_h), 1)
 
     # 상태 라벨
@@ -315,7 +397,7 @@ def run_simulation():
     _load_theme_colors()
     on_theme_change(_load_theme_colors)
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption(t("game_title_qubit_chain"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
@@ -391,6 +473,11 @@ def run_simulation():
                         n.reset()
                     gs.reset()
                     panel.reset_all()
+                    _notify(gs, t("notify_reset"), 1.0)
+                elif event.key == pygame.K_PAGEUP:
+                    gs.history_page = max(0, gs.history_page - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    gs.history_page += 1
                 elif event.key == pygame.K_SPACE:
                     gs.paused = not gs.paused
                 elif event.key == pygame.K_UP:
@@ -409,6 +496,7 @@ def run_simulation():
                         gs.qec_uses += 1
                         snd.play("shield_on")
                         gs.cascade_log.append("QEC SHIELD ON!")
+                        _notify(gs, t("qc_notify_shield"), 1.5)
                 elif event.key == pygame.K_h:
                     # 힐링 (미션3)
                     if gs.heal_cooldown <= 0:
@@ -419,6 +507,8 @@ def run_simulation():
                         gs.heal_cooldown = HEAL_COOLDOWN_SEC
                         snd.play("heal")
                         gs.cascade_log.append(f"HEAL! All -{int(heal_amt)} stress")
+                        _notify(gs, t("qc_notify_healed",
+                                      amount=int(heal_amt)), 1.5)
                 elif event.key == pygame.K_n:
                     # 랜덤 큐비트에 즉시 큰 노이즈 주입
                     alive = [n for n in nodes if not n.collapsed]
@@ -441,10 +531,25 @@ def run_simulation():
                             n.stress = 0.0
                             snd.play("error_correct")
                             gs.cascade_log.append(f"Q{n.qid} 오류 정정! (stress → 0)")
+                            _notify(gs, t("qc_notify_corrected",
+                                          id=n.qid), 1.0)
                 elif event.key == pygame.K_l:
                     toggle_locale()
                 elif event.key == pygame.K_g:
                     toast.toggle_history()
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode(
+                    (event.w, event.h), pygame.RESIZABLE)
+                _rebuild_layout(event.w - PANEL_W, event.h)
+                # 네트워크 노드 위치 재계산
+                L = _layout
+                cx_new, cy_new = L.net_cx, L.net_cy
+                ring_r_new = L.ring_r
+                nodes[0].x, nodes[0].y = cx_new, cy_new
+                for i in range(6):
+                    angle = math.radians(60 * i - 90)
+                    nodes[i + 1].x = cx_new + ring_r_new * math.cos(angle)
+                    nodes[i + 1].y = cy_new + ring_r_new * math.sin(angle)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 for n in nodes:
@@ -522,23 +627,24 @@ def run_simulation():
                 }
             )
 
-        # 로그 길이 제한
-        if len(gs.cascade_log) > 8:
-            gs.cascade_log = gs.cascade_log[-8:]
+        # 알림 타이머
+        if gs.notify_timer > 0:
+            gs.notify_timer -= dt
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
 
         # 방어막 배경 글로우 (미션3)
-        if gs.shield_active:
+        if gs.shield_active and not is_reduced_motion():
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             alpha = int(12 + 8 * math.sin(gs.t * 3))
             overlay.fill((*SHIELD_GLOW, alpha))
             screen.blit(overlay, (0, 0))
 
         # 타이틀
+        L = _layout
         title_surf = title_font.render(t("game_title_qubit_chain"), True, ACCENT)
-        screen.blit(title_surf, (WIDTH // 2 - title_surf.get_width() // 2, 12))
+        screen.blit(title_surf, (L.W // 2 - title_surf.get_width() // 2, L.title_y))
 
         # 얽힘 연결선
         drawn_pairs = set()
@@ -554,24 +660,32 @@ def run_simulation():
             _draw_node(screen, n, gs.t, font, gs.shield_active, focused=(i == gs.kb_focus))
 
         # 하중 바 패널
-        panel_x, panel_y = 15, 50
+        panel_x, panel_y = L.panel_x, L.panel_y
         panel_label = info_font.render(t("qc_stress_panel"), True, ACCENT)
         screen.blit(panel_label, (panel_x, panel_y - 16))
         for i, n in enumerate(nodes):
             _draw_stress_bar(screen, n, font, panel_x, panel_y + i * 18)
 
-        # 이벤트 로그
-        log_x = 15
+        # 이벤트 로그 (페이지네이션)
+        log_x = L.panel_x
         log_y = panel_y + len(nodes) * 18 + 20
-        log_label = info_font.render(t("qc_event_log"), True, ACCENT)
-        screen.blit(log_label, (log_x, log_y - 16))
-        for i, msg in enumerate(gs.cascade_log):
-            clr = STATE_COLORS[QubitState.COLLAPSED] if "COLLAPSED" in msg else TEXT_CLR
-            surf = info_font.render(msg, True, clr)
-            screen.blit(surf, (log_x, log_y + i * 15))
+        if gs.cascade_log:
+            page_items, gs.history_page, total_pages = paginate(gs.cascade_log, gs.history_page)
+            title_text = t("qc_event_log")
+            if total_pages > 1:
+                title_text += f"  ({gs.history_page + 1}/{total_pages})"
+            log_label = info_font.render(title_text, True, ACCENT)
+            screen.blit(log_label, (log_x, log_y - 16))
+            for i, msg in enumerate(page_items):
+                clr = STATE_COLORS[QubitState.COLLAPSED] if "COLLAPSED" in msg else TEXT_CLR
+                surf = info_font.render(msg, True, clr)
+                screen.blit(surf, (log_x, log_y + i * 15))
+        else:
+            log_label = info_font.render(t("qc_event_log"), True, ACCENT)
+            screen.blit(log_label, (log_x, log_y - 16))
 
         # 방어막 상태 HUD (미션3)
-        hud_x, hud_y = 720, 50
+        hud_x, hud_y = L.hud_x, L.hud_y
         if gs.shield_active:
             shield_txt = info_font.render(t("qc_shield_on_timer", time=gs.shield_timer), True, SHIELD_GLOW)
             screen.blit(shield_txt, (hud_x, hud_y))
@@ -617,7 +731,7 @@ def run_simulation():
         ]
         for i, hint in enumerate(hints):
             surf = info_font.render(hint, True, TEXT_CLR)
-            screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 70 + i * 16))
+            screen.blit(surf, (L.W // 2 - surf.get_width() // 2, L.hint_y + i * 16))
 
         # 최종보스미션: 생존 시간 갱신
         all_collapsed = all(n.collapsed for n in nodes)
@@ -671,9 +785,14 @@ def run_simulation():
         toast.draw(screen, info_font)
         toast.draw_history(screen, info_font)
 
+        # 알림 메시지 (페이드 아웃)
+        if gs.notify_timer > 0:
+            render_notify(screen, gs.notify_msg, gs.notify_timer, info_font,
+                          ACCENT, L.W // 2, L.notify_y)
+
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, info_font)
-        perf.draw_overlay(screen, info_font, x=WIDTH - 250, y=4)
+        perf.draw_overlay(screen, info_font, x=L.perf_x, y=4)
 
         pygame.display.flip()
 

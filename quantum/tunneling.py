@@ -5,19 +5,24 @@
 """
 
 import math
-import time
 
 import pygame
 
 from achievement_toast import AchievementToast
+from achievements import check_achievements
 from config_loader import cfg
+from quantum.ui_common import (
+    HISTORY_PAGE_SIZE,
+    draw_bar_pattern as _draw_bar_pattern,
+    paginate,
+    render_notify,
+)
 from game_base import choose_difficulty_or_quit, finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
 from perf_monitor import PerfMonitor
 from preset_hud import PresetHUD
-from tutorial import TutorialOverlay
 
 # ── 물리 엔진 (순수 로직) ────────────────────────────
 from quantum.tunneling_physics import (
@@ -38,7 +43,8 @@ from quantum.tunneling_physics import (
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
-from theme import load_pg_colors, on_theme_change
+from theme import is_reduced_motion, load_pg_colors, on_theme_change
+from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("tunneling")
@@ -79,9 +85,50 @@ def _load_theme_colors():
     load_pg_colors(_COLOR_MAP, globals())
 
 
-# ── 블로흐 구 레이아웃 ────────────────────────────────
-BLOCH_CX, BLOCH_CY = 730, 280
-BLOCH_R = 110
+# ── 레이아웃 ─────────────────────────────────────────
+
+
+class Layout:
+    """해상도 기반 레이아웃 좌표 계산.
+
+    기준 해상도 900×600에 대한 비례식으로 좌표를 산출합니다.
+    """
+
+    def __init__(self, w: int = 900, h: int = 600):
+        self.W = w
+        self.H = h
+        sx = w / 900
+        sy = h / 600
+
+        # 블로흐 구
+        self.bloch_cx = int(730 * sx)
+        self.bloch_cy = int(280 * sy)
+        self.bloch_r = int(110 * min(sx, sy))
+
+        # 타이틀
+        self.title_y = int(12 * sy)
+
+        # 이벤트 로그
+        self.log_x = int(580 * sx)
+        self.log_y = int(430 * sy)
+
+        # 알림
+        self.notify_y = h - int(70 * sy)
+
+        # 하단 힌트
+        self.hint_y = h - int(52 * sy)
+
+        # 성능 모니터
+        self.perf_x = w - int(250 * sx)
+
+
+_layout = Layout()
+
+
+def _rebuild_layout(w: int, h: int):
+    """리사이즈 시 레이아웃 재계산."""
+    global _layout
+    _layout = Layout(w, h)
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
@@ -95,6 +142,7 @@ def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     # 장벽
     bx = BARRIER_X - barrier_width // 2
     pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, barrier_width, SIM_H))
+    _draw_bar_pattern(screen, (bx, SIM_TOP, barrier_width, SIM_H), BARRIER_CLR, "mid")
 
     # 장벽 라벨
     label = font.render(t("tn_barrier"), True, BG)
@@ -114,7 +162,7 @@ def _draw_particle(screen, p: QuantumParticle, font):
     time_ms = pygame.time.get_ticks()
 
     # 터널링/반사 플래시
-    if p.flash_timer > 0:
+    if p.flash_timer > 0 and not is_reduced_motion():
         flash_r = int(PARTICLE_RADIUS + 20 * p.flash_timer)
         flash_clr = TUNNEL_FLASH if p.tunneled else REFLECT_CLR
         glow = pygame.Surface((flash_r * 2, flash_r * 2), pygame.SRCALPHA)
@@ -135,50 +183,53 @@ def _draw_particle(screen, p: QuantumParticle, font):
 
 def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     """블로흐 구 시각화."""
+    L = _layout
+    BCX, BCY, BR = L.bloch_cx, L.bloch_cy, L.bloch_r
     time_ms = pygame.time.get_ticks()
 
     # 타이틀
     label = title_font.render(t("tn_bloch"), True, ACCENT)
-    screen.blit(label, (BLOCH_CX - label.get_width() // 2, BLOCH_CY - BLOCH_R - 40))
+    screen.blit(label, (BCX - label.get_width() // 2, BCY - BR - 40))
 
     # 구 외곽 (원)
-    pygame.draw.circle(screen, BLOCH_RING, (BLOCH_CX, BLOCH_CY), BLOCH_R, 1)
+    pygame.draw.circle(screen, BLOCH_RING, (BCX, BCY), BR, 1)
 
     # 적도 타원
     pygame.draw.ellipse(
         screen,
         BLOCH_RING,
-        (BLOCH_CX - BLOCH_R, BLOCH_CY - BLOCH_R // 4, BLOCH_R * 2, BLOCH_R // 2),
+        (BCX - BR, BCY - BR // 4, BR * 2, BR // 2),
         1,
     )
 
     # 축
-    pygame.draw.line(screen, OVERLAY_CLR, (BLOCH_CX, BLOCH_CY - BLOCH_R - 8), (BLOCH_CX, BLOCH_CY + BLOCH_R + 8), 1)
+    pygame.draw.line(screen, OVERLAY_CLR, (BCX, BCY - BR - 8), (BCX, BCY + BR + 8), 1)
 
     # |0⟩, |1⟩ 라벨
     z0 = font.render("|0⟩", True, TUNNEL_FLASH)
     z1 = font.render("|1⟩", True, REFLECT_CLR)
-    screen.blit(z0, (BLOCH_CX + 8, BLOCH_CY - BLOCH_R - 18))
-    screen.blit(z1, (BLOCH_CX + 8, BLOCH_CY + BLOCH_R + 4))
+    screen.blit(z0, (BCX + 8, BCY - BR - 18))
+    screen.blit(z1, (BCX + 8, BCY + BR + 4))
 
     # 상태 벡터 (θ 기반)
-    theta = p.superposition_alpha(time_ms)
-    tip_x = BLOCH_CX + int(BLOCH_R * 0.4 * math.sin(theta))
-    tip_y = BLOCH_CY - int(BLOCH_R * math.cos(theta))
+    theta = 0.0 if is_reduced_motion() else p.superposition_alpha(time_ms)
+    tip_x = BCX + int(BR * 0.4 * math.sin(theta))
+    tip_y = BCY - int(BR * math.cos(theta))
 
-    pygame.draw.line(screen, ACCENT, (BLOCH_CX, BLOCH_CY), (tip_x, tip_y), 2)
+    pygame.draw.line(screen, ACCENT, (BCX, BCY), (tip_x, tip_y), 2)
     pygame.draw.circle(screen, ACCENT, (tip_x, tip_y), 6)
 
     # 현재 상태 텍스트
     state_label = f"|{'0' if theta < math.pi / 2 else '1'}⟩  θ={math.degrees(theta):.0f}°"
     sl = font.render(state_label, True, TEXT_CLR)
-    screen.blit(sl, (BLOCH_CX - sl.get_width() // 2, BLOCH_CY + BLOCH_R + 26))
+    screen.blit(sl, (BCX - sl.get_width() // 2, BCY + BR + 26))
 
 
 def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PROB_BASE):
     """통계 패널."""
-    stats_x = BLOCH_CX - BLOCH_R
-    stats_y = BLOCH_CY + BLOCH_R + 60
+    L = _layout
+    stats_x = L.bloch_cx - L.bloch_r
+    stats_y = L.bloch_cy + L.bloch_r + 60
 
     lines = [
         (t("tn_attempts", count=p.total_attempts), TEXT_CLR),
@@ -202,7 +253,7 @@ def run_simulation():
     _load_theme_colors()
     on_theme_change(_load_theme_colors)
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption(t("game_title_tunneling"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
@@ -227,9 +278,6 @@ def run_simulation():
     }
     preset_hud = PresetHUD("tunneling", slider_map)
     help_overlay = HelpOverlay("tunneling")
-    toast = AchievementToast()
-    tutorial = TutorialOverlay("tunneling")
-    perf = PerfMonitor(target_fps=FPS)
 
     # ── 사운드 ──
     snd = get_sound_manager()
@@ -238,20 +286,33 @@ def run_simulation():
     # ── 리플레이 ──
     recorder = ReplayRecorder("tunneling")
 
+    # ── 업적 / 튜토리얼 / 성능 모니터 ──
+    toast = AchievementToast()
+    tutorial = TutorialOverlay("tunneling")
+    perf = PerfMonitor(target_fps=FPS)
+
     barrier_width = BARRIER_WIDTH_DEFAULT
     tunnel_prob = _calc_tunnel_prob(barrier_width)
+
+    # 알림 / 페이지네이션
+    notify_msg = ""
+    notify_timer = 0.0
+    history_page = 0
+    event_log: list[tuple[str, bool]] = []  # (message, is_tunnel)
+
+    def _notify(msg: str, duration: float = 2.0):
+        nonlocal notify_msg, notify_timer
+        notify_msg = msg
+        notify_timer = duration
 
     # ── 시작 시 난이도 선택 ──
     if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
 
-    start_time = time.time()
-
     running = True
     while running:
-        raw_dt = clock.tick(FPS) / 1000.0
-        dt = raw_dt
-        perf.tick(raw_dt)
+        dt = clock.tick(FPS) / 1000.0
+        perf.tick(dt)
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
@@ -269,11 +330,16 @@ def run_simulation():
                         running = False
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
-                    snd.play("click")
                 elif event.key == pygame.K_r:
                     particle = QuantumParticle()
                     panel.reset_all()
-                    snd.play("click")
+                    event_log.clear()
+                    history_page = 0
+                    _notify(t("notify_reset"), 1.0)
+                elif event.key == pygame.K_PAGEUP:
+                    history_page = max(0, history_page - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    history_page += 1
                 elif event.key == pygame.K_UP:
                     sl_speed.value = sl_speed.value + 0.5
                 elif event.key == pygame.K_DOWN:
@@ -284,6 +350,12 @@ def run_simulation():
                     sl_barrier.value = sl_barrier.value - 10
                 elif event.key == pygame.K_l:
                     toggle_locale()
+                elif event.key == pygame.K_g:
+                    toast.toggle_history()
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode(
+                    (event.w, event.h), pygame.RESIZABLE)
+                _rebuild_layout(event.w - PANEL_W, event.h)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 # 클릭으로 입자 재발사
                 particle.reset()
@@ -295,10 +367,35 @@ def run_simulation():
 
         # ── 물리 업데이트 ────────────────────────────
         if not paused:
+            prev_attempts = particle.total_attempts
             orig_vx = particle.vx
             particle.vx = orig_vx * speed_mult if orig_vx > 0 else orig_vx
             particle.update(dt, barrier_width, tunnel_prob, sl_boost.value)
             particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
+
+            # ── 이벤트 로그 ──
+            if particle.total_attempts > prev_attempts:
+                n = particle.total_attempts
+                if particle.tunneled is True:
+                    event_log.append((t("tn_notify_tunneled", n=n), True))
+                    _notify(t("tn_notify_tunneled", n=n), 1.0)
+                elif particle.tunneled is False:
+                    event_log.append((t("tn_notify_reflected", n=n), False))
+                    _notify(t("tn_notify_reflected", n=n), 1.0)
+
+                # 실시간 업적 체크
+                try:
+                    new_ach = check_achievements(
+                        "tunneling",
+                        {
+                            "tunnel_count": particle.tunnel_count,
+                            "total_attempts": particle.total_attempts,
+                            "tunnel_rate": particle.tunnel_count / max(particle.total_attempts, 1),
+                        },
+                    )
+                    toast.show_many(new_ach)
+                except (KeyError, TypeError) as e:
+                    _log.warning("실시간 업적 확인 실패: %s", e)
 
             # ── 사운드 ──
             if particle.tunneled is True and particle.flash_timer > 0.5:
@@ -321,8 +418,9 @@ def run_simulation():
         screen.fill(BG)
 
         # 타이틀
+        L = _layout
         t_surf = big_font.render(t("game_title_tunneling"), True, ACCENT)
-        screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
+        screen.blit(t_surf, (L.W // 2 - t_surf.get_width() // 2, L.title_y))
 
         # 시뮬레이션 영역
         _draw_sim_area(screen, font, barrier_width)
@@ -335,6 +433,19 @@ def run_simulation():
 
         # 통계
         _draw_stats(screen, particle, font, tunnel_prob)
+
+        # ── 이벤트 로그 (페이지네이션) ──
+        if event_log:
+            page_items, history_page, total_pages = paginate(event_log, history_page)
+            title_text = t("tn_event_log")
+            if total_pages > 1:
+                title_text += f"  ({history_page + 1}/{total_pages})"
+            lt = font.render(title_text, True, ACCENT)
+            screen.blit(lt, (L.log_x, L.log_y))
+            for li, (entry, is_tunnel) in enumerate(page_items):
+                clr = TUNNEL_FLASH if is_tunnel else TEXT_CLR
+                es = font.render(f"  {entry}", True, clr)
+                screen.blit(es, (L.log_x, L.log_y + 16 + li * 14))
 
         # 슬라이더 패널 그리기
         panel.draw(screen, font)
@@ -353,27 +464,31 @@ def run_simulation():
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
-            screen.blit(surf, (SIM_LEFT, HEIGHT - 52 + i * 16))
+            screen.blit(surf, (SIM_LEFT, L.hint_y + i * 16))
+
+        # 알림 메시지 (페이드 아웃)
+        if notify_timer > 0:
+            notify_timer -= dt
+            render_notify(screen, notify_msg, notify_timer, info_font, ACCENT,
+                          L.W // 2, L.notify_y)
 
         preset_hud.draw(screen, font)
 
-        # ── 오버레이 ──
         toast.update(dt)
         toast.draw(screen, info_font)
         toast.draw_history(screen, info_font)
+
         help_overlay.draw(screen, info_font)
-        tutorial.draw(screen, font)
-        perf.draw_overlay(screen, info_font, x=WIDTH - 250, y=4)
+        tutorial.draw(screen, info_font)
+        perf.draw_overlay(screen, info_font, x=L.perf_x, y=4)
 
         pygame.display.flip()
 
     perf.log_summary()
     rate = particle.tunnel_count / max(particle.total_attempts, 1)
-    play_time = round(time.time() - start_time, 1)
     finalize_session(
         "tunneling",
         {
-            "play_time": play_time,
             "total_attempts": particle.total_attempts,
             "tunnel_count": particle.tunnel_count,
             "reflect_count": particle.reflect_count,
@@ -382,7 +497,6 @@ def run_simulation():
             "tunnel_prob": round(tunnel_prob, 3),
         },
         recorder=recorder,
-        recorder_meta={"play_time": play_time},
         snd=snd,
         theme_callback=_load_theme_colors,
     )

@@ -846,6 +846,31 @@ def crack_rsa(state: ShorState) -> bool:
     return True
 
 
+def finalize_rsa_crack(state: ShorState) -> bool:
+    """Shor 소인수분해 완료 후 RSA 비밀키 복원 및 복호화.
+
+    crack_rsa()의 후처리 부분만 분리한 함수.
+    단계별 RSA 크래킹에서 소인수분해 성공(SUCCESS) 후 호출합니다.
+    """
+    if state.factors is None:
+        return False
+
+    p, q = state.factors
+    state.rsa.cracked_p = p
+    state.rsa.cracked_q = q
+
+    phi = (p - 1) * (q - 1)
+    d = _mod_inverse(state.rsa.rsa_e, phi)
+    if d is None:
+        return False
+
+    state.rsa.cracked_d = d
+    decrypted = mod_pow(state.rsa.ciphertext, d, state.rsa.rsa_n)
+    state.rsa.decrypted = decrypted
+    state.rsa.cracked = True
+    return True
+
+
 # ── 교육 메시지 ──────────────────────────────────────
 
 _PHASE_DESC_KEYS = {

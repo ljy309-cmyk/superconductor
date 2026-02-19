@@ -70,8 +70,23 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "center",
         },
         {
+            "title": "Bloch Sphere",
+            "text": "오른쪽 블로흐 구는 큐비트의 중첩 상태를 보여줍니다.\n벡터가 |0⟩과 |1⟩ 사이를 오갑니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Barrier & Probability",
+            "text": "장벽이 두꺼울수록 터널링 확률이 지수적으로 감소합니다.\n슬라이더로 장벽 두께를 조절해 보세요!",
+            "highlight": "none",
+        },
+        {
+            "title": "Statistics",
+            "text": "시도 횟수, 터널링/반사 수, 성공률을 추적합니다.\n업적을 달성하면 토스트 알림이 나타납니다!",
+            "highlight": "none",
+        },
+        {
             "title": "Controls",
-            "text": "클릭: 입자 재발사\nUp/Down: 속도 조절\nLeft/Right: 장벽 두께",
+            "text": "클릭: 입자 재발사  |  Space: 일시정지\nUp/Down: 속도 조절  |  Left/Right: 장벽 두께\nR: 리셋  |  L: 언어 전환  |  T: 튜토리얼",
             "highlight": "none",
         },
     ],
@@ -165,42 +180,40 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "none",
         },
     ],
-    "qec_shield": [
+    "shor_algorithm": [
         {
-            "title": "QEC Shield — Error Correction",
-            "text": "양자 오류 정정(QEC) 방어막으로 큐비트 네트워크를\n노이즈로부터 보호하는 시뮬레이션입니다.",
+            "title": "Shor's Factoring Algorithm",
+            "text": "양자 컴퓨터로 큰 수를 소인수분해하는 알고리즘입니다.\nRSA 암호를 위협하는 핵심 양자 알고리즘!",
             "highlight": "center",
         },
         {
-            "title": "Shield & Heal",
-            "text": "S: QEC 방어막 활성화 (노이즈 감소)\nH: 전체 큐비트 힐링 (stress 감소)",
+            "title": "Step 1: Classical Precheck",
+            "text": "먼저 짝수, 소수, 소수 거듭제곱 여부를 검사합니다.\n이 경우 양자 계산 없이 즉시 결과를 얻습니다.",
             "highlight": "none",
         },
         {
-            "title": "Compare Mode",
-            "text": "C: 비교 모드 (QEC/Heal 비활성화)\nQEC 없이 버틴 시간 vs QEC 사용 비교!",
+            "title": "Step 2: Modular Exponentiation",
+            "text": "임의의 a를 골라 a^x mod N을 계산합니다.\n이 수열의 주기(period)를 찾는 것이 핵심입니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Step 3: QFT & Measurement",
+            "text": "양자 푸리에 변환(QFT)으로 주기를 추출합니다.\n측정 결과에서 연분수 전개로 주기 r을 복원합니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Step 4: Factor Extraction",
+            "text": "gcd(a^(r/2) ± 1, N)으로 소인수를 추출합니다.\n실패하면 다른 a로 재시도합니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "3 Modes",
+            "text": "Tab 키로 모드를 전환합니다:\n1) Step-by-Step  2) Auto Run  3) RSA Threat",
             "highlight": "none",
         },
         {
             "title": "Controls",
-            "text": "Left/Right: QEC 감쇠 계수 조절\nR: 리셋  |  SPACE: 일시정지\n1/2/3: 난이도 프리셋",
-            "highlight": "none",
-        },
-    ],
-    "gate_builder": [
-        {
-            "title": "Quantum Gate Builder",
-            "text": "양자 회로를 시각적으로 구성하고\n실시간으로 상태 벡터를 확인합니다.",
-            "highlight": "center",
-        },
-        {
-            "title": "Build a Circuit",
-            "text": "팔레트에서 게이트를 클릭 → 와이어를 클릭하여 배치\nCNOT은 제어-타겟 큐비트 자동 연결!",
-            "highlight": "none",
-        },
-        {
-            "title": "Measurement",
-            "text": "Enter: 측정 실행 (히스토그램 갱신)\nTab: 블로흐 구 표시 큐비트 전환\nBackspace: 마지막 게이트 제거",
+            "text": "SPACE: 다음 단계/시작  |  N: 새 수 입력  |  R: 리셋\nTab: 모드 전환  |  ↑↓: 난이도/속도 조절",
             "highlight": "none",
         },
     ],

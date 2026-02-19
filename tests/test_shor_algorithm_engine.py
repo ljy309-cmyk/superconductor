@@ -20,6 +20,7 @@ from quantum.shor_algorithm_engine import (
     convergents,
     crack_rsa,
     detect_period_from_table,
+    finalize_rsa_crack,
     find_order,
     gcd,
     is_prime,
@@ -1091,6 +1092,56 @@ class TestRSAAdvanced(unittest.TestCase):
         state = ShorState()
         setup_rsa_demo(state, difficulty=999)
         self.assertGreater(state.rsa.rsa_n, 0)
+
+    def test_finalize_rsa_crack_after_shor_success(self):
+        """소인수분해 성공 후 finalize_rsa_crack으로 RSA 복호화."""
+        state = ShorState()
+        setup_rsa_demo(state, difficulty=0)
+        original = state.rsa.plaintext
+
+        # Shor 단계별 실행으로 소인수분해
+        max_iter = 200
+        for _ in range(max_iter):
+            shor_step(state)
+            if state.phase in (ShorPhase.SUCCESS, ShorPhase.DONE):
+                break
+
+        self.assertEqual(state.phase, ShorPhase.SUCCESS)
+        self.assertIsNotNone(state.factors)
+
+        # finalize_rsa_crack으로 후처리
+        success = finalize_rsa_crack(state)
+        self.assertTrue(success)
+        self.assertTrue(state.rsa.cracked)
+        self.assertEqual(state.rsa.decrypted, original)
+
+    def test_finalize_rsa_crack_without_factors_fails(self):
+        """소인수분해 미완료 시 finalize_rsa_crack은 False."""
+        state = ShorState()
+        setup_rsa_demo(state, difficulty=0)
+        state.factors = None
+
+        success = finalize_rsa_crack(state)
+        self.assertFalse(success)
+        self.assertFalse(state.rsa.cracked)
+
+    def test_finalize_rsa_crack_all_difficulties(self):
+        """모든 난이도에서 단계별 크래킹 + finalize_rsa_crack 성공."""
+        for diff in range(min(4, len(RSA_EXAMPLES))):
+            state = ShorState()
+            setup_rsa_demo(state, difficulty=diff)
+            original = state.rsa.plaintext
+
+            for _ in range(200):
+                shor_step(state)
+                if state.phase in (ShorPhase.SUCCESS, ShorPhase.DONE):
+                    break
+
+            if state.phase == ShorPhase.SUCCESS:
+                success = finalize_rsa_crack(state)
+                self.assertTrue(success, f"diff={diff}")
+                self.assertEqual(state.rsa.decrypted, original,
+                                 f"diff={diff}")
 
 
 if __name__ == "__main__":
