@@ -25,7 +25,7 @@ from quantum.shor_algorithm_engine import (
     RSA_EXAMPLES,
     ShorPhase,
     ShorState,
-    crack_rsa,
+    finalize_rsa_crack,
     get_phase_description,
     get_qkd_motivation,
     reset_state,
@@ -50,6 +50,7 @@ ANIMATION_SPEED = cfg("shor", "animation_speed", 0.6)
 QFT_DISPLAY_QUBITS = cfg("shor", "qft_display_qubits", 6)
 AUTO_BATCH_SIZE = cfg("shor", "auto_batch_size", 1)
 RSA_DEFAULT_DIFFICULTY = cfg("shor", "rsa_default_difficulty", 0)
+RSA_CRACK_SPEED = cfg("shor", "rsa_crack_speed", 0.15)
 
 # ── 색상 (테마에서 동적 로드) ────────────────────────
 BG = (30, 30, 46)
@@ -112,6 +113,7 @@ class UIState:
     rsa_difficulty: int = RSA_DEFAULT_DIFFICULTY
     rsa_phase: int = 0  # 0=setup, 1=cracking, 2=cracked, 3=qkd_message
     rsa_message: str = ""
+    rsa_crack_timer: float = 0.0
 
     # 입력
     input_buffer: str = "15"
@@ -533,9 +535,31 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
         msg = title_font.render(t("shor_rsa_press_space"), True, YELLOW)
         screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 240))
     elif ui.rsa_phase == 1:
-        # 크래킹 중
+        # 크래킹 중 — Shor 알고리즘 진행 표시
+        _draw_panel(screen, 40, 228, WIDTH - 80, 240, "", title_font, info_font)
+
         msg = title_font.render(t("shor_rsa_cracking"), True, RED)
-        screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 240))
+        screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 236))
+
+        # 진행률 바
+        progress = min(1.0, shor.phase.value / ShorPhase.DONE.value)
+        _draw_progress_bar(screen, 200, 262, WIDTH - 400, 12, progress, RED)
+
+        # 단계 인디케이터 (왼쪽)
+        _draw_phase_indicator(screen, shor.phase, info_font, 60, 286)
+
+        # 상태 메시지 (오른쪽)
+        if shor.step_message:
+            msg_lines = _wrap_text(shor.step_message, 45)
+            for i, line in enumerate(msg_lines[:3]):
+                ms = info_font.render(line, True, TEXT_CLR)
+                screen.blit(ms, (260, 290 + i * 16))
+
+        # 시도 카운터
+        if shor.attempt > 0:
+            att = info_font.render(
+                f"Attempt #{shor.attempt}  a = {shor.a}", True, TEAL)
+            screen.blit(att, (260, 345))
     elif ui.rsa_phase >= 2:
         # 크래킹 완료
         _draw_panel(screen, 40, 230, WIDTH - 80, 50, "", title_font, info_font)
@@ -752,6 +776,8 @@ def run_simulation():
                         if ui.rsa_phase == 0:
                             # 크래킹 시작
                             ui.rsa_phase = 1
+                            ui.rsa_crack_timer = 0.0
+                            shor_step(ui.shor)  # INPUT → CLASSICAL_PRECHECK
                             snd.play("click")
                         elif ui.rsa_phase == 1:
                             pass  # 진행 중
@@ -774,15 +800,25 @@ def run_simulation():
                         setup_rsa_demo(ui.shor, ui.rsa_difficulty)
                         snd.play("click")
 
-        # ── RSA 크래킹 실행 (이벤트 외부) ──
+        # ── RSA 크래킹 단계별 실행 (이벤트 외부) ──
         if ui.mode == MODE_RSA and ui.rsa_phase == 1:
-            success = crack_rsa(ui.shor)
-            if success:
-                ui.rsa_phase = 2
-                ui.numbers_factored += 1
-                snd.play("achievement")
-            else:
-                ui.rsa_phase = 0  # 실패 → 리셋
+            ui.rsa_crack_timer += dt
+            if ui.rsa_crack_timer >= RSA_CRACK_SPEED:
+                ui.rsa_crack_timer = 0.0
+                if ui.shor.phase == ShorPhase.SUCCESS:
+                    # 소인수분해 성공 → RSA 비밀키 복원/복호화
+                    if finalize_rsa_crack(ui.shor):
+                        ui.rsa_phase = 2
+                        ui.numbers_factored += 1
+                        snd.play("achievement")
+                    else:
+                        ui.rsa_phase = 0
+                elif ui.shor.phase == ShorPhase.DONE:
+                    # 최대 시도 초과 → 실패 리셋
+                    ui.rsa_phase = 0
+                else:
+                    shor_step(ui.shor)
+                    ui.total_steps += 1
 
         # ── 레코딩 ──
         recorder.record_frame({

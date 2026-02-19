@@ -300,7 +300,8 @@
     "animation_speed": 0.6,
     "qft_display_qubits": 6,
     "auto_batch_size": 1,
-    "rsa_default_difficulty": 0
+    "rsa_default_difficulty": 0,
+    "rsa_crack_speed": 0.15
   },
   "theme": "dark",
   "colorblind_mode": false,
