@@ -21,11 +21,13 @@ from quantum.ui_common import (
     render_notify,
 )
 from config_loader import cfg
+from difficulty_dialog import choose_difficulty
 from game_base import finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
 from perf_monitor import PerfMonitor
+from presets import get_preset
 from quantum.entanglement_physics import (
     BELL_DESCRIPTIONS,
     BELL_LABELS,
@@ -180,6 +182,9 @@ class Layout:
         # 하단 힌트
         self.hint_y = h - int(38 * sy)
 
+        # 난이도 뱃지
+        self.badge_y = h - int(16 * sy)
+
         # 퍼포먼스
         self.perf_x = w - int(250 * sx)
 
@@ -199,6 +204,7 @@ class EntanglementState:
     mode: int = MODE_BELL
     t: float = 0.0
     paused: bool = False
+    difficulty: str = "normal"
 
     # ── Bell States ──
     bell_selected: int = 0  # 0~3 (Φ+, Φ-, Ψ+, Ψ-)
@@ -780,7 +786,20 @@ def run_simulation():
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
     info_font = pygame.font.SysFont("Consolas", 11)
 
+    # 난이도 선택
+    chosen = choose_difficulty(screen, font)
+    if chosen is None:
+        on_theme_change(_load_theme_colors)
+        pygame.quit()
+        return
+    preset = get_preset(chosen)
+    ent_preset = preset.get("entanglement", {})
+    measure_batch = ent_preset.get("measure_batch", MEASURE_BATCH)
+    chsh_shots = ent_preset.get("chsh_shots", CHSH_SHOTS)
+    teleport_anim_speed = ent_preset.get("teleport_anim_speed", TELEPORT_ANIM_SPEED)
+
     gs = EntanglementState()
+    gs.difficulty = chosen
     gs.reset_teleport()  # 초기 랜덤 상태
 
     help_overlay = HelpOverlay("entanglement")
@@ -853,14 +872,14 @@ def run_simulation():
                         # 배치 측정
                         bell_name = BELL_LABELS[gs.bell_selected]
                         state = BELL_STATES[bell_name]
-                        for _ in range(MEASURE_BATCH):
+                        for _ in range(measure_batch):
                             a, b = measure_bell(state)
                             gs.bell_measurements.append((a, b))
                             gs.bell_counts[f"{a}{b}"] += 1
                             gs.bell_total += 1
                             gs.total_measurements += 1
                         _notify(gs, t("ent_notify_measured",
-                                      count=MEASURE_BATCH), 1.0)
+                                      count=measure_batch), 1.0)
                         snd.play("click")
                     elif event.key == pygame.K_m:
                         # 단일 측정
@@ -880,7 +899,7 @@ def run_simulation():
                         gs.chsh_running = True
                         state = BELL_STATES["Φ+"]
                         result = run_chsh_experiment(
-                            state, n_shots=CHSH_SHOTS)
+                            state, n_shots=chsh_shots)
                         gs.chsh_result = result
                         gs.chsh_history.append(result["S"])
                         gs.chsh_experiments += 1
@@ -980,6 +999,12 @@ def run_simulation():
             render_notify(screen, gs.notify_msg, gs.notify_timer, info_font,
                           ACCENT, L.W // 2, L.notify_y)
 
+        # 난이도 뱃지
+        diff_colors = {"easy": GREEN, "normal": YELLOW, "hard": RED}
+        badge_clr = diff_colors.get(gs.difficulty, TEXT_CLR)
+        badge = info_font.render(f"[{gs.difficulty.upper()}]", True, badge_clr)
+        screen.blit(badge, (L.W - badge.get_width() - 8, L.badge_y))
+
         # 오버레이
         toast.update(dt)
         toast.draw(screen, info_font)
@@ -994,6 +1019,7 @@ def run_simulation():
 
     session_data = {
         "play_time": round(time.time() - gs.start_time, 1),
+        "difficulty": gs.difficulty,
         "total_measurements": gs.total_measurements,
         "chsh_experiments": gs.chsh_experiments,
         "teleport_completions": gs.teleport_completions,

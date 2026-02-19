@@ -141,6 +141,7 @@ class QuantumCircuit:
         self.gates: list[GateOp] = []
         self.state: list[complex] = self._init_state()
         self._executed = False
+        self.max_gates: int = MAX_GATES
 
     def _init_state(self) -> list[complex]:
         """|00...0⟩ 초기 상태."""
@@ -150,7 +151,7 @@ class QuantumCircuit:
 
     def add_gate(self, name: str, qubit: int, target: int | None = None) -> bool:
         """게이트 추가. 성공 시 True."""
-        if len(self.gates) >= MAX_GATES:
+        if len(self.gates) >= self.max_gates:
             return False
         if name == "CNOT":
             if target is None or qubit == target:

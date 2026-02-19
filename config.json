@@ -214,6 +214,15 @@
         "default_number": 15,
         "animation_speed": 0.8,
         "rsa_default_difficulty": 0
+      },
+      "gate_builder": {
+        "num_qubits": 2,
+        "max_gates": 16
+      },
+      "entanglement": {
+        "measure_batch": 100,
+        "chsh_shots": 400,
+        "teleport_anim_speed": 1.0
       }
     },
     "normal": {
@@ -249,6 +258,15 @@
         "default_number": 91,
         "animation_speed": 0.5,
         "rsa_default_difficulty": 1
+      },
+      "gate_builder": {
+        "num_qubits": 2,
+        "max_gates": 12
+      },
+      "entanglement": {
+        "measure_batch": 50,
+        "chsh_shots": 200,
+        "teleport_anim_speed": 1.5
       }
     },
     "hard": {
@@ -284,6 +302,15 @@
         "default_number": 437,
         "animation_speed": 0.3,
         "rsa_default_difficulty": 3
+      },
+      "gate_builder": {
+        "num_qubits": 3,
+        "max_gates": 8
+      },
+      "entanglement": {
+        "measure_batch": 25,
+        "chsh_shots": 100,
+        "teleport_anim_speed": 2.5
       }
     }
   },

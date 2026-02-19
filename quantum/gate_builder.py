@@ -13,6 +13,7 @@ import time
 import pygame
 
 from config_loader import cfg
+from difficulty_dialog import choose_difficulty
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
     draw_bar_pattern as _draw_bar_pattern,
@@ -22,6 +23,7 @@ from game_base import finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
+from presets import get_preset
 from quantum.gate_builder_engine import (
     ALL_GATES,
     GATE_INFO,
@@ -130,6 +132,9 @@ class Layout:
         self.log_x = int(580 * sx)
         self.log_y = int(430 * sy)
 
+        # 난이도 뱃지
+        self.badge_y = h - int(16 * sy)
+
 
 _layout = Layout()
 
@@ -153,12 +158,25 @@ def run_simulation():
     small_font = pygame.font.SysFont("Consolas", 11)
     gate_font = pygame.font.SysFont("Consolas", 14, bold=True)
 
+    # 난이도 선택
+    chosen = choose_difficulty(screen, font)
+    if chosen is None:
+        on_theme_change(_load_theme_colors)
+        pygame.quit()
+        return
+    preset = get_preset(chosen)
+    gb_preset = preset.get("gate_builder", {})
+    num_qubits = gb_preset.get("num_qubits", NUM_QUBITS)
+    max_gates = gb_preset.get("max_gates", MAX_GATES)
+    difficulty = chosen
+
     help_overlay = HelpOverlay("gate_builder")
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("gate_builder")
 
-    qc = QuantumCircuit(NUM_QUBITS)
+    qc = QuantumCircuit(num_qubits)
+    qc.max_gates = max_gates
     selected_gate: str | None = None
     hover_gate: str | None = None
     measure_counts: dict[int, int] = {}
@@ -370,9 +388,15 @@ def run_simulation():
 
         # 게이트 수 표시
         count_text = small_font.render(
-            t("gb_gate_count", count=len(qc.gates), max=MAX_GATES), True, TEXT_CLR
+            t("gb_gate_count", count=len(qc.gates), max=max_gates), True, TEXT_CLR
         )
         screen.blit(count_text, (L.circuit_x, L.circuit_y + qc.num_qubits * L.wire_spacing + L.count_offset_y))
+
+        # 난이도 뱃지
+        diff_colors = {"easy": (166, 227, 161), "normal": (249, 226, 175), "hard": (243, 139, 168)}
+        badge_clr = diff_colors.get(difficulty, TEXT_CLR)
+        badge = small_font.render(f"[{difficulty.upper()}]", True, badge_clr)
+        screen.blit(badge, (L.W - badge.get_width() - 8, L.badge_y))
 
         # 알림 메시지 (페이드 아웃)
         if notify_timer > 0:
@@ -390,6 +414,7 @@ def run_simulation():
         "gate_builder",
         {
             "play_time": play_time,
+            "difficulty": difficulty,
             "gates_used": len(qc.gates),
             "total_measures": total_measures,
         },
