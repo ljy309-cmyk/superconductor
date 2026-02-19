@@ -9,6 +9,7 @@ import math
 import pygame
 
 from achievement_toast import AchievementToast
+from achievements import check_achievements
 from config_loader import cfg
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
@@ -256,6 +257,7 @@ def run_simulation():
     pygame.display.set_caption(t("game_title_tunneling"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
+    info_font = pygame.font.SysFont("Consolas", 11)
     title_font = pygame.font.SysFont("Consolas", 16, bold=True)
     big_font = pygame.font.SysFont("Consolas", 18, bold=True)
 
@@ -310,6 +312,7 @@ def run_simulation():
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
+        perf.tick(dt)
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
@@ -347,6 +350,8 @@ def run_simulation():
                     sl_barrier.value = sl_barrier.value - 10
                 elif event.key == pygame.K_l:
                     toggle_locale()
+                elif event.key == pygame.K_g:
+                    toast.toggle_history()
             elif event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode(
                     (event.w, event.h), pygame.RESIZABLE)
@@ -380,8 +385,6 @@ def run_simulation():
 
                 # 실시간 업적 체크
                 try:
-                    from achievements import check_achievements
-
                     new_ach = check_achievements(
                         "tunneling",
                         {
@@ -391,7 +394,7 @@ def run_simulation():
                         },
                     )
                     toast.show_many(new_ach)
-                except (ImportError, KeyError, TypeError) as e:
+                except (KeyError, TypeError) as e:
                     _log.warning("실시간 업적 확인 실패: %s", e)
 
             # ── 사운드 ──
@@ -401,7 +404,6 @@ def run_simulation():
                 snd.play("tunnel_reflect")
 
             preset_hud.update(dt)
-            perf.tick(dt)
 
             recorder.record_frame(
                 {
@@ -467,18 +469,18 @@ def run_simulation():
         # 알림 메시지 (페이드 아웃)
         if notify_timer > 0:
             notify_timer -= dt
-            render_notify(screen, notify_msg, notify_timer, font, ACCENT,
+            render_notify(screen, notify_msg, notify_timer, info_font, ACCENT,
                           L.W // 2, L.notify_y)
 
         preset_hud.draw(screen, font)
 
         toast.update(dt)
-        toast.draw(screen, font)
-        toast.draw_history(screen, font)
+        toast.draw(screen, info_font)
+        toast.draw_history(screen, info_font)
 
-        help_overlay.draw(screen, font)
-        tutorial.draw(screen, font)
-        perf.draw_overlay(screen, font, x=L.perf_x, y=4)
+        help_overlay.draw(screen, info_font)
+        tutorial.draw(screen, info_font)
+        perf.draw_overlay(screen, info_font, x=L.perf_x, y=4)
 
         pygame.display.flip()
 
