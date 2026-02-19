@@ -54,6 +54,7 @@ QFT_DISPLAY_QUBITS = cfg("shor", "qft_display_qubits", 6)
 AUTO_BATCH_SIZE = cfg("shor", "auto_batch_size", 1)
 RSA_DEFAULT_DIFFICULTY = cfg("shor", "rsa_default_difficulty", 0)
 RSA_CRACK_SPEED = cfg("shor", "rsa_crack_speed", 0.15)
+BAR_ANIM_INTERVAL = cfg("shor", "bar_anim_interval", 0.03)
 
 # ── 색상 (테마에서 동적 로드) ────────────────────────
 BG = (30, 30, 46)
@@ -131,6 +132,13 @@ class UIState:
     # 히스토그램 선택
     show_qft_detail: bool = False
 
+    # 막대 애니메이션 (하나씩 나타나는 효과)
+    mod_exp_anim_count: int = 0   # 현재 표시할 막대 수
+    qft_anim_count: int = 0       # 현재 표시할 막대 수
+    _anim_timer: float = 0.0      # 막대 추가 타이머
+    _prev_mod_exp_len: int = 0    # 테이블 변경 감지
+    _prev_qft_len: int = 0        # 히스토그램 변경 감지
+
 
 # ── 그리기 유틸리티 ──────────────────────────────────
 
@@ -184,16 +192,19 @@ def _draw_phase_indicator(screen, phase, font, x, y):
         screen.blit(s, (x, py))
 
 
-def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h):
-    """a^x mod N 주기 그래프."""
+def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h,
+                        visible_count=0):
+    """a^x mod N 주기 그래프 (막대가 하나씩 나타나는 애니메이션)."""
     if not table:
         return
 
     n = len(table)
+    show = min(visible_count, n) if visible_count > 0 else n
     max_val = max(e.value for e in table) or 1
     bar_w = max(1, (w - 20) // n)
 
-    for i, entry in enumerate(table):
+    for i in range(show):
+        entry = table[i]
         bx = x + 10 + i * bar_w
         bar_h = int((h - 30) * entry.value / max_val)
         by = y + h - 10 - bar_h
@@ -206,33 +217,41 @@ def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h):
 
         pygame.draw.rect(screen, clr, (bx, by, max(1, bar_w - 1), bar_h))
 
-    # 주기 구분선
-    if period > 0:
+    # 주기 구분선 (전체 표시 후에만)
+    if period > 0 and show >= n:
         for k in range(1, n // period + 1):
             lx = x + 10 + k * period * bar_w
             if lx < x + w:
                 pygame.draw.line(screen, RED, (lx, y + 5), (lx, y + h - 10), 1)
 
     # 레이블
-    label = font.render(f"a^x mod N  (period={period})" if period > 0
-                        else "a^x mod N", True, TEXT_CLR)
+    if show >= n and period > 0:
+        label = font.render(f"a^x mod N  (period={period})", True, TEXT_CLR)
+    else:
+        label = font.render(f"a^x mod N  ({show}/{n})", True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
 
 
-def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h):
-    """QFT 확률 분포 히스토그램."""
+def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h,
+                        visible_count=0):
+    """QFT 확률 분포 히스토그램 (막대가 하나씩 나타나는 애니메이션)."""
     if not amplitudes:
         return
 
     n = len(amplitudes)
     max_val = max(amplitudes) or 1
-    bar_w = max(1, (w - 20) // min(n, 128))
 
     # 너무 많으면 간추림
     step = max(1, n // 128)
+    total_bars = (n + step - 1) // step
+    bar_w = max(1, (w - 20) // min(n, 128))
+    show = min(visible_count, total_bars) if visible_count > 0 else total_bars
 
+    bar_idx = 0
     for i in range(0, n, step):
-        bx = x + 10 + (i // step) * bar_w
+        if bar_idx >= show:
+            break
+        bx = x + 10 + bar_idx * bar_w
         bar_h = int((h - 30) * amplitudes[i] / max_val)
         by = y + h - 10 - bar_h
 
@@ -244,6 +263,7 @@ def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h):
             clr = OVERLAY_CLR
 
         pygame.draw.rect(screen, clr, (bx, by, max(1, bar_w - 1), bar_h))
+        bar_idx += 1
 
     label = font.render("QFT Probability Distribution", True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
@@ -382,11 +402,13 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
     # 중앙 하단: 모듈러 지수 그래프 / QFT 히스토그램
     if shor.qft_amplitudes:
         _draw_qft_histogram(screen, shor.qft_amplitudes, info_font,
-                            20, 240, 420, 150)
+                            20, 240, 420, 150,
+                            visible_count=ui.qft_anim_count)
     elif shor.mod_exp_table:
         _draw_mod_exp_graph(screen, shor.mod_exp_table,
                             shor.mod_exp_period_visual, info_font,
-                            20, 240, 420, 150)
+                            20, 240, 420, 150,
+                            visible_count=ui.mod_exp_anim_count)
 
     # 우측 하단: 연분수 / 결과
     if shor.qft_current:
@@ -463,11 +485,13 @@ def _draw_auto_mode(screen, ui, font, title_font, info_font):
     # 그래프
     if shor.qft_amplitudes:
         _draw_qft_histogram(screen, shor.qft_amplitudes, info_font,
-                            20, 240, 560, 160)
+                            20, 240, 560, 160,
+                            visible_count=ui.qft_anim_count)
     elif shor.mod_exp_table:
         _draw_mod_exp_graph(screen, shor.mod_exp_table,
                             shor.mod_exp_period_visual, info_font,
-                            20, 240, 560, 160)
+                            20, 240, 560, 160,
+                            visible_count=ui.mod_exp_anim_count)
 
     # 연분수
     if shor.qft_current:
@@ -863,6 +887,9 @@ def run_simulation():
             "attempt": ui.shor.attempt,
         })
 
+        # ── 막대 애니메이션 업데이트 ──
+        _update_bar_animation(ui, dt)
+
         # ── 렌더링 ──
         screen.fill(BG)
 
@@ -941,6 +968,40 @@ def run_simulation():
         snd=snd,
         theme_callback=_load_theme_colors,
     )
+
+
+def _update_bar_animation(ui, dt):
+    """모듈러 지수 그래프 / QFT 히스토그램 막대 애니메이션 업데이트."""
+    shor = ui.shor
+
+    # 테이블 변경 감지 → 카운터 리셋
+    cur_mod_len = len(shor.mod_exp_table)
+    cur_qft_len = len(shor.qft_amplitudes)
+
+    if cur_mod_len != ui._prev_mod_exp_len:
+        ui._prev_mod_exp_len = cur_mod_len
+        ui.mod_exp_anim_count = 0
+        ui._anim_timer = 0.0
+
+    if cur_qft_len != ui._prev_qft_len:
+        ui._prev_qft_len = cur_qft_len
+        ui.qft_anim_count = 0
+        ui._anim_timer = 0.0
+
+    # 타이머 기반 막대 추가
+    mod_target = cur_mod_len
+    qft_target = cur_qft_len
+    need_anim = (ui.mod_exp_anim_count < mod_target
+                 or ui.qft_anim_count < qft_target)
+
+    if need_anim:
+        ui._anim_timer += dt
+        while ui._anim_timer >= BAR_ANIM_INTERVAL:
+            ui._anim_timer -= BAR_ANIM_INTERVAL
+            if ui.mod_exp_anim_count < mod_target:
+                ui.mod_exp_anim_count += 1
+            if ui.qft_anim_count < qft_target:
+                ui.qft_anim_count += 1
 
 
 def _apply_difficulty(ui, name, snd):
