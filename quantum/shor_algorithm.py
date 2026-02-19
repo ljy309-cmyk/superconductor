@@ -132,6 +132,9 @@ class UIState:
     # 히스토그램 선택
     show_qft_detail: bool = False
 
+    # 진행률 (최고치 추적 — RETRY 역행 방지)
+    progress_high: float = 0.0
+
     # 막대 애니메이션 (하나씩 나타나는 효과)
     mod_exp_anim_count: int = 0   # 현재 표시할 막대 수
     qft_anim_count: int = 0       # 현재 표시할 막대 수
@@ -149,6 +152,29 @@ def _draw_panel(screen, x, y, w, h, title="", title_font=None, font=None):
     if title and title_font:
         ts = title_font.render(title, True, ACCENT)
         screen.blit(ts, (x + 10, y + 6))
+
+
+def _calc_shor_progress(ui):
+    """Shor 알고리즘 진행률 계산 (0.0 ~ 1.0).
+
+    RETRY 시 PICK_RANDOM_A로 돌아가도 진행률이 역행하지 않도록,
+    핵심 파이프라인(INPUT→EXTRACT_FACTORS) 기준 + 최고치 추적.
+    """
+    phase = ui.shor.phase
+
+    # 새 수 입력 시 리셋 (INPUT = reset_state 직후)
+    if phase == ShorPhase.INPUT:
+        ui.progress_high = 0.0
+        return 0.0
+
+    # 핵심 파이프라인: CLASSICAL_PRECHECK(2)~EXTRACT_FACTORS(8)
+    if phase in (ShorPhase.SUCCESS, ShorPhase.DONE, ShorPhase.RETRY):
+        raw = 1.0
+    else:
+        raw = min(1.0, phase.value / ShorPhase.EXTRACT_FACTORS.value)
+
+    ui.progress_high = max(ui.progress_high, raw)
+    return ui.progress_high
 
 
 def _draw_progress_bar(screen, x, y, w, h, progress, color=None):
@@ -462,11 +488,7 @@ def _draw_auto_mode(screen, ui, font, title_font, info_font):
     screen.blit(st, (150, 70))
 
     # 진행률
-    if shor.phase != ShorPhase.DONE and shor.phase != ShorPhase.SUCCESS:
-        progress = shor.phase.value / ShorPhase.DONE.value
-    else:
-        progress = 1.0
-    _draw_progress_bar(screen, 300, 72, 200, 14, progress)
+    _draw_progress_bar(screen, 300, 72, 200, 14, _calc_shor_progress(ui))
 
     # 단계 인디케이터
     _draw_phase_indicator(screen, shor.phase, font, 20, 100)
@@ -573,8 +595,8 @@ def _draw_rsa_mode(screen, ui, font, title_font, info_font):
         screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 236))
 
         # 진행률 바
-        progress = min(1.0, shor.phase.value / ShorPhase.DONE.value)
-        _draw_progress_bar(screen, 200, 262, WIDTH - 400, 12, progress, RED)
+        _draw_progress_bar(screen, 200, 262, WIDTH - 400, 12,
+                           _calc_shor_progress(ui), RED)
 
         # 단계 인디케이터 (왼쪽)
         _draw_phase_indicator(screen, shor.phase, info_font, 60, 286)
