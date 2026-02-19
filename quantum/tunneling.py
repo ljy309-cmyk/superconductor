@@ -111,6 +111,7 @@ class Layout:
         self.H = h
         sx = w / 900
         sy = h / 600
+        fs = min(sx, sy)  # 폰트/간격 공통 스케일
 
         # 탭 바
         self.margin = int(20 * sx)
@@ -123,10 +124,11 @@ class Layout:
         # 블로흐 구
         self.bloch_cx = int(730 * sx)
         self.bloch_cy = int(280 * sy)
-        self.bloch_r = int(110 * min(sx, sy))
+        self.bloch_r = int(110 * fs)
 
         # 타이틀
         self.title_y = int(12 * sy)
+        self.title_offset = int(28 * sy)
 
         # 이벤트 로그
         self.log_x = int(580 * sx)
@@ -141,6 +143,22 @@ class Layout:
         # 성능 모니터
         self.perf_x = w - int(250 * sx)
 
+        # ── 폰트 비례 줄간격 ──
+        self.line_h = max(12, int(17 * fs))       # 통계 줄간격
+        self.line_h_sm = max(10, int(14 * fs))    # 이벤트 로그 항목
+        self.line_h_md = max(12, int(16 * fs))    # 힌트 줄간격
+        self.line_h_lg = max(14, int(22 * fs))    # 비교 결과 줄간격
+        self.text_gap = max(10, int(16 * fs))     # 텍스트 블록 간격
+
+        # ── 블로흐 구 오프셋 ──
+        self.bloch_title_gap = int(40 * fs)       # 타이틀-구 간격
+        self.bloch_axis_ext = max(4, int(8 * fs))
+        self.bloch_label_x = max(4, int(8 * fs))  # |0⟩/|1⟩ 라벨 X 오프셋
+        self.bloch_z0_y = int(18 * fs)
+        self.bloch_z1_y = max(2, int(4 * fs))
+        self.bloch_state_y = int(26 * fs)         # 상태 텍스트 Y 오프셋
+        self.bloch_stats_gap = int(60 * fs)       # 구-통계 간격
+
         # Compare 모드 레이아웃
         self.cmp_title_y = int(50 * sy)
         self.cmp_track_x = int(60 * sx)
@@ -150,10 +168,14 @@ class Layout:
         self.cmp_panel_w = int(520 * sx)
         self.cmp_panel_h = int(80 * sy)
         self.cmp_bar_h = int(20 * sy)
+        self.cmp_bar_offset = int(35 * sy)        # 패널 내 진행바 오프셋
+        self.cmp_text_offset = int(60 * sy)       # 패널 내 텍스트 오프셋
         self.cmp_stats_x = int(40 * sx)
         self.cmp_stats_y = int(370 * sy)
         self.cmp_stats_w = int(520 * sx)
         self.cmp_stats_h = int(100 * sy)
+        self.cmp_result_pad = int(15 * sy)        # 결과 패널 내부 패딩
+        self.cmp_result_indent = int(20 * sx)     # 결과 텍스트 들여쓰기
         self.cmp_result_y = int(490 * sy)
 
 
@@ -243,7 +265,7 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
 
     # 타이틀
     label = title_font.render(t("tn_bloch"), True, ACCENT)
-    screen.blit(label, (BCX - label.get_width() // 2, BCY - BR - 40))
+    screen.blit(label, (BCX - label.get_width() // 2, BCY - BR - L.bloch_title_gap))
 
     # 구 외곽 (원) — 고대비: 두꺼운 선
     ring_w = 2 if hc else 1
@@ -259,7 +281,8 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
 
     # 축 — 고대비: 두꺼운 선
     axis_w = 2 if hc else 1
-    pygame.draw.line(screen, OVERLAY_CLR, (BCX, BCY - BR - 8), (BCX, BCY + BR + 8), axis_w)
+    ae = L.bloch_axis_ext
+    pygame.draw.line(screen, OVERLAY_CLR, (BCX, BCY - BR - ae), (BCX, BCY + BR + ae), axis_w)
 
     # |0⟩ 극점 마커 — 색맹 보조: 수평선 패턴 (터널링=성공과 동일)
     pole0_y = BCY - BR
@@ -276,8 +299,8 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     # |0⟩, |1⟩ 라벨
     z0 = font.render("|0⟩", True, TUNNEL_FLASH)
     z1 = font.render("|1⟩", True, REFLECT_CLR)
-    screen.blit(z0, (BCX + 8, BCY - BR - 18))
-    screen.blit(z1, (BCX + 8, BCY + BR + 4))
+    screen.blit(z0, (BCX + L.bloch_label_x, BCY - BR - L.bloch_z0_y))
+    screen.blit(z1, (BCX + L.bloch_label_x, BCY + BR + L.bloch_z1_y))
 
     # 상태 벡터 (θ 기반) — reduced motion 시 부드러운 보간
     global _bloch_smooth_theta
@@ -303,14 +326,14 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
     # 현재 상태 텍스트
     state_label = f"|{'0' if theta < math.pi / 2 else '1'}⟩  θ={math.degrees(theta):.0f}°"
     sl = font.render(state_label, True, TEXT_CLR)
-    screen.blit(sl, (BCX - sl.get_width() // 2, BCY + BR + 26))
+    screen.blit(sl, (BCX - sl.get_width() // 2, BCY + BR + L.bloch_state_y))
 
 
 def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PROB_BASE):
     """통계 패널."""
     L = _layout
     stats_x = L.bloch_cx - L.bloch_r
-    stats_y = L.bloch_cy + L.bloch_r + 60
+    stats_y = L.bloch_cy + L.bloch_r + L.bloch_stats_gap
 
     lines = [
         (t("tn_attempts", count=p.total_attempts), TEXT_CLR),
@@ -323,7 +346,7 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
     ]
     for i, (line, color) in enumerate(lines):
         surf = font.render(line, True, color)
-        screen.blit(surf, (stats_x, stats_y + i * 17))
+        screen.blit(surf, (stats_x, stats_y + i * L.line_h))
 
 
 # ── 모드 탭 / 비교 모드 렌더링 ────────────────────────
@@ -368,7 +391,7 @@ def _draw_compare_mode(screen, font, title_font, info_font, cmp):
                    SURFACE_CLR, OVERLAY_CLR,
                    t("tn_compare_thin", w=thin_w), font, TUNNEL_FLASH)
     prog_thin = cmp["thin_attempts"] / max(COMPARE_TARGET, 1)
-    _draw_progress_bar(screen, L.cmp_track_x, L.cmp_thin_y + 35,
+    _draw_progress_bar(screen, L.cmp_track_x, L.cmp_thin_y + L.cmp_bar_offset,
                        L.cmp_track_w, L.cmp_bar_h,
                        prog_thin, TUNNEL_FLASH, SURFACE_CLR, OVERLAY_CLR)
     # 통계 텍스트
@@ -376,29 +399,29 @@ def _draw_compare_mode(screen, font, title_font, info_font, cmp):
     ts_thin = info_font.render(
         t("tn_compare_tunnels", count=cmp["thin_tunnels"],
           total=cmp["thin_attempts"], pct=pct_thin), True, TEXT_CLR)
-    screen.blit(ts_thin, (L.cmp_track_x, L.cmp_thin_y + 60))
+    screen.blit(ts_thin, (L.cmp_track_x, L.cmp_thin_y + L.cmp_text_offset))
     prob_thin = info_font.render(
         t("tn_compare_prob", prob=thin_prob * 100), True, OVERLAY_CLR)
     screen.blit(prob_thin, (L.cmp_track_x + L.cmp_track_w - prob_thin.get_width(),
-                            L.cmp_thin_y + 60))
+                            L.cmp_thin_y + L.cmp_text_offset))
 
     # ── 두꺼운 장벽 트랙 ──
     _draw_ui_panel(screen, L.margin, L.cmp_thick_y, L.cmp_panel_w, L.cmp_panel_h,
                    SURFACE_CLR, OVERLAY_CLR,
                    t("tn_compare_thick", w=thick_w), font, REFLECT_CLR)
     prog_thick = cmp["thick_attempts"] / max(COMPARE_TARGET, 1)
-    _draw_progress_bar(screen, L.cmp_track_x, L.cmp_thick_y + 35,
+    _draw_progress_bar(screen, L.cmp_track_x, L.cmp_thick_y + L.cmp_bar_offset,
                        L.cmp_track_w, L.cmp_bar_h,
                        prog_thick, REFLECT_CLR, SURFACE_CLR, OVERLAY_CLR)
     pct_thick = cmp["thick_tunnels"] / max(cmp["thick_attempts"], 1) * 100
     ts_thick = info_font.render(
         t("tn_compare_tunnels", count=cmp["thick_tunnels"],
           total=cmp["thick_attempts"], pct=pct_thick), True, TEXT_CLR)
-    screen.blit(ts_thick, (L.cmp_track_x, L.cmp_thick_y + 60))
+    screen.blit(ts_thick, (L.cmp_track_x, L.cmp_thick_y + L.cmp_text_offset))
     prob_thick = info_font.render(
         t("tn_compare_prob", prob=thick_prob * 100), True, OVERLAY_CLR)
     screen.blit(prob_thick, (L.cmp_track_x + L.cmp_track_w - prob_thick.get_width(),
-                             L.cmp_thick_y + 60))
+                             L.cmp_thick_y + L.cmp_text_offset))
 
     # ── 결과 통계 (완료 시) ──
     if cmp["done"]:
@@ -418,8 +441,8 @@ def _draw_compare_mode(screen, font, title_font, info_font, cmp):
             lines.append((t("tn_compare_equal"), ACCENT))
         for i, (line, clr) in enumerate(lines):
             ls = info_font.render(line, True, clr)
-            screen.blit(ls, (L.cmp_stats_x + 20,
-                             L.cmp_stats_y + 15 + i * 22))
+            screen.blit(ls, (L.cmp_stats_x + L.cmp_result_indent,
+                             L.cmp_stats_y + L.cmp_result_pad + i * L.line_h_lg))
 
 
 # ── 해상도 비례 폰트 ─────────────────────────────────
@@ -722,7 +745,7 @@ def run_simulation():
         if mode in (MODE_STEP, MODE_AUTO):
             # 타이틀
             t_surf = big_font.render(t("game_title_tunneling"), True, ACCENT)
-            screen.blit(t_surf, (L.W // 2 - t_surf.get_width() // 2, L.title_y + 28))
+            screen.blit(t_surf, (L.W // 2 - t_surf.get_width() // 2, L.title_y + L.title_offset))
 
             # 시뮬레이션 영역
             _draw_sim_area(screen, font, barrier_width)
@@ -747,7 +770,7 @@ def run_simulation():
                 for li, (entry, is_tunnel) in enumerate(page_items):
                     clr = TUNNEL_FLASH if is_tunnel else TEXT_CLR
                     es = font.render(f"  {entry}", True, clr)
-                    screen.blit(es, (L.log_x, L.log_y + 16 + li * 14))
+                    screen.blit(es, (L.log_x, L.log_y + L.text_gap + li * L.line_h_sm))
 
             # 슬라이더 패널
             panel.draw(screen, font)
@@ -757,7 +780,7 @@ def run_simulation():
                 wait_surf = info_font.render(t("tn_step_waiting"), True, ACCENT)
                 screen.blit(wait_surf,
                             (SIM_LEFT + SIM_W // 2 - wait_surf.get_width() // 2,
-                             SIM_TOP + SIM_H + 5))
+                             SIM_TOP + SIM_H + max(3, int(5 * L.H / 600))))
 
             # 힌트
             if mode == MODE_STEP:
@@ -766,7 +789,7 @@ def run_simulation():
                 hints = [t("tn_hint_auto_1"), t("tn_hint_auto_2")]
             for i, h in enumerate(hints):
                 surf = info_font.render(h, True, TEXT_CLR)
-                screen.blit(surf, (SIM_LEFT, L.hint_y + i * 16))
+                screen.blit(surf, (SIM_LEFT, L.hint_y + i * L.line_h_md))
 
         elif mode == MODE_COMPARE:
             _draw_compare_mode(screen, font, title_font, info_font, cmp)
@@ -775,7 +798,7 @@ def run_simulation():
             hints = [t("tn_hint_compare_1"), t("tn_hint_compare_2")]
             for i, h in enumerate(hints):
                 surf = info_font.render(h, True, TEXT_CLR)
-                screen.blit(surf, (SIM_LEFT, L.hint_y + i * 16))
+                screen.blit(surf, (SIM_LEFT, L.hint_y + i * L.line_h_md))
 
         # 카테고리 토스트 알림
         notify_toast.update(dt)

@@ -235,7 +235,7 @@ class NotifyToast:
 
             ts = font.render(text, True, pg.TEXT)
             tw = ts.get_width() + self.PAD_X * 2
-            th = self.TOAST_H
+            th = max(self.TOAST_H, ts.get_height() + self.PAD_X)
 
             x = center_x - tw // 2
             y = base_y - (idx + 1) * (th + self.GAP)
