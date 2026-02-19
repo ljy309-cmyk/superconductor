@@ -95,21 +95,26 @@ class QuantumParticle:
         if not self.alive:
             return
 
-        self.x += self.vx * dt
-        self.y += self.vy * dt
-
-        # 상하 벽 반사
-        if self.y - PARTICLE_RADIUS < SIM_TOP:
-            self.y = SIM_TOP + PARTICLE_RADIUS
-            self.vy = abs(self.vy)
-        elif self.y + PARTICLE_RADIUS > SIM_TOP + SIM_H:
-            self.y = SIM_TOP + SIM_H - PARTICLE_RADIUS
-            self.vy = -abs(self.vy)
-
-        # 장벽 충돌 판정
+        # ── CCD(연속 충돌 감지): 이동 전 장벽 교차 판정 ──
+        # 프레임 드랍 시 입자가 장벽을 관통하는 것을 방지합니다.
+        # 접촉점까지의 정확한 시간을 계산하고, 충돌 후 남은 시간만큼 이동합니다.
+        remaining_dt = dt
         if self.tunneled is None and self.vx > 0:
-            # 오른쪽으로 진행 중, 장벽에 도달
-            if self.x + PARTICLE_RADIUS >= BARRIER_X - barrier_width / 2:
+            contact_x = BARRIER_X - barrier_width / 2 - PARTICLE_RADIUS
+            if self.x >= contact_x:
+                # 이미 접촉 영역 — 즉시 판정
+                t_hit = 0.0
+            else:
+                t_hit = (contact_x - self.x) / self.vx
+                if t_hit > dt:
+                    t_hit = None  # 이번 프레임에 도달 불가
+
+            if t_hit is not None:
+                # 접촉점까지 y 이동 (x는 판정 후 덮어씀)
+                self.y += self.vy * t_hit
+                remaining_dt = dt - t_hit
+
+                # 충돌 판정
                 self.total_attempts += 1
                 if random.random() < tunnel_prob:
                     # 터널링 성공! 장벽 반대편으로 좌표 이동 + 속도 부스트
@@ -125,6 +130,18 @@ class QuantumParticle:
                     self.tunneled = False
                     self.reflect_count += 1
                     self.flash_timer = _REFLECT_FLASH
+
+        # ── 남은 시간만큼 이동 ──
+        self.x += self.vx * remaining_dt
+        self.y += self.vy * remaining_dt
+
+        # 상하 벽 반사
+        if self.y - PARTICLE_RADIUS < SIM_TOP:
+            self.y = SIM_TOP + PARTICLE_RADIUS
+            self.vy = abs(self.vy)
+        elif self.y + PARTICLE_RADIUS > SIM_TOP + SIM_H:
+            self.y = SIM_TOP + SIM_H - PARTICLE_RADIUS
+            self.vy = -abs(self.vy)
 
         # 화면 밖으로 나가면 재발사
         if self.x < SIM_LEFT - 20 or self.x > SIM_LEFT + SIM_W + 20:
