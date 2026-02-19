@@ -90,6 +90,133 @@ MODE_COMPARE = 2
 _MODE_TAB_KEYS = ["grover_tab_step", "grover_tab_auto", "grover_tab_compare"]
 
 
+# ── 레이아웃 (해상도 적응) ─────────────────────────────
+
+class Layout:
+    """해상도 기반 레이아웃 좌표 계산.
+
+    기준 해상도 900×600에 대한 비례식으로 좌표를 산출합니다.
+    """
+
+    def __init__(self, w: int = 900, h: int = 600):
+        self.W = w
+        self.H = h
+        sx = w / 900
+        sy = h / 600
+
+        # 마진
+        self.margin = int(20 * sx)
+
+        # 상단: 모드 탭 바
+        self.tab_y = int(8 * sy)
+        self.tab_h = int(28 * sy)
+        tab_total = w - 2 * self.margin
+        self.tab_w = tab_total // 3
+        self.tab_label_offset_y = int(6 * sy)
+
+        # 제목 / N 표시 줄
+        self.title_y = int(42 * sy)
+        self.n_row_y = int(70 * sy)
+
+        # Step/Auto: 단계 인디케이터, 회로, 상태 패널
+        self.indicator_x = self.margin
+        self.indicator_y = int(100 * sy)
+
+        col2_x = int(200 * sx)
+        col3_x = int(600 * sx)
+        panel_row_y = int(90 * sy)
+        panel_row_h = int(130 * sy)
+
+        self.circuit_x = col2_x
+        self.circuit_y = panel_row_y
+        self.circuit_w = col3_x - col2_x - self.margin
+        self.circuit_h = panel_row_h
+
+        self.status_x = col3_x
+        self.status_y = panel_row_y
+        self.status_w = w - col3_x - self.margin
+        self.status_h = panel_row_h
+        self.status_text_x = col3_x + int(10 * sx)
+        self.status_msg_y = panel_row_y + int(25 * sy)
+        self.status_desc_y = panel_row_y + int(80 * sy)
+
+        # 그래프 영역
+        graph_y = int(240 * sy)
+        self.graph_x = self.margin
+        self.graph_y = graph_y
+        self.graph_w_step = int(420 * sx)
+        self.graph_h_step = int(150 * sy)
+        self.graph_w_auto = int(560 * sx)
+        self.graph_h_auto = int(160 * sy)
+
+        # 확률 변화 그래프
+        self.prob_x_step = int(460 * sx)
+        self.prob_w_step = int(410 * sx)
+        self.prob_h = int(130 * sy)
+        self.prob_x_auto = col3_x
+        self.prob_w_auto = w - col3_x - self.margin
+
+        # Auto 상태/진행률
+        self.auto_status_x = int(400 * sx)
+        self.prog_x = int(520 * sx)
+        self.prog_w = int(200 * sx)
+        self.prog_h = int(14 * sy)
+
+        # 반복 텍스트 (Step)
+        self.iter_text_x = int(500 * sx)
+
+        # 결과
+        self.result_y = int(405 * sy)
+        self.speedup_y = int(432 * sy)
+        self.result_y_auto = int(420 * sy)
+
+        # 히스토리
+        self.history_y = int(460 * sy)
+
+        # 입력 필드
+        self.input_y = h - int(70 * sy)
+
+        # 하단 힌트
+        self.hint_y1 = h - int(38 * sy)
+        self.hint_y2 = h - int(22 * sy)
+        self.notify_y = h - int(55 * sy)
+        self.badge_y = h - int(16 * sy)
+
+        # ── Compare 모드 ──
+        self.cmp_track_x = int(60 * sx)
+        self.cmp_track_w = w - int(120 * sx)
+        self.cmp_classical_y = int(140 * sy)
+        self.cmp_quantum_y = int(220 * sy)
+        self.cmp_panel_h = int(60 * sy)
+        self.cmp_bar_h = int(20 * sy)
+
+        self.cmp_stats_x = int(40 * sx)
+        self.cmp_stats_y = int(300 * sy)
+        self.cmp_stats_w = w - int(80 * sx)
+        self.cmp_stats_h = int(120 * sy)
+        self.cmp_stats_text_x = int(60 * sx)
+        self.cmp_stats_text_y = int(320 * sy)
+
+        self.cmp_adv_y = int(430 * sy)
+        self.cmp_adv_h = int(100 * sy)
+        self.cmp_adv_text_x = int(55 * sx)
+        self.cmp_adv_text_y = int(445 * sy)
+
+        self.cmp_hint_y = h - int(55 * sy)
+
+        # Perf overlay
+        self.perf_x = w - int(250 * sx)
+
+
+_layout = Layout(WIDTH, HEIGHT)
+
+
+def _rebuild_layout(w: int, h: int):
+    """리사이즈 시 레이아웃 재계산."""
+    global _layout
+    _layout = Layout(w, h)
+
+
 # ── UI 상태 ──────────────────────────────────────────
 
 @dataclass
@@ -462,52 +589,59 @@ def _draw_search_history(screen, ui, font, x, y):
 
 def _draw_step_mode(screen, ui, font, title_font, info_font):
     """Step-by-Step 모드."""
+    L = _layout
     grover = ui.grover
 
     title = title_font.render(t("grover_title_step"), True, ACCENT)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 42))
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     # 큐빗/대상 표시
     n_text = font.render(
         f"N = 2^{grover.n_qubits} = {1 << grover.n_qubits}  "
         f"target = {grover.targets}", True, TEXT_CLR)
-    screen.blit(n_text, (20, 70))
+    screen.blit(n_text, (L.margin, L.n_row_y))
 
     if grover.current_iteration > 0:
         att = font.render(
             f"Iteration {grover.current_iteration}/{grover.optimal_iterations}",
             True, TEAL)
-        screen.blit(att, (500, 70))
+        screen.blit(att, (L.iter_text_x, L.n_row_y))
 
     # 좌측: 단계 인디케이터
-    _draw_phase_indicator(screen, grover.phase, font, 20, 100)
+    _draw_phase_indicator(screen, grover.phase, font,
+                          L.indicator_x, L.indicator_y)
 
     # 중앙 상단: 양자 회로 다이어그램
-    _draw_circuit_diagram(screen, grover, info_font, 200, 90, 380, 130)
+    _draw_circuit_diagram(screen, grover, info_font,
+                          L.circuit_x, L.circuit_y,
+                          L.circuit_w, L.circuit_h)
 
     # 우측 상단: 상태 메시지
-    _draw_panel(screen, 600, 90, 280, 130, t("grover_status_title"), font, info_font)
+    _draw_panel(screen, L.status_x, L.status_y, L.status_w, L.status_h,
+                t("grover_status_title"), font, info_font)
     msg_lines = _wrap_text(grover.step_message, 35)
     for i, line in enumerate(msg_lines):
         clr = GREEN if grover.phase == GroverPhase.SUCCESS else TEXT_CLR
         if grover.phase == GroverPhase.FAIL:
             clr = RED
         ms = info_font.render(line, True, clr)
-        screen.blit(ms, (610, 115 + i * 16))
+        screen.blit(ms, (L.status_text_x, L.status_msg_y + i * 16))
     desc_lines = _wrap_text(get_phase_description(grover.phase), 35)
     for i, line in enumerate(desc_lines[:3]):
         ds = info_font.render(line, True, SUBTEXT)
-        screen.blit(ds, (610, 170 + i * 14))
+        screen.blit(ds, (L.status_text_x, L.status_desc_y + i * 14))
 
     # 중앙 하단: 진폭 바 차트
     if grover.amplitudes:
         _draw_amplitude_bar_chart(screen, grover, info_font,
-                                  20, 240, 420, 150)
+                                  L.graph_x, L.graph_y,
+                                  L.graph_w_step, L.graph_h_step)
 
     # 우측 하단: 확률 변화 그래프
     if len(grover.target_prob_history) >= 2:
         _draw_probability_evolution(screen, grover.target_prob_history,
-                                    info_font, 460, 240, 410, 130)
+                                    info_font, L.prob_x_step, L.graph_y,
+                                    L.prob_w_step, L.prob_h)
 
     # 최종 결과
     if grover.phase == GroverPhase.SUCCESS:
@@ -515,7 +649,7 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
             t("grover_result_found", result=grover.measured,
               iter=grover.current_iteration),
             True, GREEN)
-        screen.blit(result, (WIDTH // 2 - result.get_width() // 2, 405))
+        screen.blit(result, (L.W // 2 - result.get_width() // 2, L.result_y))
         if grover.comparison:
             comp = grover.comparison
             speedup = info_font.render(
@@ -524,39 +658,40 @@ def _draw_step_mode(screen, ui, font, title_font, info_font):
                 f"Speedup: {comp.speedup_ratio:.1f}×",
                 True, PURPLE)
             screen.blit(speedup,
-                        (WIDTH // 2 - speedup.get_width() // 2, 432))
+                        (L.W // 2 - speedup.get_width() // 2, L.speedup_y))
     elif grover.phase == GroverPhase.FAIL:
         result = title_font.render(
             t("grover_result_not_target", result=grover.measured),
             True, RED)
-        screen.blit(result, (WIDTH // 2 - result.get_width() // 2, 405))
+        screen.blit(result, (L.W // 2 - result.get_width() // 2, L.result_y))
 
     # 탐색 히스토리 (페이지네이션)
-    _draw_search_history(screen, ui, info_font, 20, 460)
+    _draw_search_history(screen, ui, info_font, L.margin, L.history_y)
 
     # 입력 필드
     if grover.phase in (GroverPhase.INPUT, GroverPhase.DONE,
                         GroverPhase.SUCCESS, GroverPhase.FAIL):
-        _draw_input_fields(screen, ui, font, 20, HEIGHT - 70)
+        _draw_input_fields(screen, ui, font, L.margin, L.input_y)
 
 
 def _draw_auto_mode(screen, ui, font, title_font, info_font):
     """Auto 모드."""
+    L = _layout
     grover = ui.grover
 
     title = title_font.render(t("grover_title_auto"), True, ACCENT)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 42))
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     n_text = font.render(
         f"N = 2^{grover.n_qubits} = {1 << grover.n_qubits}  "
         f"target = {grover.targets}", True, TEXT_CLR)
-    screen.blit(n_text, (20, 70))
+    screen.blit(n_text, (L.margin, L.n_row_y))
 
     status = t("grover_auto_running") if ui.auto_running \
         else t("grover_auto_paused")
     status_clr = GREEN if ui.auto_running else YELLOW
     st = font.render(status, True, status_clr)
-    screen.blit(st, (400, 70))
+    screen.blit(st, (L.auto_status_x, L.n_row_y))
 
     # 진행률
     if grover.phase not in (GroverPhase.DONE, GroverPhase.SUCCESS,
@@ -564,31 +699,38 @@ def _draw_auto_mode(screen, ui, font, title_font, info_font):
         progress = grover.phase.value / GroverPhase.DONE.value
     else:
         progress = 1.0
-    _draw_progress_bar(screen, 520, 72, 200, 14, progress)
+    _draw_progress_bar(screen, L.prog_x, L.n_row_y + 2,
+                       L.prog_w, L.prog_h, progress)
 
     # 단계 인디케이터
-    _draw_phase_indicator(screen, grover.phase, font, 20, 100)
+    _draw_phase_indicator(screen, grover.phase, font,
+                          L.indicator_x, L.indicator_y)
 
     # 회로 다이어그램
-    _draw_circuit_diagram(screen, grover, info_font, 200, 90, 380, 130)
+    _draw_circuit_diagram(screen, grover, info_font,
+                          L.circuit_x, L.circuit_y,
+                          L.circuit_w, L.circuit_h)
 
     # 상태 메시지
-    _draw_panel(screen, 600, 90, 280, 130, t("grover_status_title"), font, info_font)
+    _draw_panel(screen, L.status_x, L.status_y, L.status_w, L.status_h,
+                t("grover_status_title"), font, info_font)
     msg_lines = _wrap_text(grover.step_message, 35)
     for i, line in enumerate(msg_lines):
         clr = GREEN if grover.phase == GroverPhase.SUCCESS else TEXT_CLR
         ms = info_font.render(line, True, clr)
-        screen.blit(ms, (610, 115 + i * 16))
+        screen.blit(ms, (L.status_text_x, L.status_msg_y + i * 16))
 
     # 바 차트
     if grover.amplitudes:
         _draw_amplitude_bar_chart(screen, grover, info_font,
-                                  20, 240, 560, 160)
+                                  L.graph_x, L.graph_y,
+                                  L.graph_w_auto, L.graph_h_auto)
 
     # 확률 변화
     if len(grover.target_prob_history) >= 2:
         _draw_probability_evolution(screen, grover.target_prob_history,
-                                    info_font, 600, 240, 280, 130)
+                                    info_font, L.prob_x_auto, L.graph_y,
+                                    L.prob_w_auto, L.prob_h)
 
     # 결과
     if grover.phase == GroverPhase.SUCCESS:
@@ -596,67 +738,67 @@ def _draw_auto_mode(screen, ui, font, title_font, info_font):
             t("grover_result_found", result=grover.measured,
               iter=grover.current_iteration),
             True, GREEN)
-        screen.blit(result, (WIDTH // 2 - result.get_width() // 2, 420))
+        screen.blit(result,
+                    (L.W // 2 - result.get_width() // 2, L.result_y_auto))
 
     # 입력 필드
     if grover.phase in (GroverPhase.INPUT, GroverPhase.DONE,
                         GroverPhase.SUCCESS, GroverPhase.FAIL):
-        _draw_input_fields(screen, ui, font, 20, HEIGHT - 70)
+        _draw_input_fields(screen, ui, font, L.margin, L.input_y)
 
 
 def _draw_compare_mode(screen, ui, font, title_font, info_font):
     """Classical vs Quantum 비교 모드."""
+    L = _layout
     title = title_font.render(t("grover_title_compare"), True, ACCENT)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 42))
+    screen.blit(title, (L.W // 2 - title.get_width() // 2, L.title_y))
 
     n_qubits = ui.compare_n_qubits
     n_states = 1 << n_qubits
     n_text = font.render(
         f"Database: N = 2^{n_qubits} = {n_states} items  |  "
         f"Target: 1 item", True, TEXT_CLR)
-    screen.blit(n_text, (20, 70))
+    screen.blit(n_text, (L.margin, L.n_row_y))
 
     # 레이스 트랙
-    track_x = 60
-    track_w = WIDTH - 120
-    track_y_classical = 140
-    track_y_quantum = 220
+    tx = L.cmp_track_x
+    tw = L.cmp_track_w
+    cy = L.cmp_classical_y
+    qy = L.cmp_quantum_y
 
     # 고전 트랙
-    _draw_panel(screen, 20, track_y_classical - 10, WIDTH - 40, 60,
-                t("grover_compare_classical"), font, info_font)
-    _draw_progress_bar(screen, track_x, track_y_classical + 20,
-                       track_w, 20, ui.compare_classical_pos, RED)
+    _draw_panel(screen, L.margin, cy - 10, L.W - 2 * L.margin,
+                L.cmp_panel_h, t("grover_compare_classical"), font, info_font)
+    _draw_progress_bar(screen, tx, cy + 20, tw, L.cmp_bar_h,
+                       ui.compare_classical_pos, RED)
     queries_c = int(ui.compare_classical_pos * n_states)
     qc_text = info_font.render(
         f"{queries_c}/{n_states} queries", True, TEXT_CLR)
-    screen.blit(qc_text, (track_x + track_w + 5, track_y_classical + 20))
+    screen.blit(qc_text, (tx + tw + 5, cy + 20))
 
     # 양자 트랙
     opt_iter = max(1, int(math.pi / 4 * math.sqrt(n_states)))
-    _draw_panel(screen, 20, track_y_quantum - 10, WIDTH - 40, 60,
-                t("grover_compare_quantum"), font, info_font)
-    _draw_progress_bar(screen, track_x, track_y_quantum + 20,
-                       track_w, 20, ui.compare_quantum_pos, GREEN)
+    _draw_panel(screen, L.margin, qy - 10, L.W - 2 * L.margin,
+                L.cmp_panel_h, t("grover_compare_quantum"), font, info_font)
+    _draw_progress_bar(screen, tx, qy + 20, tw, L.cmp_bar_h,
+                       ui.compare_quantum_pos, GREEN)
     queries_q = int(ui.compare_quantum_pos * opt_iter)
     qq_text = info_font.render(
         f"{queries_q}/{opt_iter} queries", True, TEXT_CLR)
-    screen.blit(qq_text, (track_x + track_w + 5, track_y_quantum + 20))
+    screen.blit(qq_text, (tx + tw + 5, qy + 20))
 
     # 완료 마커
     if ui.compare_classical_done:
         done_c = font.render(t("grover_compare_found"), True, RED)
-        screen.blit(done_c, (track_x + track_w - 55,
-                             track_y_classical + 2))
+        screen.blit(done_c, (tx + tw - 55, cy + 2))
     if ui.compare_quantum_done:
         done_q = font.render(t("grover_compare_found"), True, GREEN)
-        screen.blit(done_q, (track_x + track_w - 55,
-                             track_y_quantum + 2))
+        screen.blit(done_q, (tx + tw - 55, qy + 2))
 
     # 비교 통계
     if ui.compare_classical_done or ui.compare_quantum_done:
-        _draw_panel(screen, 40, 300, WIDTH - 80, 120, "", title_font,
-                    info_font)
+        _draw_panel(screen, L.cmp_stats_x, L.cmp_stats_y,
+                    L.cmp_stats_w, L.cmp_stats_h, "", title_font, info_font)
 
         speedup = n_states / max(1, opt_iter)
         stats = [
@@ -667,21 +809,23 @@ def _draw_compare_mode(screen, ui, font, title_font, info_font):
         for i, line in enumerate(stats):
             clr = [RED, GREEN, YELLOW][i]
             ls = info_font.render(line, True, clr)
-            screen.blit(ls, (60, 320 + i * 22))
+            screen.blit(ls, (L.cmp_stats_text_x,
+                             L.cmp_stats_text_y + i * 22))
 
     # 양자 우위 메시지
     if ui.compare_classical_done and ui.compare_quantum_done:
-        _draw_panel(screen, 40, 430, WIDTH - 80, 100, "", title_font,
-                    info_font)
+        _draw_panel(screen, L.cmp_stats_x, L.cmp_adv_y,
+                    L.cmp_stats_w, L.cmp_adv_h, "", title_font, info_font)
         msg_lines = _wrap_text(get_quantum_advantage_message(), 90)
         for i, line in enumerate(msg_lines[:4]):
             ms = info_font.render(line, True, YELLOW)
-            screen.blit(ms, (55, 445 + i * 16))
+            screen.blit(ms, (L.cmp_adv_text_x,
+                             L.cmp_adv_text_y + i * 16))
 
     # 하단 힌트
     hint = info_font.render(
         t("grover_compare_hint_db", n=n_qubits), True, SUBTEXT)
-    screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, HEIGHT - 55))
+    screen.blit(hint, (L.W // 2 - hint.get_width() // 2, L.cmp_hint_y))
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
@@ -794,6 +938,7 @@ def run_simulation():
             elif event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode(
                     (event.w, event.h), pygame.RESIZABLE)
+                _rebuild_layout(event.w, event.h)
             elif event.type == pygame.KEYDOWN:
                 snd.handle_key(event.key)
 
@@ -926,21 +1071,23 @@ def run_simulation():
         })
 
         # ── 렌더링 ──
+        L = _layout
         screen.fill(BG)
 
         # 상단: 모드 탭
-        tab_total_w = len(_MODE_TAB_KEYS) * 280
-        tab_start = max(5, (WIDTH - tab_total_w) // 2)
+        tab_start = L.margin
         for i, key in enumerate(_MODE_TAB_KEYS):
-            tab_x = tab_start + i * 280
+            tab_x = tab_start + i * L.tab_w
             is_sel = (i == ui.mode)
             tab_clr = ACCENT if is_sel else OVERLAY_CLR
             pygame.draw.rect(screen, tab_clr,
-                             (tab_x, 8, 260, 28), 0 if is_sel else 1,
-                             border_radius=4)
+                             (tab_x, L.tab_y, L.tab_w - 4, L.tab_h),
+                             0 if is_sel else 1, border_radius=4)
             ts_text = font.render(t(key), True, BG if is_sel else TEXT_CLR)
             screen.blit(ts_text,
-                        (tab_x + 130 - ts_text.get_width() // 2, 14))
+                        (tab_x + (L.tab_w - 4) // 2
+                         - ts_text.get_width() // 2,
+                         L.tab_y + L.tab_label_offset_y))
 
         # 모드별 렌더링
         if ui.mode == MODE_STEP:
@@ -960,8 +1107,8 @@ def run_simulation():
                      t("grover_hint_compare_2")]
         for i, hint in enumerate(hints):
             hs = info_font.render(hint, True, TEXT_CLR)
-            screen.blit(hs, (WIDTH // 2 - hs.get_width() // 2,
-                             HEIGHT - 38 + i * 16))
+            screen.blit(hs, (L.W // 2 - hs.get_width() // 2,
+                             L.hint_y1 + i * 16))
 
         # 알림 표시
         if ui.notify_timer > 0:
@@ -969,14 +1116,13 @@ def run_simulation():
             alpha = min(255, int(255 * min(1.0, ui.notify_timer / 0.3)))
             ns = info_font.render(ui.notify_msg, True, YELLOW)
             ns.set_alpha(alpha)
-            screen.blit(ns, (WIDTH // 2 - ns.get_width() // 2,
-                             HEIGHT - 55))
+            screen.blit(ns, (L.W // 2 - ns.get_width() // 2, L.notify_y))
 
         # 난이도 뱃지
         diff_colors = {"easy": GREEN, "normal": YELLOW, "hard": RED}
         badge_clr = diff_colors.get(ui.difficulty, TEXT_CLR)
         badge = info_font.render(f"[{ui.difficulty.upper()}]", True, badge_clr)
-        screen.blit(badge, (WIDTH - badge.get_width() - 8, HEIGHT - 16))
+        screen.blit(badge, (L.W - badge.get_width() - 8, L.badge_y))
 
         # 오버레이
         toast.update(dt)
@@ -984,7 +1130,7 @@ def run_simulation():
         toast.draw_history(screen, info_font)
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, font)
-        perf.draw_overlay(screen, info_font, x=WIDTH - 250, y=4)
+        perf.draw_overlay(screen, info_font, x=L.perf_x, y=4)
 
         pygame.display.flip()
 
