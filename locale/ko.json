@@ -62,6 +62,8 @@
   "shor_phase_success": "성공",
   "shor_phase_retry": "재시도",
   "shor_phase_done": "완료",
+  "shor_phase_tag_current": "진행",
+  "shor_phase_tag_done": "완료",
 
   "shor_desc_input": "소인수분해할 수 N을 입력하세요. Shor 알고리즘은 최적 고전 알고리즘보다 지수적으로 빠르게 큰 수를 소인수분해합니다.",
   "shor_desc_classical": "고전 전처리: 자명한 경우를 제거합니다. 짝수, 소수, 소수 거듭제곱은 고전적으로 처리 가능합니다.",

@@ -62,6 +62,8 @@
   "shor_phase_success": "Success",
   "shor_phase_retry": "Retry",
   "shor_phase_done": "Done",
+  "shor_phase_tag_current": "NOW",
+  "shor_phase_tag_done": "OK",
 
   "shor_desc_input": "Input the number N to factor. Shor's algorithm can factor large numbers exponentially faster than the best classical algorithms.",
   "shor_desc_classical": "Classical pre-check: eliminate trivial cases. Even numbers, primes, and prime powers can be handled classically.",

@@ -346,15 +346,21 @@ def _draw_phase_indicator(screen, phase, font, x, y):
         if is_current:
             clr = ACCENT
             marker = "▶"
+            tag = t("shor_phase_tag_current")
         elif is_done:
             clr = GREEN
             marker = "✓"
+            tag = t("shor_phase_tag_done")
         else:
             clr = SUBTEXT
             marker = "·"
+            tag = ""
 
-        s = font.render(f" {marker} {label}", True, clr)
-        screen.blit(s, (x, py))
+        main = font.render(f" {marker} {label}", True, clr)
+        screen.blit(main, (x, py))
+        if tag:
+            ts = font.render(f" [{tag}]", True, clr)
+            screen.blit(ts, (x + main.get_width(), py))
 
 
 def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h,
@@ -389,12 +395,27 @@ def _draw_mod_exp_graph(screen, table, period, font, x, y, w, h,
             if lx < x + w:
                 pygame.draw.line(screen, RED, (lx, y + 5), (lx, y + h - 10), 1)
 
-    # 레이블
+    # 타이틀
     if show >= n and period > 0:
         label = font.render(f"a^x mod N  (period={period})", True, TEXT_CLR)
     else:
         label = font.render(f"a^x mod N  ({show}/{n})", True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
+
+    # Y축 라벨 (최대값)
+    y_top = font.render(str(max_val), True, SUBTEXT)
+    screen.blit(y_top, (x + 10, y + 18))
+    y_zero = font.render("0", True, SUBTEXT)
+    screen.blit(y_zero, (x + 10, y + h - 12))
+
+    # X축 라벨 (처음과 끝)
+    x0_label = font.render("0", True, SUBTEXT)
+    screen.blit(x0_label, (x + 10, y + h - 2))
+    if n > 1:
+        xn_label = font.render(str(n - 1), True, SUBTEXT)
+        xn_x = x + 10 + (n - 1) * bar_w
+        if xn_x + xn_label.get_width() <= x + w:
+            screen.blit(xn_label, (xn_x, y + h - 2))
 
 
 def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h,
