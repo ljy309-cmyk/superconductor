@@ -70,6 +70,7 @@ _COLOR_MAP = {
     "RED": "COLLAPSED",
     "YELLOW": "WARNING",
     "PURPLE": "ACCENT_PURPLE",
+    "TEAL": "TEAL",
     "OVERLAY_CLR": "OVERLAY",
     "WHITE": "WHITE",
     "PANEL_BG": "PANEL_BG",
