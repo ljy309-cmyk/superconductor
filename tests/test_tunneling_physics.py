@@ -417,14 +417,14 @@ class TestQuantumParticleUpdate(unittest.TestCase):
         self.assertGreaterEqual(p.y - PARTICLE_RADIUS, SIM_TOP - 1)
         self.assertLessEqual(p.y + PARTICLE_RADIUS, SIM_TOP + SIM_H + 1)
 
-    def test_flash_timer_does_not_go_below_zero_far(self):
-        """flash_timer가 감소하지만 수백 프레임 후 부적절하게 음수가 되지 않음."""
+    def test_flash_timer_never_negative(self):
+        """flash_timer가 감소하지만 절대 음수가 되지 않음."""
         p = QuantumParticle()
         p.flash_timer = 0.1
         for _ in range(100):
             p.update(0.016)
-        # 0 이하가 될 수 있지만, 무한히 음수가 되면 안 됨
-        self.assertGreater(p.flash_timer, -1.0)
+            self.assertGreaterEqual(p.flash_timer, 0.0,
+                                    "flash_timer가 음수가 되었습니다")
 
     def test_position_linear_with_dt(self):
         """충돌 없는 구간에서 x 이동은 vx*dt에 비례."""

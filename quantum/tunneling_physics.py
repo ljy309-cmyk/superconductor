@@ -148,4 +148,4 @@ class QuantumParticle:
             self.reset()
 
         if self.flash_timer > 0:
-            self.flash_timer -= dt
+            self.flash_timer = max(0.0, self.flash_timer - dt)
