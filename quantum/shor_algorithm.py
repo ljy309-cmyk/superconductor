@@ -229,6 +229,12 @@ class Layout:
 _layout = Layout(WIDTH, HEIGHT)
 
 
+def _rebuild_layout(w: int, h: int):
+    """해상도 변경 시 레이아웃 재계산."""
+    global _layout
+    _layout = Layout(w, h)
+
+
 # ── UI 상태 ──────────────────────────────────────────
 
 @dataclass
@@ -925,7 +931,7 @@ def run_simulation():
     _load_theme_colors()
     on_theme_change(_load_theme_colors)
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption(t("game_title_shor"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 13)
@@ -993,6 +999,10 @@ def run_simulation():
             help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode(
+                    (event.w, event.h), pygame.RESIZABLE)
+                _rebuild_layout(event.w, event.h)
             elif event.type == pygame.KEYDOWN:
                 snd.handle_key(event.key)
 
