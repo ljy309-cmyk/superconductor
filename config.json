@@ -269,6 +269,13 @@
     "decoy_chance": 0.15,
     "decoy_error_mult": 2.0
   },
+  "grover": {
+    "max_qubits": 10,
+    "default_qubits": 4,
+    "animation_speed": 0.5,
+    "auto_batch_size": 1,
+    "display_states": 32
+  },
   "shor": {
     "max_number": 10000,
     "qft_precision_bits": 8,
