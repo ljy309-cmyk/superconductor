@@ -270,6 +270,10 @@ class UIState:
     # 시도 히스토리 페이지네이션
     history_page: int = 0
 
+    # 일반 알림 (페이드 아웃)
+    notify_msg: str = ""
+    notify_timer: float = 0.0
+
     # 막대 애니메이션 (하나씩 나타나는 효과)
     mod_exp_anim_count: int = 0   # 현재 표시할 막대 수
     qft_anim_count: int = 0       # 현재 표시할 막대 수
@@ -1048,8 +1052,12 @@ def run_simulation():
                         snd.play("click")
                     elif event.key == pygame.K_UP:
                         ui.auto_interval = max(0.1, ui.auto_interval - 0.1)
+                        _notify(ui, t("shor_speed_changed",
+                                      speed=f"{ui.auto_interval:.1f}"), 1.0)
                     elif event.key == pygame.K_DOWN:
                         ui.auto_interval = min(2.0, ui.auto_interval + 0.1)
+                        _notify(ui, t("shor_speed_changed",
+                                      speed=f"{ui.auto_interval:.1f}"), 1.0)
 
                 # ── RSA 모드 키 ──
                 elif ui.mode == MODE_RSA:
@@ -1112,6 +1120,10 @@ def run_simulation():
         # ── 막대 애니메이션 업데이트 ──
         _update_bar_animation(ui, dt)
 
+        # ── 알림 타이머 ──
+        if ui.notify_timer > 0:
+            ui.notify_timer -= dt
+
         # ── 렌더링 ──
         screen.fill(BG)
 
@@ -1155,6 +1167,16 @@ def run_simulation():
         badge_clr = diff_colors.get(ui.difficulty, TEXT_CLR)
         badge = info_font.render(f"[{ui.difficulty.upper()}]", True, badge_clr)
         screen.blit(badge, (L.W - badge.get_width() - 8, L.badge_y))
+
+        # 알림 메시지 (페이드 아웃)
+        if ui.notify_timer > 0:
+            alpha = min(255, int(255 * min(ui.notify_timer, 1.0)))
+            ns = info_font.render(ui.notify_msg, True, YELLOW)
+            notif_surf = pygame.Surface(ns.get_size(), pygame.SRCALPHA)
+            notif_surf.blit(ns, (0, 0))
+            notif_surf.set_alpha(alpha)
+            screen.blit(notif_surf, (L.W // 2 - ns.get_width() // 2,
+                                     L.hint_y1 - 20))
 
         # 오버레이
         toast.update(dt)
@@ -1259,18 +1281,32 @@ def _apply_difficulty(ui, name, snd):
     snd.play("click")
 
 
+def _notify(ui, msg: str, duration: float = 2.0):
+    """일반 알림 메시지 설정."""
+    ui.notify_msg = msg
+    ui.notify_timer = duration
+
+
 def _submit_input(ui, snd):
     """숫자 입력 확인."""
     ui.input_active = False
+    buf = ui.input_buffer.strip()
+    if not buf:
+        return
     try:
-        n = int(ui.input_buffer)
-        if n >= 2:
-            reset_state(ui.shor, n)
-            shor_step(ui.shor)  # INPUT → CLASSICAL_PRECHECK
-            ui.history_page = 0
-            snd.play("click")
+        n = int(buf)
     except ValueError:
-        pass
+        _notify(ui, t("shor_input_err_invalid"))
+        snd.play("error")
+        return
+    if n < 2:
+        _notify(ui, t("shor_input_err_range"))
+        snd.play("error")
+        return
+    reset_state(ui.shor, n)
+    shor_step(ui.shor)  # INPUT → CLASSICAL_PRECHECK
+    ui.history_page = 0
+    snd.play("click")
 
 
 def _on_mode_change(ui):

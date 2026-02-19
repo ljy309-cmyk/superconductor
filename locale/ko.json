@@ -129,6 +129,9 @@
   "shor_circuit_title": "양자 회로",
   "shor_input_hint": "Enter로 확인",
   "shor_attempt_history": "시도 히스토리:",
+  "shor_input_err_invalid": "잘못된 입력 — 정수를 입력하세요",
+  "shor_input_err_range": "N은 2 이상이어야 합니다",
+  "shor_speed_changed": "속도: {speed}초 / 단계",
 
   "btn_grover_search": "3-7. 그로버 탐색 — 양자 우위 체감",
   "game_title_grover": "그로버 탐색 — 양자 우위 체감",

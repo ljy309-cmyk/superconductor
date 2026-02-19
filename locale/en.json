@@ -129,6 +129,9 @@
   "shor_circuit_title": "Quantum Circuit",
   "shor_input_hint": "Enter to confirm",
   "shor_attempt_history": "Attempt History:",
+  "shor_input_err_invalid": "Invalid input — enter an integer",
+  "shor_input_err_range": "N must be ≥ 2",
+  "shor_speed_changed": "Speed: {speed}s / step",
 
   "btn_grover_search": "3-7. Grover's Search — Quantum Speedup",
   "game_title_grover": "Grover's Search — Quantum Speedup",
