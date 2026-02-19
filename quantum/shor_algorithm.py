@@ -425,6 +425,24 @@ def _draw_qft_histogram(screen, amplitudes, font, x, y, w, h,
     label = font.render("QFT Probability Distribution", True, TEXT_CLR)
     screen.blit(label, (x + 10, y + 2))
 
+    # ── 범례 (legend) ──
+    legend_items = [
+        (YELLOW, t("shor_qft_legend_high")),
+        (PURPLE, t("shor_qft_legend_mid")),
+        (OVERLAY_CLR, t("shor_qft_legend_low")),
+    ]
+    lx = x + w - 10
+    ly = y + 4
+    for clr, lbl in reversed(legend_items):
+        ls = font.render(lbl, True, clr)
+        lx -= ls.get_width()
+        screen.blit(ls, (lx, ly))
+        swatch_size = 8
+        sw_y = ly + ls.get_height() // 2 - swatch_size // 2
+        lx -= swatch_size + 4
+        pygame.draw.rect(screen, clr, (lx, sw_y, swatch_size, swatch_size))
+        lx -= 12
+
 
 def _draw_continued_fraction(screen, qft_result, font, x, y):
     """연분수 전개 시각화."""
