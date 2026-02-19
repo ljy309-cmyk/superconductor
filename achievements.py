@@ -39,6 +39,8 @@ _T = {
     "shor_speed_run_sec": cfg("achievements", "shor_speed_run_sec", 30),
     "grover_large_db": cfg("achievements", "grover_large_db", 6),
     "grover_speed_run_sec": cfg("achievements", "grover_speed_run_sec", 30),
+    "grover_multi_search": cfg("achievements", "grover_multi_search", 5),
+    "grover_perfect_prob": cfg("achievements", "grover_perfect_prob", 0.9),
 }
 
 # ── 업적 정의 ───────────────────────────────────────────────
@@ -274,6 +276,22 @@ ACHIEVEMENTS = [
             d.get("searches_completed", 0) >= 1
             and d.get("play_time", 999) <= _T["grover_speed_run_sec"]
         ),
+    },
+    {
+        "id": "grover_multi_search",
+        "module": "grover_search",
+        "title": "Search Expert",
+        "desc": f"한 세션에서 {_T['grover_multi_search']}회 이상 탐색을 완료했습니다!",
+        "icon": "M",
+        "condition": lambda d: d.get("searches_completed", 0) >= _T["grover_multi_search"],
+    },
+    {
+        "id": "grover_high_prob",
+        "module": "grover_search",
+        "title": "Quantum Precision",
+        "desc": "측정 직전 목표 확률이 90% 이상이었습니다!",
+        "icon": "P",
+        "condition": lambda d: d.get("best_target_prob", 0) >= _T["grover_perfect_prob"],
     },
     # 플럭스 피닝
     {

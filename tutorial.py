@@ -165,6 +165,48 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
             "highlight": "none",
         },
     ],
+    "grover_search": [
+        {
+            "title": "Grover's Search Algorithm",
+            "text": "정렬되지 않은 데이터베이스에서 원하는 항목을\n양자 컴퓨터로 빠르게 찾는 알고리즘입니다.",
+            "highlight": "center",
+        },
+        {
+            "title": "Step 1: Superposition",
+            "text": "Hadamard 게이트로 모든 큐비트를 균등 중첩 상태로\n만듭니다. 모든 상태가 동일한 확률을 가집니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Step 2: Oracle",
+            "text": "오라클이 정답 상태의 위상을 반전합니다.\n|x⟩ → −|x⟩ (정답인 경우만)",
+            "highlight": "none",
+        },
+        {
+            "title": "Step 3: Diffusion",
+            "text": "진폭 증폭(Amplitude Amplification)으로\n정답 상태의 확률을 높입니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "Optimal Iterations",
+            "text": "반복 횟수 ≈ π/4 × √(N/M)\n너무 많이 반복하면 오히려 확률이 줄어듭니다!",
+            "highlight": "none",
+        },
+        {
+            "title": "Quantum Advantage",
+            "text": "고전 탐색: O(N) 쿼리 / 양자 탐색: O(√N) 쿼리\n→ 2차 속도 향상(Quadratic Speedup)!",
+            "highlight": "none",
+        },
+        {
+            "title": "3 Modes",
+            "text": "Tab 키로 모드를 전환합니다:\n1) Step-by-Step  2) Auto Run  3) Compare Race",
+            "highlight": "none",
+        },
+        {
+            "title": "Controls",
+            "text": "SPACE: 다음 단계/시작  |  N: 새 탐색  |  R: 리셋\nTab: 모드 전환  |  ↑↓: 속도/DB 크기",
+            "highlight": "none",
+        },
+    ],
 }
 
 

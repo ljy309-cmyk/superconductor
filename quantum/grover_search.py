@@ -32,10 +32,12 @@ from quantum.grover_search_engine import (
     get_probabilities,
     target_probability,
 )
+from presets import get_preset
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sound_manager import get_sound_manager
 from theme import load_pg_colors, on_theme_change
+from tutorial import TutorialOverlay
 
 _log = get_module_logger("grover_search")
 
@@ -121,6 +123,9 @@ class UIState:
     input_target_buffer: str = "7"
     input_active: int = 0          # 0=비활성, 1=큐빗, 2=대상
     input_field: int = 0
+
+    # 난이도
+    difficulty: str = "normal"
 
     # 통계
     searches_completed: int = 0
@@ -607,10 +612,30 @@ def run_simulation():
     title_font = pygame.font.SysFont("Consolas", 18, bold=True)
     info_font = pygame.font.SysFont("Consolas", 11)
 
+    # 난이도 선택
+    from difficulty_dialog import choose_difficulty
+
+    chosen = choose_difficulty(screen, font)
+    if chosen is None:
+        on_theme_change(_load_theme_colors)  # cleanup
+        pygame.quit()
+        return
+    preset = get_preset(chosen)
+    grover_preset = preset.get("grover", {})
+    default_qubits = grover_preset.get("default_qubits", 4)
+    anim_speed = grover_preset.get("animation_speed", ANIMATION_SPEED)
+
     ui = UIState()
+    ui.grover = GroverState(n_qubits=default_qubits,
+                            targets=[random.randint(0, (1 << default_qubits) - 1)])
+    ui.input_buffer = str(default_qubits)
+    ui.input_target_buffer = str(ui.grover.targets[0])
+    ui.auto_interval = anim_speed
+    ui.difficulty = chosen
     grover_step(ui.grover)  # INPUT → INIT_SUPERPOSITION
 
     help_overlay = HelpOverlay("grover_search")
+    tutorial = TutorialOverlay("grover_search")
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("grover_search")
@@ -675,6 +700,8 @@ def run_simulation():
 
         # ── 이벤트 ──
         for event in pygame.event.get():
+            if tutorial.handle_event(event):
+                continue
             help_overlay.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
@@ -838,17 +865,27 @@ def run_simulation():
             screen.blit(hs, (WIDTH // 2 - hs.get_width() // 2,
                              HEIGHT - 38 + i * 16))
 
+        # 난이도 뱃지
+        diff_colors = {"easy": GREEN, "normal": YELLOW, "hard": RED}
+        badge_clr = diff_colors.get(ui.difficulty, TEXT_CLR)
+        badge = info_font.render(f"[{ui.difficulty.upper()}]", True, badge_clr)
+        screen.blit(badge, (WIDTH - badge.get_width() - 8, HEIGHT - 16))
+
         # 오버레이
         toast.update(dt)
         toast.draw(screen, info_font)
         toast.draw_history(screen, info_font)
         help_overlay.draw(screen, info_font)
+        tutorial.draw(screen, font)
         perf.draw_overlay(screen, info_font, x=WIDTH - 250, y=4)
 
         pygame.display.flip()
 
     perf.log_summary()
 
+    best_prob = max(
+        (h.get("target_prob", 0) for h in ui.grover.search_history),
+        default=0.0)
     session_data = {
         "play_time": round(time.time() - ui.start_time, 1),
         "searches_completed": ui.searches_completed,
@@ -857,6 +894,7 @@ def run_simulation():
         "largest_db": max(
             (h["n_qubits"] for h in ui.grover.search_history),
             default=ui.grover.n_qubits),
+        "best_target_prob": round(best_prob, 4),
     }
 
     finalize_session(

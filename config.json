@@ -201,6 +201,10 @@
       "squid_mines": {
         "num_mines": 5,
         "sensitivity_default": 5.0
+      },
+      "grover": {
+        "default_qubits": 3,
+        "animation_speed": 0.8
       }
     },
     "normal": {
@@ -227,6 +231,10 @@
       "squid_mines": {
         "num_mines": 8,
         "sensitivity_default": 3.0
+      },
+      "grover": {
+        "default_qubits": 4,
+        "animation_speed": 0.5
       }
     },
     "hard": {
@@ -253,6 +261,10 @@
       "squid_mines": {
         "num_mines": 14,
         "sensitivity_default": 1.5
+      },
+      "grover": {
+        "default_qubits": 6,
+        "animation_speed": 0.3
       }
     }
   },

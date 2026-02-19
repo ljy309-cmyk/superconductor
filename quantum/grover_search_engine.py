@@ -384,6 +384,7 @@ def _step_measure(state: GroverState):
         "success": state.measured_is_target,
         "iterations": state.current_iteration,
         "optimal": state.optimal_iterations,
+        "target_prob": prob,
     })
 
     if state.measured_is_target:
