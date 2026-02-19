@@ -5,6 +5,7 @@
 """
 
 import math
+import time
 
 import pygame
 
@@ -205,6 +206,7 @@ def run_simulation():
     pygame.display.set_caption(t("game_title_tunneling"))
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Consolas", 12)
+    info_font = pygame.font.SysFont("Consolas", 11)
     title_font = pygame.font.SysFont("Consolas", 16, bold=True)
     big_font = pygame.font.SysFont("Consolas", 18, bold=True)
 
@@ -243,8 +245,7 @@ def run_simulation():
     if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
 
-    import time as _time
-    start_time = _time.time()
+    start_time = time.time()
 
     running = True
     while running:
@@ -268,9 +269,11 @@ def run_simulation():
                         running = False
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
+                    snd.play("click")
                 elif event.key == pygame.K_r:
                     particle = QuantumParticle()
                     panel.reset_all()
+                    snd.play("click")
                 elif event.key == pygame.K_UP:
                     sl_speed.value = sl_speed.value + 0.5
                 elif event.key == pygame.K_DOWN:
@@ -356,17 +359,17 @@ def run_simulation():
 
         # ── 오버레이 ──
         toast.update(dt)
-        toast.draw(screen, font)
-        toast.draw_history(screen, font)
-        help_overlay.draw(screen, font)
+        toast.draw(screen, info_font)
+        toast.draw_history(screen, info_font)
+        help_overlay.draw(screen, info_font)
         tutorial.draw(screen, font)
-        perf.draw_overlay(screen, font, x=WIDTH - 250, y=4)
+        perf.draw_overlay(screen, info_font, x=WIDTH - 250, y=4)
 
         pygame.display.flip()
 
     perf.log_summary()
     rate = particle.tunnel_count / max(particle.total_attempts, 1)
-    play_time = round(_time.time() - start_time, 1)
+    play_time = round(time.time() - start_time, 1)
     finalize_session(
         "tunneling",
         {

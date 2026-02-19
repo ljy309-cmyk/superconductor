@@ -153,16 +153,19 @@ def run_simulation():
                 elif event.key == pygame.K_BACKSPACE:
                     qc.remove_last_gate()
                     qc.run()
+                    snd.play("click")
                 elif event.key == pygame.K_DELETE:
                     qc.clear()
                     measure_counts.clear()
                     total_measures = 0
+                    snd.play("click")
                 elif event.key == pygame.K_RETURN:
                     # 측정
                     qc.run()
                     result = qc.measure()
                     measure_counts[result] = measure_counts.get(result, 0) + 1
                     total_measures += 1
+                    snd.play("click")
                 elif event.key == pygame.K_TAB:
                     bloch_qubit = (bloch_qubit + 1) % qc.num_qubits
                 elif event.key == pygame.K_l:
@@ -286,11 +289,11 @@ def run_simulation():
 
         # ── 오버레이 ──
         toast.update(raw_dt)
-        toast.draw(screen, font)
-        toast.draw_history(screen, font)
-        help_overlay.draw(screen, font)
+        toast.draw(screen, small_font)
+        toast.draw_history(screen, small_font)
+        help_overlay.draw(screen, small_font)
         tutorial.draw(screen, font)
-        perf.draw_overlay(screen, font, x=WIDTH - 250, y=4)
+        perf.draw_overlay(screen, small_font, x=WIDTH - 250, y=4)
 
         pygame.display.flip()
 
