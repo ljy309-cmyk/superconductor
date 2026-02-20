@@ -36,6 +36,8 @@ def _backup_before_overwrite(dest: str) -> None:
     """기존 파일이 있으면 ``.bak`` 백업 생성."""
     if os.path.exists(dest):
         bak = dest + ".bak"
+        if os.path.exists(bak):
+            _log.info("기존 백업 덮어쓰기: %s", bak)
         try:
             shutil.copy2(dest, bak)
             _log.info("백업 생성: %s", bak)
@@ -169,7 +171,11 @@ def list_exports() -> list[str]:
     """내보내기 디렉터리의 ZIP 파일 목록."""
     if not os.path.isdir(_EXPORT_DIR):
         return []
-    return sorted(
-        [os.path.join(_EXPORT_DIR, f) for f in os.listdir(_EXPORT_DIR) if f.endswith(".zip")],
-        reverse=True,
-    )
+    try:
+        return sorted(
+            [os.path.join(_EXPORT_DIR, f) for f in os.listdir(_EXPORT_DIR) if f.endswith(".zip")],
+            reverse=True,
+        )
+    except OSError as e:
+        _log.warning("내보내기 목록 조회 실패: %s", e)
+        return []

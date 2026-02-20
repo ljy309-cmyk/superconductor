@@ -668,6 +668,7 @@
   "settings_delete": "Delete",
   "settings_export_done": "Settings exported: {path}",
   "settings_export_fail": "Export failed: No settings files to export or write error occurred.",
+  "settings_save_error": "Failed to save settings: cannot write to file.",
   "settings_import_done": "Settings imported ({count} files)",
   "settings_import_skipped": "Skipped {count} file(s): {files}",
   "settings_import_fail": "Import failed: Please select a valid ZIP file.",

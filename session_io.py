@@ -90,8 +90,8 @@ def _export_as_json(prefix, session_data, ts, trial_rows=None):
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-    except OSError:
-        _log.warning("JSON 내보내기 실패: %s", path)
+    except OSError as e:
+        _log.warning("JSON 내보내기 실패: %s — %s", path, e)
         return None
     _log.info("데이터 내보내기 완료: %s", path)
     return path
@@ -131,8 +131,8 @@ def _export_as_csv(prefix, session_data, ts, trial_rows=None, trial_columns=None
                         values.append(v)
                 writer.writerow(headers)
                 writer.writerow(values)
-    except OSError:
-        _log.warning("CSV 내보내기 실패: %s", path)
+    except OSError as e:
+        _log.warning("CSV 내보내기 실패: %s — %s", path, e)
         return None
     _log.info("데이터 내보내기 완료: %s", path)
     return path
@@ -216,6 +216,13 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
     max_visible = 6
     clock = pygame.time.Clock()
 
+    # Surface 캐싱 — 루프 내 반복 생성 방지
+    overlay = pygame.Surface((W, H), pygame.SRCALPHA)
+    btn_sample = _import_btn_rect(W, H, 0)
+    btn_surf = pygame.Surface((btn_sample.width, btn_sample.height), pygame.SRCALPHA)
+    title_surf = font.render(t("import_title"), True, pg.TEXT)
+    hint_surf = font.render(t("import_hint"), True, pg.SUBTEXT)
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -267,7 +274,6 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
                         selected = idx
 
         # 렌더링
-        overlay = pygame.Surface((W, H), pygame.SRCALPHA)
         overlay.fill((*pg.BG, 200))
         screen.blit(overlay, (0, 0))
 
@@ -277,8 +283,7 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
         pygame.draw.rect(screen, pg.PANEL_BG, (px, py, panel_w, panel_h), border_radius=10)
         pygame.draw.rect(screen, pg.OVERLAY, (px, py, panel_w, panel_h), 2, border_radius=10)
 
-        title = font.render(t("import_title"), True, pg.TEXT)
-        screen.blit(title, (W // 2 - title.get_width() // 2, py + 12))
+        screen.blit(title_surf, (W // 2 - title_surf.get_width() // 2, py + 12))
 
         for vi in range(min(max_visible, len(files) - scroll)):
             idx = scroll + vi
@@ -286,7 +291,7 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
             btn = _import_btn_rect(W, H, vi)
             is_sel = idx == selected
             bg_alpha = 80 if is_sel else 30
-            btn_surf = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
+            btn_surf.fill((0, 0, 0, 0))
             btn_surf.fill((*pg.ACCENT_BLUE[:3], bg_alpha))
             screen.blit(btn_surf, btn.topleft)
             border_w = 2 if is_sel else 1
@@ -301,10 +306,9 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
             info = font.render(f"{selected + 1}/{len(files)}", True, pg.SUBTEXT)
             screen.blit(info, (W // 2 - info.get_width() // 2, py + panel_h - 22))
 
-        hint = font.render(t("import_hint"), True, pg.SUBTEXT)
         screen.blit(
-            hint,
-            (W // 2 - hint.get_width() // 2, py + panel_h - 22 if len(files) <= max_visible else py + panel_h - 10),
+            hint_surf,
+            (W // 2 - hint_surf.get_width() // 2, py + panel_h - 22 if len(files) <= max_visible else py + panel_h - 10),
         )
 
         pygame.display.flip()
@@ -314,12 +318,14 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
 # ── 데이터 로드 ───────────────────────────────────────
 
 
-def load_session(path: str) -> dict | None:
+def load_session(path: str | None) -> dict | None:
     """세션 파일 로드 (포맷 자동 감지). 실패 시 ``None``.
 
     ``.json`` → JSON으로 로드, ``.csv`` → CSV로 로드.
     지원하지 않는 확장자는 경고 후 ``None`` 반환.
     """
+    if not path:
+        return None
     if path.endswith(".csv"):
         return _load_session_csv(path)
     if path.endswith(".json"):

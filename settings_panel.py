@@ -8,10 +8,13 @@
     open_settings(master, on_change_callback)
 """
 
+import json
+import os
 import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
+from logger import get_module_logger
 from font_helper import get_font_family, get_user_font, list_available_fonts, set_user_font
 from i18n import get_locale, set_locale, t
 from sound_manager import get_sound_manager
@@ -27,6 +30,29 @@ from theme import (
     toggle_colorblind,
     toggle_theme,
 )
+
+_log = get_module_logger("settings_panel")
+_CFG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+
+def _read_config() -> dict:
+    """config.json 읽기. 실패 시 빈 dict 반환."""
+    try:
+        with open(_CFG_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _write_config(cfg: dict) -> bool:
+    """config.json 쓰기. 실패 시 ``False`` 반환 및 로그 기록."""
+    try:
+        with open(_CFG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+        return True
+    except OSError as e:
+        _log.warning("설정 저장 실패: %s", e)
+        return False
 
 
 class SettingsPanel(tk.Toplevel):
@@ -192,34 +218,16 @@ class SettingsPanel(tk.Toplevel):
         self._rebuild()
 
     def _change_fps(self, fps_str):
-        import json
-        import os
         fps = int(fps_str)
-        cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-        try:
-            with open(cfg_path, encoding="utf-8") as f:
-                cfg = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            cfg = {}
+        cfg = _read_config()
         if "display" not in cfg:
             cfg["display"] = {}
         cfg["display"]["fps"] = fps
-        try:
-            with open(cfg_path, "w", encoding="utf-8") as f:
-                json.dump(cfg, f, indent=2, ensure_ascii=False)
-        except OSError:
-            pass
+        if not _write_config(cfg):
+            messagebox.showwarning(t("settings_title"), t("settings_save_error"), parent=self)
 
     def _get_fps(self) -> int:
-        import json
-        import os
-        cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-        try:
-            with open(cfg_path, encoding="utf-8") as f:
-                cfg = json.load(f)
-            return cfg.get("display", {}).get("fps", 60)
-        except (OSError, json.JSONDecodeError):
-            return 60
+        return _read_config().get("display", {}).get("fps", 60)
 
     # ── 폰트 ──
 
@@ -273,35 +281,19 @@ class SettingsPanel(tk.Toplevel):
         snd = get_sound_manager()
         snd.volume = int(val) / 100.0
         snd.save_preferences()
+        if self._on_change:
+            self._on_change()
 
     # ── 난이도 ──
 
     def _get_default_difficulty(self) -> str:
-        import json
-        import os
-        cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-        try:
-            with open(cfg_path, encoding="utf-8") as f:
-                cfg = json.load(f)
-            return cfg.get("default_difficulty", "normal")
-        except (OSError, json.JSONDecodeError):
-            return "normal"
+        return _read_config().get("default_difficulty", "normal")
 
     def _change_difficulty(self, diff):
-        import json
-        import os
-        cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-        try:
-            with open(cfg_path, encoding="utf-8") as f:
-                cfg = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            cfg = {}
+        cfg = _read_config()
         cfg["default_difficulty"] = diff
-        try:
-            with open(cfg_path, "w", encoding="utf-8") as f:
-                json.dump(cfg, f, indent=2, ensure_ascii=False)
-        except OSError:
-            pass
+        if not _write_config(cfg):
+            messagebox.showwarning(t("settings_title"), t("settings_save_error"), parent=self)
 
     # ── 데이터 관리 ──
 

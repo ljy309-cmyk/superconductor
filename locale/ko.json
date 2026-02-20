@@ -668,6 +668,7 @@
   "settings_delete": "삭제",
   "settings_export_done": "설정 내보내기 완료: {path}",
   "settings_export_fail": "내보내기 실패: 내보낼 설정 파일이 없거나 쓰기 오류가 발생했습니다.",
+  "settings_save_error": "설정 저장 실패: 파일에 쓸 수 없습니다.",
   "settings_import_done": "설정 가져오기 완료 ({count}개 파일)",
   "settings_import_skipped": "건너뛴 파일 {count}개: {files}",
   "settings_import_fail": "가져오기 실패: 올바른 ZIP 파일을 선택하세요.",

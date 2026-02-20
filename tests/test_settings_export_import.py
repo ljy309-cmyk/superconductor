@@ -2284,5 +2284,214 @@ class TestImportSettingsRefactored(unittest.TestCase):
             settings_io._EXPORT_DIRS = orig_dirs
 
 
+# ═══════════════════════════════════════════════════════════
+# 36. OSError 상세 정보 로깅 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportOSErrorDetail(unittest.TestCase):
+    """_export_as_json/_export_as_csv OSError 시 상세 정보 로깅."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+        self._orig = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+        session_io.EXPORT_DIR = self._orig
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_json_error_includes_detail(self):
+        import builtins
+        import session_io
+        real_open = builtins.open
+
+        def mock_open_fail(path, *a, **kw):
+            if path.endswith(".json") and "stats" in path:
+                raise OSError("disk full")
+            return real_open(path, *a, **kw)
+
+        with unittest.mock.patch("builtins.open", side_effect=mock_open_fail):
+            with unittest.mock.patch.object(session_io._log, "warning") as mock_warn:
+                result = session_io.export_session("test", {"a": 1})
+                self.assertIsNone(result)
+                self.assertTrue(mock_warn.called)
+                fmt_str = mock_warn.call_args[0][0]
+                self.assertIn("—", fmt_str)
+
+    def test_csv_error_includes_detail(self):
+        import builtins
+        import session_io
+        real_open = builtins.open
+
+        def mock_open_fail(path, *a, **kw):
+            if path.endswith(".csv") and "stats" in path:
+                raise OSError("disk full")
+            return real_open(path, *a, **kw)
+
+        with unittest.mock.patch("builtins.open", side_effect=mock_open_fail):
+            with unittest.mock.patch.object(session_io._log, "warning") as mock_warn:
+                result = session_io.export_session("test", {"a": 1}, fmt="csv")
+                self.assertIsNone(result)
+                self.assertTrue(mock_warn.called)
+                fmt_str = mock_warn.call_args[0][0]
+                self.assertIn("—", fmt_str)
+
+
+# ═══════════════════════════════════════════════════════════
+# 37. list_exports() 예외 처리 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestListExportsExceptionHandling(unittest.TestCase):
+    """list_exports() PermissionError 등 예외 시 빈 리스트 반환."""
+
+    def test_oserror_returns_empty(self):
+        import settings_io
+        orig = settings_io._EXPORT_DIR
+        tmpdir = tempfile.mkdtemp()
+        try:
+            settings_io._EXPORT_DIR = tmpdir
+            with unittest.mock.patch("os.listdir", side_effect=PermissionError("access denied")):
+                result = settings_io.list_exports()
+                self.assertEqual(result, [])
+        finally:
+            settings_io._EXPORT_DIR = orig
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_normal_listing_still_works(self):
+        import settings_io
+        orig = settings_io._EXPORT_DIR
+        tmpdir = tempfile.mkdtemp()
+        try:
+            settings_io._EXPORT_DIR = tmpdir
+            # ZIP 파일 생성
+            for name in ["a.zip", "b.zip", "c.txt"]:
+                open(os.path.join(tmpdir, name), "w").close()
+            result = settings_io.list_exports()
+            self.assertEqual(len(result), 2)
+            self.assertTrue(all(p.endswith(".zip") for p in result))
+        finally:
+            settings_io._EXPORT_DIR = orig
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ═══════════════════════════════════════════════════════════
+# 38. load_session None/빈 문자열 방어 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestLoadSessionNullGuard(unittest.TestCase):
+    """load_session()에 None 또는 빈 문자열 전달 시 None 반환."""
+
+    def test_none_returns_none(self):
+        from session_io import load_session
+        self.assertIsNone(load_session(None))
+
+    def test_empty_string_returns_none(self):
+        from session_io import load_session
+        self.assertIsNone(load_session(""))
+
+
+# ═══════════════════════════════════════════════════════════
+# 39. config.json 헬퍼 함수 검증
+# ═══════════════════════════════════════════════════════════
+
+
+@unittest.skipUnless(
+    unittest.mock.patch.dict("sys.modules", {}).start() is None or True,
+    "requires settings_panel importable",
+)
+class TestConfigHelpers(unittest.TestCase):
+    """_read_config / _write_config 헬퍼 검증."""
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import settings_panel  # noqa: F401
+            cls._skip = False
+        except (ImportError, ModuleNotFoundError):
+            cls._skip = True
+
+    def setUp(self):
+        if self._skip:
+            self.skipTest("settings_panel import 불가 (tkinter 미설치)")
+        import settings_panel
+        self._orig_path = settings_panel._CFG_PATH
+        self.tmpdir = tempfile.mkdtemp()
+        self.cfg_path = os.path.join(self.tmpdir, "config.json")
+        settings_panel._CFG_PATH = self.cfg_path
+
+    def tearDown(self):
+        if self._skip:
+            return
+        import settings_panel
+        settings_panel._CFG_PATH = self._orig_path
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_read_missing_returns_empty_dict(self):
+        from settings_panel import _read_config
+        self.assertEqual(_read_config(), {})
+
+    def test_write_and_read_roundtrip(self):
+        from settings_panel import _read_config, _write_config
+        cfg = {"display": {"fps": 120}, "default_difficulty": "hard"}
+        self.assertTrue(_write_config(cfg))
+        loaded = _read_config()
+        self.assertEqual(loaded["display"]["fps"], 120)
+        self.assertEqual(loaded["default_difficulty"], "hard")
+
+    def test_write_failure_returns_false(self):
+        from settings_panel import _write_config
+        with unittest.mock.patch("builtins.open", side_effect=OSError("read-only")):
+            self.assertFalse(_write_config({"a": 1}))
+
+
+# ═══════════════════════════════════════════════════════════
+# 40. _backup_before_overwrite 기존 .bak 경고 로그 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestBackupOverwriteWarning(unittest.TestCase):
+    """기존 .bak 파일이 있을 때 덮어쓰기 로그 확인."""
+
+    def test_existing_bak_logs_overwrite(self):
+        import settings_io
+        tmpdir = tempfile.mkdtemp()
+        try:
+            dest = os.path.join(tmpdir, "config.json")
+            bak = dest + ".bak"
+            # 원본 + 기존 백업 생성
+            with open(dest, "w") as f:
+                f.write('{"v": 2}')
+            with open(bak, "w") as f:
+                f.write('{"v": 1}')
+
+            with unittest.mock.patch.object(settings_io._log, "info") as mock_info:
+                settings_io._backup_before_overwrite(dest)
+                # "기존 백업 덮어쓰기" 로그 확인
+                messages = [call[0][0] for call in mock_info.call_args_list]
+                self.assertTrue(any("기존 백업 덮어쓰기" in m for m in messages))
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_no_existing_bak_no_overwrite_log(self):
+        import settings_io
+        tmpdir = tempfile.mkdtemp()
+        try:
+            dest = os.path.join(tmpdir, "config.json")
+            with open(dest, "w") as f:
+                f.write('{"v": 1}')
+
+            with unittest.mock.patch.object(settings_io._log, "info") as mock_info:
+                settings_io._backup_before_overwrite(dest)
+                messages = [call[0][0] for call in mock_info.call_args_list]
+                self.assertFalse(any("기존 백업 덮어쓰기" in m for m in messages))
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()
