@@ -297,6 +297,36 @@ class QuantumParticle:
         if self.flash_timer > 0:
             self.flash_timer -= dt
 
+    # ── 스냅샷 / 복원 (#31 되감기) ──────────────────────
+
+    def snapshot(self) -> dict:
+        """현재 입자 상태를 딕셔너리로 반환."""
+        return {
+            "x": self.x,
+            "y": self.y,
+            "vx": self.vx,
+            "vy": self.vy,
+            "alive": self.alive,
+            "tunneled": self.tunneled,
+            "flash_timer": self.flash_timer,
+            "tunnel_count": self.tunnel_count,
+            "reflect_count": self.reflect_count,
+            "total_attempts": self.total_attempts,
+        }
+
+    def restore(self, snap: dict):
+        """스냅샷에서 입자 상태를 복원."""
+        self.x = snap["x"]
+        self.y = snap["y"]
+        self.vx = snap["vx"]
+        self.vy = snap["vy"]
+        self.alive = snap["alive"]
+        self.tunneled = snap["tunneled"]
+        self.flash_timer = snap["flash_timer"]
+        self.tunnel_count = snap["tunnel_count"]
+        self.reflect_count = snap["reflect_count"]
+        self.total_attempts = snap["total_attempts"]
+
 
 # ── 배리어 스위퍼 (#29) ──────────────────────────────
 

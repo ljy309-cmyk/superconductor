@@ -516,6 +516,9 @@
   "tn_step_mode": "스텝 모드",
   "tn_step_indicator": "[STEP] 프레임 #{frame}  dt={dt:.1f}ms  (N: 다음 스텝)",
 
+  "tn_rewind_title": "되감기",
+  "tn_rewind_indicator": "◀◀ 되감기 {pct:.0f}% ({frames}프레임)  F5: 중지",
+
   "glossary_title": "용어집",
   "glossary_nav_hint": "↑↓: 스크롤  |  G/ESC: 닫기",
 

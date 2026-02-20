@@ -2094,6 +2094,115 @@ class TestHelpOverlayShortcuts(unittest.TestCase):
         self.assertIn("SPACE", joined)
 
 
+class TestRewind(unittest.TestCase):
+    """#31 — 되감기 기능 테스트."""
+
+    def test_particle_snapshot_restore(self):
+        """QuantumParticle snapshot/restore 왕복 일치."""
+        from quantum.tunneling_physics import QuantumParticle
+
+        p = QuantumParticle(seed=42)
+        # 몇 프레임 진행
+        for _ in range(10):
+            p.update(1 / 60, barrier_width=12, tunnel_prob=0.1)
+        snap = p.snapshot()
+
+        # 더 진행해서 상태 변경
+        for _ in range(20):
+            p.update(1 / 60, barrier_width=12, tunnel_prob=0.1)
+        self.assertNotEqual(p.x, snap["x"])
+
+        # 복원 후 일치 확인
+        p.restore(snap)
+        self.assertAlmostEqual(p.x, snap["x"])
+        self.assertAlmostEqual(p.y, snap["y"])
+        self.assertAlmostEqual(p.vx, snap["vx"])
+        self.assertAlmostEqual(p.vy, snap["vy"])
+        self.assertEqual(p.alive, snap["alive"])
+        self.assertEqual(p.tunneled, snap["tunneled"])
+        self.assertEqual(p.tunnel_count, snap["tunnel_count"])
+        self.assertEqual(p.reflect_count, snap["reflect_count"])
+        self.assertEqual(p.total_attempts, snap["total_attempts"])
+
+    def test_snapshot_keys(self):
+        """스냅샷에 필수 키가 모두 포함."""
+        from quantum.tunneling_physics import QuantumParticle
+
+        p = QuantumParticle(seed=1)
+        snap = p.snapshot()
+        expected = {
+            "x",
+            "y",
+            "vx",
+            "vy",
+            "alive",
+            "tunneled",
+            "flash_timer",
+            "tunnel_count",
+            "reflect_count",
+            "total_attempts",
+        }
+        self.assertEqual(set(snap.keys()), expected)
+
+    def test_help_has_f5(self):
+        """터널링 도움말에 F5 되감기 안내 포함."""
+        from help_overlay import _HELP_TEXTS
+
+        lines = _HELP_TEXTS.get("tunneling", [])
+        joined = " ".join(lines)
+        self.assertIn("F5", joined)
+
+    def test_i18n_rewind_keys_exist_ko(self):
+        """한국어 로케일에 되감기 i18n 키 존재."""
+        import json
+
+        with open("locale/ko.json", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIn("tn_rewind_title", data)
+        self.assertIn("tn_rewind_indicator", data)
+
+    def test_i18n_rewind_keys_exist_en(self):
+        """영어 로케일에 되감기 i18n 키 존재."""
+        import json
+
+        with open("locale/en.json", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIn("tn_rewind_title", data)
+        self.assertIn("tn_rewind_indicator", data)
+
+    def test_rewind_indicator_format(self):
+        """되감기 인디케이터 문자열 포맷 유효."""
+        import json
+
+        with open("locale/en.json", encoding="utf-8") as f:
+            data = json.load(f)
+        tmpl = data["tn_rewind_indicator"]
+        result = tmpl.format(pct=75.3, frames=180)
+        self.assertIn("75", result)
+        self.assertIn("180", result)
+
+    def test_restore_preserves_counters(self):
+        """복원 후 카운터(tunnel_count 등)가 스냅샷 시점 값으로 되돌아감."""
+        from quantum.tunneling_physics import QuantumParticle
+
+        p = QuantumParticle(seed=99)
+        # 수동으로 카운터 설정
+        p.tunnel_count = 5
+        p.reflect_count = 3
+        p.total_attempts = 8
+        snap = p.snapshot()
+
+        # 카운터 변경
+        p.tunnel_count = 10
+        p.reflect_count = 7
+        p.total_attempts = 17
+
+        p.restore(snap)
+        self.assertEqual(p.tunnel_count, 5)
+        self.assertEqual(p.reflect_count, 3)
+        self.assertEqual(p.total_attempts, 8)
+
+
 class TestStepMode(unittest.TestCase):
     """#30 — 스텝별 실행 모드 테스트."""
 
@@ -2409,6 +2518,7 @@ class TestBarrierSweeper(unittest.TestCase):
 
     def test_seed_reproducibility(self):
         """같은 시드로 동일 결과."""
+
         def run_sweep(seed):
             sw = BarrierSweeper(seed=seed, trials_per_width=20, batch_size=500)
             while sw.advance():

@@ -516,6 +516,9 @@
   "tn_step_mode": "Step Mode",
   "tn_step_indicator": "[STEP] Frame #{frame}  dt={dt:.1f}ms  (N: next step)",
 
+  "tn_rewind_title": "Rewind",
+  "tn_rewind_indicator": "◀◀ Rewind {pct:.0f}% ({frames} frames)  F5: stop",
+
   "glossary_title": "Glossary",
   "glossary_nav_hint": "Up/Down: Scroll  |  G/ESC: Close",
 

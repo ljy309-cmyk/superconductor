@@ -1124,6 +1124,12 @@ class _SimContext:
         self.step_count = 0  # 스텝 모드에서 진행한 총 프레임 수
         self.step_dt = 0.0  # 마지막 스텝의 dt 값
 
+        # 되감기 (#31)
+        rewind_sec = cfg("tunneling", "rewind_seconds", 5)
+        self.rewind_buf: deque[dict] = deque(maxlen=int(FPS * rewind_sec))
+        self.rewinding = False  # 되감기 재생 중 여부
+        self.rewind_speed = cfg("tunneling", "rewind_speed", 2)  # 되감기 배속
+
     def read_sliders(self):
         """슬라이더 값 → 물리 파라미터 동기화."""
         self.speed_mult = self.sl_speed.value
@@ -1267,6 +1273,17 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         if ctx.step_mode:
             ctx.step_pending = True
             _log.debug("스텝 진행 요청 (프레임 #%d)", ctx.step_count + 1)
+    elif key == pygame.K_F5:
+        # 되감기 토글 (#31)
+        if ctx.rewinding:
+            # 되감기 중지 → 현재 시점에서 일시정지
+            ctx.rewinding = False
+            ctx.paused = True
+            _log.info("되감기 중지 (버퍼 %d프레임 남음)", len(ctx.rewind_buf))
+        elif len(ctx.rewind_buf) > 0:
+            ctx.rewinding = True
+            ctx.paused = True  # 정방향 물리 중지
+            _log.info("되감기 시작 (%d프레임 보유)", len(ctx.rewind_buf))
     return running
 
 
@@ -1314,6 +1331,50 @@ def _handle_mouse_motion(ctx: _SimContext, pos: tuple[int, int]):
 
 
 # ── 물리 업데이트 ────────────────────────────────────
+
+
+# ── 되감기 스냅샷 (#31) ──────────────────────────────
+
+
+def _capture_snapshot(ctx: _SimContext):
+    """현재 프레임 상태를 되감기 버퍼에 저장."""
+    ctx.rewind_buf.append(
+        {
+            "particle": ctx.particle.snapshot(),
+            "barrier_width": ctx.barrier_width,
+            "base_prob": ctx.base_prob,
+            "tunnel_prob": ctx.tunnel_prob,
+            "trail_frame": ctx.trail_frame,
+            "current_trail": ctx.current_trail[:],
+            "trails_len": len(ctx.trails),
+            "prev_tunneled_state": ctx.prev_tunneled_state,
+            "prev_attempts": ctx.prev_attempts,
+            "peak_rate": ctx.peak_rate,
+            "max_tunnel_barrier": ctx.max_tunnel_barrier,
+            "trial_history_len": len(ctx.trial_history),
+        }
+    )
+
+
+def _restore_snapshot(ctx: _SimContext, snap: dict):
+    """스냅샷에서 시뮬레이션 상태를 복원."""
+    ctx.particle.restore(snap["particle"])
+    ctx.barrier_width = snap["barrier_width"]
+    ctx.base_prob = snap["base_prob"]
+    ctx.tunnel_prob = snap["tunnel_prob"]
+    ctx.trail_frame = snap["trail_frame"]
+    ctx.current_trail = snap["current_trail"]
+    ctx.prev_tunneled_state = snap["prev_tunneled_state"]
+    ctx.prev_attempts = snap["prev_attempts"]
+    ctx.peak_rate = snap["peak_rate"]
+    ctx.max_tunnel_barrier = snap["max_tunnel_barrier"]
+
+    # trails / trial_history를 스냅샷 길이로 잘라서 되돌림
+    while len(ctx.trails) > snap["trails_len"]:
+        ctx.trails.pop()
+    while len(ctx.trial_history) > snap["trial_history_len"]:
+        ctx.trial_history.pop()
+    ctx.trail_cache.mark_dirty()
 
 
 def _step_physics(ctx: _SimContext, dt: float):
@@ -1703,6 +1764,16 @@ def _render_frame(ctx: _SimContext):
         step_surf = _tcache.render(ctx.font, step_label, TUNNEL_FLASH)
         ctx.screen.blit(step_surf, (SIM_LEFT, 38))
 
+    # 되감기 인디케이터 (#31)
+    if ctx.rewinding or ctx.rewind_buf:
+        buf_max = ctx.rewind_buf.maxlen or 1
+        remaining = len(ctx.rewind_buf) / buf_max * 100
+        rw_label = t("tn_rewind_indicator", pct=remaining, frames=len(ctx.rewind_buf))
+        rw_color = TUNNEL_FLASH if ctx.rewinding else TEXT_CLR
+        rw_surf = _tcache.render(ctx.font, rw_label, rw_color)
+        rw_y = 54 if ctx.step_mode else 38
+        ctx.screen.blit(rw_surf, (SIM_LEFT, rw_y))
+
     _draw_sim_area(ctx.screen, ctx.font, ctx.barrier_width, ctx.barrier_hover, ctx.barrier_dragging)
     _draw_wavefunction(ctx.screen, ctx.barrier_width, ctx.tunnel_prob, pygame.time.get_ticks())
     _draw_trails(ctx.screen, ctx.trail_cache, ctx.trails, ctx.current_trail, ctx.particle.tunneled)
@@ -1725,12 +1796,20 @@ def _render_frame(ctx: _SimContext):
             sim_speed=speed_label(),
             width=ctx.barrier_width,
             prob=ctx.tunnel_prob * 100,
-            pause_state=t("tn_step_mode") if ctx.step_mode else (t("paused") if ctx.paused else t("running_state")),
+            pause_state=(
+                t("tn_rewind_title")
+                if ctx.rewinding
+                else t("tn_step_mode")
+                if ctx.step_mode
+                else t("paused")
+                if ctx.paused
+                else t("running_state")
+            ),
         ),
         t("hint_click_launch"),
         t("hint_pause_reset")
         + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X/I: Export/Import"
-        + f"  |  F3: {t('tn_sweep_title')}  |  F4: {t('tn_step_mode')}  |  G: {t('glossary_title')}",
+        + f"  |  F3: {t('tn_sweep_title')}  |  F4: {t('tn_step_mode')}  |  F5: {t('tn_rewind_title')}  |  G: {t('glossary_title')}",
     ]
     for i, h in enumerate(hints):
         surf = _tcache.render(ctx.font, h, TEXT_CLR)
@@ -1802,13 +1881,24 @@ def run_simulation():
         running = _handle_events(ctx)
         ctx.read_sliders()
 
+        # 되감기 모드 (#31): 버퍼에서 스냅샷을 역순으로 복원
+        if ctx.rewinding:
+            for _ in range(ctx.rewind_speed):
+                if ctx.rewind_buf:
+                    _restore_snapshot(ctx, ctx.rewind_buf.pop())
+                else:
+                    ctx.rewinding = False
+                    ctx.paused = True
+                    break
         # 스텝 모드 (#30): N 키로 한 프레임씩 진행
-        if ctx.step_mode and ctx.step_pending:
+        elif ctx.step_mode and ctx.step_pending:
             ctx.step_pending = False
             ctx.step_count += 1
             ctx.step_dt = dt
+            _capture_snapshot(ctx)
             _step_physics(ctx, dt)
         elif not ctx.paused:
+            _capture_snapshot(ctx)
             _step_physics(ctx, dt)
 
         ctx.toast.update(raw_dt)
