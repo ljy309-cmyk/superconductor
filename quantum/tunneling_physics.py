@@ -27,6 +27,7 @@ _TUNNEL_DECAY = cfg("tunneling", "tunnel_decay_rate", 0.02)
 _VY_RANGE = cfg("tunneling", "particle_vy_range", 60.0)
 _TUNNEL_FLASH = cfg("tunneling", "tunnel_flash_sec", 0.6)
 _REFLECT_FLASH = cfg("tunneling", "reflect_flash_sec", 0.4)
+BLOCH_LERP_SPEED = cfg("tunneling", "bloch_lerp_speed", 8.0)
 
 # ── 영역 레이아웃 ────────────────────────────────────
 # 왼쪽: 터널링 시뮬레이션 | 오른쪽: 블로흐 구
@@ -35,6 +36,42 @@ SIM_W, SIM_H = 520, 420
 
 # 장벽 위치 (시뮬레이션 영역 중앙)
 BARRIER_X = SIM_LEFT + SIM_W // 2
+
+
+def _lerp(a: float, b: float, t: float) -> float:
+    """선형 보간 — a에서 b로 t(0~1)만큼.
+
+    t는 [0, 1] 범위로 클램핑됩니다.
+    """
+    t = max(0.0, min(1.0, t))
+    return a + (b - a) * t
+
+
+def _bloch_smooth_theta(
+    current: float,
+    target: float,
+    dt: float,
+    speed: float = BLOCH_LERP_SPEED,
+) -> float:
+    """블로흐 구 θ 각도를 target으로 부드럽게 보간 (지수 감쇠 lerp).
+
+    프레임 속도 독립적인 지수 보간으로 현재 θ를 목표 θ에 수렴시킵니다.
+    수식: result = current + (target - current) * (1 - e^(-speed * dt))
+
+    Args:
+        current: 현재 θ (라디안).
+        target: 목표 θ (라디안).
+        dt: 시간 간격 (초). 음수이면 0으로 처리.
+        speed: 보간 속도 (높을수록 빠르게 수렴, 기본 8.0).
+
+    Returns:
+        보간된 θ (라디안, 0~π 범위로 클램핑).
+    """
+    if dt <= 0:
+        return max(0.0, min(math.pi, current))
+    alpha = 1.0 - math.exp(-speed * dt)
+    result = current + (target - current) * alpha
+    return max(0.0, min(math.pi, result))
 
 
 def _calc_tunnel_prob(barrier_width: int) -> float:
