@@ -923,12 +923,15 @@
 
   "gl_teleportation": "Quantum Teleportation",
   "gl_teleportation_def": "Transferring an unknown quantum state from one qubit to another using entanglement and classical communication. No physical particle moves; only quantum information is transmitted.",
+  "gl_teleportation_formula": "|ψ⟩ → Bell measurement + classical 2 bits → U|ψ⟩",
 
   "gl_no_cloning": "No-Cloning Theorem",
   "gl_no_cloning_def": "It is impossible to create an identical copy of an arbitrary unknown quantum state. This is fundamental to quantum cryptography — eavesdroppers cannot copy qubits without detection.",
+  "gl_no_cloning_formula": "∄ U : U|ψ⟩|0⟩ = |ψ⟩|ψ⟩  ∀|ψ⟩",
 
   "gl_decoherence": "Decoherence",
   "gl_decoherence_def": "The loss of quantum coherence due to interaction with the environment. Superpositions degrade into classical mixtures, limiting quantum computation and communication.",
+  "gl_decoherence_formula": "ρ(t) → Σ_k E_k ρ E_k†,  T₂ = decoherence time",
 
   "gl_cooper_pair": "Cooper Pair",
   "gl_cooper_pair_def": "Two electrons bound together at low temperatures via phonon-mediated attraction. Cooper pairs behave as bosons and flow without resistance, enabling superconductivity.",
@@ -944,6 +947,7 @@
 
   "gl_meissner": "Meissner Effect",
   "gl_meissner_def": "A superconductor expels all internal magnetic flux when cooled below Tc (perfect diamagnetism). This causes magnetic levitation and is a hallmark of the superconducting state.",
+  "gl_meissner_formula": "B_inside = 0,  χ = −1 (perfect diamagnet)",
 
   "gl_flux_pinning": "Flux Pinning",
   "gl_flux_pinning_def": "In type-II superconductors, magnetic flux penetrates as quantized vortices that become pinned at defects. This locks the superconductor in space (quantum locking), enabling stable levitation.",
@@ -959,9 +963,11 @@
 
   "gl_phase_transition": "Phase Transition",
   "gl_phase_transition_def": "A transformation between states of matter. In superconductors, cooling below the critical temperature Tc causes a phase transition from normal (resistive) to superconducting (zero resistance).",
+  "gl_phase_transition_formula": "F = −kBT ln Z,  ∂²F/∂T² discontinuous at Tc",
 
   "gl_critical_temp": "Critical Temperature (Tc)",
   "gl_critical_temp_def": "The temperature below which a material becomes superconducting. Examples: Al (1.2K), Nb (9.3K), MgB₂ (39K), YBCO (92K), BSCCO (110K).",
+  "gl_critical_temp_formula": "Tc ≈ (ℏωD/kB) exp(−1/N(0)V)  (BCS)",
 
   "gl_flux_quantum": "Magnetic Flux Quantum",
   "gl_flux_quantum_def": "The smallest unit of magnetic flux in a superconducting loop. All magnetic flux through a superconductor is quantized in multiples of Φ₀.",
@@ -969,9 +975,11 @@
 
   "gl_qubit": "Qubit",
   "gl_qubit_def": "The basic unit of quantum information, analogous to a classical bit. Unlike bits (0 or 1), a qubit can be in a superposition of |0⟩ and |1⟩, enabling quantum parallelism.",
+  "gl_qubit_formula": "|ψ⟩ = α|0⟩ + β|1⟩,  |α|²+|β|²=1",
 
   "gl_quantum_gate": "Quantum Gate",
   "gl_quantum_gate_def": "A unitary operation on qubits, analogous to logic gates in classical computing. Quantum gates are reversible and manipulate qubit states through rotation on the Bloch sphere.",
+  "gl_quantum_gate_formula": "U†U = UU† = I  (unitary condition)",
 
   "gl_hadamard": "Hadamard Gate (H)",
   "gl_hadamard_def": "Creates equal superposition from basis states: H|0⟩=|+⟩, H|1⟩=|−⟩. Fundamental for quantum algorithms — it enables quantum parallelism by querying all inputs simultaneously.",
@@ -979,6 +987,7 @@
 
   "gl_pauli_gates": "Pauli Gates (X, Y, Z)",
   "gl_pauli_gates_def": "X (bit flip): |0⟩↔|1⟩. Y: rotation around Y-axis. Z (phase flip): |1⟩→−|1⟩. Together with H and T, they form a universal gate set for quantum computation.",
+  "gl_pauli_gates_formula": "X=[[0,1],[1,0]], Y=[[0,−i],[i,0]], Z=[[1,0],[0,−1]]",
 
   "gl_cnot": "CNOT Gate",
   "gl_cnot_def": "Controlled-NOT: flips the target qubit if the control qubit is |1⟩. Essential for creating entanglement and implementing quantum error correction codes.",
@@ -986,6 +995,7 @@
 
   "gl_shor": "Shor's Algorithm",
   "gl_shor_def": "A quantum algorithm (1994) for integer factorization in polynomial time O((log N)³). It threatens RSA encryption and is a primary motivation for post-quantum cryptography and QKD.",
+  "gl_shor_formula": "Complexity: O((log N)³),  N = p × q",
 
   "gl_grover": "Grover's Algorithm",
   "gl_grover_def": "A quantum search algorithm (1996) that finds a target in an unsorted database of N items in O(√N) queries — a provably optimal quadratic speedup over classical O(N) search.",
@@ -993,6 +1003,7 @@
 
   "gl_qec": "Quantum Error Correction (QEC)",
   "gl_qec_def": "Techniques to protect quantum information from noise and decoherence using redundant encoding. Unlike classical error correction, QEC must handle bit-flip and phase-flip errors without measuring the data directly.",
+  "gl_qec_formula": "[[n,k,d]] code: n physical → k logical, distance d",
 
   "gl_qft": "Quantum Fourier Transform (QFT)",
   "gl_qft_def": "The quantum analog of the discrete Fourier transform. Key subroutine in Shor's algorithm for period finding. Exponentially faster than classical FFT for certain structured problems.",
@@ -1000,9 +1011,11 @@
 
   "gl_qkd": "Quantum Key Distribution (QKD)",
   "gl_qkd_def": "A method to establish secure cryptographic keys using quantum mechanics. Any eavesdropping attempt disturbs the quantum states, enabling detection. Security is based on physics, not computational assumptions.",
+  "gl_qkd_formula": "R ≥ I(A:B) − I(A:E)  (key rate bound)",
 
   "gl_bb84": "BB84 Protocol",
   "gl_bb84_def": "The first QKD protocol (Bennett & Brassard, 1984). Alice sends qubits in random bases (+/×), Bob measures in random bases. Matching bases yield key bits; QBER > 11% indicates eavesdropping.",
+  "gl_bb84_formula": "Key rate: R = 1 − 2H(QBER),  H = binary entropy",
 
   "gl_e91": "E91 Protocol",
   "gl_e91_def": "Entanglement-based QKD (Ekert, 1991). Uses Bell pairs shared between Alice and Bob. Security verified through CHSH inequality violation — if S≈2√2, no eavesdropper is present.",
@@ -1014,6 +1027,7 @@
 
   "gl_privacy_amp": "Privacy Amplification",
   "gl_privacy_amp_def": "A post-processing step in QKD that compresses the raw key using universal hash functions to eliminate any partial information an eavesdropper might have. Based on the Leftover Hash Lemma.",
+  "gl_privacy_amp_formula": "ℓ = n(1 − H(QBER)) − log(1/ε)  (secure key length)",
 
   "gl_ghz_state": "GHZ State",
   "gl_ghz_state_def": "Greenberger-Horne-Zeilinger state — a maximally entangled state of three or more qubits. Used in multi-party QKD and tests of quantum non-locality.",
@@ -1021,11 +1035,13 @@
 
   "gl_decoy_state": "Decoy State Protocol",
   "gl_decoy_state_def": "A practical QKD enhancement where Alice randomly varies photon intensity (signal, decoy, vacuum). This detects photon-number-splitting attacks that exploit multi-photon pulses in real implementations.",
+  "gl_decoy_state_formula": "Q_μ e^μ ≥ Q₁μ  (single-photon yield bound)",
 
   "gl_otp": "One-Time Pad (OTP)",
   "gl_otp_def": "An encryption method with information-theoretic security: plaintext XOR random key = ciphertext. Requires key length ≥ message length and single-use. QKD provides the keys for practical OTP.",
   "gl_otp_formula": "C = M ⊕ K,  M = C ⊕ K",
 
   "gl_rsa": "RSA Encryption",
-  "gl_rsa_def": "A widely-used public-key cryptosystem based on the difficulty of factoring large numbers N=p×q. Shor's algorithm on a quantum computer can break RSA, motivating the need for QKD."
+  "gl_rsa_def": "A widely-used public-key cryptosystem based on the difficulty of factoring large numbers N=p×q. Shor's algorithm on a quantum computer can break RSA, motivating the need for QKD.",
+  "gl_rsa_formula": "C = M^e mod N,  M = C^d mod N,  N=pq"
 }

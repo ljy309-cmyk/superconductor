@@ -647,11 +647,10 @@ class TestGlossaryI18n(unittest.TestCase):
         self.assertIn("exp", formula)
 
     def test_missing_formula_returns_key(self):
-        """수식이 없는 용어는 키 자체를 반환해야 한다."""
+        """존재하지 않는 수식 키는 키 자체를 반환해야 한다."""
         i18n.set_locale("en")
-        # teleportation에는 formula가 없음
-        result = i18n.t("gl_teleportation_formula")
-        self.assertEqual(result, "gl_teleportation_formula")
+        result = i18n.t("gl_nonexistent_term_formula")
+        self.assertEqual(result, "gl_nonexistent_term_formula")
 
     def test_page_format_string(self):
         i18n.set_locale("en")

@@ -923,12 +923,15 @@
 
   "gl_teleportation": "양자 텔레포테이션 (Teleportation)",
   "gl_teleportation_def": "얽힘과 고전 통신을 이용해 미지의 양자 상태를 다른 큐비트로 전송하는 기술입니다. 물리적 입자가 이동하는 것이 아니라 양자 정보만 전송됩니다.",
+  "gl_teleportation_formula": "|ψ⟩ → Bell measurement + classical 2 bits → U|ψ⟩",
 
   "gl_no_cloning": "복제 불가 정리 (No-Cloning Theorem)",
   "gl_no_cloning_def": "임의의 미지 양자 상태를 완벽하게 복제하는 것은 불가능합니다. 이는 양자 암호의 핵심 원리로, 도청자는 큐비트를 복사할 수 없어 반드시 흔적을 남깁니다.",
+  "gl_no_cloning_formula": "∄ U : U|ψ⟩|0⟩ = |ψ⟩|ψ⟩  ∀|ψ⟩",
 
   "gl_decoherence": "결맞음 깨짐 (Decoherence)",
   "gl_decoherence_def": "환경과의 상호작용으로 양자 결맞음이 소실되는 현상입니다. 중첩 상태가 고전적 혼합 상태로 퇴화하여 양자 계산과 통신의 성능을 제한합니다.",
+  "gl_decoherence_formula": "ρ(t) → Σ_k E_k ρ E_k†,  T₂ = decoherence time",
 
   "gl_cooper_pair": "쿠퍼 쌍 (Cooper Pair)",
   "gl_cooper_pair_def": "포논(격자 진동)을 매개로 간접 인력을 느끼는 두 전자의 쌍입니다. 쿠퍼 쌍은 보손처럼 행동하여 산란 없이 흐르므로, 초전도 현상의 원인이 됩니다.",
@@ -944,6 +947,7 @@
 
   "gl_meissner": "마이스너 효과 (Meissner Effect)",
   "gl_meissner_def": "초전도체가 Tc 이하로 냉각되면 내부 자기장을 완전히 배제하는 현상(완전 반자성)입니다. 이로 인해 자석 위에서 안정적으로 부상할 수 있습니다.",
+  "gl_meissner_formula": "B_inside = 0,  χ = −1 (완전 반자성)",
 
   "gl_flux_pinning": "플럭스 피닝 (Flux Pinning)",
   "gl_flux_pinning_def": "제2종 초전도체에서 자기 선속이 양자화된 소용돌이로 관통하여 결함에 고정되는 현상입니다. 초전도체를 공간에 안정적으로 잠그는 양자 잠금(Quantum Locking)을 가능하게 합니다.",
@@ -959,9 +963,11 @@
 
   "gl_phase_transition": "상전이 (Phase Transition)",
   "gl_phase_transition_def": "물질의 상태가 변환되는 현상입니다. 초전도체에서는 임계 온도 Tc 이하로 냉각하면 정상 상태(저항 있음)에서 초전도 상태(저항 0)로 상전이가 일어납니다.",
+  "gl_phase_transition_formula": "F = −kBT ln Z,  ∂²F/∂T² Tc에서 불연속",
 
   "gl_critical_temp": "임계 온도 Tc (Critical Temperature)",
   "gl_critical_temp_def": "물질이 초전도 상태로 전이되는 온도입니다. 예: Al (1.2K), Nb (9.3K), MgB₂ (39K), YBCO (92K), BSCCO (110K).",
+  "gl_critical_temp_formula": "Tc ≈ (ℏωD/kB) exp(−1/N(0)V)  (BCS)",
 
   "gl_flux_quantum": "자기 선속 양자 (Flux Quantum)",
   "gl_flux_quantum_def": "초전도 루프를 통과하는 자기 선속의 최소 단위입니다. 초전도체의 모든 자기 선속은 Φ₀의 정수배로 양자화됩니다.",
@@ -969,9 +975,11 @@
 
   "gl_qubit": "큐비트 (Qubit)",
   "gl_qubit_def": "양자 정보의 기본 단위로, 고전 비트에 대응됩니다. 비트(0 또는 1)와 달리 큐비트는 |0⟩과 |1⟩의 중첩 상태를 가질 수 있어 양자 병렬성을 가능하게 합니다.",
+  "gl_qubit_formula": "|ψ⟩ = α|0⟩ + β|1⟩,  |α|²+|β|²=1",
 
   "gl_quantum_gate": "양자 게이트 (Quantum Gate)",
   "gl_quantum_gate_def": "큐비트에 대한 유니터리 연산으로, 고전 논리 게이트에 대응됩니다. 양자 게이트는 가역적이며 블로흐 구 위의 회전으로 큐비트 상태를 조작합니다.",
+  "gl_quantum_gate_formula": "U†U = UU† = I  (유니터리 조건)",
 
   "gl_hadamard": "하다마드 게이트 (Hadamard, H)",
   "gl_hadamard_def": "기저 상태로부터 균등 중첩을 생성합니다: H|0⟩=|+⟩, H|1⟩=|−⟩. 양자 알고리즘의 핵심으로, 모든 입력을 동시에 탐색하는 양자 병렬성의 시작점입니다.",
@@ -979,6 +987,7 @@
 
   "gl_pauli_gates": "파울리 게이트 (X, Y, Z)",
   "gl_pauli_gates_def": "X (비트 플립): |0⟩↔|1⟩. Y: Y축 회전. Z (위상 플립): |1⟩→−|1⟩. H, T 게이트와 함께 범용 게이트 집합을 구성하여 모든 양자 연산을 수행할 수 있습니다.",
+  "gl_pauli_gates_formula": "X=[[0,1],[1,0]], Y=[[0,−i],[i,0]], Z=[[1,0],[0,−1]]",
 
   "gl_cnot": "CNOT 게이트",
   "gl_cnot_def": "제어-NOT 게이트: 제어 큐비트가 |1⟩이면 타겟 큐비트를 플립합니다. 얽힘 생성과 양자 오류 정정 코드 구현에 필수적인 2큐비트 게이트입니다.",
@@ -986,6 +995,7 @@
 
   "gl_shor": "쇼어 알고리즘 (Shor's Algorithm)",
   "gl_shor_def": "1994년 Peter Shor가 발표한 양자 소인수분해 알고리즘으로, O((log N)³) 다항 시간에 동작합니다. RSA 암호를 위협하며, 포스트 양자 암호와 QKD의 필요성을 촉발했습니다.",
+  "gl_shor_formula": "복잡도: O((log N)³),  N = p × q",
 
   "gl_grover": "그로버 알고리즘 (Grover's Algorithm)",
   "gl_grover_def": "1996년 발표된 양자 탐색 알고리즘으로, N개 항목에서 대상을 O(√N) 쿼리로 찾습니다. 고전 O(N) 대비 2차 속도 향상이며, 이는 증명 가능한 최적입니다.",
@@ -993,6 +1003,7 @@
 
   "gl_qec": "양자 오류 정정 (QEC)",
   "gl_qec_def": "여분의 큐비트를 사용해 노이즈와 결맞음 깨짐으로부터 양자 정보를 보호하는 기술입니다. 고전 오류 정정과 달리, 데이터를 직접 측정하지 않고도 비트 플립과 위상 플립 오류를 모두 처리합니다.",
+  "gl_qec_formula": "[[n,k,d]] 코드: n 물리 → k 논리, 거리 d",
 
   "gl_qft": "양자 푸리에 변환 (QFT)",
   "gl_qft_def": "이산 푸리에 변환의 양자 버전으로, 쇼어 알고리즘에서 주기 탐색의 핵심 서브루틴입니다. 특정 구조화된 문제에서 고전 FFT보다 지수적으로 빠릅니다.",
@@ -1000,9 +1011,11 @@
 
   "gl_qkd": "양자 키 분배 (QKD)",
   "gl_qkd_def": "양자역학을 이용해 안전한 암호 키를 생성하는 방법입니다. 도청 시도는 양자 상태를 교란시켜 감지가 가능합니다. 보안이 계산 가정이 아닌 물리 법칙에 기반합니다.",
+  "gl_qkd_formula": "R ≥ I(A:B) − I(A:E)  (키 생성률 한계)",
 
   "gl_bb84": "BB84 프로토콜",
   "gl_bb84_def": "최초의 QKD 프로토콜(Bennett & Brassard, 1984)입니다. Alice가 랜덤 기저(+/×)로 큐비트를 전송하고 Bob이 랜덤 기저로 측정합니다. 기저 일치 시 키 비트 생성, QBER > 11%이면 도청 의심.",
+  "gl_bb84_formula": "키 생성률: R = 1 − 2H(QBER),  H = 이진 엔트로피",
 
   "gl_e91": "E91 프로토콜",
   "gl_e91_def": "얽힘 기반 QKD(Ekert, 1991)입니다. Alice와 Bob이 벨 쌍을 공유하고, CHSH 부등식 위반으로 보안을 검증합니다. S≈2√2이면 도청자가 없음을 확인합니다.",
@@ -1014,6 +1027,7 @@
 
   "gl_privacy_amp": "프라이버시 증폭 (Privacy Amplification)",
   "gl_privacy_amp_def": "QKD 후처리 단계로, 범용 해시 함수를 사용해 원시 키를 압축하여 도청자가 가진 부분 정보를 제거합니다. Leftover Hash Lemma에 기반한 정보이론적 보안 기술입니다.",
+  "gl_privacy_amp_formula": "ℓ = n(1 − H(QBER)) − log(1/ε)  (안전 키 길이)",
 
   "gl_ghz_state": "GHZ 상태",
   "gl_ghz_state_def": "Greenberger-Horne-Zeilinger 상태로, 3개 이상 큐비트의 최대 얽힘 상태입니다. 다자간 QKD와 양자 비국소성 검증에 사용됩니다.",
@@ -1021,11 +1035,13 @@
 
   "gl_decoy_state": "디코이 상태 프로토콜 (Decoy State)",
   "gl_decoy_state_def": "실용적 QKD 강화 기법으로, Alice가 광자 세기를 무작위로 변경(신호/디코이/진공)하여 다광자 펄스를 악용한 광자수분할 공격(PNS attack)을 탐지합니다.",
+  "gl_decoy_state_formula": "Q_μ e^μ ≥ Q₁μ  (단일광자 수율 한계)",
 
   "gl_otp": "일회용 패드 (One-Time Pad)",
   "gl_otp_def": "정보이론적 보안을 가진 암호화 방식으로, 평문과 랜덤 키를 XOR 연산합니다. 키 길이 ≥ 메시지 길이이고 일회 사용이 조건입니다. QKD가 실용적 OTP 키를 제공합니다.",
   "gl_otp_formula": "C = M ⊕ K,  M = C ⊕ K",
 
   "gl_rsa": "RSA 암호",
-  "gl_rsa_def": "큰 수의 소인수분해 어려움에 기반한 공개키 암호 시스템(N=p×q)입니다. 양자 컴퓨터의 쇼어 알고리즘으로 해독 가능하므로, QKD의 필요성이 대두되었습니다."
+  "gl_rsa_def": "큰 수의 소인수분해 어려움에 기반한 공개키 암호 시스템(N=p×q)입니다. 양자 컴퓨터의 쇼어 알고리즘으로 해독 가능하므로, QKD의 필요성이 대두되었습니다.",
+  "gl_rsa_formula": "C = M^e mod N,  M = C^d mod N,  N=pq"
 }
