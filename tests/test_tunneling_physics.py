@@ -1878,5 +1878,108 @@ class TestBlochMeshCache(unittest.TestCase):
         self.assertIs(eq, eq2)
 
 
+class TestTrailCache(unittest.TestCase):
+    """#21 — 트레일 서피스 캐싱 테스트."""
+
+    def setUp(self):
+        import pygame
+
+        from quantum.tunneling import (
+            _draw_trails,
+            _TrailCache,
+        )
+
+        self.pg = pygame
+        self.TrailCache = _TrailCache
+        self.draw_trails = _draw_trails
+
+    # -- _TrailCache 단위 테스트 --
+
+    def test_initial_dirty(self):
+        """초기 상태는 dirty=True."""
+        cache = self.TrailCache()
+        self.assertTrue(cache._dirty)
+
+    def test_get_surface_returns_surface(self):
+        """get_surface는 pygame.Surface를 반환."""
+        cache = self.TrailCache()
+        trails = [([(100, 200)], True)]
+        surf = cache.get_surface(trails)
+        self.assertIsNotNone(surf)
+
+    def test_cache_hit_after_get(self):
+        """get_surface 후 dirty=False이면 같은 서피스 반환."""
+        cache = self.TrailCache()
+        trails = [([(100, 200)], True)]
+        s1 = cache.get_surface(trails)
+        s2 = cache.get_surface(trails)
+        self.assertIs(s1, s2)
+
+    def test_mark_dirty_triggers_rebuild(self):
+        """mark_dirty 호출 후 dirty=True로 전환, get_surface에서 재빌드."""
+        cache = self.TrailCache()
+        trails = [([(100, 200)], True)]
+        cache.get_surface(trails)
+        self.assertFalse(cache._dirty)
+        cache.mark_dirty()
+        self.assertTrue(cache._dirty)
+        cache.get_surface(trails)
+        self.assertFalse(cache._dirty)
+
+    def test_clear_resets_state(self):
+        """clear 후 dirty=True, 서피스=None."""
+        cache = self.TrailCache()
+        trails = [([(100, 200)], True)]
+        cache.get_surface(trails)
+        cache.clear()
+        self.assertTrue(cache._dirty)
+        self.assertIsNone(cache._surf)
+
+    def test_empty_trails_surface(self):
+        """빈 trails에서도 서피스 생성."""
+        cache = self.TrailCache()
+        surf = cache.get_surface([])
+        self.assertIsNotNone(surf)
+
+    def test_multiple_trails_cached(self):
+        """여러 궤적이 있어도 정상 캐싱."""
+        cache = self.TrailCache()
+        trails = [
+            ([(100, 200), (110, 210)], True),
+            ([(120, 220), (130, 230)], False),
+            ([(140, 240)], True),
+        ]
+        s1 = cache.get_surface(trails)
+        s2 = cache.get_surface(trails)
+        self.assertIs(s1, s2)
+
+    # -- _draw_trails 통합 테스트 --
+
+    def test_draw_trails_uses_cache(self):
+        """_draw_trails가 trail_cache를 사용하여 과거 궤적 렌더링."""
+        cache = self.TrailCache()
+        trails = [([(100, 200)], True)]
+        screen = self.pg.Surface((800, 600))
+        self.draw_trails(screen, cache, trails, [], None)
+        # 호출 후 dirty=False (캐시됨)
+        self.assertFalse(cache._dirty)
+
+    def test_draw_trails_empty_no_error(self):
+        """trails와 current_trail 모두 비어있으면 에러 없이 조기 반환."""
+        cache = self.TrailCache()
+        screen = self.pg.Surface((800, 600))
+        self.draw_trails(screen, cache, [], [], None)
+        # dirty 상태 유지 (get_surface 호출 안 됨)
+        self.assertTrue(cache._dirty)
+
+    def test_draw_trails_current_only(self):
+        """current_trail만 있을 때 과거 캐시 건드리지 않음."""
+        cache = self.TrailCache()
+        screen = self.pg.Surface((800, 600))
+        self.draw_trails(screen, cache, [], [(150, 250)], None)
+        # past trails 없으므로 get_surface 호출 안 됨
+        self.assertTrue(cache._dirty)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -221,6 +221,44 @@ class _BlochMeshCache:
 _bloch_mesh = _BlochMeshCache()
 
 
+# ── 트레일 서피스 캐시 (#21) ────────────────────────────
+
+
+class _TrailCache:
+    """과거 궤적 서피스 캐싱 — trails 변경 시에만 재빌드."""
+
+    __slots__ = ("_surf", "_dirty")
+
+    def __init__(self):
+        self._surf: pygame.Surface | None = None
+        self._dirty = True
+
+    def mark_dirty(self):
+        self._dirty = True
+
+    def get_surface(self, trails) -> pygame.Surface:
+        """trails 목록이 변경되지 않았으면 캐시된 서피스 반환."""
+        if not self._dirty and self._surf is not None:
+            return self._surf
+        surf = pygame.Surface((SIM_W, SIM_H), pygame.SRCALPHA)
+        n_trails = len(trails)
+        for i, (pts, result) in enumerate(trails):
+            base_alpha = max(15, int(70 * (i + 1) / max(n_trails, 1)))
+            clr = TUNNEL_FLASH if result else REFLECT_CLR
+            rgba = (*clr[:3], base_alpha)
+            for px, py in pts:
+                sx, sy = px - SIM_LEFT, py - SIM_TOP
+                if 0 <= sx < SIM_W and 0 <= sy < SIM_H:
+                    pygame.draw.circle(surf, rgba, (sx, sy), _TRAIL_DOT_R)
+        self._surf = surf
+        self._dirty = False
+        return surf
+
+    def clear(self):
+        self._surf = None
+        self._dirty = True
+
+
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
 
@@ -258,26 +296,18 @@ def _draw_sim_area(
     screen.blit(right_label, (BARRIER_X + 20, SIM_TOP + 5))
 
 
-def _draw_trails(screen, trails, current_trail, current_result):
-    """과거 입자 궤적 잔상 렌더링."""
+def _draw_trails(screen, trail_cache, trails, current_trail, current_result):
+    """과거 입자 궤적 잔상 렌더링 (과거 궤적은 캐시 서피스 사용)."""
     if not trails and not current_trail:
         return
 
-    surf = pygame.Surface((SIM_W, SIM_H), pygame.SRCALPHA)
-    n_trails = len(trails)
+    # 과거 궤적 — 캐시된 서피스 (#21)
+    if trails:
+        screen.blit(trail_cache.get_surface(trails), (SIM_LEFT, SIM_TOP))
 
-    # 과거 궤적 (오래될수록 투명)
-    for i, (pts, result) in enumerate(trails):
-        base_alpha = max(15, int(70 * (i + 1) / max(n_trails, 1)))
-        clr = TUNNEL_FLASH if result else REFLECT_CLR
-        rgba = (*clr[:3], base_alpha)
-        for px, py in pts:
-            sx, sy = px - SIM_LEFT, py - SIM_TOP
-            if 0 <= sx < SIM_W and 0 <= sy < SIM_H:
-                pygame.draw.circle(surf, rgba, (sx, sy), _TRAIL_DOT_R)
-
-    # 현재 진행 중인 궤적
+    # 현재 진행 중인 궤적 — 매 프레임 갱신
     if current_trail:
+        cur_surf = pygame.Surface((SIM_W, SIM_H), pygame.SRCALPHA)
         if current_result is True:
             clr = TUNNEL_FLASH
         elif current_result is False:
@@ -288,9 +318,8 @@ def _draw_trails(screen, trails, current_trail, current_result):
         for px, py in current_trail:
             sx, sy = px - SIM_LEFT, py - SIM_TOP
             if 0 <= sx < SIM_W and 0 <= sy < SIM_H:
-                pygame.draw.circle(surf, rgba, (sx, sy), _TRAIL_DOT_R)
-
-    screen.blit(surf, (SIM_LEFT, SIM_TOP))
+                pygame.draw.circle(cur_surf, rgba, (sx, sy), _TRAIL_DOT_R)
+        screen.blit(cur_surf, (SIM_LEFT, SIM_TOP))
 
 
 def _draw_particle(screen, p: QuantumParticle, font):
@@ -772,6 +801,7 @@ class _SimContext:
         self.current_trail: list[tuple[int, int]] = []
         self.trail_frame = 0
         self.prev_tunneled_state: bool | None = None
+        self.trail_cache = _TrailCache()
 
         # 슬라이더 패널
         self.panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
@@ -887,6 +917,7 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         ctx.panel.reset_all()
         ctx.trails.clear()
         ctx.current_trail.clear()
+        ctx.trail_cache.clear()
         ctx.prev_tunneled_state = None
     elif key == pygame.K_UP:
         ctx.sl_speed.value = ctx.sl_speed.value + 0.5
@@ -1016,6 +1047,7 @@ def _step_physics(ctx: _SimContext, dt: float):
             if len(ctx.trails) > _MAX_TRAILS:
                 ctx.trails.pop(0)
             ctx.current_trail.clear()
+            ctx.trail_cache.mark_dirty()
     ctx.prev_tunneled_state = p.tunneled
 
     ctx.preset_hud.update(dt)
@@ -1341,7 +1373,7 @@ def _render_frame(ctx: _SimContext):
     ctx.screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
 
     _draw_sim_area(ctx.screen, ctx.font, ctx.barrier_width, ctx.barrier_hover, ctx.barrier_dragging)
-    _draw_trails(ctx.screen, ctx.trails, ctx.current_trail, ctx.particle.tunneled)
+    _draw_trails(ctx.screen, ctx.trail_cache, ctx.trails, ctx.current_trail, ctx.particle.tunneled)
     _draw_particle(ctx.screen, ctx.particle, ctx.font)
     _draw_formula_overlay(ctx.screen, ctx.font, ctx)
     _draw_bloch_sphere(ctx.screen, ctx.particle, ctx.font, ctx.title_font, ctx.bloch_phi, ctx.bloch_el)
