@@ -852,7 +852,8 @@ class TestGlossaryModuleStructure(unittest.TestCase):
         """wrap_text가 quantum.ui_common에서 임포트되어야 한다."""
         import inspect
         src = inspect.getsource(_glossary_mod)
-        self.assertIn("from quantum.ui_common import wrap_text", src)
+        self.assertIn("from quantum.ui_common import", src)
+        self.assertIn("wrap_text", src)
         # 로컬 _wrap_text 함수가 없어야 한다
         self.assertNotIn("def _wrap_text(", src)
 

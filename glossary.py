@@ -20,7 +20,7 @@ except ImportError:
     pygame = None  # type: ignore[assignment]
 
 from i18n import t
-from quantum.ui_common import wrap_text
+from quantum.ui_common import draw_page_dots, wrap_text
 from theme import get_pg_theme, is_high_contrast, is_reduced_motion
 
 # ── 용어 정의 ────────────────────────────────────────────
@@ -337,17 +337,13 @@ class GlossaryOverlay:
 
         # 도트 인디케이터
         dot_r = 4 if hc else 3
-        dot_gap = dot_r * 2 + 6
-        dots_w = total_pg * dot_gap - 6
+        dot_gap = dot_r * 2 + 5
+        dots_w = total_pg * dot_gap - 5
         dot_start_x = box_x + box_w // 2 - dots_w // 2
         dot_cy = bottom_y + dot_r + 1
-        for i in range(total_pg):
-            cx = dot_start_x + i * dot_gap + dot_r
-            if i == self._page:
-                pygame.draw.circle(screen, pg.ACCENT_BLUE, (cx, dot_cy), dot_r)
-            else:
-                pygame.draw.circle(screen, pg.OVERLAY, (cx, dot_cy), dot_r)
-                pygame.draw.circle(screen, pg.SUBTEXT, (cx, dot_cy), dot_r, 1)
+        draw_page_dots(screen, dot_start_x, dot_cy,
+                       total_pg, self._page,
+                       pg.ACCENT_BLUE, pg.OVERLAY, pg.SUBTEXT)
 
         # 페이지 번호 (도트 아래)
         page_text = t("glossary_page", page=self._page + 1, total=total_pg)

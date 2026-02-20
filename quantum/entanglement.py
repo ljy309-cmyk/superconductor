@@ -17,6 +17,7 @@ from achievement_toast import AchievementToast
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
     draw_bar_pattern as _draw_bar_pattern,
+    draw_page_dots,
     paginate,
     render_notify,
 )
@@ -460,10 +461,15 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
         rx = L.bell_recent_x
         ry = stat_y
         title_text = t("ent_bell_recent")
-        if total_pages > 1:
-            title_text += f"  ({gs.history_page + 1}/{total_pages})"
         r_title = info_font.render(title_text, True, YELLOW)
         screen.blit(r_title, (rx, ry))
+
+        # 도트 인디케이터
+        draw_page_dots(screen,
+                       rx + r_title.get_width() + 10,
+                       ry + r_title.get_height() // 2,
+                       total_pages, gs.history_page,
+                       YELLOW, OVERLAY_CLR, OVERLAY_CLR)
         for i, (a, b) in enumerate(page_items):
             ms = info_font.render(f"|{a}{b}⟩", True, TEXT_CLR)
             screen.blit(ms, (rx, ry + 16 + i * 14))
@@ -608,10 +614,15 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         total = len(gs.chsh_history)
 
         title_text = t("ent_chsh_history", count=total)
-        if total_pages > 1:
-            title_text += f"  ({gs.history_page + 1}/{total_pages})"
         hist_title = info_font.render(title_text, True, ACCENT)
         screen.blit(hist_title, (corr_x, hist_y))
+
+        # 도트 인디케이터
+        draw_page_dots(screen,
+                       corr_x + hist_title.get_width() + 10,
+                       hist_y + hist_title.get_height() // 2,
+                       total_pages, gs.history_page,
+                       ACCENT, OVERLAY_CLR, OVERLAY_CLR)
 
         # 미니 히스토리 바
         hist_bar_w = L.chsh_hist_bar_w
@@ -789,10 +800,15 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
     page_items, gs.history_page, total_pages = paginate(gs.teleport_log, gs.history_page)
 
     title_text = t("ent_tp_protocol_log")
-    if total_pages > 1:
-        title_text += f"  ({gs.history_page + 1}/{total_pages})"
     log_title = info_font.render(title_text, True, ACCENT)
     screen.blit(log_title, (L.tp_log_x, log_y))
+
+    # 도트 인디케이터
+    draw_page_dots(screen,
+                   L.tp_log_x + log_title.get_width() + 10,
+                   log_y + log_title.get_height() // 2,
+                   total_pages, gs.history_page,
+                   ACCENT, OVERLAY_CLR, OVERLAY_CLR)
     for i, msg in enumerate(page_items):
         clr = GREEN if "Fidelity" in msg else TEXT_CLR
         ms = info_font.render(msg, True, clr)

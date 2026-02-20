@@ -17,6 +17,7 @@ from difficulty_dialog import choose_difficulty
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
     draw_bar_pattern as _draw_bar_pattern,
+    draw_page_dots,
     paginate,
 )
 from game_base import finalize_session
@@ -375,10 +376,15 @@ def run_simulation():
             page_items, history_page, total_pages = paginate(measure_log, history_page)
             pg_start = history_page * HISTORY_PAGE_SIZE
             title_text = t("gb_measure_log")
-            if total_pages > 1:
-                title_text += f"  ({history_page + 1}/{total_pages})"
             lt = small_font.render(title_text, True, SC_GLOW)
             screen.blit(lt, (L.log_x, L.log_y))
+
+            # 도트 인디케이터
+            draw_page_dots(screen,
+                           L.log_x + lt.get_width() + 10,
+                           L.log_y + lt.get_height() // 2,
+                           total_pages, history_page,
+                           SC_GLOW, GATE_BG, SUBTEXT_CLR)
             for li, entry in enumerate(page_items):
                 idx = pg_start + li + 1
                 es = small_font.render(f"  #{idx}: |{entry}⟩", True, TEXT_CLR)

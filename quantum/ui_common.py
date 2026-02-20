@@ -24,6 +24,37 @@ def paginate(items, page, page_size=HISTORY_PAGE_SIZE):
     return items[start:end], page, total_pages
 
 
+# ── 페이지 도트 인디케이터 ────────────────────────────
+
+
+def draw_page_dots(screen, x, cy, total_pages, current_page,
+                   active_clr, inactive_clr, border_clr):
+    """페이지 도트 인디케이터.
+
+    Args:
+        screen: Pygame 화면.
+        x: 첫 도트 시작 X 좌표.
+        cy: 도트 중심 Y 좌표.
+        total_pages: 전체 페이지 수.
+        current_page: 현재 페이지 인덱스 (0-based).
+        active_clr: 현재 페이지 도트 색상.
+        inactive_clr: 비활성 도트 채움 색상.
+        border_clr: 비활성 도트 테두리 색상.
+    """
+    if total_pages <= 1:
+        return
+    hc = is_high_contrast()
+    dot_r = 4 if hc else 3
+    gap = dot_r * 2 + 5
+    for i in range(total_pages):
+        cx = x + i * gap + dot_r
+        if i == current_page:
+            pygame.draw.circle(screen, active_clr, (cx, cy), dot_r)
+        else:
+            pygame.draw.circle(screen, inactive_clr, (cx, cy), dot_r)
+            pygame.draw.circle(screen, border_clr, (cx, cy), dot_r, 1)
+
+
 # ── 색맹 보조 막대 패턴 ──────────────────────────────
 
 

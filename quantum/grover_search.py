@@ -16,6 +16,7 @@ import pygame
 from achievement_toast import AchievementToast
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
+    draw_page_dots,
     paginate,
     render_notify,
     wrap_text as _wrap_text,
@@ -562,10 +563,15 @@ def _draw_search_history(screen, ui, font, x, y):
     page_items, ui.history_page, total_pages = paginate(history, ui.history_page)
 
     title_text = t("grover_search_history")
-    if total_pages > 1:
-        title_text += f"  ({ui.history_page + 1}/{total_pages})"
     ht = font.render(title_text, True, ACCENT)
     screen.blit(ht, (x, y))
+
+    # 도트 인디케이터
+    draw_page_dots(screen,
+                   x + ht.get_width() + 10,
+                   y + ht.get_height() // 2,
+                   total_pages, ui.history_page,
+                   ACCENT, OVERLAY_CLR, OVERLAY_CLR)
 
     for i, h in enumerate(page_items):
         clr = GREEN if h["success"] else YELLOW

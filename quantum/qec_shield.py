@@ -14,6 +14,7 @@ from config_loader import cfg
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
     draw_bar_pattern as _draw_bar_pattern,
+    draw_page_dots,
     paginate,
     render_notify,
 )
@@ -573,10 +574,15 @@ def run_simulation():
         if event_log:
             page_items, history_page, total_pages = paginate(event_log, history_page)
             title_text = t("qec_event_log")
-            if total_pages > 1:
-                title_text += f"  ({history_page + 1}/{total_pages})"
             lt = font.render(title_text, True, ACCENT)
             screen.blit(lt, (L.log_x, L.log_y))
+
+            # 도트 인디케이터
+            draw_page_dots(screen,
+                           L.log_x + lt.get_width() + 10,
+                           L.log_y + lt.get_height() // 2,
+                           total_pages, history_page,
+                           ACCENT, OVERLAY_CLR, SUBTEXT_CLR)
             for li, entry in enumerate(page_items):
                 clr = COLLAPSED_CLR if "COLLAPSED" in entry else TEXT_CLR
                 es = font.render(f"  {entry}", True, clr)

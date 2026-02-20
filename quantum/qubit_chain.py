@@ -16,6 +16,7 @@ from achievement_toast import AchievementToast
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
     draw_bar_pattern as _draw_bar_pattern,
+    draw_page_dots,
     paginate,
     render_notify,
 )
@@ -683,10 +684,15 @@ def run_simulation():
         if gs.cascade_log:
             page_items, gs.history_page, total_pages = paginate(gs.cascade_log, gs.history_page)
             title_text = t("qc_event_log")
-            if total_pages > 1:
-                title_text += f"  ({gs.history_page + 1}/{total_pages})"
             log_label = info_font.render(title_text, True, ACCENT)
             screen.blit(log_label, (log_x, log_y - 16))
+
+            # 도트 인디케이터
+            draw_page_dots(screen,
+                           log_x + log_label.get_width() + 10,
+                           log_y - 16 + log_label.get_height() // 2,
+                           total_pages, gs.history_page,
+                           ACCENT, OVERLAY_CLR, LINK_CLR)
             for i, msg in enumerate(page_items):
                 clr = STATE_COLORS[QubitState.COLLAPSED] if "COLLAPSED" in msg else TEXT_CLR
                 surf = info_font.render(msg, True, clr)

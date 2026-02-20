@@ -16,6 +16,7 @@ from achievement_toast import AchievementToast
 from quantum.ui_common import (
     HISTORY_PAGE_SIZE,
     draw_bar_pattern as _draw_bar_pattern,
+    draw_page_dots,
     paginate,
     wrap_text as _wrap_text,
 )
@@ -868,24 +869,17 @@ def _draw_attempt_history(screen, ui, font, x, y):
     page_items, ui.history_page, total_pages = paginate(history, ui.history_page)
     page = ui.history_page
 
-    # 타이틀 + 페이지 표시
-    if total_pages > 1:
-        title_text = f"{t('shor_attempt_history')}  ({page + 1}/{total_pages})"
-    else:
-        title_text = t("shor_attempt_history")
+    # 타이틀
+    title_text = t("shor_attempt_history")
     hist_title = font.render(title_text, True, ACCENT)
     screen.blit(hist_title, (x, y))
 
-    # 페이지 화살표 (여러 페이지일 때만)
-    if total_pages > 1:
-        arrow_x = x + hist_title.get_width() + 8
-        if page > 0:
-            arr_l = font.render("◀", True, ACCENT)
-            screen.blit(arr_l, (arrow_x, y))
-            arrow_x += arr_l.get_width() + 4
-        if page < total_pages - 1:
-            arr_r = font.render("▶", True, ACCENT)
-            screen.blit(arr_r, (arrow_x, y))
+    # 도트 인디케이터
+    draw_page_dots(screen,
+                   x + hist_title.get_width() + 10,
+                   y + hist_title.get_height() // 2,
+                   total_pages, page,
+                   ACCENT, OVERLAY_CLR, SUBTEXT)
 
     for i, h in enumerate(page_items):
         reason = h.get("reason", "")
