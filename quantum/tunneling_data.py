@@ -70,37 +70,12 @@ def _export_session(ctx) -> str | None:
 # ── 데이터 가져오기 ──────────────────────────────────
 
 
-def _safe_numeric(value, typ, default):
-    """값을 안전하게 숫자로 변환. 실패 시 default 반환."""
-    if isinstance(value, typ):
-        return value
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return typ(value)
-    return default
-
-
 def _load_import_data(path: str) -> tuple[dict | None, list[dict]]:
-    """세션 파일 로드 (포맷 자동 감지) + 타입 검증."""
+    """세션 파일 로드 (포맷 자동 감지)."""
     data = load_session(path)
     if data is None:
         return None, []
-    # 핵심 필드 타입 검증
-    for key in ("base_prob", "tunnel_prob", "tunnel_rate", "peak_rate", "speed_mult"):
-        if key in data:
-            data[key] = _safe_numeric(data[key], float, None)
-            if data[key] is None:
-                _log.warning("가져오기 필드 타입 오류 (제거): %s", key)
-                del data[key]
-    for key in ("total_attempts", "tunnel_count", "reflect_count", "barrier_width"):
-        if key in data:
-            data[key] = _safe_numeric(data[key], int, None)
-            if data[key] is None:
-                _log.warning("가져오기 필드 타입 오류 (제거): %s", key)
-                del data[key]
     trials = data.pop("trial_history", [])
-    if not isinstance(trials, list):
-        _log.warning("trial_history가 list가 아님, 무시")
-        trials = []
     return data, trials
 
 
@@ -114,7 +89,7 @@ def _import_session(ctx) -> bool:
     if session is None:
         return False
 
-    # 슬라이더에 파라미터 적용 (타입이 검증된 값만 사용)
+    # 슬라이더에 파라미터 적용
     if "base_prob" in session:
         ctx.sl_prob.value = max(0.01, min(0.50, session["base_prob"]))
     if "barrier_width" in session:

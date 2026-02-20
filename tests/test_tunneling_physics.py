@@ -1250,6 +1250,9 @@ class TestContextualHints(unittest.TestCase):
     def setUp(self):
         from quantum.tunneling import (
             _BARRIER_EDGE_TOL,
+            _get_contextual_hint,
+        )
+        from quantum.tunneling_render import (
             _CHART_H,
             _CHART_W,
             _CHART_X,
@@ -1263,7 +1266,6 @@ class TestContextualHints(unittest.TestCase):
             BLOCH_R,
             HEIGHT,
             WIDTH,
-            _get_contextual_hint,
         )
 
         self._get_hint = _get_contextual_hint
@@ -1698,7 +1700,7 @@ class TestTextCache(unittest.TestCase):
     """#19 텍스트 서피스 캐시 — font.render() 반복 호출 제거."""
 
     def setUp(self):
-        from quantum.tunneling import _TextCache
+        from quantum.tunneling_render import _TextCache
 
         self.TextCache = _TextCache
 
@@ -1786,7 +1788,7 @@ class TestBlochMeshCache(unittest.TestCase):
     """#20 대원 메시 캐시 — 3D 기저점 사전 계산 + 투영 캐싱."""
 
     def setUp(self):
-        from quantum.tunneling import (
+        from quantum.tunneling_render import (
             _CIRCLE_STEPS,
             _EQUATOR_PTS,
             _MERIDIAN_XZ,
@@ -1981,7 +1983,7 @@ class TestFlashEase(unittest.TestCase):
     """#22 — ease-out 이징 커브 테스트."""
 
     def setUp(self):
-        from quantum.tunneling import _ease_out, _flash_ease
+        from quantum.tunneling_render import _ease_out, _flash_ease
 
         self.ease_out = _ease_out
         self.flash_ease = _flash_ease

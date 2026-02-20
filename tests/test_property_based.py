@@ -14,10 +14,13 @@ import os
 import sys
 import unittest
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+try:
+    from hypothesis import given, settings
+    from hypothesis import strategies as st
+except ImportError as exc:
+    raise unittest.SkipTest("hypothesis 패키지 필요") from exc
 
 # ── 전략(strategy) 정의 ──────────────────────────────
 

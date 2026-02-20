@@ -223,19 +223,8 @@ def cfg(section: str, key: str, default=None):
 
 
 def section(name: str) -> dict:
-    """섹션 전체를 dict로 반환 (스키마 기반 검증 적용)."""
-    raw = _load().get(name, {})
-    if not isinstance(raw, dict):
-        return {}
-    if name not in _SCHEMA:
-        return dict(raw)
-    # 스키마가 있는 섹션은 각 키를 검증
-    result = {}
-    for key, value in raw.items():
-        validated = _validate(name, key, value)
-        if validated is not None:
-            result[key] = validated
-    return result
+    """섹션 전체를 dict로 반환."""
+    return _load().get(name, {})
 
 
 def reload_config():
