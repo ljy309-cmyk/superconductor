@@ -1549,5 +1549,152 @@ class TestExportSession(unittest.TestCase):
             self.assertTrue(result is None or isinstance(result, str))
 
 
+class TestImportSession(unittest.TestCase):
+    """#18 데이터 가져오기 — JSON/CSV 로드 및 파라미터 적용."""
+
+    def setUp(self):
+        import csv
+        import json
+        import tempfile
+
+        self.tmpdir = tempfile.mkdtemp()
+        self.export_dir = os.path.join(self.tmpdir, "exports")
+        os.makedirs(self.export_dir, exist_ok=True)
+
+        # 테스트용 JSON 파일 생성
+        self.session_data = {
+            "total_attempts": 50,
+            "tunnel_count": 20,
+            "reflect_count": 30,
+            "tunnel_rate": 0.4,
+            "barrier_width": 30,
+            "base_prob": 0.15,
+            "tunnel_prob": 0.105,
+            "elapsed_time": 60.0,
+            "speed_mult": 2.0,
+            "difficulty": "hard",
+            "timestamp": "2026-01-15T12:00:00",
+        }
+        self.json_path = os.path.join(self.export_dir, "tunneling_stats_20260115_120000.json")
+        with open(self.json_path, "w", encoding="utf-8") as f:
+            json.dump(self.session_data, f, indent=2)
+
+        # 테스트용 CSV 파일 생성
+        self.csv_path = os.path.join(self.export_dir, "tunneling_trials_20260115_120000.csv")
+        self.trial_rows = [
+            {"trial": 1, "time_s": 1.0, "barrier_width": 30, "tunnel_prob": 0.105, "result": 1},
+            {"trial": 2, "time_s": 2.0, "barrier_width": 30, "tunnel_prob": 0.105, "result": 0},
+            {"trial": 3, "time_s": 3.5, "barrier_width": 30, "tunnel_prob": 0.105, "result": 1},
+            {"trial": 4, "time_s": 4.0, "barrier_width": 30, "tunnel_prob": 0.105, "result": 1},
+        ]
+        with open(self.csv_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["trial", "time_s", "barrier_width", "tunnel_prob", "result"])
+            for row in self.trial_rows:
+                writer.writerow([row["trial"], row["time_s"], row["barrier_width"], row["tunnel_prob"], row["result"]])
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_load_import_json(self):
+        """JSON 파일에서 세션 데이터 로드."""
+        from quantum.tunneling import _load_import_data
+
+        session, _ = _load_import_data(self.json_path)
+        self.assertIsNotNone(session)
+        self.assertEqual(session["total_attempts"], 50)
+        self.assertEqual(session["base_prob"], 0.15)
+        self.assertEqual(session["barrier_width"], 30)
+
+    def test_load_import_csv(self):
+        """매칭 CSV 파일에서 시행 이력 로드."""
+        from quantum.tunneling import _load_import_data
+
+        _, trials = _load_import_data(self.json_path)
+        self.assertEqual(len(trials), 4)
+        self.assertTrue(trials[0]["result"])
+        self.assertFalse(trials[1]["result"])
+
+    def test_load_import_csv_fields(self):
+        """가져온 시행 데이터의 필드 구조."""
+        from quantum.tunneling import _load_import_data
+
+        _, trials = _load_import_data(self.json_path)
+        tr = trials[0]
+        self.assertIn("t", tr)
+        self.assertIn("barrier", tr)
+        self.assertIn("prob", tr)
+        self.assertIn("result", tr)
+        self.assertAlmostEqual(tr["t"], 1.0)
+        self.assertEqual(tr["barrier"], 30)
+
+    def test_load_import_no_csv(self):
+        """CSV 없이 JSON만 있어도 정상 로드."""
+        import json
+
+        json_only = os.path.join(self.export_dir, "tunneling_stats_20260101_000000.json")
+        with open(json_only, "w", encoding="utf-8") as f:
+            json.dump({"total_attempts": 5}, f)
+
+        from quantum.tunneling import _load_import_data
+
+        session, trials = _load_import_data(json_only)
+        self.assertIsNotNone(session)
+        self.assertEqual(len(trials), 0)
+
+    def test_load_import_bad_json(self):
+        """잘못된 JSON 파일 → None 반환."""
+        bad_path = os.path.join(self.export_dir, "bad.json")
+        with open(bad_path, "w") as f:
+            f.write("{invalid json}")
+
+        from quantum.tunneling import _load_import_data
+
+        session, trials = _load_import_data(bad_path)
+        self.assertIsNone(session)
+        self.assertEqual(len(trials), 0)
+
+    def test_load_import_missing_file(self):
+        """존재하지 않는 파일 → None 반환."""
+        from quantum.tunneling import _load_import_data
+
+        session, trials = _load_import_data("/nonexistent/path.json")
+        self.assertIsNone(session)
+        self.assertEqual(len(trials), 0)
+
+    def test_list_export_files(self):
+        """내보내기 파일 목록 함수 존재 및 호출 가능."""
+        from quantum.tunneling import _list_export_files
+
+        self.assertTrue(callable(_list_export_files))
+        result = _list_export_files()
+        self.assertIsInstance(result, list)
+
+    def test_import_function_exists(self):
+        """_import_session 함수가 존재하고 호출 가능."""
+        from quantum.tunneling import _import_session
+
+        self.assertTrue(callable(_import_session))
+
+    def test_imported_overlay_rates(self):
+        """가져온 시행 이력에서 누적 확률 계산 검증."""
+        from quantum.tunneling import _load_import_data
+
+        _, trials = _load_import_data(self.json_path)
+        # 수동 누적 확률 계산: [1,0,1,1] → [1/1, 1/2, 2/3, 3/4]
+        tunnels = 0
+        rates = []
+        for tr in trials:
+            if tr["result"]:
+                tunnels += 1
+            rates.append(tunnels / (len(rates) + 1))
+        self.assertAlmostEqual(rates[0], 1.0)
+        self.assertAlmostEqual(rates[1], 0.5)
+        self.assertAlmostEqual(rates[2], 2 / 3, places=4)
+        self.assertAlmostEqual(rates[3], 0.75)
+
+
 if __name__ == "__main__":
     unittest.main()

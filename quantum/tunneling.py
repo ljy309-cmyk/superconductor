@@ -5,6 +5,7 @@
 """
 
 import math
+import os
 import time
 from collections import deque
 
@@ -43,7 +44,7 @@ from quit_dialog import confirm_quit
 from replay import ReplayRecorder
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from sound_manager import get_sound_manager
-from theme import load_pg_colors, on_theme_change
+from theme import get_pg_theme, load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
@@ -404,7 +405,7 @@ def _draw_formula_overlay(screen, font, ctx):
         screen.blit(no_data, (fx + 8, y))
 
 
-def _draw_rate_chart(screen, font, trial_history, tunnel_prob):
+def _draw_rate_chart(screen, font, trial_history, tunnel_prob, imported_trials=None):
     """누적 터널링 확률 실시간 라인 차트."""
     # 내부 차트 영역
     cx = _CHART_X + _CHART_PAD_L
@@ -441,6 +442,10 @@ def _draw_rate_chart(screen, font, trial_history, tunnel_prob):
     # 이론 확률 라벨
     tp_lbl = font.render(f"P={tp * 100:.0f}%", True, BARRIER_CLR)
     screen.blit(tp_lbl, (cx + cw - tp_lbl.get_width(), prob_y - 12))
+
+    # 가져온 비교 데이터 (점선 보라색 라인)
+    if imported_trials:
+        _draw_imported_overlay(screen, font, imported_trials, cx, cy, cw, ch)
 
     if not trial_history:
         msg = font.render(t("tn_no_data"), True, OVERLAY_CLR)
@@ -479,6 +484,38 @@ def _draw_rate_chart(screen, font, trial_history, tunnel_prob):
     # 시행 횟수 (x축 우측 하단)
     n_surf = font.render(f"n={n}", True, OVERLAY_CLR)
     screen.blit(n_surf, (cx + cw - n_surf.get_width(), cy + ch + 1))
+
+
+def _draw_imported_overlay(screen, font, trials, cx, cy, cw, ch):
+    """가져온 시행 이력을 차트에 점선 보라색 라인으로 표시."""
+    n = len(trials)
+    if n == 0:
+        return
+    tunnels = 0
+    rates = []
+    for i, tr in enumerate(trials):
+        if tr["result"]:
+            tunnels += 1
+        rates.append(tunnels / (i + 1))
+
+    max_pts = min(n, cw)
+    points = []
+    for i in range(max_pts):
+        idx = int(i * (n - 1) / max(max_pts - 1, 1))
+        px = cx + int(i * cw / max(max_pts - 1, 1))
+        py = cy + int((1 - rates[idx]) * ch)
+        points.append((px, py))
+
+    # 점선으로 렌더링
+    for i in range(0, len(points) - 1, 2):
+        j = min(i + 1, len(points) - 1)
+        pygame.draw.line(screen, ACCENT, points[i], points[j], 1)
+
+    # 라벨
+    imp_rate = rates[-1]
+    imp_surf = font.render(f"imp:{imp_rate * 100:.0f}%", True, ACCENT)
+    imp_py = cy + int((1 - imp_rate) * ch)
+    screen.blit(imp_surf, (cx + 2, max(cy, imp_py - 10)))
 
 
 # ── 업적 진행도 ──────────────────────────────────────
@@ -695,6 +732,10 @@ class _SimContext:
         self.toast = AchievementToast()
         self.unlocked_ids: set[str] = set()
 
+        # 가져온 비교 데이터 (Ctrl+I)
+        self.imported_trials: list[dict] | None = None
+        self.imported_label: str = ""
+
     def read_sliders(self):
         """슬라이더 값 → 물리 파라미터 동기화."""
         self.speed_mult = self.sl_speed.value
@@ -789,6 +830,10 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         result = _export_session(ctx)
         if result:
             ctx.toast.show({"title": t("export_success"), "desc": result})
+            ctx.snd.play("achievement")
+    elif key == pygame.K_i and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+        if _import_session(ctx):
+            ctx.toast.show({"title": t("import_success"), "desc": ctx.imported_label})
             ctx.snd.play("achievement")
     return running
 
@@ -1018,6 +1063,188 @@ def _export_session(ctx) -> str | None:
     return export_dir
 
 
+# ── 데이터 가져오기 ──────────────────────────────────
+
+_EXPORT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "exports")
+
+
+def _list_export_files() -> list[tuple[str, str]]:
+    """tunneling 내보내기 파일 목록 반환. [(표시 이름, JSON 경로), ...] 최신순."""
+    if not os.path.isdir(_EXPORT_DIR):
+        return []
+    files = []
+    for f in sorted(os.listdir(_EXPORT_DIR), reverse=True):
+        if f.startswith("tunneling_stats_") and f.endswith(".json"):
+            label = f.replace("tunneling_stats_", "").replace(".json", "")
+            files.append((label, os.path.join(_EXPORT_DIR, f)))
+    return files
+
+
+def _choose_export_file(screen, font) -> str | None:
+    """내보내기 파일 선택 대화상자 (Pygame). 선택한 JSON 경로 반환, 취소 시 None."""
+    pg = get_pg_theme()
+    W, H = screen.get_size()
+    files = _list_export_files()
+    if not files:
+        return None
+
+    selected = 0
+    scroll = 0
+    max_visible = 6
+    clock = pygame.time.Clock()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    return None
+                if event.key in (pygame.K_UP, pygame.K_w):
+                    selected = max(0, selected - 1)
+                    if selected < scroll:
+                        scroll = selected
+                if event.key in (pygame.K_DOWN, pygame.K_s):
+                    selected = min(len(files) - 1, selected + 1)
+                    if selected >= scroll + max_visible:
+                        scroll = selected - max_visible + 1
+                if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    return files[selected][1]
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+                for vi in range(min(max_visible, len(files) - scroll)):
+                    idx = scroll + vi
+                    btn = _import_btn_rect(W, H, vi)
+                    if btn.collidepoint(mx, my):
+                        return files[idx][1]
+            if event.type == pygame.MOUSEMOTION:
+                mx, my = event.pos
+                for vi in range(min(max_visible, len(files) - scroll)):
+                    idx = scroll + vi
+                    btn = _import_btn_rect(W, H, vi)
+                    if btn.collidepoint(mx, my):
+                        selected = idx
+
+        # 렌더링
+        overlay = pygame.Surface((W, H), pygame.SRCALPHA)
+        overlay.fill((*pg.BG, 200))
+        screen.blit(overlay, (0, 0))
+
+        panel_w, panel_h = 380, 50 + min(max_visible, len(files)) * 34 + 30
+        px = W // 2 - panel_w // 2
+        py = H // 2 - panel_h // 2
+        pygame.draw.rect(screen, pg.PANEL_BG, (px, py, panel_w, panel_h), border_radius=10)
+        pygame.draw.rect(screen, pg.OVERLAY, (px, py, panel_w, panel_h), 2, border_radius=10)
+
+        title = font.render(t("import_title"), True, pg.TEXT)
+        screen.blit(title, (W // 2 - title.get_width() // 2, py + 12))
+
+        for vi in range(min(max_visible, len(files) - scroll)):
+            idx = scroll + vi
+            label, _ = files[idx]
+            btn = _import_btn_rect(W, H, vi)
+            is_sel = idx == selected
+            bg_alpha = 80 if is_sel else 30
+            btn_surf = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
+            btn_surf.fill((*pg.ACCENT_BLUE[:3], bg_alpha))
+            screen.blit(btn_surf, btn.topleft)
+            border_w = 2 if is_sel else 1
+            pygame.draw.rect(screen, pg.ACCENT_BLUE if is_sel else pg.OVERLAY, btn, border_w, border_radius=4)
+            if is_sel:
+                arrow = font.render(">", True, pg.ACCENT_BLUE)
+                screen.blit(arrow, (btn.x - 14, btn.centery - arrow.get_height() // 2))
+            lbl_surf = font.render(label, True, pg.TEXT)
+            screen.blit(lbl_surf, (btn.x + 8, btn.centery - lbl_surf.get_height() // 2))
+
+        # 스크롤 표시
+        if len(files) > max_visible:
+            info = font.render(f"{selected + 1}/{len(files)}", True, pg.SUBTEXT)
+            screen.blit(info, (W // 2 - info.get_width() // 2, py + panel_h - 22))
+
+        hint = font.render(t("import_hint"), True, pg.SUBTEXT)
+        screen.blit(hint, (W // 2 - hint.get_width() // 2, py + panel_h - 22 if len(files) <= max_visible else py + panel_h - 10))
+
+        pygame.display.flip()
+        clock.tick(30)
+
+
+def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int) -> pygame.Rect:
+    """가져오기 대화상자 버튼 위치 계산."""
+    btn_w, btn_h = 300, 28
+    bx = screen_w // 2 - btn_w // 2
+    max_visible = 6
+    panel_h = 50 + min(max_visible, 6) * 34 + 30
+    py = screen_h // 2 - panel_h // 2
+    by = py + 40 + vis_index * 34
+    return pygame.Rect(bx, by, btn_w, btn_h)
+
+
+def _load_import_data(json_path: str) -> tuple[dict | None, list[dict]]:
+    """JSON 세션 + CSV 시행 이력 로드. (session_dict, trial_list) 반환."""
+    import csv
+    import json
+
+    session = None
+    trials: list[dict] = []
+
+    # ① JSON 로드
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            session = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        _log.warning("JSON 가져오기 실패: %s", e)
+        return None, []
+
+    # ② 매칭 CSV 찾기 (같은 타임스탬프)
+    csv_path = json_path.replace("tunneling_stats_", "tunneling_trials_").replace(".json", ".csv")
+    if os.path.exists(csv_path):
+        try:
+            with open(csv_path, encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    trials.append(
+                        {
+                            "t": float(row["time_s"]),
+                            "barrier": int(row["barrier_width"]),
+                            "prob": float(row["tunnel_prob"]),
+                            "result": bool(int(row["result"])),
+                        }
+                    )
+        except (OSError, KeyError, ValueError) as e:
+            _log.warning("CSV 가져오기 실패: %s", e)
+
+    return session, trials
+
+
+def _import_session(ctx) -> bool:
+    """내보내기 파일을 선택하고 파라미터 적용 + 비교 데이터 로드."""
+    json_path = _choose_export_file(ctx.screen, ctx.font)
+    if json_path is None:
+        return False
+
+    session, trials = _load_import_data(json_path)
+    if session is None:
+        return False
+
+    # 슬라이더에 파라미터 적용
+    if "base_prob" in session:
+        ctx.sl_prob.value = max(0.01, min(0.50, session["base_prob"]))
+    if "barrier_width" in session:
+        ctx.sl_barrier.value = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, session["barrier_width"]))
+    if "speed_mult" in session:
+        ctx.sl_speed.value = max(0.5, min(5.0, session["speed_mult"]))
+    ctx.read_sliders()
+
+    # 비교용 시행 이력 저장
+    if trials:
+        ctx.imported_trials = trials
+        ts_label = os.path.basename(json_path).replace("tunneling_stats_", "").replace(".json", "")
+        ctx.imported_label = ts_label
+
+    _log.info("데이터 가져오기 완료: %s (%d trials)", json_path, len(trials))
+    return True
+
+
 # ── 렌더링 ───────────────────────────────────────────
 
 
@@ -1035,7 +1262,7 @@ def _render_frame(ctx: _SimContext):
     _draw_formula_overlay(ctx.screen, ctx.font, ctx)
     _draw_bloch_sphere(ctx.screen, ctx.particle, ctx.font, ctx.title_font, ctx.bloch_phi, ctx.bloch_el)
     _draw_stats(ctx.screen, ctx.particle, ctx.font, ctx.tunnel_prob)
-    _draw_rate_chart(ctx.screen, ctx.font, ctx.trial_history, ctx.tunnel_prob)
+    _draw_rate_chart(ctx.screen, ctx.font, ctx.trial_history, ctx.tunnel_prob, ctx.imported_trials)
     ctx.panel.draw(ctx.screen, ctx.font)
     _draw_achievement_progress(ctx.screen, ctx.font, ctx)
 
@@ -1050,7 +1277,7 @@ def _render_frame(ctx: _SimContext):
             pause_state=t("paused") if ctx.paused else t("running_state"),
         ),
         t("hint_click_launch"),
-        t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X: Export  |  G: {t('glossary_title')}",
+        t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X/I: Export/Import  |  G: {t('glossary_title')}",
     ]
     for i, h in enumerate(hints):
         surf = ctx.font.render(h, True, TEXT_CLR)
