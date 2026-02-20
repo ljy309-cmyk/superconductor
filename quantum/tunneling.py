@@ -430,309 +430,357 @@ def _draw_rate_chart(screen, font, trial_history, tunnel_prob):
     screen.blit(n_surf, (cx + cw - n_surf.get_width(), cy + ch + 1))
 
 
+# ── 시뮬레이션 상태 번들 ──────────────────────────────
+
+
+class _SimContext:
+    """run_simulation 내부 상태를 하나로 묶는 컨테이너."""
+
+    def __init__(self):
+        _load_theme_colors()
+        on_theme_change(_load_theme_colors)
+        pygame.init()
+
+        self.screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
+        pygame.display.set_caption(t("game_title_tunneling"))
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont("Consolas", 12)
+        self.title_font = pygame.font.SysFont("Consolas", 16, bold=True)
+        self.big_font = pygame.font.SysFont("Consolas", 18, bold=True)
+
+        self.particle = QuantumParticle()
+        self.paused = False
+
+        # 블로흐 구 인터랙션
+        self.bloch_phi = 0.0
+        self.bloch_el = _BLOCH_EL_DEFAULT
+        self.bloch_dragging = False
+        self.bloch_drag_prev = (0, 0)
+
+        # 장벽 드래그
+        self.barrier_dragging = False
+        self.barrier_hover = False
+
+        # 입자 궤적 잔상
+        self.trails: list[tuple[list[tuple[int, int]], bool]] = []
+        self.current_trail: list[tuple[int, int]] = []
+        self.trail_frame = 0
+        self.prev_tunneled_state: bool | None = None
+
+        # 슬라이더 패널
+        self.panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
+        self.sl_speed = self.panel.add(0.5, 5.0, 1.0, 0.5, "Speed Mult", ".1f")
+        self.sl_barrier = self.panel.add(
+            BARRIER_WIDTH_MIN, BARRIER_WIDTH_MAX, BARRIER_WIDTH_DEFAULT, 2, "Barrier W", ".0f"
+        )
+        self.sl_boost = self.panel.add(1.0, 5.0, TUNNEL_SPEED_BOOST, 0.5, "Tunnel Boost", ".1f")
+
+        # 프리셋 HUD / 오버레이
+        slider_map = {
+            ("tunneling", "tunnel_prob_base"): self.sl_speed,
+            ("tunneling", "barrier_width_default"): self.sl_barrier,
+            ("tunneling", "tunnel_speed_boost"): self.sl_boost,
+        }
+        self.preset_hud = PresetHUD("tunneling", slider_map)
+        self.help_overlay = HelpOverlay("tunneling")
+        self.tutorial = TutorialOverlay("tunneling")
+        self.glossary = GlossaryOverlay()
+
+        # 사운드 / 리플레이
+        self.snd = get_sound_manager()
+        self.snd.init()
+        self.recorder = ReplayRecorder("tunneling")
+
+        # 물리 상태
+        self.barrier_width = BARRIER_WIDTH_DEFAULT
+        self.tunnel_prob = _calc_tunnel_prob(self.barrier_width)
+        self.speed_mult = 1.0
+
+        # 세션 통계
+        self.start_time = time.monotonic()
+        self.max_tunnel_barrier = 0
+        self.barrier_configs_tried: set[int] = set()
+        self.trial_history: deque[dict] = deque(maxlen=TRIAL_HISTORY_MAX)
+        self.peak_rate = 0.0
+        self.prev_attempts = 0
+
+    def read_sliders(self):
+        """슬라이더 값 → 물리 파라미터 동기화."""
+        self.speed_mult = self.sl_speed.value
+        self.barrier_width = int(self.sl_barrier.value)
+        self.tunnel_prob = _calc_tunnel_prob(self.barrier_width)
+        self.barrier_configs_tried.add(self.barrier_width)
+
+
+# ── 이벤트 처리 ──────────────────────────────────────
+
+
+def _handle_events(ctx: _SimContext) -> bool:
+    """Pygame 이벤트 처리. False 반환 시 루프 종료."""
+    running = True
+    for event in pygame.event.get():
+        if ctx.tutorial.handle_event(event):
+            continue
+        if ctx.glossary.handle_event(event):
+            continue
+        ctx.panel.handle_event(event)
+        ctx.preset_hud.handle_event(event)
+        ctx.help_overlay.handle_event(event)
+
+        if event.type == pygame.QUIT:
+            running = False
+        elif event.type == pygame.KEYDOWN:
+            running = _handle_key(ctx, event.key, running)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            _handle_mouse_down(ctx, event.pos)
+        elif event.type == pygame.MOUSEMOTION:
+            _handle_mouse_motion(ctx, event.pos)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            ctx.barrier_dragging = False
+            ctx.bloch_dragging = False
+    return running
+
+
+def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
+    """키보드 이벤트 분기."""
+    ctx.snd.handle_key(key)
+    if key == pygame.K_ESCAPE:
+        if confirm_quit(ctx.screen, ctx.font):
+            return False
+    elif key == pygame.K_SPACE:
+        ctx.paused = not ctx.paused
+    elif key == pygame.K_r:
+        ctx.particle = QuantumParticle()
+        ctx.panel.reset_all()
+        ctx.trails.clear()
+        ctx.current_trail.clear()
+        ctx.prev_tunneled_state = None
+    elif key == pygame.K_UP:
+        ctx.sl_speed.value = ctx.sl_speed.value + 0.5
+    elif key == pygame.K_DOWN:
+        ctx.sl_speed.value = ctx.sl_speed.value - 0.5
+    elif key == pygame.K_RIGHT:
+        ctx.sl_barrier.value = ctx.sl_barrier.value + 10
+    elif key == pygame.K_LEFT:
+        ctx.sl_barrier.value = ctx.sl_barrier.value - 10
+    elif key == pygame.K_l:
+        toggle_locale()
+    elif key == pygame.K_LEFTBRACKET:
+        cycle_sim_speed(-1)
+    elif key == pygame.K_RIGHTBRACKET:
+        cycle_sim_speed(1)
+    return running
+
+
+def _handle_mouse_down(ctx: _SimContext, pos: tuple[int, int]):
+    """마우스 클릭 — 장벽 드래그 / 블로흐 구 드래그 / 입자 재발사."""
+    mx, my = pos
+    left_edge = BARRIER_X - ctx.barrier_width // 2
+    right_edge = BARRIER_X + ctx.barrier_width // 2
+    in_sim_y = SIM_TOP <= my <= SIM_TOP + SIM_H
+    near_edge = in_sim_y and (abs(mx - left_edge) <= _BARRIER_EDGE_TOL or abs(mx - right_edge) <= _BARRIER_EDGE_TOL)
+    if near_edge:
+        ctx.barrier_dragging = True
+    else:
+        dx_b, dy_b = mx - BLOCH_CX, my - BLOCH_CY
+        if dx_b * dx_b + dy_b * dy_b <= BLOCH_R * BLOCH_R:
+            ctx.bloch_dragging = True
+            ctx.bloch_drag_prev = (mx, my)
+        else:
+            ctx.particle.reset()
+
+
+def _handle_mouse_motion(ctx: _SimContext, pos: tuple[int, int]):
+    """마우스 이동 — 드래그 업데이트 / 호버 감지."""
+    mx, my = pos
+    if ctx.barrier_dragging:
+        half_w = abs(mx - BARRIER_X)
+        ctx.sl_barrier.value = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, half_w * 2))
+    elif ctx.bloch_dragging:
+        dx_m = mx - ctx.bloch_drag_prev[0]
+        dy_m = my - ctx.bloch_drag_prev[1]
+        ctx.bloch_phi += dx_m * _BLOCH_DRAG_SENSITIVITY
+        ctx.bloch_el = max(_BLOCH_EL_MIN, min(_BLOCH_EL_MAX, ctx.bloch_el - dy_m * _BLOCH_DRAG_SENSITIVITY))
+        ctx.bloch_drag_prev = (mx, my)
+    else:
+        left_edge = BARRIER_X - ctx.barrier_width // 2
+        right_edge = BARRIER_X + ctx.barrier_width // 2
+        in_sim_y = SIM_TOP <= my <= SIM_TOP + SIM_H
+        ctx.barrier_hover = in_sim_y and (
+            abs(mx - left_edge) <= _BARRIER_EDGE_TOL or abs(mx - right_edge) <= _BARRIER_EDGE_TOL
+        )
+
+
+# ── 물리 업데이트 ────────────────────────────────────
+
+
+def _step_physics(ctx: _SimContext, dt: float):
+    """물리 시뮬레이션 한 프레임 진행 + 시행 기록 + 궤적 + 사운드."""
+    p = ctx.particle
+
+    # 속도 배율 적용 (화면 표시용, 내부 상태는 보존)
+    orig_vx = p.vx
+    p.vx = orig_vx * ctx.speed_mult if orig_vx > 0 else orig_vx
+    p.update(dt, ctx.barrier_width, ctx.tunnel_prob, ctx.sl_boost.value)
+    p.vx = orig_vx
+
+    # 시행별 기록
+    if p.total_attempts > ctx.prev_attempts:
+        ctx.prev_attempts = p.total_attempts
+        trial_elapsed = time.monotonic() - ctx.start_time
+        tunneled = p.tunneled is True
+        ctx.trial_history.append(
+            {
+                "t": round(trial_elapsed, 2),
+                "barrier": ctx.barrier_width,
+                "prob": round(ctx.tunnel_prob, 4),
+                "result": tunneled,
+            }
+        )
+        cur_rate = p.tunnel_count / p.total_attempts
+        if cur_rate > ctx.peak_rate:
+            ctx.peak_rate = cur_rate
+        if tunneled and ctx.barrier_width > ctx.max_tunnel_barrier:
+            ctx.max_tunnel_barrier = ctx.barrier_width
+
+    # 사운드
+    if p.tunneled is True and p.flash_timer > 0.5:
+        ctx.snd.play("tunnel_success")
+    elif p.tunneled is False and p.flash_timer > 0.3:
+        ctx.snd.play("tunnel_reflect")
+
+    # 궤적 기록
+    ctx.trail_frame += 1
+    if ctx.trail_frame % _TRAIL_SAMPLE == 0:
+        ctx.current_trail.append((int(p.x), int(p.y)))
+
+    if ctx.prev_tunneled_state is not None and p.tunneled is None:
+        if ctx.current_trail:
+            ctx.trails.append((ctx.current_trail[:], ctx.prev_tunneled_state))
+            if len(ctx.trails) > _MAX_TRAILS:
+                ctx.trails.pop(0)
+            ctx.current_trail.clear()
+    ctx.prev_tunneled_state = p.tunneled
+
+    ctx.preset_hud.update(dt)
+
+    ctx.recorder.record_frame(
+        {
+            "x": round(p.x, 1),
+            "tunneled": p.tunneled,
+            "attempts": p.total_attempts,
+            "tunnels": p.tunnel_count,
+            "barrier_w": ctx.barrier_width,
+            "rate": round(p.tunnel_count / max(p.total_attempts, 1), 3),
+        }
+    )
+
+
+# ── 렌더링 ───────────────────────────────────────────
+
+
+def _render_frame(ctx: _SimContext):
+    """한 프레임 전체 렌더링."""
+    ctx.screen.fill(BG)
+
+    # 타이틀
+    t_surf = ctx.big_font.render(t("game_title_tunneling"), True, ACCENT)
+    ctx.screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
+
+    _draw_sim_area(ctx.screen, ctx.font, ctx.barrier_width, ctx.barrier_hover, ctx.barrier_dragging)
+    _draw_trails(ctx.screen, ctx.trails, ctx.current_trail, ctx.particle.tunneled)
+    _draw_particle(ctx.screen, ctx.particle, ctx.font)
+    _draw_formula_overlay(ctx.screen, ctx.font, ctx.barrier_width, ctx.tunnel_prob)
+    _draw_bloch_sphere(ctx.screen, ctx.particle, ctx.font, ctx.title_font, ctx.bloch_phi, ctx.bloch_el)
+    _draw_stats(ctx.screen, ctx.particle, ctx.font, ctx.tunnel_prob)
+    _draw_rate_chart(ctx.screen, ctx.font, ctx.trial_history, ctx.tunnel_prob)
+    ctx.panel.draw(ctx.screen, ctx.font)
+
+    # 안내 텍스트
+    hints = [
+        t(
+            "hint_speed_info",
+            speed=ctx.speed_mult,
+            sim_speed=speed_label(),
+            width=ctx.barrier_width,
+            prob=ctx.tunnel_prob * 100,
+            pause_state=t("paused") if ctx.paused else t("running_state"),
+        ),
+        t("hint_click_launch"),
+        t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  G: {t('glossary_title')}",
+    ]
+    for i, h in enumerate(hints):
+        surf = ctx.font.render(h, True, TEXT_CLR)
+        ctx.screen.blit(surf, (SIM_LEFT, HEIGHT - 52 + i * 16))
+
+    ctx.preset_hud.draw(ctx.screen, ctx.font)
+    ctx.help_overlay.draw(ctx.screen, ctx.font)
+    ctx.glossary.draw(ctx.screen, ctx.font)
+    ctx.tutorial.draw(ctx.screen, ctx.font)
+
+
+# ── 세션 데이터 빌드 ────────────────────────────────
+
+
+def _build_session_data(ctx: _SimContext) -> dict:
+    """finalize_session용 세션 요약 딕셔너리 생성."""
+    p = ctx.particle
+    rate = p.tunnel_count / max(p.total_attempts, 1)
+    elapsed_time = time.monotonic() - ctx.start_time
+    elapsed_min = elapsed_time / 60.0 if elapsed_time > 0 else 1.0
+    avg_bw = (
+        round(sum(tr["barrier"] for tr in ctx.trial_history) / len(ctx.trial_history), 1)
+        if ctx.trial_history
+        else ctx.barrier_width
+    )
+    return {
+        "total_attempts": p.total_attempts,
+        "tunnel_count": p.tunnel_count,
+        "reflect_count": p.reflect_count,
+        "tunnel_rate": round(rate, 3),
+        "barrier_width": ctx.barrier_width,
+        "tunnel_prob": round(ctx.tunnel_prob, 3),
+        "elapsed_time": round(elapsed_time, 2),
+        "max_tunnel_barrier": ctx.max_tunnel_barrier,
+        "barrier_configs_tried": len(ctx.barrier_configs_tried),
+        "peak_rate": round(ctx.peak_rate, 3),
+        "avg_barrier_width": avg_bw,
+        "trials_per_minute": round(p.total_attempts / elapsed_min, 1),
+        "speed_mult": round(ctx.speed_mult, 1),
+        "difficulty": ctx.preset_hud.current,
+        "trial_history": list(ctx.trial_history),
+    }
+
+
 # ── 메인 시뮬레이션 ──────────────────────────────────
 
 
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
-    _load_theme_colors()
-    on_theme_change(_load_theme_colors)
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
-    pygame.display.set_caption(t("game_title_tunneling"))
-    clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 12)
-    title_font = pygame.font.SysFont("Consolas", 16, bold=True)
-    big_font = pygame.font.SysFont("Consolas", 18, bold=True)
+    ctx = _SimContext()
 
-    particle = QuantumParticle()
-    paused = False
-
-    # ── 블로흐 구 인터랙션 ──
-    bloch_phi = 0.0
-    bloch_el = _BLOCH_EL_DEFAULT
-    bloch_dragging = False
-    bloch_drag_prev = (0, 0)
-
-    # ── 장벽 드래그 ──
-    barrier_dragging = False
-    barrier_hover = False
-
-    # ── 입자 궤적 잔상 ──
-    trails: list[tuple[list[tuple[int, int]], bool]] = []  # (points, tunneled)
-    current_trail: list[tuple[int, int]] = []
-    trail_frame = 0
-    prev_tunneled_state: bool | None = None
-
-    # ── 슬라이더 패널 ─────────────────────────────────
-    panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
-    sl_speed = panel.add(0.5, 5.0, 1.0, 0.5, "Speed Mult", ".1f")
-    sl_barrier = panel.add(BARRIER_WIDTH_MIN, BARRIER_WIDTH_MAX, BARRIER_WIDTH_DEFAULT, 2, "Barrier W", ".0f")
-    sl_boost = panel.add(1.0, 5.0, TUNNEL_SPEED_BOOST, 0.5, "Tunnel Boost", ".1f")
-
-    # ── 프리셋 HUD ──
-    slider_map = {
-        ("tunneling", "tunnel_prob_base"): sl_speed,
-        ("tunneling", "barrier_width_default"): sl_barrier,
-        ("tunneling", "tunnel_speed_boost"): sl_boost,
-    }
-    preset_hud = PresetHUD("tunneling", slider_map)
-    help_overlay = HelpOverlay("tunneling")
-    tutorial = TutorialOverlay("tunneling")
-    glossary = GlossaryOverlay()
-
-    # ── 사운드 ──
-    snd = get_sound_manager()
-    snd.init()
-
-    # ── 리플레이 ──
-    recorder = ReplayRecorder("tunneling")
-
-    barrier_width = BARRIER_WIDTH_DEFAULT
-    tunnel_prob = _calc_tunnel_prob(barrier_width)
-
-    # ── 세션 통계 추적 ──
-    start_time = time.monotonic()
-    max_tunnel_barrier = 0
-    barrier_configs_tried: set[int] = set()
-    trial_history: deque[dict] = deque(maxlen=TRIAL_HISTORY_MAX)
-    peak_rate = 0.0
-    prev_attempts = 0
-
-    # ── 시작 시 난이도 선택 ──
-    if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
+    if not choose_difficulty_or_quit(ctx.screen, ctx.font, ctx.preset_hud, _load_theme_colors):
         return
 
     running = True
     while running:
-        raw_dt = clock.tick(FPS) / 1000.0
+        raw_dt = ctx.clock.tick(FPS) / 1000.0
         dt = apply_speed(raw_dt)
 
-        # ── 이벤트 ───────────────────────────────────
-        for event in pygame.event.get():
-            if tutorial.handle_event(event):
-                continue
-            if glossary.handle_event(event):
-                continue
-            panel.handle_event(event)
-            preset_hud.handle_event(event)
-            help_overlay.handle_event(event)
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                snd.handle_key(event.key)
-                if event.key == pygame.K_ESCAPE:
-                    if confirm_quit(screen, font):
-                        running = False
-                elif event.key == pygame.K_SPACE:
-                    paused = not paused
-                elif event.key == pygame.K_r:
-                    particle = QuantumParticle()
-                    panel.reset_all()
-                    trails.clear()
-                    current_trail.clear()
-                    prev_tunneled_state = None
-                elif event.key == pygame.K_UP:
-                    sl_speed.value = sl_speed.value + 0.5
-                elif event.key == pygame.K_DOWN:
-                    sl_speed.value = sl_speed.value - 0.5
-                elif event.key == pygame.K_RIGHT:
-                    sl_barrier.value = sl_barrier.value + 10
-                elif event.key == pygame.K_LEFT:
-                    sl_barrier.value = sl_barrier.value - 10
-                elif event.key == pygame.K_l:
-                    toggle_locale()
-                elif event.key == pygame.K_LEFTBRACKET:
-                    cycle_sim_speed(-1)
-                elif event.key == pygame.K_RIGHTBRACKET:
-                    cycle_sim_speed(1)
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                mx, my = event.pos
-                # 장벽 가장자리 드래그 감지
-                left_edge = BARRIER_X - barrier_width // 2
-                right_edge = BARRIER_X + barrier_width // 2
-                in_sim_y = SIM_TOP <= my <= SIM_TOP + SIM_H
-                near_edge = in_sim_y and (
-                    abs(mx - left_edge) <= _BARRIER_EDGE_TOL or abs(mx - right_edge) <= _BARRIER_EDGE_TOL
-                )
-                if near_edge:
-                    barrier_dragging = True
-                else:
-                    dx_b, dy_b = mx - BLOCH_CX, my - BLOCH_CY
-                    if dx_b * dx_b + dy_b * dy_b <= BLOCH_R * BLOCH_R:
-                        bloch_dragging = True
-                        bloch_drag_prev = (mx, my)
-                    else:
-                        particle.reset()
-            elif event.type == pygame.MOUSEMOTION:
-                mx, my = event.pos
-                if barrier_dragging:
-                    half_w = abs(mx - BARRIER_X)
-                    new_w = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, half_w * 2))
-                    sl_barrier.value = new_w
-                elif bloch_dragging:
-                    dx_m = mx - bloch_drag_prev[0]
-                    dy_m = my - bloch_drag_prev[1]
-                    bloch_phi += dx_m * _BLOCH_DRAG_SENSITIVITY
-                    bloch_el = max(_BLOCH_EL_MIN, min(_BLOCH_EL_MAX, bloch_el - dy_m * _BLOCH_DRAG_SENSITIVITY))
-                    bloch_drag_prev = (mx, my)
-                else:
-                    # 호버 감지
-                    left_edge = BARRIER_X - barrier_width // 2
-                    right_edge = BARRIER_X + barrier_width // 2
-                    in_sim_y = SIM_TOP <= my <= SIM_TOP + SIM_H
-                    barrier_hover = in_sim_y and (
-                        abs(mx - left_edge) <= _BARRIER_EDGE_TOL or abs(mx - right_edge) <= _BARRIER_EDGE_TOL
-                    )
-            elif event.type == pygame.MOUSEBUTTONUP:
-                barrier_dragging = False
-                bloch_dragging = False
+        running = _handle_events(ctx)
+        ctx.read_sliders()
 
-        # ── 슬라이더 값 읽기 ─────────────────────────
-        speed_mult = sl_speed.value
-        barrier_width = int(sl_barrier.value)
-        tunnel_prob = _calc_tunnel_prob(barrier_width)
-        barrier_configs_tried.add(barrier_width)
+        if not ctx.paused:
+            _step_physics(ctx, dt)
 
-        # ── 물리 업데이트 ────────────────────────────
-        if not paused:
-            orig_vx = particle.vx
-            particle.vx = orig_vx * speed_mult if orig_vx > 0 else orig_vx
-            particle.update(dt, barrier_width, tunnel_prob, sl_boost.value)
-            particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
-
-            # ── 시행별 기록 ──
-            if particle.total_attempts > prev_attempts:
-                prev_attempts = particle.total_attempts
-                trial_elapsed = time.monotonic() - start_time
-                tunneled = particle.tunneled is True
-                trial_history.append(
-                    {
-                        "t": round(trial_elapsed, 2),
-                        "barrier": barrier_width,
-                        "prob": round(tunnel_prob, 4),
-                        "result": tunneled,
-                    }
-                )
-                cur_rate = particle.tunnel_count / particle.total_attempts
-                if cur_rate > peak_rate:
-                    peak_rate = cur_rate
-                if tunneled and barrier_width > max_tunnel_barrier:
-                    max_tunnel_barrier = barrier_width
-
-            # ── 사운드 ──
-            if particle.tunneled is True and particle.flash_timer > 0.5:
-                snd.play("tunnel_success")
-            elif particle.tunneled is False and particle.flash_timer > 0.3:
-                snd.play("tunnel_reflect")
-
-            # ── 궤적 기록 ──
-            trail_frame += 1
-            if trail_frame % _TRAIL_SAMPLE == 0:
-                current_trail.append((int(particle.x), int(particle.y)))
-
-            # 입자가 리셋되면 (tunneled: non-None → None) 궤적 저장
-            if prev_tunneled_state is not None and particle.tunneled is None:
-                if current_trail:
-                    trails.append((current_trail[:], prev_tunneled_state))
-                    if len(trails) > _MAX_TRAILS:
-                        trails.pop(0)
-                    current_trail.clear()
-            prev_tunneled_state = particle.tunneled
-
-            preset_hud.update(dt)
-
-            recorder.record_frame(
-                {
-                    "x": round(particle.x, 1),
-                    "tunneled": particle.tunneled,
-                    "attempts": particle.total_attempts,
-                    "tunnels": particle.tunnel_count,
-                    "barrier_w": barrier_width,
-                    "rate": round(particle.tunnel_count / max(particle.total_attempts, 1), 3),
-                }
-            )
-
-        # ── 렌더링 ───────────────────────────────────
-        screen.fill(BG)
-
-        # 타이틀
-        t_surf = big_font.render(t("game_title_tunneling"), True, ACCENT)
-        screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
-
-        # 시뮬레이션 영역
-        _draw_sim_area(screen, font, barrier_width, barrier_hover, barrier_dragging)
-
-        # 입자 궤적 잔상
-        _draw_trails(screen, trails, current_trail, particle.tunneled)
-
-        # 입자
-        _draw_particle(screen, particle, font)
-
-        # 수식 오버레이
-        _draw_formula_overlay(screen, font, barrier_width, tunnel_prob)
-
-        # 블로흐 구
-        _draw_bloch_sphere(screen, particle, font, title_font, bloch_phi, bloch_el)
-
-        # 통계
-        _draw_stats(screen, particle, font, tunnel_prob)
-
-        # 실시간 확률 차트
-        _draw_rate_chart(screen, font, trial_history, tunnel_prob)
-
-        # 슬라이더 패널 그리기
-        panel.draw(screen, font)
-
-        # 안내
-        hints = [
-            t(
-                "hint_speed_info",
-                speed=speed_mult,
-                sim_speed=speed_label(),
-                width=barrier_width,
-                prob=tunnel_prob * 100,
-                pause_state=t("paused") if paused else t("running_state"),
-            ),
-            t("hint_click_launch"),
-            t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  G: {t('glossary_title')}",
-        ]
-        for i, h in enumerate(hints):
-            surf = font.render(h, True, TEXT_CLR)
-            screen.blit(surf, (SIM_LEFT, HEIGHT - 52 + i * 16))
-
-        preset_hud.draw(screen, font)
-        help_overlay.draw(screen, font)
-        glossary.draw(screen, font)
-        tutorial.draw(screen, font)
-
+        _render_frame(ctx)
         pygame.display.flip()
 
-    rate = particle.tunnel_count / max(particle.total_attempts, 1)
-    elapsed_time = time.monotonic() - start_time
-    elapsed_min = elapsed_time / 60.0 if elapsed_time > 0 else 1.0
-    avg_bw = round(sum(t["barrier"] for t in trial_history) / len(trial_history), 1) if trial_history else barrier_width
     finalize_session(
         "tunneling",
-        {
-            "total_attempts": particle.total_attempts,
-            "tunnel_count": particle.tunnel_count,
-            "reflect_count": particle.reflect_count,
-            "tunnel_rate": round(rate, 3),
-            "barrier_width": barrier_width,
-            "tunnel_prob": round(tunnel_prob, 3),
-            "elapsed_time": round(elapsed_time, 2),
-            "max_tunnel_barrier": max_tunnel_barrier,
-            "barrier_configs_tried": len(barrier_configs_tried),
-            "peak_rate": round(peak_rate, 3),
-            "avg_barrier_width": avg_bw,
-            "trials_per_minute": round(particle.total_attempts / elapsed_min, 1),
-            "speed_mult": round(speed_mult, 1),
-            "difficulty": preset_hud.current,
-            "trial_history": list(trial_history),
-        },
-        recorder=recorder,
-        snd=snd,
+        _build_session_data(ctx),
+        recorder=ctx.recorder,
+        snd=ctx.snd,
         theme_callback=_load_theme_colors,
     )
 
