@@ -94,11 +94,16 @@ _CHART_PAD_L = 22  # y축 라벨
 _CHART_PAD_T = 3
 _CHART_PAD_B = 10  # x축 라벨
 
+# ── 장벽 드래그 ──────────────────────────────────────
+_BARRIER_EDGE_TOL = 8  # 장벽 가장자리 감지 허용 범위 (px)
+
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
 
-def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
+def _draw_sim_area(
+    screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT, barrier_hover=False, barrier_dragging=False
+):
     """시뮬레이션 영역 배경."""
     pygame.draw.rect(screen, SURFACE_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H))
     pygame.draw.rect(screen, OVERLAY_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H), 1)
@@ -106,6 +111,17 @@ def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     # 장벽
     bx = BARRIER_X - barrier_width // 2
     pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, barrier_width, SIM_H))
+
+    # 장벽 가장자리 하이라이트 (호버 또는 드래그 시)
+    if barrier_hover or barrier_dragging:
+        edge_clr = WHITE if barrier_dragging else ACCENT
+        left_edge = BARRIER_X - barrier_width // 2
+        right_edge = BARRIER_X + barrier_width // 2
+        pygame.draw.line(screen, edge_clr, (left_edge, SIM_TOP), (left_edge, SIM_TOP + SIM_H), 2)
+        pygame.draw.line(screen, edge_clr, (right_edge, SIM_TOP), (right_edge, SIM_TOP + SIM_H), 2)
+        # 두께 표시
+        w_lbl = font.render(f"{barrier_width}px", True, edge_clr)
+        screen.blit(w_lbl, (BARRIER_X - w_lbl.get_width() // 2, SIM_TOP + SIM_H - 18))
 
     # 장벽 라벨
     label = font.render(t("tn_barrier"), True, BG)
@@ -356,6 +372,10 @@ def run_simulation():
     bloch_dragging = False
     bloch_drag_prev = (0, 0)
 
+    # ── 장벽 드래그 ──
+    barrier_dragging = False
+    barrier_hover = False
+
     # ── 슬라이더 패널 ─────────────────────────────────
     panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
     sl_speed = panel.add(0.5, 5.0, 1.0, 0.5, "Speed Mult", ".1f")
@@ -431,22 +451,44 @@ def run_simulation():
                     cycle_sim_speed(1)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
-                dx_b, dy_b = mx - BLOCH_CX, my - BLOCH_CY
-                if dx_b * dx_b + dy_b * dy_b <= BLOCH_R * BLOCH_R:
-                    # 블로흐 구 드래그 시작
-                    bloch_dragging = True
+                # 장벽 가장자리 드래그 감지
+                left_edge = BARRIER_X - barrier_width // 2
+                right_edge = BARRIER_X + barrier_width // 2
+                in_sim_y = SIM_TOP <= my <= SIM_TOP + SIM_H
+                near_edge = in_sim_y and (
+                    abs(mx - left_edge) <= _BARRIER_EDGE_TOL or abs(mx - right_edge) <= _BARRIER_EDGE_TOL
+                )
+                if near_edge:
+                    barrier_dragging = True
+                else:
+                    dx_b, dy_b = mx - BLOCH_CX, my - BLOCH_CY
+                    if dx_b * dx_b + dy_b * dy_b <= BLOCH_R * BLOCH_R:
+                        bloch_dragging = True
+                        bloch_drag_prev = (mx, my)
+                    else:
+                        particle.reset()
+            elif event.type == pygame.MOUSEMOTION:
+                mx, my = event.pos
+                if barrier_dragging:
+                    half_w = abs(mx - BARRIER_X)
+                    new_w = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, half_w * 2))
+                    sl_barrier.value = new_w
+                elif bloch_dragging:
+                    dx_m = mx - bloch_drag_prev[0]
+                    dy_m = my - bloch_drag_prev[1]
+                    bloch_phi += dx_m * _BLOCH_DRAG_SENSITIVITY
+                    bloch_el = max(_BLOCH_EL_MIN, min(_BLOCH_EL_MAX, bloch_el - dy_m * _BLOCH_DRAG_SENSITIVITY))
                     bloch_drag_prev = (mx, my)
                 else:
-                    # 다른 영역 클릭 → 입자 재발사
-                    particle.reset()
-            elif event.type == pygame.MOUSEMOTION and bloch_dragging:
-                mx, my = event.pos
-                dx_m = mx - bloch_drag_prev[0]
-                dy_m = my - bloch_drag_prev[1]
-                bloch_phi += dx_m * _BLOCH_DRAG_SENSITIVITY
-                bloch_el = max(_BLOCH_EL_MIN, min(_BLOCH_EL_MAX, bloch_el - dy_m * _BLOCH_DRAG_SENSITIVITY))
-                bloch_drag_prev = (mx, my)
+                    # 호버 감지
+                    left_edge = BARRIER_X - barrier_width // 2
+                    right_edge = BARRIER_X + barrier_width // 2
+                    in_sim_y = SIM_TOP <= my <= SIM_TOP + SIM_H
+                    barrier_hover = in_sim_y and (
+                        abs(mx - left_edge) <= _BARRIER_EDGE_TOL or abs(mx - right_edge) <= _BARRIER_EDGE_TOL
+                    )
             elif event.type == pygame.MOUSEBUTTONUP:
+                barrier_dragging = False
                 bloch_dragging = False
 
         # ── 슬라이더 값 읽기 ─────────────────────────
@@ -508,7 +550,7 @@ def run_simulation():
         screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
 
         # 시뮬레이션 영역
-        _draw_sim_area(screen, font, barrier_width)
+        _draw_sim_area(screen, font, barrier_width, barrier_hover, barrier_dragging)
 
         # 입자
         _draw_particle(screen, particle, font)

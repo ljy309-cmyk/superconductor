@@ -292,7 +292,7 @@
   "hint_reset": "R: Full Reset  |  ESC: Exit",
 
   "hint_speed_info": "Speed: x{speed:.1f}  |  Sim: {sim_speed}  |  Wall Thickness: {width}px  |  Probability: {prob:.1f}%  |  {pause_state}",
-  "hint_click_launch": "Click: Relaunch  |  Drag Bloch Sphere: Rotate  |  Up/Down/Left/Right: Parameters",
+  "hint_click_launch": "Click: Relaunch  |  Drag Barrier Edge: Width  |  Drag Bloch: Rotate  |  Arrows: Params",
   "hint_pause_reset": "SPACE: Pause  |  R: Reset  |  ESC: Exit",
 
   "hint_reduction_info": "Reduction: x{red:.1f}  |  {shield_state}  |  {pause_state}",
