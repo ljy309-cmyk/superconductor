@@ -21,9 +21,12 @@
     data = load_session(file_path)
 """
 
+import copy
 import csv
+import hashlib
 import json
 import os
+import tempfile
 from datetime import datetime
 
 from logger import get_module_logger
@@ -31,6 +34,12 @@ from logger import get_module_logger
 _log = get_module_logger("session_io")
 
 EXPORT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports", "sessions")
+
+# 세션 데이터 스키마 버전 — 포맷 변경 시 증가
+SESSION_VERSION = 1
+
+# 내보내기 파일 최대 보관 수 (prefix 당)
+MAX_EXPORT_FILES = 50
 
 
 # ── 내보내기 ──────────────────────────────────────────
@@ -77,20 +86,30 @@ def export_session(
         fmt = "json"
 
     if fmt == "csv":
-        return _export_as_csv(prefix, session_data, ts, now, trial_rows, trial_columns, trial_row_fn)
-    return _export_as_json(prefix, session_data, ts, now, trial_rows)
+        path = _export_as_csv(prefix, session_data, ts, now, trial_rows, trial_columns, trial_row_fn)
+    else:
+        path = _export_as_json(prefix, session_data, ts, now, trial_rows)
+
+    # 오래된 파일 정리
+    if path:
+        _cleanup_old_exports(prefix)
+
+    return path
 
 
 def _export_as_json(prefix, session_data, ts, now, trial_rows=None):
     """JSON 포맷으로 내보내기 (내부)."""
-    data = dict(session_data)
+    data = copy.deepcopy(session_data)
+    data["_version"] = SESSION_VERSION
     data["timestamp"] = now.isoformat()
     if trial_rows:
-        data["trial_history"] = trial_rows
+        data["trial_history"] = copy.deepcopy(trial_rows)
     path = os.path.join(EXPORT_DIR, f"{prefix}_stats_{ts}.json")
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        content = json.dumps(data, indent=2, ensure_ascii=False)
+        data["_checksum"] = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        final = json.dumps(data, indent=2, ensure_ascii=False)
+        _atomic_write(path, final)
     except OSError as e:
         _log.warning("JSON 내보내기 실패: %s — %s", path, e)
         return None
@@ -102,43 +121,90 @@ def _export_as_csv(prefix, session_data, ts, now, trial_rows=None, trial_columns
     """CSV 포맷으로 내보내기 (내부)."""
     path = os.path.join(EXPORT_DIR, f"{prefix}_stats_{ts}.csv")
     try:
-        with open(path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            if trial_rows and not trial_columns:
-                _log.warning("trial_rows가 있지만 trial_columns가 없어 시행 데이터 무시")
-            if trial_rows and trial_columns:
-                # 시행 데이터가 있으면 시행 데이터를 CSV로
-                # 첫 행: 내보내기 타임스탬프 (메타 헤더)
-                writer.writerow(["#timestamp", now.isoformat()])
-                writer.writerow(trial_columns)
-                for i, row in enumerate(trial_rows, 1):
-                    if trial_row_fn:
-                        writer.writerow(trial_row_fn(i, row))
-                    else:
-                        writer.writerow([row.get(c, "") for c in trial_columns])
-            else:
-                # 세션 요약만 flat CSV로
-                data = dict(session_data)
-                data["timestamp"] = now.isoformat()
-                headers = list(data.keys())
-                values = []
-                for k in headers:
-                    v = data[k]
-                    if v is None:
-                        values.append("")
-                    elif isinstance(v, bool):
-                        values.append(str(v))
-                    elif isinstance(v, (dict, list)):
-                        values.append(json.dumps(v, ensure_ascii=False))
-                    else:
-                        values.append(v)
-                writer.writerow(headers)
-                writer.writerow(values)
+        # 임시 파일에 먼저 쓴 후 원자적으로 이동
+        fd, tmp_path = tempfile.mkstemp(suffix=".csv", dir=EXPORT_DIR)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+                writer = csv.writer(f)
+                # 메타 헤더에 버전 정보 포함
+                writer.writerow(["#version", str(SESSION_VERSION)])
+                if trial_rows and not trial_columns:
+                    _log.warning("trial_rows가 있지만 trial_columns가 없어 시행 데이터 무시")
+                if trial_rows and trial_columns:
+                    # 시행 데이터가 있으면 시행 데이터를 CSV로
+                    writer.writerow(["#timestamp", now.isoformat()])
+                    writer.writerow(trial_columns)
+                    for i, row in enumerate(trial_rows, 1):
+                        if trial_row_fn:
+                            writer.writerow(trial_row_fn(i, row))
+                        else:
+                            writer.writerow([row.get(c, "") for c in trial_columns])
+                else:
+                    # 세션 요약만 flat CSV로
+                    data = copy.deepcopy(session_data)
+                    data["timestamp"] = now.isoformat()
+                    headers = list(data.keys())
+                    values = []
+                    for k in headers:
+                        v = data[k]
+                        if v is None:
+                            values.append("")
+                        elif isinstance(v, bool):
+                            values.append(str(v))
+                        elif isinstance(v, (dict, list)):
+                            values.append(json.dumps(v, ensure_ascii=False))
+                        else:
+                            values.append(v)
+                    writer.writerow(headers)
+                    writer.writerow(values)
+            os.replace(tmp_path, path)
+        except BaseException:
+            # 실패 시 임시 파일 정리
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
     except OSError as e:
         _log.warning("CSV 내보내기 실패: %s — %s", path, e)
         return None
     _log.info("데이터 내보내기 완료: %s", path)
     return path
+
+
+def _atomic_write(path: str, content: str) -> None:
+    """원자적 파일 쓰기 — 임시 파일에 쓴 후 rename."""
+    fd, tmp_path = tempfile.mkstemp(suffix=".json", dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _cleanup_old_exports(prefix: str) -> None:
+    """오래된 내보내기 파일 정리 (MAX_EXPORT_FILES 초과 시 삭제)."""
+    stats_prefix = f"{prefix}_stats_"
+    if not os.path.isdir(EXPORT_DIR):
+        return
+    try:
+        entries = sorted(
+            (f for f in os.listdir(EXPORT_DIR) if f.startswith(stats_prefix)),
+            reverse=True,
+        )
+    except OSError:
+        return
+    for old_file in entries[MAX_EXPORT_FILES:]:
+        try:
+            os.remove(os.path.join(EXPORT_DIR, old_file))
+            _log.info("오래된 내보내기 파일 삭제: %s", old_file)
+        except OSError:
+            pass
 
 
 # ── 파일 목록 ─────────────────────────────────────────
@@ -352,6 +418,16 @@ def _load_session_json(json_path: str) -> dict | None:
         if not isinstance(data, dict):
             _log.warning("JSON 최상위가 dict가 아님: %s (%s)", json_path, type(data).__name__)
             return None
+        # 체크섬 검증 (있는 경우)
+        stored_checksum = data.pop("_checksum", None)
+        if stored_checksum:
+            verify_content = json.dumps(data, indent=2, ensure_ascii=False)
+            computed = hashlib.sha256(verify_content.encode("utf-8")).hexdigest()
+            if computed != stored_checksum:
+                _log.warning("체크섬 불일치: %s (기대=%s, 실제=%s)", json_path, stored_checksum[:12], computed[:12])
+                return None
+        # 버전 정보 제거 (소비자에게 불필요)
+        data.pop("_version", None)
         return data
     except (OSError, json.JSONDecodeError) as e:
         _log.warning("JSON 가져오기 실패: %s", e)
@@ -367,10 +443,15 @@ def _load_session_csv(csv_path: str) -> dict | None:
     """
     try:
         with open(csv_path, encoding="utf-8") as f:
-            # 메타 헤더 행 건너뛰기 (#timestamp 등)
-            first_line = f.readline()
-            if not first_line.startswith("#"):
-                f.seek(0)  # 메타 헤더가 아니면 되감기
+            # 메타 헤더 행 건너뛰기 (#version, #timestamp 등)
+            while True:
+                pos = f.tell()
+                line = f.readline()
+                if not line:
+                    break
+                if not line.startswith("#"):
+                    f.seek(pos)
+                    break
             reader = csv.DictReader(f)
             rows = list(reader)
         if not rows:

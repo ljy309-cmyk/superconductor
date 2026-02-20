@@ -101,9 +101,13 @@ class TestExportSessionJsonFormat(unittest.TestCase):
         self.assertTrue(result.endswith(".csv"))
 
         with open(result, encoding="utf-8") as f:
-            first_line = f.readline()
-            if not first_line.startswith("#"):
-                f.seek(0)
+            # 모든 # 메타 헤더 행 건너뛰기
+            while True:
+                pos = f.tell()
+                line = f.readline()
+                if not line or not line.startswith("#"):
+                    f.seek(pos)
+                    break
             reader = csv.DictReader(f)
             rows = list(reader)
         self.assertEqual(len(rows), 2)
@@ -1250,8 +1254,14 @@ class TestExportSession(unittest.TestCase):
         self.assertTrue(path.endswith(".csv"))
         self.assertTrue(os.path.isfile(path))
 
-        # CSV 내용 확인
+        # CSV 내용 확인 (# 메타 헤더 건너뛰기)
         with open(path, encoding="utf-8") as f:
+            while True:
+                pos = f.tell()
+                line = f.readline()
+                if not line or not line.startswith("#"):
+                    f.seek(pos)
+                    break
             reader = csv.DictReader(f)
             rows = list(reader)
         self.assertEqual(len(rows), 1)
@@ -1275,9 +1285,12 @@ class TestExportSession(unittest.TestCase):
         self.assertTrue(path.endswith(".csv"))
 
         with open(path, encoding="utf-8") as f:
-            first_line = f.readline()
-            if not first_line.startswith("#"):
-                f.seek(0)
+            while True:
+                pos = f.tell()
+                line = f.readline()
+                if not line or not line.startswith("#"):
+                    f.seek(pos)
+                    break
             reader = csv.DictReader(f)
             rows = list(reader)
         self.assertEqual(len(rows), 3)
@@ -1298,9 +1311,12 @@ class TestExportSession(unittest.TestCase):
 
         path = export_session("test", {}, fmt="csv", trial_rows=trials, trial_columns=columns, trial_row_fn=row_fn)
         with open(path, encoding="utf-8") as f:
-            first_line = f.readline()
-            if not first_line.startswith("#"):
-                f.seek(0)
+            while True:
+                pos = f.tell()
+                line = f.readline()
+                if not line or not line.startswith("#"):
+                    f.seek(pos)
+                    break
             reader = csv.DictReader(f)
             rows = list(reader)
         self.assertEqual(rows[0]["idx"], "1")
@@ -1337,6 +1353,12 @@ class TestExportSession(unittest.TestCase):
         path = export_session("test", session, fmt="csv")
 
         with open(path, encoding="utf-8") as f:
+            while True:
+                pos = f.tell()
+                line = f.readline()
+                if not line or not line.startswith("#"):
+                    f.seek(pos)
+                    break
             reader = csv.DictReader(f)
             rows = list(reader)
         # JSON 인코딩된 필드 확인
@@ -2324,18 +2346,9 @@ class TestExportOSErrorDetail(unittest.TestCase):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_json_error_includes_detail(self):
-        import builtins
-
         import session_io
 
-        real_open = builtins.open
-
-        def mock_open_fail(path, *a, **kw):
-            if path.endswith(".json") and "stats" in path:
-                raise OSError("disk full")
-            return real_open(path, *a, **kw)
-
-        with unittest.mock.patch("builtins.open", side_effect=mock_open_fail):
+        with unittest.mock.patch("tempfile.mkstemp", side_effect=OSError("disk full")):
             with unittest.mock.patch.object(session_io._log, "warning") as mock_warn:
                 result = session_io.export_session("test", {"a": 1})
                 self.assertIsNone(result)
@@ -2344,18 +2357,9 @@ class TestExportOSErrorDetail(unittest.TestCase):
                 self.assertIn("—", fmt_str)
 
     def test_csv_error_includes_detail(self):
-        import builtins
-
         import session_io
 
-        real_open = builtins.open
-
-        def mock_open_fail(path, *a, **kw):
-            if path.endswith(".csv") and "stats" in path:
-                raise OSError("disk full")
-            return real_open(path, *a, **kw)
-
-        with unittest.mock.patch("builtins.open", side_effect=mock_open_fail):
+        with unittest.mock.patch("tempfile.mkstemp", side_effect=OSError("disk full")):
             with unittest.mock.patch.object(session_io._log, "warning") as mock_warn:
                 result = session_io.export_session("test", {"a": 1}, fmt="csv")
                 self.assertIsNone(result)
@@ -2506,9 +2510,9 @@ class TestBackupOverwriteWarning(unittest.TestCase):
 
             with unittest.mock.patch.object(settings_io._log, "info") as mock_info:
                 settings_io._backup_before_overwrite(dest)
-                # "기존 백업 덮어쓰기" 로그 확인
+                # "기존 백업 이동" 로그 확인 (번호 매긴 백업)
                 messages = [call[0][0] for call in mock_info.call_args_list]
-                self.assertTrue(any("기존 백업 덮어쓰기" in m for m in messages))
+                self.assertTrue(any("기존 백업 이동" in m for m in messages))
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -2524,7 +2528,7 @@ class TestBackupOverwriteWarning(unittest.TestCase):
             with unittest.mock.patch.object(settings_io._log, "info") as mock_info:
                 settings_io._backup_before_overwrite(dest)
                 messages = [call[0][0] for call in mock_info.call_args_list]
-                self.assertFalse(any("기존 백업 덮어쓰기" in m for m in messages))
+                self.assertFalse(any("기존 백업 이동" in m for m in messages))
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -2609,6 +2613,13 @@ class TestTimestampConsistency(unittest.TestCase):
         ts_part = fname.replace("tsc_stats_", "").replace(".csv", "")
 
         with open(path, encoding="utf-8") as f:
+            # # 메타 헤더 건너뛰기
+            while True:
+                pos = f.tell()
+                line = f.readline()
+                if not line or not line.startswith("#"):
+                    f.seek(pos)
+                    break
             import csv as csv_mod
 
             reader = csv_mod.DictReader(f)
@@ -2833,7 +2844,7 @@ class TestTrialCsvTimestampMeta(unittest.TestCase):
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_trial_csv_has_timestamp_meta_row(self):
-        """trial CSV 첫 행이 #timestamp 메타 헤더."""
+        """trial CSV에 #version과 #timestamp 메타 헤더 포함."""
         from session_io import export_session
 
         trials = [{"x": 1, "y": 2}]
@@ -2842,11 +2853,14 @@ class TestTrialCsvTimestampMeta(unittest.TestCase):
         self.assertIsNotNone(path)
 
         with open(path, encoding="utf-8") as f:
-            first_line = f.readline().strip()
-        self.assertTrue(first_line.startswith("#timestamp,"))
+            lines = f.readlines()
+        # 첫 번째 메타 행: #version
+        self.assertTrue(lines[0].strip().startswith("#version,"))
+        # 두 번째 메타 행: #timestamp
+        self.assertTrue(lines[1].strip().startswith("#timestamp,"))
 
-    def test_no_trial_csv_has_no_meta_row(self):
-        """trial 없는 CSV는 메타 헤더가 없어야 한다."""
+    def test_no_trial_csv_has_version_meta_row(self):
+        """trial 없는 CSV에도 #version 메타 헤더는 포함."""
         from session_io import export_session
 
         path = export_session("test", {"a": 1}, fmt="csv")
@@ -2854,7 +2868,7 @@ class TestTrialCsvTimestampMeta(unittest.TestCase):
 
         with open(path, encoding="utf-8") as f:
             first_line = f.readline().strip()
-        self.assertFalse(first_line.startswith("#"))
+        self.assertTrue(first_line.startswith("#version,"))
 
     def test_load_session_csv_skips_meta_header(self):
         """_load_session_csv가 메타 헤더를 건너뛰고 데이터를 올바르게 로드."""
@@ -2881,9 +2895,11 @@ class TestTrialCsvTimestampMeta(unittest.TestCase):
         columns = ["a"]
         path = export_session("test", {}, fmt="csv", trial_rows=trials, trial_columns=columns)
         with open(path, encoding="utf-8") as f:
-            first_line = f.readline().strip()
+            lines = f.readlines()
 
-        parts = first_line.split(",", 1)
+        # #version 다음 줄이 #timestamp
+        ts_line = lines[1].strip()
+        parts = ts_line.split(",", 1)
         self.assertEqual(parts[0], "#timestamp")
         ts_str = parts[1]
         # ISO 형식 파싱 가능해야 함
@@ -2909,6 +2925,291 @@ class TestSettingsIoDocstring(unittest.TestCase):
         self.assertIsNotNone(doc)
         # settings_export_20260217_153045_123456.zip 형태 확인
         self.assertIn("settings_export_20260217_153045_123456.zip", doc)
+
+
+# ═══════════════════════════════════════════════════════════
+# 49. 데이터 무결성 개선 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestDataIntegrityImprovements(unittest.TestCase):
+    """데이터 무결성 개선 사항 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig_export_dir = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig_export_dir
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_json_export_includes_version(self):
+        """JSON 내보내기에 _version 필드 포함."""
+        from session_io import export_session
+
+        path = export_session("test", {"a": 1})
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIn("_version", data)
+        self.assertEqual(data["_version"], 1)
+
+    def test_json_export_includes_checksum(self):
+        """JSON 내보내기에 _checksum 필드 포함."""
+        from session_io import export_session
+
+        path = export_session("test", {"a": 1})
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIn("_checksum", data)
+        self.assertEqual(len(data["_checksum"]), 64)  # SHA-256 hex
+
+    def test_json_checksum_valid_on_load(self):
+        """체크섬이 유효한 JSON은 정상 로드."""
+        from session_io import export_session, load_session
+
+        path = export_session("test", {"val": 42})
+        data = load_session(path)
+        self.assertIsNotNone(data)
+        self.assertEqual(data["val"], 42)
+        # 내부 필드는 제거됨
+        self.assertNotIn("_checksum", data)
+        self.assertNotIn("_version", data)
+
+    def test_json_tampered_checksum_rejected(self):
+        """변조된 JSON은 체크섬 불일치로 거부."""
+        from session_io import export_session, load_session
+
+        path = export_session("test", {"val": 42})
+        # 파일 변조
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        data["val"] = 999  # 값 변조
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        result = load_session(path)
+        self.assertIsNone(result)
+
+    def test_deepcopy_no_mutation(self):
+        """내보내기 시 원본 딕셔너리와 중첩 객체가 변형되지 않음."""
+        from session_io import export_session
+
+        nested = {"items": [1, 2, 3]}
+        session = {"config": nested, "count": 10}
+        original_items = list(nested["items"])
+        export_session("test", session)
+        self.assertEqual(nested["items"], original_items)
+        self.assertNotIn("_version", session)
+        self.assertNotIn("timestamp", session)
+
+    def test_csv_version_meta_header(self):
+        """CSV 내보내기에 #version 메타 헤더 포함."""
+        from session_io import export_session
+
+        path = export_session("test", {"a": 1}, fmt="csv")
+        with open(path, encoding="utf-8") as f:
+            first_line = f.readline().strip()
+        self.assertTrue(first_line.startswith("#version,"))
+
+    def test_old_exports_cleanup(self):
+        """MAX_EXPORT_FILES 초과 시 오래된 파일 삭제."""
+        import session_io
+
+        orig_max = session_io.MAX_EXPORT_FILES
+        session_io.MAX_EXPORT_FILES = 3
+        try:
+            for i in range(5):
+                session_io.export_session("cleanup", {"seq": i})
+            files = [f for f in os.listdir(self.tmpdir) if f.startswith("cleanup_stats_")]
+            self.assertLessEqual(len(files), 3)
+        finally:
+            session_io.MAX_EXPORT_FILES = orig_max
+
+
+class TestSettingsIoIntegrity(unittest.TestCase):
+    """settings_io 데이터 무결성 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.fake_base = tempfile.mkdtemp()
+        import settings_io
+
+        self._orig_base = settings_io._BASE
+        self._orig_dir = settings_io._EXPORT_DIR
+        settings_io._BASE = self.fake_base
+        settings_io._EXPORT_DIR = os.path.join(self.tmpdir, "out")
+
+    def tearDown(self):
+        import settings_io
+
+        settings_io._BASE = self._orig_base
+        settings_io._EXPORT_DIR = self._orig_dir
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        shutil.rmtree(self.fake_base, ignore_errors=True)
+
+    def test_zip_contains_meta_json(self):
+        """내보내기 ZIP에 _meta.json 메타데이터 포함."""
+        import settings_io
+
+        # 테스트용 config.json 생성
+        with open(os.path.join(self.fake_base, "config.json"), "w") as f:
+            json.dump({"test": True}, f)
+
+        path = settings_io.export_settings()
+        self.assertIsNotNone(path)
+        with zipfile.ZipFile(path, "r") as zf:
+            self.assertIn("_meta.json", zf.namelist())
+            meta = json.loads(zf.read("_meta.json"))
+            self.assertIn("version", meta)
+            self.assertEqual(meta["version"], 1)
+
+    def test_zip_bomb_rejected(self):
+        """ZIP bomb (과도한 크기)은 가져오기 거부."""
+        import settings_io
+
+        zip_path = os.path.join(self.tmpdir, "bomb.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            # 11MB 데이터 (제한 10MB)
+            big_data = json.dumps({"x": "A" * (11 * 1024 * 1024)})
+            zf.writestr("config.json", big_data)
+        result = settings_io.import_settings(zip_path)
+        self.assertEqual(result["imported"], [])
+
+    def test_meta_json_skipped_on_import(self):
+        """가져오기 시 _meta.json은 imported에 포함되지 않음."""
+        import settings_io
+
+        zip_path = os.path.join(self.tmpdir, "test.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("_meta.json", '{"version": 1}')
+            zf.writestr("config.json", '{"a": 1}')
+        result = settings_io.import_settings(zip_path)
+        self.assertNotIn("_meta.json", result["imported"])
+        self.assertIn("config.json", result["imported"])
+
+    def test_numbered_backup_levels(self):
+        """번호 매긴 백업이 3단계까지 유지."""
+        import settings_io
+
+        dest = os.path.join(self.tmpdir, "test.json")
+        for i in range(4):
+            with open(dest, "w") as f:
+                json.dump({"v": i}, f)
+            settings_io._backup_before_overwrite(dest)
+        # .bak, .bak.1, .bak.2, .bak.3 확인
+        self.assertTrue(os.path.exists(dest + ".bak"))
+        self.assertTrue(os.path.exists(dest + ".bak.1"))
+        self.assertTrue(os.path.exists(dest + ".bak.2"))
+
+    def test_old_zip_cleanup(self):
+        """_MAX_EXPORT_ZIPS 초과 시 오래된 ZIP 삭제."""
+        import settings_io
+
+        orig_max = settings_io._MAX_EXPORT_ZIPS
+        settings_io._MAX_EXPORT_ZIPS = 2
+        try:
+            with open(os.path.join(self.fake_base, "config.json"), "w") as f:
+                json.dump({"test": True}, f)
+            for _ in range(4):
+                settings_io.export_settings()
+            out_dir = settings_io._EXPORT_DIR
+            zips = [f for f in os.listdir(out_dir) if f.endswith(".zip")]
+            self.assertLessEqual(len(zips), 2)
+        finally:
+            settings_io._MAX_EXPORT_ZIPS = orig_max
+
+
+class TestConfigLoaderSectionValidation(unittest.TestCase):
+    """config_loader.section()이 스키마 검증을 적용하는지 테스트."""
+
+    def test_section_validates_values(self):
+        import config_loader
+
+        orig_cache = config_loader._cache
+        try:
+            config_loader._cache = {
+                "display": {"fps": 60, "width": 99999}  # width 범위 초과
+            }
+            result = config_loader.section("display")
+            self.assertEqual(result["fps"], 60)
+            # 범위 초과 값은 제거됨
+            self.assertNotIn("width", result)
+        finally:
+            config_loader._cache = orig_cache
+
+    def test_section_unknown_schema_passthrough(self):
+        """스키마 없는 섹션은 그대로 반환."""
+        import config_loader
+
+        orig_cache = config_loader._cache
+        try:
+            config_loader._cache = {"custom": {"key": "value", "num": 42}}
+            result = config_loader.section("custom")
+            self.assertEqual(result["key"], "value")
+            self.assertEqual(result["num"], 42)
+        finally:
+            config_loader._cache = orig_cache
+
+    def test_section_non_dict_returns_empty(self):
+        """섹션이 dict가 아니면 빈 dict 반환."""
+        import config_loader
+
+        orig_cache = config_loader._cache
+        try:
+            config_loader._cache = {"display": "not_a_dict"}
+            result = config_loader.section("display")
+            self.assertEqual(result, {})
+        finally:
+            config_loader._cache = orig_cache
+
+
+class TestTunnelingDataTypeValidation(unittest.TestCase):
+    """tunneling_data._load_import_data 타입 검증 테스트."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_valid_numeric_fields_preserved(self):
+        from quantum.tunneling_data import _load_import_data
+
+        path = os.path.join(self.tmpdir, "test.json")
+        data = {"base_prob": 0.15, "barrier_width": 50, "speed_mult": 2.0, "total_attempts": 100}
+        with open(path, "w") as f:
+            json.dump(data, f)
+        session, trials = _load_import_data(path)
+        self.assertIsNotNone(session)
+        self.assertEqual(session["base_prob"], 0.15)
+        self.assertEqual(session["barrier_width"], 50)
+
+    def test_invalid_type_fields_removed(self):
+        from quantum.tunneling_data import _load_import_data
+
+        path = os.path.join(self.tmpdir, "test.json")
+        data = {"base_prob": "not_a_number", "barrier_width": "wide", "total_attempts": 100}
+        with open(path, "w") as f:
+            json.dump(data, f)
+        session, trials = _load_import_data(path)
+        self.assertIsNotNone(session)
+        self.assertNotIn("base_prob", session)
+        self.assertNotIn("barrier_width", session)
+        self.assertEqual(session["total_attempts"], 100)
+
+    def test_invalid_trial_history_type_ignored(self):
+        from quantum.tunneling_data import _load_import_data
+
+        path = os.path.join(self.tmpdir, "test.json")
+        data = {"base_prob": 0.1, "trial_history": "not_a_list"}
+        with open(path, "w") as f:
+            json.dump(data, f)
+        session, trials = _load_import_data(path)
+        self.assertEqual(trials, [])
 
 
 if __name__ == "__main__":
