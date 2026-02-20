@@ -190,6 +190,56 @@ def compute_potential_profile(
     return xs, potentials, energy
 
 
+# ── 확률밀도 누적기 ──────────────────────────────────
+# 매 프레임 입자 x 위치를 히스토그램 빈(bin)에 누적하여
+# 실험적 |ψ(x)|² 확률밀도를 구축한다.
+
+_DENSITY_BINS = 100  # x축 히스토그램 빈 개수
+
+
+class DensityAccumulator:
+    """입자 위치를 누적하여 확률밀도 히스토그램을 구축.
+
+    매 프레임 record(x) 호출 → 빈에 카운트 누적 → get_density()로
+    정규화된 밀도 배열 반환.
+    """
+
+    def __init__(self, n_bins: int = _DENSITY_BINS):
+        self.n_bins = max(1, n_bins)
+        self.counts: list[int] = [0] * self.n_bins
+        self.total_samples = 0
+
+    def record(self, x: float) -> None:
+        """입자 x 좌표를 기록."""
+        if x < SIM_LEFT or x > SIM_LEFT + SIM_W:
+            return
+        frac = (x - SIM_LEFT) / SIM_W
+        idx = int(frac * self.n_bins)
+        idx = min(idx, self.n_bins - 1)
+        self.counts[idx] += 1
+        self.total_samples += 1
+
+    def get_density(self) -> list[float]:
+        """정규화된 밀도 배열 (0.0~1.0) 반환.
+
+        최대값이 1.0이 되도록 정규화.
+        """
+        peak = max(self.counts)
+        if peak == 0:
+            return [0.0] * self.n_bins
+        return [c / peak for c in self.counts]
+
+    def get_bin_centers(self) -> list[float]:
+        """각 빈의 중심 x 좌표 리스트."""
+        dx = SIM_W / self.n_bins
+        return [SIM_LEFT + (i + 0.5) * dx for i in range(self.n_bins)]
+
+    def reset(self) -> None:
+        """누적 데이터 초기화."""
+        self.counts = [0] * self.n_bins
+        self.total_samples = 0
+
+
 # ── 입자 클래스 ──────────────────────────────────────
 
 

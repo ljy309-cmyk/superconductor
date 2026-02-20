@@ -44,6 +44,7 @@ from quantum.tunneling_physics import (
     SIM_W,
     TUNNEL_PROB_BASE,
     TUNNEL_SPEED_BOOST,
+    DensityAccumulator,
     QuantumParticle,
     _calc_tunnel_prob,
     compute_potential_profile,
@@ -616,6 +617,127 @@ def _draw_potential_energy(screen, font, barrier_width: int):
         screen.blit(ls, (lx + 14, ly))
 
 
+# ── 확률밀도 히트맵 ────────────────────────────────────
+
+_density_visible = False
+
+# 히트맵 색상 그라데이션 (저밀도 → 고밀도)
+_HEATMAP_COLORS = [
+    (30, 30, 80),       # 극저 (진한 남색)
+    (50, 50, 180),      # 저 (파란색)
+    (80, 200, 200),     # 중저 (시안)
+    (100, 230, 100),    # 중 (초록)
+    (240, 230, 60),     # 중고 (노란)
+    (240, 130, 40),     # 고 (주황)
+    (230, 50, 50),      # 극고 (빨간)
+]
+
+
+def _heatmap_color(val: float) -> tuple[int, int, int]:
+    """0.0~1.0 밀도값을 히트맵 색상으로 변환."""
+    n = len(_HEATMAP_COLORS) - 1
+    idx = val * n
+    lo = int(idx)
+    lo = min(lo, n - 1)
+    hi = lo + 1
+    frac = idx - lo
+    c0, c1 = _HEATMAP_COLORS[lo], _HEATMAP_COLORS[hi]
+    return (
+        int(c0[0] + (c1[0] - c0[0]) * frac),
+        int(c0[1] + (c1[1] - c0[1]) * frac),
+        int(c0[2] + (c1[2] - c0[2]) * frac),
+    )
+
+
+def _draw_density_heatmap(screen, font, accumulator: DensityAccumulator):
+    """확률밀도 히트맵을 시뮬레이션 영역 위에 오버레이.
+
+    누적된 입자 위치를 히스토그램 바 + 컬러맵으로 표시.
+    상단에 바 차트, 하단에 시뮬레이션 영역과 겹치는 반투명 히트 스트립.
+    """
+    L = _layout
+    hc = is_high_contrast()
+    density = accumulator.get_density()
+    centers = accumulator.get_bin_centers()
+    n_bins = accumulator.n_bins
+
+    if accumulator.total_samples == 0:
+        # 샘플이 없으면 안내 메시지만 표시
+        msg = font.render(t("tn_dm_no_data"), True, OVERLAY_CLR)
+        screen.blit(msg, (SIM_LEFT + SIM_W // 2 - msg.get_width() // 2,
+                          SIM_TOP + SIM_H - 20))
+        return
+
+    bin_w = SIM_W / n_bins
+
+    # 1) 시뮬레이션 영역 위에 반투명 히트 스트립
+    strip_h = SIM_H
+    strip_surf = pygame.Surface((SIM_W, strip_h), pygame.SRCALPHA)
+    for i in range(n_bins):
+        d = density[i]
+        if d < 0.01:
+            continue
+        clr = _heatmap_color(d)
+        alpha = int(40 + 80 * d)  # 40~120 알파
+        bx = int(i * bin_w)
+        bw = max(int(bin_w) + 1, 1)
+        pygame.draw.rect(strip_surf, (*clr, alpha), (bx, 0, bw, strip_h))
+    screen.blit(strip_surf, (SIM_LEFT, SIM_TOP))
+
+    # 2) 하단 바 차트 (시뮬레이션 영역 아래쪽에 작은 히스토그램)
+    bar_h_max = 50
+    bar_y_base = SIM_TOP + SIM_H - 3
+
+    # 바 차트 배경
+    bar_bg = pygame.Surface((SIM_W, bar_h_max + 4), pygame.SRCALPHA)
+    bar_bg.fill((*BG[:3], 160))
+    screen.blit(bar_bg, (SIM_LEFT, bar_y_base - bar_h_max - 1))
+
+    for i in range(n_bins):
+        d = density[i]
+        if d < 0.005:
+            continue
+        bx = int(SIM_LEFT + i * bin_w)
+        bw = max(int(bin_w) - 1, 1)
+        bh = int(d * bar_h_max)
+        clr = _heatmap_color(d)
+        pygame.draw.rect(screen, clr, (bx, bar_y_base - bh, bw, bh))
+
+    # 3) 장벽 위치 마커
+    half_bw = 6  # 장벽 중심 표시선
+    pygame.draw.line(screen, BARRIER_CLR,
+                     (BARRIER_X, bar_y_base - bar_h_max),
+                     (BARRIER_X, bar_y_base), 1)
+
+    # 4) 라벨
+    title = font.render(t("tn_dm_title"), True, ACCENT)
+    screen.blit(title, (SIM_LEFT + 5,
+                        bar_y_base - bar_h_max - title.get_height() - 2))
+
+    # 샘플 수 표시
+    samples_txt = font.render(
+        t("tn_dm_samples", n=accumulator.total_samples), True, TEXT_CLR
+    )
+    screen.blit(samples_txt, (SIM_LEFT + SIM_W - samples_txt.get_width() - 5,
+                               bar_y_base - bar_h_max - samples_txt.get_height() - 2))
+
+    # 5) 컬러바 범례
+    cb_x = SIM_LEFT + SIM_W - 100
+    cb_y = bar_y_base - 12
+    cb_w = 80
+    cb_h = 8
+    for px in range(cb_w):
+        val = px / max(cb_w - 1, 1)
+        clr = _heatmap_color(val)
+        pygame.draw.line(screen, clr, (cb_x + px, cb_y), (cb_x + px, cb_y + cb_h))
+    frame_w = 2 if hc else 1
+    pygame.draw.rect(screen, OVERLAY_CLR, (cb_x, cb_y, cb_w, cb_h), frame_w)
+    lo_txt = font.render("0", True, TEXT_CLR)
+    hi_txt = font.render("max", True, TEXT_CLR)
+    screen.blit(lo_txt, (cb_x - lo_txt.get_width() - 2, cb_y - 1))
+    screen.blit(hi_txt, (cb_x + cb_w + 3, cb_y - 1))
+
+
 # ── 모드 탭 / 비교 모드 렌더링 ────────────────────────
 
 
@@ -883,6 +1005,7 @@ def run_simulation():
     font, info_font, title_font, big_font = _make_fonts(WIDTH, HEIGHT)
 
     particle = QuantumParticle()
+    density_acc = DensityAccumulator()
     paused = False
     frame_step = False  # 일시정지 중 1프레임 전진
 
@@ -1022,6 +1145,7 @@ def run_simulation():
                 elif event.key == pygame.K_r:
                     if mode in (MODE_STEP, MODE_AUTO):
                         particle = QuantumParticle()
+                        density_acc.reset()
                         panel.reset_all()
                         event_log.clear()
                         history_page = 0
@@ -1092,6 +1216,12 @@ def run_simulation():
                     key = "tn_pe_on" if _pe_visible else "tn_pe_off"
                     _notify(t(key), "info", 1.0)
                     snd.play("click")
+                elif event.key == pygame.K_d:
+                    global _density_visible
+                    _density_visible = not _density_visible
+                    key = "tn_dm_on" if _density_visible else "tn_dm_off"
+                    _notify(t(key), "info", 1.0)
+                    snd.play("click")
                 elif event.key == pygame.K_l:
                     toggle_locale()
                 elif event.key == pygame.K_g:
@@ -1136,6 +1266,10 @@ def run_simulation():
             particle.vx = orig_vx * speed_mult if orig_vx > 0 else orig_vx
             particle.update(dt_phys, barrier_width, tunnel_prob, sl_boost.value)
             particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
+
+            # 밀도 히트맵 누적 (활성 시에만)
+            if _density_visible and particle.alive:
+                density_acc.record(particle.x)
 
             # Step 모드: 입자가 리스폰되면 다음 발사 대기
             if mode == MODE_STEP:
@@ -1241,6 +1375,10 @@ def run_simulation():
 
             # 시뮬레이션 영역
             _draw_sim_area(screen, font, barrier_width)
+
+            # 확률밀도 히트맵 (시뮬레이션 영역 위에 반투명)
+            if _density_visible:
+                _draw_density_heatmap(screen, font, density_acc)
 
             # 포텐셜 에너지 다이어그램 (시뮬레이션 영역 상단)
             if _pe_visible:

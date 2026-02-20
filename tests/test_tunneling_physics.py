@@ -27,6 +27,7 @@ from quantum.tunneling_physics import (
     _TUNNEL_DECAY,
     _TUNNEL_FLASH,
     _VY_RANGE,
+    DensityAccumulator,
     _calc_tunnel_prob,
     compute_potential_profile,
     compute_wavefunction,
@@ -1733,6 +1734,132 @@ class TestComputePotentialProfile(unittest.TestCase):
         xs, _, _ = compute_potential_profile()
         for i in range(1, len(xs)):
             self.assertGreater(xs[i], xs[i - 1])
+
+
+# ── DensityAccumulator 테스트 ─────────────────────────
+
+
+class TestDensityAccumulator(unittest.TestCase):
+    """DensityAccumulator 단위 테스트."""
+
+    def test_initial_state(self):
+        """초기 상태: 모든 빈 0, 샘플 수 0."""
+        acc = DensityAccumulator(n_bins=50)
+        self.assertEqual(acc.total_samples, 0)
+        self.assertEqual(len(acc.counts), 50)
+        self.assertTrue(all(c == 0 for c in acc.counts))
+
+    def test_record_increments_count(self):
+        """기록 시 해당 빈 카운트가 증가한다."""
+        acc = DensityAccumulator(n_bins=10)
+        mid_x = SIM_LEFT + SIM_W / 2
+        acc.record(mid_x)
+        self.assertEqual(acc.total_samples, 1)
+        self.assertEqual(sum(acc.counts), 1)
+
+    def test_record_out_of_range_ignored(self):
+        """범위 밖 x 좌표는 무시된다."""
+        acc = DensityAccumulator()
+        acc.record(SIM_LEFT - 100)
+        acc.record(SIM_LEFT + SIM_W + 100)
+        self.assertEqual(acc.total_samples, 0)
+
+    def test_density_normalized(self):
+        """get_density() 최대값이 1.0이다."""
+        acc = DensityAccumulator(n_bins=20)
+        for _ in range(100):
+            acc.record(SIM_LEFT + SIM_W / 2)
+        density = acc.get_density()
+        self.assertAlmostEqual(max(density), 1.0)
+
+    def test_density_empty(self):
+        """데이터 없을 때 모든 밀도값 0.0."""
+        acc = DensityAccumulator()
+        density = acc.get_density()
+        self.assertTrue(all(d == 0.0 for d in density))
+
+    def test_density_length(self):
+        """get_density() 길이가 n_bins와 같다."""
+        acc = DensityAccumulator(n_bins=42)
+        self.assertEqual(len(acc.get_density()), 42)
+
+    def test_bin_centers_length(self):
+        """get_bin_centers() 길이가 n_bins와 같다."""
+        acc = DensityAccumulator(n_bins=30)
+        centers = acc.get_bin_centers()
+        self.assertEqual(len(centers), 30)
+
+    def test_bin_centers_range(self):
+        """빈 중심이 시뮬레이션 영역 내에 있다."""
+        acc = DensityAccumulator(n_bins=50)
+        centers = acc.get_bin_centers()
+        for c in centers:
+            self.assertGreater(c, SIM_LEFT - 1)
+            self.assertLess(c, SIM_LEFT + SIM_W + 1)
+
+    def test_bin_centers_ordered(self):
+        """빈 중심이 단조 증가한다."""
+        acc = DensityAccumulator(n_bins=20)
+        centers = acc.get_bin_centers()
+        for i in range(1, len(centers)):
+            self.assertGreater(centers[i], centers[i - 1])
+
+    def test_reset_clears_data(self):
+        """reset() 후 모든 데이터가 초기화된다."""
+        acc = DensityAccumulator(n_bins=10)
+        for _ in range(50):
+            acc.record(SIM_LEFT + SIM_W * random.random())
+        self.assertGreater(acc.total_samples, 0)
+        acc.reset()
+        self.assertEqual(acc.total_samples, 0)
+        self.assertTrue(all(c == 0 for c in acc.counts))
+
+    def test_multiple_records_accumulate(self):
+        """같은 빈에 여러 번 기록하면 누적된다."""
+        acc = DensityAccumulator(n_bins=10)
+        x = SIM_LEFT + SIM_W * 0.15  # 약 bin 1
+        for _ in range(20):
+            acc.record(x)
+        self.assertEqual(acc.total_samples, 20)
+        # 하나의 빈에 집중되어야 함
+        self.assertEqual(max(acc.counts), 20)
+
+    def test_uniform_distribution(self):
+        """균일 분포 기록 시 밀도가 대체로 균등하다."""
+        acc = DensityAccumulator(n_bins=10)
+        n_per_bin = 100
+        dx = SIM_W / 10
+        for i in range(10):
+            x = SIM_LEFT + (i + 0.5) * dx
+            for _ in range(n_per_bin):
+                acc.record(x)
+        density = acc.get_density()
+        # 모든 빈의 밀도가 0.8 이상 (균등에 가까움)
+        for d in density:
+            self.assertGreater(d, 0.8)
+
+    def test_edge_values(self):
+        """경계값 (SIM_LEFT, SIM_LEFT+SIM_W)에서 정상 동작."""
+        acc = DensityAccumulator(n_bins=10)
+        acc.record(SIM_LEFT)
+        acc.record(SIM_LEFT + SIM_W)
+        self.assertEqual(acc.total_samples, 2)
+
+    def test_single_bin(self):
+        """n_bins=1에서도 정상 동작."""
+        acc = DensityAccumulator(n_bins=1)
+        acc.record(SIM_LEFT + 100)
+        self.assertEqual(acc.total_samples, 1)
+        self.assertEqual(acc.counts[0], 1)
+
+    def test_density_values_in_range(self):
+        """모든 밀도값이 0.0~1.0 범위 내."""
+        acc = DensityAccumulator(n_bins=20)
+        for _ in range(200):
+            acc.record(SIM_LEFT + SIM_W * random.random())
+        for d in acc.get_density():
+            self.assertGreaterEqual(d, 0.0)
+            self.assertLessEqual(d, 1.0)
 
 
 if __name__ == "__main__":
