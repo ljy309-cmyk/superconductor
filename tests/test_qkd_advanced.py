@@ -1746,7 +1746,7 @@ class TestStatsExport(unittest.TestCase):
         import os
         export_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "exports"
+            "exports", "sessions"
         )
         files = [f for f in os.listdir(export_dir) if f.startswith("qkd_stats_")]
         self.assertGreater(len(files), 0)

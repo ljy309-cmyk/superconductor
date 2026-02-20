@@ -1301,5 +1301,492 @@ class TestSessionIoLazyImport(unittest.TestCase):
         self.assertFalse(top_level_pygame, "session_io가 최상위에서 pygame을 import하면 안 됩니다")
 
 
+# ═══════════════════════════════════════════════════════════
+# 17. export_session — 통합 내보내기 함수 (fmt 파라미터)
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportSession(unittest.TestCase):
+    """export_session 통합 함수 (JSON/CSV 포맷 선택) 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig_export_dir = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig_export_dir
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_json_format_default(self):
+        """기본 포맷은 JSON."""
+        from session_io import export_session
+
+        path = export_session("test", {"count": 10, "rate": 0.5})
+        self.assertIsNotNone(path)
+        self.assertTrue(path.endswith(".json"))
+        self.assertTrue(os.path.isfile(path))
+
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual(data["count"], 10)
+        self.assertIn("timestamp", data)
+
+    def test_json_format_explicit(self):
+        """fmt='json' 명시적 지정."""
+        from session_io import export_session
+
+        path = export_session("test", {"key": "val"}, fmt="json")
+        self.assertTrue(path.endswith(".json"))
+
+    def test_csv_format_session_summary(self):
+        """fmt='csv': trial_rows 없이 세션 요약만 CSV로 내보내기."""
+        from session_io import export_session
+
+        session = {"attempts": 100, "rate": 0.35, "speed": 2.0}
+        path = export_session("test", session, fmt="csv")
+        self.assertIsNotNone(path)
+        self.assertTrue(path.endswith(".csv"))
+        self.assertTrue(os.path.isfile(path))
+
+        # CSV 내용 확인
+        with open(path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["attempts"], "100")
+        self.assertIn("timestamp", rows[0])
+
+    def test_csv_format_with_trials(self):
+        """fmt='csv': trial_rows를 CSV로 내보내기."""
+        from session_io import export_session
+
+        session = {"total": 3}
+        trials = [
+            {"trial": 1, "time_s": 1.0, "prob": 0.2, "result": 1},
+            {"trial": 2, "time_s": 2.5, "prob": 0.1, "result": 0},
+            {"trial": 3, "time_s": 4.0, "prob": 0.2, "result": 1},
+        ]
+        columns = ["trial", "time_s", "prob", "result"]
+
+        path = export_session("test", session, fmt="csv",
+                              trial_rows=trials, trial_columns=columns)
+        self.assertIsNotNone(path)
+        self.assertTrue(path.endswith(".csv"))
+
+        with open(path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0]["trial"], "1")
+        self.assertEqual(rows[2]["result"], "1")
+
+    def test_csv_with_trial_row_fn(self):
+        """fmt='csv': trial_row_fn을 사용한 CSV 내보내기."""
+        from session_io import export_session
+
+        trials = [
+            {"t": 1.5, "barrier": 10, "prob": 0.2, "result": True},
+        ]
+        columns = ["idx", "time", "width", "prob", "res"]
+        row_fn = lambda i, tr: [i, tr["t"], tr["barrier"], tr["prob"], int(tr["result"])]
+
+        path = export_session("test", {}, fmt="csv",
+                              trial_rows=trials, trial_columns=columns, trial_row_fn=row_fn)
+        with open(path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        self.assertEqual(rows[0]["idx"], "1")
+        self.assertEqual(rows[0]["res"], "1")
+
+    def test_json_embeds_trial_history(self):
+        """fmt='json': trial_rows가 있으면 JSON에 trial_history로 포함."""
+        from session_io import export_session
+
+        trials = [{"t": 1.0, "result": True}, {"t": 2.0, "result": False}]
+        path = export_session("test", {"total": 2}, trial_rows=trials)
+        self.assertTrue(path.endswith(".json"))
+
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIn("trial_history", data)
+        self.assertEqual(len(data["trial_history"]), 2)
+        self.assertTrue(data["trial_history"][0]["result"])
+
+    def test_json_no_trials_no_trial_history_key(self):
+        """fmt='json': trial_rows 없으면 trial_history 키 없음."""
+        from session_io import export_session
+
+        path = export_session("test", {"total": 0})
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertNotIn("trial_history", data)
+
+    def test_csv_nested_dict_serialized_as_json_string(self):
+        """fmt='csv': 중첩된 dict/list는 JSON 문자열로 저장."""
+        from session_io import export_session
+
+        session = {"name": "test", "config": {"fps": 60, "mode": "fast"}, "tags": [1, 2, 3]}
+        path = export_session("test", session, fmt="csv")
+
+        with open(path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        # JSON 인코딩된 필드 확인
+        config_str = rows[0]["config"]
+        parsed = json.loads(config_str)
+        self.assertEqual(parsed["fps"], 60)
+
+    def test_csv_filename_uses_stats_prefix(self):
+        """fmt='csv': 파일명 형식이 {prefix}_stats_{ts}.csv."""
+        from session_io import export_session
+
+        path = export_session("mymod", {"a": 1}, fmt="csv")
+        basename = os.path.basename(path)
+        self.assertTrue(basename.startswith("mymod_stats_"))
+        self.assertTrue(basename.endswith(".csv"))
+
+    def test_original_data_not_mutated(self):
+        """원본 session_data가 변경되지 않는지 확인."""
+        from session_io import export_session
+
+        session = {"key": "val"}
+        original_keys = set(session.keys())
+        export_session("test", session, fmt="json")
+        self.assertEqual(set(session.keys()), original_keys)
+
+        session2 = {"key": "val"}
+        export_session("test", session2, fmt="csv")
+        self.assertEqual(set(session2.keys()), set(["key"]))
+
+
+# ═══════════════════════════════════════════════════════════
+# 18. load_session / load_session_csv — 통합 로드 함수
+# ═══════════════════════════════════════════════════════════
+
+
+class TestLoadSession(unittest.TestCase):
+    """load_session (포맷 자동 감지) 및 load_session_csv 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_load_session_auto_detect_json(self):
+        """load_session: .json 확장자 → JSON으로 로드."""
+        from session_io import load_session
+
+        path = os.path.join(self.tmpdir, "data.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"format": "json", "count": 42}, f)
+
+        result = load_session(path)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["format"], "json")
+        self.assertEqual(result["count"], 42)
+
+    def test_load_session_auto_detect_csv(self):
+        """load_session: .csv 확장자 → CSV로 로드."""
+        from session_io import load_session
+
+        path = os.path.join(self.tmpdir, "data.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["name", "value"])
+            writer.writerow(["test", "123"])
+
+        result = load_session(path)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "test")
+        self.assertEqual(result["value"], 123)
+
+    def test_load_session_csv_single_row(self):
+        """load_session_csv: 단일 행 → dict 반환."""
+        from session_io import load_session_csv
+
+        path = os.path.join(self.tmpdir, "single.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["attempts", "rate", "speed"])
+            writer.writerow(["100", "0.35", "2.0"])
+
+        result = load_session_csv(path)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["attempts"], 100)
+        self.assertAlmostEqual(result["rate"], 0.35)
+        self.assertAlmostEqual(result["speed"], 2.0)
+
+    def test_load_session_csv_multi_rows(self):
+        """load_session_csv: 다중 행 → {"rows": [...]} 반환."""
+        from session_io import load_session_csv
+
+        path = os.path.join(self.tmpdir, "multi.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["trial", "time_s", "result"])
+            writer.writerow(["1", "1.5", "1"])
+            writer.writerow(["2", "3.0", "0"])
+            writer.writerow(["3", "4.5", "1"])
+
+        result = load_session_csv(path)
+        self.assertIsNotNone(result)
+        self.assertIn("rows", result)
+        self.assertEqual(len(result["rows"]), 3)
+        self.assertEqual(result["rows"][0]["trial"], 1)
+        self.assertAlmostEqual(result["rows"][1]["time_s"], 3.0)
+
+    def test_load_session_csv_empty_file(self):
+        """load_session_csv: 빈 CSV → None."""
+        from session_io import load_session_csv
+
+        path = os.path.join(self.tmpdir, "empty.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["col1", "col2"])
+            # 데이터 행 없음
+
+        result = load_session_csv(path)
+        self.assertIsNone(result)
+
+    def test_load_session_csv_nonexistent(self):
+        """load_session_csv: 존재하지 않는 파일 → None."""
+        from session_io import load_session_csv
+
+        result = load_session_csv("/nonexistent/path/data.csv")
+        self.assertIsNone(result)
+
+    def test_load_session_csv_json_encoded_fields(self):
+        """load_session_csv: JSON 인코딩된 dict/list 필드 자동 파싱."""
+        from session_io import load_session_csv
+
+        path = os.path.join(self.tmpdir, "nested.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["name", "config", "tags"])
+            writer.writerow(["test", '{"fps": 60}', '[1, 2, 3]'])
+
+        result = load_session_csv(path)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "test")
+        self.assertIsInstance(result["config"], dict)
+        self.assertEqual(result["config"]["fps"], 60)
+        self.assertIsInstance(result["tags"], list)
+        self.assertEqual(result["tags"], [1, 2, 3])
+
+    def test_load_session_csv_numeric_conversion(self):
+        """load_session_csv: 숫자 문자열 자동 변환."""
+        from session_io import load_session_csv
+
+        path = os.path.join(self.tmpdir, "nums.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["int_val", "float_val", "str_val"])
+            writer.writerow(["42", "3.14", "hello"])
+
+        result = load_session_csv(path)
+        self.assertEqual(result["int_val"], 42)
+        self.assertIsInstance(result["int_val"], int)
+        self.assertAlmostEqual(result["float_val"], 3.14)
+        self.assertIsInstance(result["float_val"], float)
+        self.assertEqual(result["str_val"], "hello")
+        self.assertIsInstance(result["str_val"], str)
+
+
+# ═══════════════════════════════════════════════════════════
+# 19. export_session → load_session 라운드트립
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportLoadRoundtrip(unittest.TestCase):
+    """export_session → load_session 라운드트립 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig_export_dir = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig_export_dir
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_json_roundtrip(self):
+        """JSON 포맷 라운드트립: export → load."""
+        from session_io import export_session, load_session
+
+        session = {"attempts": 50, "rate": 0.4, "difficulty": "hard"}
+        path = export_session("rt", session, fmt="json")
+
+        loaded = load_session(path)
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded["attempts"], 50)
+        self.assertAlmostEqual(loaded["rate"], 0.4)
+        self.assertEqual(loaded["difficulty"], "hard")
+        self.assertIn("timestamp", loaded)
+
+    def test_csv_summary_roundtrip(self):
+        """CSV 포맷 (세션 요약) 라운드트립: export → load."""
+        from session_io import export_session, load_session
+
+        session = {"total": 100, "rate": 0.25, "speed": 3.0}
+        path = export_session("rt", session, fmt="csv")
+
+        loaded = load_session(path)
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded["total"], 100)
+        self.assertAlmostEqual(loaded["rate"], 0.25)
+        self.assertAlmostEqual(loaded["speed"], 3.0)
+        self.assertIn("timestamp", loaded)
+
+    def test_csv_trials_roundtrip(self):
+        """CSV 포맷 (시행 데이터) 라운드트립: export → load."""
+        from session_io import export_session, load_session
+
+        trials = [
+            {"trial": 1, "time_s": 1.0, "result": 1},
+            {"trial": 2, "time_s": 2.5, "result": 0},
+        ]
+        columns = ["trial", "time_s", "result"]
+        path = export_session("rt", {}, fmt="csv",
+                              trial_rows=trials, trial_columns=columns)
+
+        loaded = load_session(path)
+        self.assertIsNotNone(loaded)
+        self.assertIn("rows", loaded)
+        self.assertEqual(len(loaded["rows"]), 2)
+        self.assertEqual(loaded["rows"][0]["trial"], 1)
+
+    def test_json_with_trials_roundtrip(self):
+        """JSON 포맷 + trial_rows 라운드트립."""
+        from session_io import export_session, load_session
+
+        trials = [{"t": 1.0, "result": True}, {"t": 2.0, "result": False}]
+        session = {"total": 2, "rate": 0.5}
+        path = export_session("rt", session, fmt="json", trial_rows=trials)
+
+        loaded = load_session(path)
+        self.assertEqual(loaded["total"], 2)
+        self.assertEqual(len(loaded["trial_history"]), 2)
+        self.assertTrue(loaded["trial_history"][0]["result"])
+
+    def test_csv_nested_data_roundtrip(self):
+        """CSV 포맷: 중첩 dict/list의 라운드트립."""
+        from session_io import export_session, load_session
+
+        session = {"name": "exp", "params": {"a": 1, "b": 2}, "ids": [10, 20]}
+        path = export_session("rt", session, fmt="csv")
+
+        loaded = load_session(path)
+        self.assertEqual(loaded["name"], "exp")
+        self.assertEqual(loaded["params"], {"a": 1, "b": 2})
+        self.assertEqual(loaded["ids"], [10, 20])
+
+
+# ═══════════════════════════════════════════════════════════
+# 20. list_export_files — JSON/CSV 모두 표시
+# ═══════════════════════════════════════════════════════════
+
+
+class TestListExportFilesDualFormat(unittest.TestCase):
+    """list_export_files가 JSON과 CSV 파일 모두 포함하는지 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig_export_dir = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig_export_dir
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_includes_json_and_csv(self):
+        """JSON과 CSV 파일 모두 목록에 포함."""
+        from session_io import list_export_files
+
+        for name in [
+            "test_stats_20260101_100000.json",
+            "test_stats_20260102_100000.csv",
+        ]:
+            with open(os.path.join(self.tmpdir, name), "w") as f:
+                f.write("data")
+
+        result = list_export_files("test")
+        self.assertEqual(len(result), 2)
+
+        labels = [r[0] for r in result]
+        # CSV가 최신이므로 첫 번째
+        self.assertIn("(CSV)", labels[0])
+        self.assertIn("(JSON)", labels[1])
+
+    def test_label_format_json(self):
+        """JSON 파일 라벨에 (JSON) 포함."""
+        from session_io import list_export_files
+
+        with open(os.path.join(self.tmpdir, "mod_stats_20260101_120000.json"), "w") as f:
+            f.write("{}")
+
+        result = list_export_files("mod")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0][0], "20260101_120000 (JSON)")
+
+    def test_label_format_csv(self):
+        """CSV 파일 라벨에 (CSV) 포함."""
+        from session_io import list_export_files
+
+        with open(os.path.join(self.tmpdir, "mod_stats_20260101_120000.csv"), "w") as f:
+            f.write("a,b")
+
+        result = list_export_files("mod")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0][0], "20260101_120000 (CSV)")
+
+    def test_ignores_trials_csv(self):
+        """기존 trials CSV 파일은 무시 (stats_ 패턴만)."""
+        from session_io import list_export_files
+
+        for name in [
+            "test_stats_20260101.json",
+            "test_trials_20260101.csv",  # 이건 무시됨
+        ]:
+            with open(os.path.join(self.tmpdir, name), "w") as f:
+                f.write("data")
+
+        result = list_export_files("test")
+        self.assertEqual(len(result), 1)
+        self.assertIn("(JSON)", result[0][0])
+
+    def test_mixed_formats_sorted_by_timestamp(self):
+        """JSON/CSV 혼합 시 타임스탬프 순 정렬."""
+        from session_io import list_export_files
+
+        for name in [
+            "m_stats_20260101_100000.json",
+            "m_stats_20260103_100000.csv",
+            "m_stats_20260102_100000.json",
+        ]:
+            with open(os.path.join(self.tmpdir, name), "w") as f:
+                f.write("data")
+
+        result = list_export_files("m")
+        self.assertEqual(len(result), 3)
+        # 최신이 첫 번째
+        self.assertIn("20260103", result[0][0])
+        self.assertIn("(CSV)", result[0][0])
+        self.assertIn("20260101", result[2][0])
+
+
 if __name__ == "__main__":
     unittest.main()

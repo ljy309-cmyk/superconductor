@@ -1,20 +1,24 @@
 """공통 세션 데이터 내보내기/가져오기 모듈.
 
-모든 시뮬레이션에서 동일한 JSON export/import, 파일 선택 UI를
+모든 시뮬레이션에서 동일한 export/import, 파일 선택 UI를
 공유할 수 있도록 일반화한 유틸리티.
 
 사용법::
 
-    from session_io import export_session_json, choose_import_file, load_session_json
+    from session_io import export_session, choose_import_file, load_session
 
-    # 내보내기
-    path = export_session_json("tunneling", session_dict, trial_rows, trial_columns)
+    # 내보내기 (JSON 포맷)
+    path = export_session("tunneling", session_dict)
+
+    # 내보내기 (CSV 포맷)
+    path = export_session("tunneling", session_dict, fmt="csv",
+                          trial_rows=trials, trial_columns=columns)
 
     # 가져오기 UI
-    json_path = choose_import_file(screen, font, "tunneling")
+    file_path = choose_import_file(screen, font, "tunneling")
 
-    # 데이터 로드
-    session, trials = load_session_json(json_path)
+    # 데이터 로드 (포맷 자동 감지)
+    data = load_session(file_path)
 """
 
 import csv
@@ -32,6 +36,98 @@ EXPORT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports",
 # ── 내보내기 ──────────────────────────────────────────
 
 
+def export_session(
+    prefix: str,
+    session_data: dict,
+    *,
+    fmt: str = "json",
+    trial_rows: list[dict] | None = None,
+    trial_columns: list[str] | None = None,
+    trial_row_fn=None,
+) -> str | None:
+    """세션 데이터를 선택한 포맷(JSON 또는 CSV)으로 내보내기.
+
+    Parameters
+    ----------
+    prefix : str
+        파일명 접두사. 예: ``"tunneling"``
+    session_data : dict
+        세션 요약 딕셔너리.
+    fmt : str
+        내보내기 포맷. ``"json"`` 또는 ``"csv"``.
+    trial_rows : list[dict] | None
+        시행별 이력 리스트.
+    trial_columns : list[str] | None
+        CSV 헤더 컬럼 목록. ``trial_rows`` 와 함께 사용.
+    trial_row_fn : callable | None
+        ``(index, row_dict) -> list`` 형태의 함수.
+        CSV 한 행을 변환한다. 미지정 시 ``trial_columns`` 순서로 값 추출.
+
+    Returns
+    -------
+    str | None
+        저장된 파일 경로. 실패 시 ``None``.
+    """
+    os.makedirs(EXPORT_DIR, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if fmt == "csv":
+        return _export_as_csv(prefix, session_data, ts, trial_rows, trial_columns, trial_row_fn)
+    return _export_as_json(prefix, session_data, ts, trial_rows)
+
+
+def _export_as_json(prefix, session_data, ts, trial_rows=None):
+    """JSON 포맷으로 내보내기 (내부)."""
+    data = dict(session_data)
+    data["timestamp"] = datetime.now().isoformat()
+    if trial_rows:
+        data["trial_history"] = trial_rows
+    path = os.path.join(EXPORT_DIR, f"{prefix}_stats_{ts}.json")
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except OSError:
+        _log.warning("JSON 내보내기 실패: %s", path)
+        return None
+    _log.info("데이터 내보내기 완료: %s", path)
+    return path
+
+
+def _export_as_csv(prefix, session_data, ts, trial_rows=None, trial_columns=None, trial_row_fn=None):
+    """CSV 포맷으로 내보내기 (내부)."""
+    path = os.path.join(EXPORT_DIR, f"{prefix}_stats_{ts}.csv")
+    try:
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            if trial_rows and trial_columns:
+                # 시행 데이터가 있으면 시행 데이터를 CSV로
+                writer.writerow(trial_columns)
+                for i, row in enumerate(trial_rows, 1):
+                    if trial_row_fn:
+                        writer.writerow(trial_row_fn(i, row))
+                    else:
+                        writer.writerow([row.get(c, "") for c in trial_columns])
+            else:
+                # 세션 요약만 flat CSV로
+                data = dict(session_data)
+                data["timestamp"] = datetime.now().isoformat()
+                headers = list(data.keys())
+                values = []
+                for k in headers:
+                    v = data[k]
+                    if isinstance(v, (dict, list)):
+                        values.append(json.dumps(v, ensure_ascii=False))
+                    else:
+                        values.append(v)
+                writer.writerow(headers)
+                writer.writerow(values)
+    except OSError:
+        _log.warning("CSV 내보내기 실패: %s", path)
+        return None
+    _log.info("데이터 내보내기 완료: %s", path)
+    return path
+
+
 def export_session_json(
     prefix: str,
     session_data: dict,
@@ -42,24 +138,8 @@ def export_session_json(
 ) -> str | None:
     """세션 데이터를 JSON(+선택적 CSV)으로 내보내기.
 
-    Parameters
-    ----------
-    prefix : str
-        파일명 접두사. 예: ``"tunneling"`` → ``tunneling_stats_<ts>.json``
-    session_data : dict
-        JSON으로 저장할 세션 요약 딕셔너리.
-    trial_rows : list[dict] | None
-        시행별 이력 리스트. 주어지면 CSV도 함께 생성.
-    trial_columns : list[str] | None
-        CSV 헤더 컬럼 목록. ``trial_rows`` 와 함께 사용.
-    trial_row_fn : callable | None
-        ``(index, row_dict) -> list`` 형태의 함수.
-        CSV 한 행을 변환한다. 미지정 시 ``trial_columns`` 순서로 값 추출.
-
-    Returns
-    -------
-    str | None
-        저장된 JSON 파일 경로. 실패 시 ``None``.
+    .. deprecated::
+        하위 호환용. 새 코드에서는 ``export_session(fmt="json")`` 사용 권장.
     """
     os.makedirs(EXPORT_DIR, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -98,14 +178,22 @@ def export_session_json(
 
 
 def list_export_files(prefix: str) -> list[tuple[str, str]]:
-    """특정 prefix의 내보내기 파일 목록. ``[(표시명, JSON경로), ...]`` 최신순."""
+    """특정 prefix의 내보내기 파일 목록. ``[(표시명, 파일경로), ...]`` 최신순.
+
+    JSON과 CSV 파일을 모두 포함하며, 표시명에 포맷을 표기합니다.
+    """
     stats_prefix = f"{prefix}_stats_"
     if not os.path.isdir(EXPORT_DIR):
         return []
     files = []
     for f in sorted(os.listdir(EXPORT_DIR), reverse=True):
-        if f.startswith(stats_prefix) and f.endswith(".json"):
-            label = f.replace(stats_prefix, "").replace(".json", "")
+        if not f.startswith(stats_prefix):
+            continue
+        if f.endswith(".json"):
+            label = f.replace(stats_prefix, "").replace(".json", "") + " (JSON)"
+            files.append((label, os.path.join(EXPORT_DIR, f)))
+        elif f.endswith(".csv"):
+            label = f.replace(stats_prefix, "").replace(".csv", "") + " (CSV)"
             files.append((label, os.path.join(EXPORT_DIR, f)))
     return files
 
@@ -224,6 +312,16 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
 # ── 데이터 로드 ───────────────────────────────────────
 
 
+def load_session(path: str) -> dict | None:
+    """세션 파일 로드 (포맷 자동 감지). 실패 시 ``None``.
+
+    ``.json`` → JSON으로 로드, ``.csv`` → CSV로 로드.
+    """
+    if path.endswith(".csv"):
+        return load_session_csv(path)
+    return load_session_json(path)
+
+
 def load_session_json(json_path: str) -> dict | None:
     """JSON 세션 파일 로드. 실패 시 ``None``."""
     try:
@@ -232,6 +330,57 @@ def load_session_json(json_path: str) -> dict | None:
     except (OSError, json.JSONDecodeError) as e:
         _log.warning("JSON 가져오기 실패: %s", e)
         return None
+
+
+def load_session_csv(csv_path: str) -> dict | None:
+    """CSV 세션 파일 로드. 실패 시 ``None``.
+
+    단일 행 CSV (세션 요약)는 dict로 반환.
+    다중 행 CSV (시행 이력)는 ``{"rows": [행 목록]}`` 형태로 반환.
+    JSON 문자열로 인코딩된 필드(dict/list)는 자동 파싱합니다.
+    """
+    try:
+        with open(csv_path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        if not rows:
+            return None
+        if len(rows) == 1:
+            # 단일 행 → 세션 요약 dict로 반환
+            result = dict(rows[0])
+            _auto_parse_csv_values(result)
+            return result
+        # 다중 행 → 시행 이력
+        for row in rows:
+            _auto_parse_csv_values(row)
+        return {"rows": rows}
+    except (OSError, csv.Error) as e:
+        _log.warning("CSV 가져오기 실패: %s", e)
+        return None
+
+
+def _auto_parse_csv_values(row: dict):
+    """CSV 행의 문자열 값을 원래 타입으로 복원 (in-place)."""
+    for k, v in row.items():
+        if not isinstance(v, str):
+            continue
+        # JSON 인코딩된 dict/list 복원
+        if v.startswith(("{", "[")):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, (dict, list)):
+                    row[k] = parsed
+                    continue
+            except (json.JSONDecodeError, ValueError):
+                pass
+        # 숫자 복원
+        try:
+            if "." in v:
+                row[k] = float(v)
+            else:
+                row[k] = int(v)
+        except ValueError:
+            pass
 
 
 def load_session_with_trials(
