@@ -6,6 +6,7 @@
     result = import_settings("backup.zip")     # → {"imported": [...], "skipped": [...]}
 """
 
+import json
 import os
 import shutil
 import zipfile
@@ -16,7 +17,7 @@ from logger import get_module_logger
 _log = get_module_logger("settings_io")
 
 _BASE = os.path.dirname(os.path.abspath(__file__))
-_EXPORT_DIR = os.path.join(_BASE, "exports")
+_EXPORT_DIR = os.path.join(_BASE, "exports", "settings")
 
 # 내보낼 파일 목록 (상대 경로)
 _EXPORT_FILES = [
@@ -102,12 +103,26 @@ def import_settings(zip_path: str) -> dict:
                     _log.warning("허용되지 않은 파일 건너뜀: %s", member)
                     continue
 
-                dest = os.path.join(_BASE, member)
-                dest_dir = os.path.dirname(dest)
-                os.makedirs(dest_dir, exist_ok=True)
-
-                with zf.open(member) as src, open(dest, "wb") as dst:
-                    shutil.copyfileobj(src, dst)
+                # JSON 파일이면 유효성 검사
+                if member.endswith(".json"):
+                    raw = zf.read(member)
+                    try:
+                        json.loads(raw)
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        result["skipped"].append(member)
+                        _log.warning("유효하지 않은 JSON 건너뜀: %s", member)
+                        continue
+                    dest = os.path.join(_BASE, member)
+                    dest_dir = os.path.dirname(dest)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    with open(dest, "wb") as dst:
+                        dst.write(raw)
+                else:
+                    dest = os.path.join(_BASE, member)
+                    dest_dir = os.path.dirname(dest)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    with zf.open(member) as src, open(dest, "wb") as dst:
+                        shutil.copyfileobj(src, dst)
                 result["imported"].append(member)
                 _log.info("가져오기: %s", member)
 

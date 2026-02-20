@@ -1111,5 +1111,195 @@ class TestExportFilenameUniqueness(unittest.TestCase):
         self.assertEqual(len(ts_part), 15)  # 20260220_120000
 
 
+# ═══════════════════════════════════════════════════════════
+# 13. export_session_json 반환값이 JSON 파일 경로인지 확인
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportReturnValue(unittest.TestCase):
+    """export_session_json 반환값이 JSON 파일 경로인지 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig_export_dir = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig_export_dir
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_returns_json_file_path(self):
+        """반환값이 .json 파일 경로여야 함."""
+        from session_io import export_session_json
+
+        result = export_session_json("ret_test", {"key": "value"})
+        self.assertIsNotNone(result)
+        self.assertTrue(result.endswith(".json"))
+        self.assertTrue(os.path.isfile(result))
+
+    def test_returned_path_is_loadable(self):
+        """반환된 경로로 바로 load_session_json 호출 가능."""
+        from session_io import export_session_json, load_session_json
+
+        path = export_session_json("load_test", {"count": 42})
+        loaded = load_session_json(path)
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded["count"], 42)
+
+
+# ═══════════════════════════════════════════════════════════
+# 14. import_settings JSON 유효성 검사 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestImportSettingsJsonValidation(unittest.TestCase):
+    """import_settings 가져오기 시 유효하지 않은 JSON 건너뜀 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.fake_base = tempfile.mkdtemp()
+        import settings_io
+
+        self._orig_base = settings_io._BASE
+        settings_io._BASE = self.fake_base
+
+    def tearDown(self):
+        import settings_io
+
+        settings_io._BASE = self._orig_base
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        shutil.rmtree(self.fake_base, ignore_errors=True)
+
+    def _make_zip(self, files_dict):
+        zip_path = os.path.join(self.tmpdir, "test.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            for arcname, content in files_dict.items():
+                zf.writestr(arcname, content)
+        return zip_path
+
+    def test_invalid_json_skipped(self):
+        """유효하지 않은 JSON 파일은 건너뜀."""
+        from settings_io import import_settings
+
+        zip_path = self._make_zip({"config.json": "{invalid json!!"})
+        result = import_settings(zip_path)
+        self.assertIn("config.json", result["skipped"])
+        self.assertEqual(result["imported"], [])
+        # 파일이 실제로 생성되지 않았는지
+        self.assertFalse(os.path.exists(os.path.join(self.fake_base, "config.json")))
+
+    def test_valid_json_imported(self):
+        """유효한 JSON은 정상 가져오기."""
+        from settings_io import import_settings
+
+        zip_path = self._make_zip({"config.json": '{"theme": "dark"}'})
+        result = import_settings(zip_path)
+        self.assertIn("config.json", result["imported"])
+
+    def test_mixed_valid_invalid_json(self):
+        """유효/무효 JSON이 섞인 경우 유효한 것만 가져오기."""
+        from settings_io import import_settings
+
+        zip_path = self._make_zip({
+            "config.json": '{"ok": true}',
+            "achievements.json": "not valid json {{{",
+            "tutorial_state.json": '{"step": 3}',
+        })
+        result = import_settings(zip_path)
+        self.assertIn("config.json", result["imported"])
+        self.assertIn("tutorial_state.json", result["imported"])
+        self.assertIn("achievements.json", result["skipped"])
+
+    def test_non_json_files_bypass_validation(self):
+        """JSON이 아닌 파일(profiles 내)은 유효성 검사 없이 가져오기."""
+        from settings_io import import_settings
+
+        zip_path = self._make_zip({
+            "profiles/user1.json": '{"name": "user1"}',
+            "profiles/avatar.png": b"PNG binary data".decode("latin-1"),
+        })
+        result = import_settings(zip_path)
+        # profiles/ 내 파일은 허용됨 — .json은 유효성 검사, .png는 바이패스 가능
+        # (profiles/ prefix가 허용되므로 .png도 통과)
+        # profiles/user1.json은 유효한 JSON이므로 imported
+        self.assertIn("profiles/user1.json", result["imported"])
+
+    def test_empty_json_object_imported(self):
+        """빈 JSON 객체 {}는 유효한 JSON이므로 가져오기."""
+        from settings_io import import_settings
+
+        zip_path = self._make_zip({"config.json": "{}"})
+        result = import_settings(zip_path)
+        self.assertIn("config.json", result["imported"])
+
+    def test_json_array_imported(self):
+        """JSON 배열도 유효한 JSON이므로 가져오기."""
+        from settings_io import import_settings
+
+        zip_path = self._make_zip({"achievements.json": "[]"})
+        result = import_settings(zip_path)
+        self.assertIn("achievements.json", result["imported"])
+
+
+# ═══════════════════════════════════════════════════════════
+# 15. exports 디렉터리 분리 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportDirectorySeparation(unittest.TestCase):
+    """session_io와 settings_io의 exports 디렉터리가 분리되었는지 검증."""
+
+    def test_session_io_uses_sessions_subdir(self):
+        import session_io
+
+        self.assertTrue(session_io.EXPORT_DIR.endswith(os.path.join("exports", "sessions")))
+
+    def test_settings_io_uses_settings_subdir(self):
+        import settings_io
+
+        self.assertTrue(settings_io._EXPORT_DIR.endswith(os.path.join("exports", "settings")))
+
+    def test_directories_are_different(self):
+        import session_io
+        import settings_io
+
+        self.assertNotEqual(session_io.EXPORT_DIR, settings_io._EXPORT_DIR)
+
+
+# ═══════════════════════════════════════════════════════════
+# 16. session_io의 pygame 지연 import 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestSessionIoLazyImport(unittest.TestCase):
+    """session_io가 최상위에서 pygame을 import하지 않는지 검증."""
+
+    def test_data_functions_work_without_pygame(self):
+        """데이터 함수들은 pygame 없이도 동작해야 함."""
+        # 이미 pygame이 설치되어 있으므로 직접 확인은 어렵지만,
+        # 최상위 import에 pygame이 없는지 소스 코드로 확인
+        import inspect
+
+        import session_io
+
+        source = inspect.getsource(session_io)
+        # 모듈 최상위(함수 밖)에서 import pygame이 없어야 함
+        lines = source.split("\n")
+        top_level_pygame = False
+        for line in lines:
+            stripped = line.strip()
+            # 함수/클래스 정의 안에 있으면 무시
+            if stripped.startswith("def ") or stripped.startswith("class "):
+                break
+            if stripped == "import pygame" or stripped.startswith("from pygame"):
+                top_level_pygame = True
+                break
+        self.assertFalse(top_level_pygame, "session_io가 최상위에서 pygame을 import하면 안 됩니다")
+
+
 if __name__ == "__main__":
     unittest.main()

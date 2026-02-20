@@ -324,8 +324,12 @@ class SettingsPanel(tk.Toplevel):
                 parent=self,
             )
             # 설정 리로드
+            from config_loader import reload_config
             from theme import load_preferences
+
+            reload_config()
             load_preferences()
+            get_sound_manager().load_preferences()
             self._notify()
             self._rebuild()
         else:

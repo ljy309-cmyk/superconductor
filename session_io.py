@@ -22,15 +22,11 @@ import json
 import os
 from datetime import datetime
 
-import pygame
-
-from i18n import t
 from logger import get_module_logger
-from theme import get_pg_theme
 
 _log = get_module_logger("session_io")
 
-EXPORT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports")
+EXPORT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports", "sessions")
 
 
 # ── 내보내기 ──────────────────────────────────────────
@@ -63,7 +59,7 @@ def export_session_json(
     Returns
     -------
     str | None
-        저장 디렉토리 경로. 실패 시 ``None``.
+        저장된 JSON 파일 경로. 실패 시 ``None``.
     """
     os.makedirs(EXPORT_DIR, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -94,8 +90,8 @@ def export_session_json(
         except OSError:
             _log.warning("CSV 내보내기 실패: %s", csv_path)
 
-    _log.info("데이터 내보내기 완료: %s", EXPORT_DIR)
-    return EXPORT_DIR
+    _log.info("데이터 내보내기 완료: %s", json_path)
+    return json_path
 
 
 # ── 파일 목록 ─────────────────────────────────────────
@@ -117,8 +113,10 @@ def list_export_files(prefix: str) -> list[tuple[str, str]]:
 # ── 파일 선택 UI ──────────────────────────────────────
 
 
-def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int) -> pygame.Rect:
+def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int):
     """가져오기 대화상자 버튼 위치."""
+    import pygame
+
     btn_w, btn_h = 300, 28
     bx = screen_w // 2 - btn_w // 2
     max_visible = 6
@@ -130,6 +128,11 @@ def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int) -> pygame.Rec
 
 def choose_import_file(screen, font, prefix: str) -> str | None:
     """내보내기 파일 선택 대화상자 (Pygame). JSON 경로 반환, 취소 시 ``None``."""
+    import pygame
+
+    from i18n import t
+    from theme import get_pg_theme
+
     pg = get_pg_theme()
     W, H = screen.get_size()
     files = list_export_files(prefix)
