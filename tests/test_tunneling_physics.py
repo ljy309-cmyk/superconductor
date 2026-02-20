@@ -2094,6 +2094,158 @@ class TestHelpOverlayShortcuts(unittest.TestCase):
         self.assertIn("SPACE", joined)
 
 
+class TestExperimentComparison(unittest.TestCase):
+    """#32 — 실험 데이터 비교 테스트."""
+
+    def test_get_dataset_ids(self):
+        """데이터셋 ID 목록 비어있지 않음."""
+        from quantum.tunneling_experiment import get_dataset_ids
+
+        ids = get_dataset_ids()
+        self.assertGreater(len(ids), 0)
+        self.assertIn("alpha_decay", ids)
+        self.assertIn("stm_electron", ids)
+
+    def test_get_experiment_data_alpha(self):
+        """알파 붕괴 데이터 반환 유효."""
+        from quantum.tunneling_experiment import get_experiment_data
+
+        data = get_experiment_data("alpha_decay")
+        self.assertGreater(len(data), 0)
+        for bw, prob in data:
+            self.assertGreaterEqual(bw, 4)
+            self.assertLessEqual(bw, 200)
+            self.assertGreater(prob, 0)
+            self.assertLessEqual(prob, 1)
+
+    def test_get_experiment_data_stm(self):
+        """STM 전자 데이터 반환 유효."""
+        from quantum.tunneling_experiment import get_experiment_data
+
+        data = get_experiment_data("stm_electron")
+        self.assertGreater(len(data), 0)
+
+    def test_unknown_dataset_raises(self):
+        """알 수 없는 데이터셋 ID → KeyError."""
+        from quantum.tunneling_experiment import get_experiment_data
+
+        with self.assertRaises(KeyError):
+            get_experiment_data("nonexistent")
+
+    def test_wkb_transmission_at_ref(self):
+        """기준 두께에서 WKB 투과 계수 = 1.0."""
+        from quantum.tunneling_experiment import wkb_transmission
+
+        t = wkb_transmission(12, kappa=0.02, ref_width=12)
+        self.assertAlmostEqual(t, 1.0)
+
+    def test_wkb_transmission_decays(self):
+        """두꺼운 장벽에서 WKB 투과 계수 감소."""
+        from quantum.tunneling_experiment import wkb_transmission
+
+        t_thin = wkb_transmission(20, kappa=0.02, ref_width=12)
+        t_thick = wkb_transmission(100, kappa=0.02, ref_width=12)
+        self.assertGreater(t_thin, t_thick)
+
+    def test_generate_theory_curve(self):
+        """이론 곡선 생성 유효."""
+        from quantum.tunneling_experiment import generate_theory_curve
+
+        pts = generate_theory_curve(base_prob=0.1, kappa=0.02, width_min=4, width_max=200, step=10)
+        self.assertGreater(len(pts), 5)
+        # 단조감소 확인
+        for i in range(1, len(pts)):
+            self.assertLessEqual(pts[i][1], pts[i - 1][1])
+
+    def test_compute_fit_stats_perfect(self):
+        """동일 데이터 → R² = 1.0, RMSE = 0."""
+        from quantum.tunneling_experiment import compute_fit_stats
+
+        data = [(10, 0.5), (20, 0.3), (30, 0.1)]
+        stats = compute_fit_stats(data, data)
+        self.assertAlmostEqual(stats["r_squared"], 1.0)
+        self.assertAlmostEqual(stats["rmse"], 0.0)
+        self.assertEqual(stats["n_matched"], 3)
+
+    def test_compute_fit_stats_empty(self):
+        """빈 데이터 → n_matched = 0."""
+        from quantum.tunneling_experiment import compute_fit_stats
+
+        stats = compute_fit_stats([], [(10, 0.5)])
+        self.assertEqual(stats["n_matched"], 0)
+
+    def test_compute_fit_stats_no_match(self):
+        """매칭 불가 거리 → n_matched = 0."""
+        from quantum.tunneling_experiment import compute_fit_stats
+
+        sim = [(10, 0.5)]
+        ref = [(200, 0.01)]
+        stats = compute_fit_stats(sim, ref)
+        self.assertEqual(stats["n_matched"], 0)
+
+    def test_stm_decays_faster_than_alpha(self):
+        """STM 전자가 알파 붕괴보다 빠르게 감쇠."""
+        from quantum.tunneling_experiment import get_experiment_data
+
+        alpha = get_experiment_data("alpha_decay")
+        stm = get_experiment_data("stm_electron")
+        # 같은 barrier_width에서 STM이 더 낮은 확률
+        a_dict = dict(alpha)
+        s_dict = dict(stm)
+        common_widths = set(a_dict.keys()) & set(s_dict.keys())
+        for w in common_widths:
+            if w > 20:  # 넓은 장벽에서 차이가 확실
+                self.assertLess(s_dict[w], a_dict[w])
+
+    def test_i18n_exp_keys_ko(self):
+        """한국어 로케일에 실험 비교 i18n 키 존재."""
+        import json
+
+        with open("locale/ko.json", encoding="utf-8") as f:
+            data = json.load(f)
+        for key in ["exp_chart_title", "exp_alpha_decay", "exp_stm_electron", "exp_legend_sim", "exp_fit_label"]:
+            self.assertIn(key, data)
+
+    def test_i18n_exp_keys_en(self):
+        """영어 로케일에 실험 비교 i18n 키 존재."""
+        import json
+
+        with open("locale/en.json", encoding="utf-8") as f:
+            data = json.load(f)
+        for key in ["exp_chart_title", "exp_alpha_decay", "exp_stm_electron", "exp_legend_sim", "exp_fit_label"]:
+            self.assertIn(key, data)
+
+    def test_help_has_f6(self):
+        """터널링 도움말에 F6 실험 비교 안내 포함."""
+        from help_overlay import _HELP_TEXTS
+
+        lines = _HELP_TEXTS.get("tunneling", [])
+        joined = " ".join(lines)
+        self.assertIn("F6", joined)
+
+    def test_fit_label_format(self):
+        """적합도 레이블 포맷 문자열 유효."""
+        import json
+
+        with open("locale/en.json", encoding="utf-8") as f:
+            data = json.load(f)
+        tmpl = data["exp_fit_label"]
+        result = tmpl.format(r2=0.987, rmse=0.0012, n=8)
+        self.assertIn("0.987", result)
+        self.assertIn("8", result)
+
+    def test_datasets_have_metadata(self):
+        """모든 데이터셋에 name_key, desc_key, kappa 포함."""
+        from quantum.tunneling_experiment import get_experiment_datasets
+
+        datasets = get_experiment_datasets()
+        for ds_id, meta in datasets.items():
+            self.assertIn("name_key", meta, f"{ds_id} missing name_key")
+            self.assertIn("desc_key", meta, f"{ds_id} missing desc_key")
+            self.assertIn("kappa", meta, f"{ds_id} missing kappa")
+            self.assertGreater(meta["kappa"], 0)
+
+
 class TestRewind(unittest.TestCase):
     """#31 — 되감기 기능 테스트."""
 

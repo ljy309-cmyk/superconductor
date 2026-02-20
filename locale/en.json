@@ -519,6 +519,17 @@
   "tn_rewind_title": "Rewind",
   "tn_rewind_indicator": "◀◀ Rewind {pct:.0f}% ({frames} frames)  F5: stop",
 
+  "exp_chart_title": "Experiment Comparison",
+  "exp_switch_dataset": "Switch Dataset",
+  "exp_alpha_decay": "Alpha Decay",
+  "exp_alpha_decay_desc": "Alpha particle tunneling (Geiger-Nuttall law)",
+  "exp_stm_electron": "STM Electron",
+  "exp_stm_electron_desc": "Scanning tunneling microscope electron transmission",
+  "exp_legend_sim": "Simulation",
+  "exp_legend_theory": "Theory",
+  "exp_legend_experiment": "Experiment",
+  "exp_fit_label": "Fit: R²={r2:.3f}  RMSE={rmse:.4f}  ({n} pairs matched)",
+
   "glossary_title": "Glossary",
   "glossary_nav_hint": "Up/Down: Scroll  |  G/ESC: Close",
 

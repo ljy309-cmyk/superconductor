@@ -21,6 +21,13 @@ from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
 from preset_hud import PresetHUD
+from quantum.tunneling_experiment import (
+    compute_fit_stats,
+    generate_theory_curve,
+    get_dataset_ids,
+    get_experiment_data,
+    get_experiment_datasets,
+)
 
 # ── 물리 엔진 (순수 로직) ────────────────────────────
 from quantum.tunneling_physics import (
@@ -895,6 +902,189 @@ def _draw_sweep_chart(screen, font, sweeper: BarrierSweeper):
         screen.blit(hint, (cx + cw - hint.get_width(), cy + ch + 1))
 
 
+# ── 실험 데이터 비교 (#32) ────────────────────────────
+
+_EXP_CHART_H = 120
+
+
+def _update_exp_fit_stats(ctx: "_SimContext"):
+    """시뮬레이션 trial_history에서 배리어별 평균 투과율을 계산하고 적합도를 갱신."""
+    if not ctx.trial_history:
+        ctx.exp_fit_stats = None
+        return
+    # 배리어 폭별 통계 집계
+    from collections import defaultdict
+
+    bw_stats: dict[int, list[bool]] = defaultdict(list)
+    for tr in ctx.trial_history:
+        bw_stats[tr["barrier"]].append(tr["result"])
+
+    sim_data = []
+    for bw in sorted(bw_stats):
+        results = bw_stats[bw]
+        rate = sum(results) / len(results)
+        sim_data.append((bw, rate))
+
+    ref_data = get_experiment_data(ctx.exp_dataset_id)
+    ctx.exp_fit_stats = compute_fit_stats(sim_data, ref_data)
+
+
+def _draw_experiment_chart(screen, font, ctx: "_SimContext"):
+    """실험 데이터 비교 차트 렌더링 (#32)."""
+    # 블로흐 구 아래 영역에 배치
+    sx = _CHART_X
+    sy = _CHART_Y - (_EXP_CHART_H - _CHART_H)
+    sw = _CHART_W
+    sh = _EXP_CHART_H
+
+    pad_l, pad_t, pad_b = _CHART_PAD_L, _CHART_PAD_T + 12, _CHART_PAD_B
+    cx = sx + pad_l
+    cy = sy + pad_t
+    cw = sw - pad_l - 4
+    ch = sh - pad_t - pad_b
+
+    # 배경 (반투명)
+    bg_surf = pygame.Surface((sw, sh), pygame.SRCALPHA)
+    bg_surf.fill((*BG[:3], 220))
+    screen.blit(bg_surf, (sx, sy))
+    pygame.draw.rect(screen, OVERLAY_CLR, (sx, sy, sw, sh), 1)
+
+    # 타이틀
+    title = _tcache.render(font, t("exp_chart_title"), TEXT_CLR)
+    screen.blit(title, (cx + cw - title.get_width(), sy + 1))
+
+    datasets = get_experiment_datasets()
+    ds_meta = datasets.get(ctx.exp_dataset_id, {})
+    ds_name = t(ds_meta.get("name_key", ctx.exp_dataset_id))
+    ds_kappa = ds_meta.get("kappa", 0.02)
+
+    # 데이터셋 이름 + 전환 안내
+    ds_lbl = _tcache.render(font, f"{ds_name}  (F7: {t('exp_switch_dataset')})", ACCENT)
+    screen.blit(ds_lbl, (cx, sy + 1))
+
+    # 실험 참조 데이터
+    ref_data = get_experiment_data(ctx.exp_dataset_id)
+    if not ref_data:
+        return
+
+    # 이론 곡선 (시뮬레이터 수식 기준)
+    theory_data = generate_theory_curve(
+        base_prob=ctx.base_prob,
+        kappa=_TUNNEL_DECAY,
+        ref_width=BARRIER_WIDTH_DEFAULT,
+        width_min=BARRIER_WIDTH_MIN,
+        width_max=BARRIER_WIDTH_MAX,
+        step=4,
+    )
+
+    # y축 최대값 결정
+    all_probs = [p for _, p in ref_data] + [p for _, p in theory_data]
+    max_prob = max(all_probs) if all_probs else 0.01
+    max_prob = max(max_prob, 0.01)
+
+    # 좌표 변환 헬퍼
+    w_min = BARRIER_WIDTH_MIN
+    w_max = BARRIER_WIDTH_MAX
+    w_range = max(w_max - w_min, 1)
+
+    def to_px(bw: int, prob: float) -> tuple[int, int]:
+        px = cx + int((bw - w_min) / w_range * cw)
+        py = cy + int((1.0 - prob / max_prob) * ch)
+        return (px, py)
+
+    # y축 눈금
+    for frac in (1.0, 0.5, 0.0):
+        gy = cy + int((1 - frac) * ch)
+        pygame.draw.line(screen, OVERLAY_CLR, (cx, gy), (cx + cw, gy), 1)
+    l_top = _tcache.render(font, f"{max_prob * 100:.1f}%", OVERLAY_CLR)
+    l_bot = _tcache.render(font, "0", OVERLAY_CLR)
+    screen.blit(l_top, (sx + 1, cy - 4))
+    screen.blit(l_bot, (sx + 10, cy + ch - 6))
+
+    # ① 이론 곡선 (노란 점선)
+    theory_pts = [to_px(w, p) for w, p in theory_data]
+    if len(theory_pts) >= 2:
+        for i in range(0, len(theory_pts) - 1, 2):
+            j = min(i + 1, len(theory_pts) - 1)
+            pygame.draw.line(screen, BARRIER_CLR, theory_pts[i], theory_pts[j], 1)
+
+    # ② WKB 곡선 (실험 kappa 기준, 하늘색 점선)
+    wkb_data = generate_theory_curve(
+        base_prob=ctx.base_prob,
+        kappa=ds_kappa,
+        ref_width=BARRIER_WIDTH_DEFAULT,
+        width_min=BARRIER_WIDTH_MIN,
+        width_max=BARRIER_WIDTH_MAX,
+        step=4,
+    )
+    wkb_pts = [to_px(w, p) for w, p in wkb_data]
+    wkb_color = (100, 180, 255)  # 하늘색
+    if len(wkb_pts) >= 2:
+        for i in range(0, len(wkb_pts) - 1, 2):
+            j = min(i + 1, len(wkb_pts) - 1)
+            pygame.draw.line(screen, wkb_color, wkb_pts[i], wkb_pts[j], 1)
+
+    # ③ 실험 참조 데이터 (빨간 ●)
+    exp_color = (255, 100, 100)  # 빨간색
+    for bw, prob in ref_data:
+        px, py = to_px(bw, prob)
+        pygame.draw.circle(screen, exp_color, (px, py), 3)
+
+    # ④ 시뮬레이션 측정 데이터 (녹색 ■) — trial_history에서
+    from collections import defaultdict
+
+    bw_stats: dict[int, list[bool]] = defaultdict(list)
+    for tr in ctx.trial_history:
+        bw_stats[tr["barrier"]].append(tr["result"])
+
+    sim_pts = []
+    for bw in sorted(bw_stats):
+        results = bw_stats[bw]
+        rate = sum(results) / len(results)
+        px, py = to_px(bw, rate)
+        sim_pts.append((px, py))
+        pygame.draw.rect(screen, TUNNEL_FLASH, (px - 2, py - 2, 5, 5))
+
+    if len(sim_pts) >= 2:
+        pygame.draw.lines(screen, TUNNEL_FLASH, False, sim_pts, 1)
+
+    # x축 라벨
+    x_lbl_l = _tcache.render(font, f"{w_min}px", OVERLAY_CLR)
+    screen.blit(x_lbl_l, (cx, cy + ch + 1))
+    x_lbl_r = _tcache.render(font, f"{w_max}px", OVERLAY_CLR)
+    screen.blit(x_lbl_r, (cx + cw - x_lbl_r.get_width(), cy + ch + 1))
+
+    # 범례 (하단)
+    leg_y = cy + ch + 1
+    leg_x = cx + 40
+    # 시뮬레이션
+    pygame.draw.rect(screen, TUNNEL_FLASH, (leg_x, leg_y + 2, 6, 6))
+    l1 = _tcache.render(font, t("exp_legend_sim"), TUNNEL_FLASH)
+    screen.blit(l1, (leg_x + 9, leg_y))
+    leg_x += l1.get_width() + 16
+    # 이론
+    pygame.draw.line(screen, BARRIER_CLR, (leg_x, leg_y + 5), (leg_x + 10, leg_y + 5), 1)
+    l2 = _tcache.render(font, t("exp_legend_theory"), BARRIER_CLR)
+    screen.blit(l2, (leg_x + 13, leg_y))
+    leg_x += l2.get_width() + 16
+    # 실험
+    pygame.draw.circle(screen, exp_color, (leg_x + 3, leg_y + 5), 3)
+    l3 = _tcache.render(font, t("exp_legend_experiment"), exp_color)
+    screen.blit(l3, (leg_x + 9, leg_y))
+    leg_x += l3.get_width() + 16
+    # WKB
+    pygame.draw.line(screen, wkb_color, (leg_x, leg_y + 5), (leg_x + 10, leg_y + 5), 1)
+    l4 = _tcache.render(font, "WKB", wkb_color)
+    screen.blit(l4, (leg_x + 13, leg_y))
+
+    # 적합도 통계
+    if ctx.exp_fit_stats and ctx.exp_fit_stats["n_matched"] > 0:
+        st = ctx.exp_fit_stats
+        stat_txt = t("exp_fit_label", r2=st["r_squared"], rmse=st["rmse"], n=st["n_matched"])
+        stat_surf = _tcache.render(font, stat_txt, TEXT_CLR)
+        screen.blit(stat_surf, (cx, sy + 12))
+
+
 # ── 업적 진행도 ──────────────────────────────────────
 
 
@@ -1130,6 +1320,12 @@ class _SimContext:
         self.rewinding = False  # 되감기 재생 중 여부
         self.rewind_speed = cfg("tunneling", "rewind_speed", 2)  # 되감기 배속
 
+        # 실험 데이터 비교 (#32)
+        self.exp_compare_visible = False  # 비교 패널 표시 여부
+        ds_ids = get_dataset_ids()
+        self.exp_dataset_id: str = ds_ids[0] if ds_ids else ""
+        self.exp_fit_stats: dict | None = None  # 최근 적합도 계산 결과
+
     def read_sliders(self):
         """슬라이더 값 → 물리 파라미터 동기화."""
         self.speed_mult = self.sl_speed.value
@@ -1284,6 +1480,22 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
             ctx.rewinding = True
             ctx.paused = True  # 정방향 물리 중지
             _log.info("되감기 시작 (%d프레임 보유)", len(ctx.rewind_buf))
+    elif key == pygame.K_F6:
+        # 실험 데이터 비교 토글 (#32)
+        ctx.exp_compare_visible = not ctx.exp_compare_visible
+        if ctx.exp_compare_visible:
+            _update_exp_fit_stats(ctx)
+            _log.info("실험 비교 패널 ON (데이터셋: %s)", ctx.exp_dataset_id)
+        else:
+            _log.info("실험 비교 패널 OFF")
+    elif key == pygame.K_F7 and ctx.exp_compare_visible:
+        # 실험 데이터셋 순환 (#32)
+        ds_ids = get_dataset_ids()
+        if ds_ids:
+            idx = ds_ids.index(ctx.exp_dataset_id) if ctx.exp_dataset_id in ds_ids else -1
+            ctx.exp_dataset_id = ds_ids[(idx + 1) % len(ds_ids)]
+            _update_exp_fit_stats(ctx)
+            _log.info("데이터셋 전환: %s", ctx.exp_dataset_id)
     return running
 
 
@@ -1785,6 +1997,8 @@ def _render_frame(ctx: _SimContext):
     _draw_rate_chart(ctx.screen, ctx.font, ctx.trial_history, ctx.tunnel_prob, ctx.imported_trials)
     if ctx.sweeper is not None:
         _draw_sweep_chart(ctx.screen, ctx.font, ctx.sweeper)
+    if ctx.exp_compare_visible:
+        _draw_experiment_chart(ctx.screen, ctx.font, ctx)
     ctx.panel.draw(ctx.screen, ctx.font)
     _draw_achievement_progress(ctx.screen, ctx.font, ctx)
 
@@ -1809,7 +2023,8 @@ def _render_frame(ctx: _SimContext):
         t("hint_click_launch"),
         t("hint_pause_reset")
         + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X/I: Export/Import"
-        + f"  |  F3: {t('tn_sweep_title')}  |  F4: {t('tn_step_mode')}  |  F5: {t('tn_rewind_title')}  |  G: {t('glossary_title')}",
+        + f"  |  F3: {t('tn_sweep_title')}  |  F4: {t('tn_step_mode')}  |  F5: {t('tn_rewind_title')}"
+        + f"  |  F6: {t('exp_chart_title')}  |  G: {t('glossary_title')}",
     ]
     for i, h in enumerate(hints):
         surf = _tcache.render(ctx.font, h, TEXT_CLR)

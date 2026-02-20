@@ -519,6 +519,17 @@
   "tn_rewind_title": "되감기",
   "tn_rewind_indicator": "◀◀ 되감기 {pct:.0f}% ({frames}프레임)  F5: 중지",
 
+  "exp_chart_title": "실험 데이터 비교",
+  "exp_switch_dataset": "데이터셋 전환",
+  "exp_alpha_decay": "알파 붕괴",
+  "exp_alpha_decay_desc": "Geiger-Nuttall 법칙 기반 알파 입자 터널링",
+  "exp_stm_electron": "STM 전자 터널링",
+  "exp_stm_electron_desc": "주사 터널링 현미경 전자 투과",
+  "exp_legend_sim": "시뮬레이션",
+  "exp_legend_theory": "이론",
+  "exp_legend_experiment": "실험",
+  "exp_fit_label": "적합도: R²={r2:.3f}  RMSE={rmse:.4f}  ({n}쌍 매칭)",
+
   "glossary_title": "용어집",
   "glossary_nav_hint": "↑↓: 스크롤  |  G/ESC: 닫기",
 
