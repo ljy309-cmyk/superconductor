@@ -223,7 +223,7 @@ class GlossaryOverlay:
 
         # 메인 박스
         box_w = min(700, w - 40)
-        box_h = min(560, h - 40)
+        box_h = min(580, h - 40)
         box_x = (w - box_w) // 2
         box_y = (h - box_h) // 2
 
@@ -297,7 +297,7 @@ class GlossaryOverlay:
             no_result = font.render(t("glossary_no_results"), True, pg.TEXT)
             screen.blit(no_result, (box_x + box_w // 2 - no_result.get_width() // 2, ty + 20))
         else:
-            content_bottom = box_y + box_h - 50
+            content_bottom = box_y + box_h - 58
             for tid, tcat in items:
                 if ty > content_bottom:
                     break
@@ -333,15 +333,34 @@ class GlossaryOverlay:
 
         # ── 하단 네비게이션 ──
         bottom_y = box_y + box_h - 42
-        page_text = t("glossary_page", page=self._page + 1, total=self._total_pages())
-        page_surf = font.render(page_text, True, pg.TEXT)
-        screen.blit(page_surf, (box_x + box_w // 2 - page_surf.get_width() // 2, bottom_y))
+        total_pg = self._total_pages()
 
+        # 도트 인디케이터
+        dot_r = 4 if hc else 3
+        dot_gap = dot_r * 2 + 6
+        dots_w = total_pg * dot_gap - 6
+        dot_start_x = box_x + box_w // 2 - dots_w // 2
+        dot_cy = bottom_y + dot_r + 1
+        for i in range(total_pg):
+            cx = dot_start_x + i * dot_gap + dot_r
+            if i == self._page:
+                pygame.draw.circle(screen, pg.ACCENT_BLUE, (cx, dot_cy), dot_r)
+            else:
+                pygame.draw.circle(screen, pg.OVERLAY, (cx, dot_cy), dot_r)
+                pygame.draw.circle(screen, pg.SUBTEXT, (cx, dot_cy), dot_r, 1)
+
+        # 페이지 번호 (도트 아래)
+        page_text = t("glossary_page", page=self._page + 1, total=total_pg)
+        page_surf = font.render(page_text, True, pg.SUBTEXT)
+        screen.blit(page_surf, (box_x + box_w // 2 - page_surf.get_width() // 2,
+                                bottom_y + dot_r * 2 + 4))
+
+        nav_y = bottom_y + dot_r * 2 + 20
         nav_text = t("glossary_nav")
         nav_surf = font.render(nav_text, True, pg.SUBTEXT)
-        screen.blit(nav_surf, (box_x + box_w // 2 - nav_surf.get_width() // 2, bottom_y + 16))
+        screen.blit(nav_surf, (box_x + box_w // 2 - nav_surf.get_width() // 2, nav_y))
 
         # 닫기 안내
         close_surf = font.render(t("glossary_close"), True, pg.SUBTEXT)
         screen.blit(close_surf,
-                     (box_x + box_w - close_surf.get_width() - 16, bottom_y + 16))
+                     (box_x + box_w - close_surf.get_width() // 2 - 16, nav_y))
