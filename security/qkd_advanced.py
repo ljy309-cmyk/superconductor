@@ -14,6 +14,7 @@ import pygame
 
 from config_loader import cfg
 from game_base import finalize_session
+from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -1912,6 +1913,7 @@ def run_simulation():
     _benchmark_results: list[dict] | None = None  # 벤치마크 결과
 
     help_overlay = HelpOverlay("qkd_advanced")
+    glossary = GlossaryOverlay()
     tutorial = TutorialOverlay("qkd_advanced")
     snd = get_sound_manager()
     snd.init()
@@ -1929,6 +1931,7 @@ def run_simulation():
 
         for event in pygame.event.get():
             help_overlay.handle_event(event)
+            glossary.handle_event(event)
             if tutorial.handle_event(event):
                 continue
             if event.type == pygame.QUIT:
@@ -2460,6 +2463,7 @@ def run_simulation():
         if _benchmark_results is not None:
             _draw_benchmark_overlay(screen, _benchmark_results, font, big_font)
 
+        glossary.draw(screen, font)
         help_overlay.draw(screen, font)
         tutorial.draw(screen, font)
 

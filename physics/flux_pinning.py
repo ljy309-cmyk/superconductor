@@ -16,6 +16,7 @@ import pygame
 
 from config_loader import cfg
 from game_base import finalize_session
+from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -212,6 +213,7 @@ def run_simulation():
 
     # ── 도움말 & 사운드 & 리플레이 ──
     help_overlay = HelpOverlay("flux_pinning")
+    glossary = GlossaryOverlay()
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("flux_pinning")
@@ -233,6 +235,7 @@ def run_simulation():
         # ── 이벤트 처리 ──────────────────────────────
         for event in pygame.event.get():
             help_overlay.handle_event(event)
+            glossary.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -425,7 +428,8 @@ def run_simulation():
             surf = font.render(hint, True, TEXT_CLR)
             screen.blit(surf, (12, HEIGHT - 40 + i * 18))
 
-        # 도움말 오버레이 (맨 마지막)
+        # 용어 사전 & 도움말 오버레이 (맨 마지막)
+        glossary.draw(screen, font)
         help_overlay.draw(screen, font)
 
         pygame.display.flip()

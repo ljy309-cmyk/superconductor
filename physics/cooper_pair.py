@@ -14,6 +14,7 @@ import pygame
 
 from config_loader import cfg
 from game_base import finalize_session
+from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -96,6 +97,7 @@ def run_simulation():
     small_font = pygame.font.SysFont("Consolas", 11)
 
     help_overlay = HelpOverlay("cooper_pair")
+    glossary = GlossaryOverlay()
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("cooper_pair")
@@ -117,6 +119,7 @@ def run_simulation():
         # ── 이벤트 처리 ──────────────────────────────
         for event in pygame.event.get():
             help_overlay.handle_event(event)
+            glossary.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -223,6 +226,7 @@ def run_simulation():
             surf = small_font.render(hint, True, SUBTEXT_CLR)
             screen.blit(surf, (12, HEIGHT - 36 + i * 16))
 
+        glossary.draw(screen, font)
         help_overlay.draw(screen, font)
         pygame.display.flip()
 

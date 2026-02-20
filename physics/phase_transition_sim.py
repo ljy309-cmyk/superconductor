@@ -20,6 +20,7 @@ import time
 import pygame
 
 from config_loader import cfg
+from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -118,6 +119,7 @@ def run_simulation():
     big_font = pygame.font.SysFont("Consolas", 28, bold=True)
 
     help_overlay = HelpOverlay("phase_transition_sim")
+    glossary = GlossaryOverlay()
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("phase_transition_sim")
@@ -158,6 +160,7 @@ def run_simulation():
 
         for event in pygame.event.get():
             help_overlay.handle_event(event)
+            glossary.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -315,6 +318,7 @@ def run_simulation():
         desc_surf = font.render(desc, True, SUBTEXT_CLR)
         screen.blit(desc_surf, (WIDTH // 2 - desc_surf.get_width() // 2, 48))
 
+        glossary.draw(screen, font)
         help_overlay.draw(screen, font)
         pygame.display.flip()
 

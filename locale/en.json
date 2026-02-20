@@ -878,5 +878,154 @@
   "tn_hint_qc_2": "R: Reset  |  L: Language  |  ESC: Exit",
 
   "tn_paused": "Paused",
-  "tn_paused_banner": "PAUSED — P/SPACE: Resume  |  . : Step 1 Frame"
+  "tn_paused_banner": "PAUSED — P/SPACE: Resume  |  . : Step 1 Frame",
+
+  "glossary_title": "Physics Glossary",
+  "glossary_search_placeholder": "Type to search…",
+  "glossary_no_results": "No matching terms.",
+  "glossary_hint": "G: Glossary",
+  "glossary_close": "G or ESC to close",
+  "glossary_nav": "←→: Category  |  ↑↓/PgUp/PgDn: Scroll  |  /: Search",
+  "glossary_page": "Page {page}/{total}",
+  "glossary_cat_all": "All",
+  "glossary_cat_quantum": "Quantum",
+  "glossary_cat_superconductor": "Superconductor",
+  "glossary_cat_computing": "Computing",
+  "glossary_cat_crypto": "Cryptography",
+
+  "gl_superposition": "Superposition",
+  "gl_superposition_def": "A qubit can exist in a linear combination of |0⟩ and |1⟩ simultaneously. Measurement collapses it to one definite state with the corresponding probability.",
+  "gl_superposition_formula": "|ψ⟩ = α|0⟩ + β|1⟩,  |α|²+|β|²=1",
+
+  "gl_entanglement": "Quantum Entanglement",
+  "gl_entanglement_def": "Two or more qubits share a quantum state such that measuring one instantly determines the other, regardless of distance. This non-local correlation violates Bell inequalities.",
+  "gl_entanglement_formula": "|Φ+⟩ = (|00⟩+|11⟩)/√2",
+
+  "gl_tunneling": "Quantum Tunneling",
+  "gl_tunneling_def": "A particle can pass through a potential barrier even when its energy is classically insufficient. The transmission probability decreases exponentially with barrier width.",
+  "gl_tunneling_formula": "P ∝ exp(−2κd),  κ=√(2m(V−E))/ℏ",
+
+  "gl_measurement": "Quantum Measurement",
+  "gl_measurement_def": "Observing a quantum system collapses its superposition into a definite eigenstate. The outcome is probabilistic, governed by the Born rule.",
+  "gl_measurement_formula": "P(outcome) = |⟨outcome|ψ⟩|²",
+
+  "gl_bloch_sphere": "Bloch Sphere",
+  "gl_bloch_sphere_def": "A geometric representation of a single qubit state on the surface of a unit sphere. |0⟩ is the north pole, |1⟩ is the south pole, and superpositions lie on the surface.",
+  "gl_bloch_sphere_formula": "|ψ⟩ = cos(θ/2)|0⟩ + e^{iφ}sin(θ/2)|1⟩",
+
+  "gl_bell_state": "Bell States",
+  "gl_bell_state_def": "Four maximally entangled two-qubit states forming an orthonormal basis. They are the simplest examples of quantum entanglement and are used in teleportation and QKD.",
+  "gl_bell_state_formula": "|Φ±⟩=(|00⟩±|11⟩)/√2,  |Ψ±⟩=(|01⟩±|10⟩)/√2",
+
+  "gl_chsh": "CHSH Inequality",
+  "gl_chsh_def": "A Bell inequality testing local hidden variable theories. Classical physics predicts |S|≤2, but quantum mechanics allows up to 2√2≈2.828 (Tsirelson bound), proving non-locality.",
+  "gl_chsh_formula": "|S| ≤ 2 (classical)  vs  |S| ≤ 2√2 (quantum)",
+
+  "gl_teleportation": "Quantum Teleportation",
+  "gl_teleportation_def": "Transferring an unknown quantum state from one qubit to another using entanglement and classical communication. No physical particle moves; only quantum information is transmitted.",
+
+  "gl_no_cloning": "No-Cloning Theorem",
+  "gl_no_cloning_def": "It is impossible to create an identical copy of an arbitrary unknown quantum state. This is fundamental to quantum cryptography — eavesdroppers cannot copy qubits without detection.",
+
+  "gl_decoherence": "Decoherence",
+  "gl_decoherence_def": "The loss of quantum coherence due to interaction with the environment. Superpositions degrade into classical mixtures, limiting quantum computation and communication.",
+
+  "gl_cooper_pair": "Cooper Pair",
+  "gl_cooper_pair_def": "Two electrons bound together at low temperatures via phonon-mediated attraction. Cooper pairs behave as bosons and flow without resistance, enabling superconductivity.",
+  "gl_cooper_pair_formula": "Binding energy ≈ 2Δ(T)",
+
+  "gl_bcs_theory": "BCS Theory",
+  "gl_bcs_theory_def": "Bardeen-Cooper-Schrieffer theory (1957) explains conventional superconductivity. Electrons form Cooper pairs through phonon exchange, condensing into a macroscopic quantum state with zero resistance.",
+  "gl_bcs_theory_formula": "Δ(T) ≈ Δ₀√(1−(T/Tc)²)",
+
+  "gl_energy_gap": "Energy Gap Δ(T)",
+  "gl_energy_gap_def": "The minimum energy required to break a Cooper pair in a superconductor. Below Tc the gap exists, preventing scattering and yielding zero resistance. It vanishes at Tc.",
+  "gl_energy_gap_formula": "Δ(0) ≈ 1.764 kBTc  (BCS weak coupling)",
+
+  "gl_meissner": "Meissner Effect",
+  "gl_meissner_def": "A superconductor expels all internal magnetic flux when cooled below Tc (perfect diamagnetism). This causes magnetic levitation and is a hallmark of the superconducting state.",
+
+  "gl_flux_pinning": "Flux Pinning",
+  "gl_flux_pinning_def": "In type-II superconductors, magnetic flux penetrates as quantized vortices that become pinned at defects. This locks the superconductor in space (quantum locking), enabling stable levitation.",
+  "gl_flux_pinning_formula": "Φ₀ = h/(2e) ≈ 2.07×10⁻¹⁵ Wb",
+
+  "gl_josephson": "Josephson Effect",
+  "gl_josephson_def": "A supercurrent flows through a thin barrier between two superconductors without voltage (DC effect). With voltage applied, the phase oscillates producing AC supercurrent.",
+  "gl_josephson_formula": "I=Ic sin(φ),  dφ/dt=2eV/ℏ",
+
+  "gl_squid_sensor": "SQUID",
+  "gl_squid_sensor_def": "Superconducting Quantum Interference Device — the most sensitive magnetic field sensor known. Uses Josephson junctions in a superconducting loop to detect tiny flux changes.",
+  "gl_squid_sensor_formula": "Φ = nΦ₀  (flux quantization)",
+
+  "gl_phase_transition": "Phase Transition",
+  "gl_phase_transition_def": "A transformation between states of matter. In superconductors, cooling below the critical temperature Tc causes a phase transition from normal (resistive) to superconducting (zero resistance).",
+
+  "gl_critical_temp": "Critical Temperature (Tc)",
+  "gl_critical_temp_def": "The temperature below which a material becomes superconducting. Examples: Al (1.2K), Nb (9.3K), MgB₂ (39K), YBCO (92K), BSCCO (110K).",
+
+  "gl_flux_quantum": "Magnetic Flux Quantum",
+  "gl_flux_quantum_def": "The smallest unit of magnetic flux in a superconducting loop. All magnetic flux through a superconductor is quantized in multiples of Φ₀.",
+  "gl_flux_quantum_formula": "Φ₀ = h/(2e) ≈ 2.07×10⁻¹⁵ Wb",
+
+  "gl_qubit": "Qubit",
+  "gl_qubit_def": "The basic unit of quantum information, analogous to a classical bit. Unlike bits (0 or 1), a qubit can be in a superposition of |0⟩ and |1⟩, enabling quantum parallelism.",
+
+  "gl_quantum_gate": "Quantum Gate",
+  "gl_quantum_gate_def": "A unitary operation on qubits, analogous to logic gates in classical computing. Quantum gates are reversible and manipulate qubit states through rotation on the Bloch sphere.",
+
+  "gl_hadamard": "Hadamard Gate (H)",
+  "gl_hadamard_def": "Creates equal superposition from basis states: H|0⟩=|+⟩, H|1⟩=|−⟩. Fundamental for quantum algorithms — it enables quantum parallelism by querying all inputs simultaneously.",
+  "gl_hadamard_formula": "H = (1/√2)[[1,1],[1,−1]]",
+
+  "gl_pauli_gates": "Pauli Gates (X, Y, Z)",
+  "gl_pauli_gates_def": "X (bit flip): |0⟩↔|1⟩. Y: rotation around Y-axis. Z (phase flip): |1⟩→−|1⟩. Together with H and T, they form a universal gate set for quantum computation.",
+
+  "gl_cnot": "CNOT Gate",
+  "gl_cnot_def": "Controlled-NOT: flips the target qubit if the control qubit is |1⟩. Essential for creating entanglement and implementing quantum error correction codes.",
+  "gl_cnot_formula": "CNOT|00⟩=|00⟩, CNOT|10⟩=|11⟩",
+
+  "gl_shor": "Shor's Algorithm",
+  "gl_shor_def": "A quantum algorithm (1994) for integer factorization in polynomial time O((log N)³). It threatens RSA encryption and is a primary motivation for post-quantum cryptography and QKD.",
+
+  "gl_grover": "Grover's Algorithm",
+  "gl_grover_def": "A quantum search algorithm (1996) that finds a target in an unsorted database of N items in O(√N) queries — a provably optimal quadratic speedup over classical O(N) search.",
+  "gl_grover_formula": "Optimal iterations: k = ⌊π/4 × √(N/M)⌋",
+
+  "gl_qec": "Quantum Error Correction (QEC)",
+  "gl_qec_def": "Techniques to protect quantum information from noise and decoherence using redundant encoding. Unlike classical error correction, QEC must handle bit-flip and phase-flip errors without measuring the data directly.",
+
+  "gl_qft": "Quantum Fourier Transform (QFT)",
+  "gl_qft_def": "The quantum analog of the discrete Fourier transform. Key subroutine in Shor's algorithm for period finding. Exponentially faster than classical FFT for certain structured problems.",
+  "gl_qft_formula": "QFT|j⟩ = (1/√N) Σ_k e^{2πijk/N}|k⟩",
+
+  "gl_qkd": "Quantum Key Distribution (QKD)",
+  "gl_qkd_def": "A method to establish secure cryptographic keys using quantum mechanics. Any eavesdropping attempt disturbs the quantum states, enabling detection. Security is based on physics, not computational assumptions.",
+
+  "gl_bb84": "BB84 Protocol",
+  "gl_bb84_def": "The first QKD protocol (Bennett & Brassard, 1984). Alice sends qubits in random bases (+/×), Bob measures in random bases. Matching bases yield key bits; QBER > 11% indicates eavesdropping.",
+
+  "gl_e91": "E91 Protocol",
+  "gl_e91_def": "Entanglement-based QKD (Ekert, 1991). Uses Bell pairs shared between Alice and Bob. Security verified through CHSH inequality violation — if S≈2√2, no eavesdropper is present.",
+  "gl_e91_formula": "S = E(a₁,b₁) − E(a₁,b₃) + E(a₃,b₁) + E(a₃,b₃)",
+
+  "gl_qber": "QBER (Quantum Bit Error Rate)",
+  "gl_qber_def": "The fraction of bits that differ between Alice and Bob after basis reconciliation. Normal channel noise gives QBER < 11%; higher values signal eavesdropping (Eve's interference).",
+  "gl_qber_formula": "QBER = errors / total_sifted_bits",
+
+  "gl_privacy_amp": "Privacy Amplification",
+  "gl_privacy_amp_def": "A post-processing step in QKD that compresses the raw key using universal hash functions to eliminate any partial information an eavesdropper might have. Based on the Leftover Hash Lemma.",
+
+  "gl_ghz_state": "GHZ State",
+  "gl_ghz_state_def": "Greenberger-Horne-Zeilinger state — a maximally entangled state of three or more qubits. Used in multi-party QKD and tests of quantum non-locality.",
+  "gl_ghz_state_formula": "|GHZ⟩ = (|00…0⟩+|11…1⟩)/√2",
+
+  "gl_decoy_state": "Decoy State Protocol",
+  "gl_decoy_state_def": "A practical QKD enhancement where Alice randomly varies photon intensity (signal, decoy, vacuum). This detects photon-number-splitting attacks that exploit multi-photon pulses in real implementations.",
+
+  "gl_otp": "One-Time Pad (OTP)",
+  "gl_otp_def": "An encryption method with information-theoretic security: plaintext XOR random key = ciphertext. Requires key length ≥ message length and single-use. QKD provides the keys for practical OTP.",
+  "gl_otp_formula": "C = M ⊕ K,  M = C ⊕ K",
+
+  "gl_rsa": "RSA Encryption",
+  "gl_rsa_def": "A widely-used public-key cryptosystem based on the difficulty of factoring large numbers N=p×q. Shor's algorithm on a quantum computer can break RSA, motivating the need for QKD."
 }

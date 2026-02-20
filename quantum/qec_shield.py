@@ -19,6 +19,7 @@ from quantum.ui_common import (
 )
 from game_base import choose_difficulty_or_quit, finalize_session
 from game_summary import draw_game_summary
+from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -332,6 +333,7 @@ def run_simulation():
     }
     preset_hud = PresetHUD("qec_shield", slider_map)
     help_overlay = HelpOverlay("qec_shield")
+    glossary = GlossaryOverlay()
 
     # ── 사운드 ──
     snd = get_sound_manager()
@@ -381,6 +383,7 @@ def run_simulation():
             spanel.handle_event(event)
             preset_hud.handle_event(event)
             help_overlay.handle_event(event)
+            glossary.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.VIDEORESIZE:
@@ -601,6 +604,7 @@ def run_simulation():
                           L.W // 2, L.notify_y)
 
         preset_hud.draw(screen, font, 10, 50)
+        glossary.draw(screen, font)
         help_overlay.draw(screen, font)
 
         pygame.display.flip()

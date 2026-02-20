@@ -12,6 +12,7 @@ import pygame
 
 from config_loader import cfg
 from game_base import choose_difficulty_or_quit, finalize_session
+from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -324,6 +325,7 @@ def run_simulation():
     }
     preset_hud = PresetHUD("bb84_defense", slider_map)
     help_overlay = HelpOverlay("bb84_defense")
+    glossary = GlossaryOverlay()
     snd = get_sound_manager()
     snd.init()
     recorder = ReplayRecorder("bb84_defense")
@@ -342,6 +344,7 @@ def run_simulation():
             panel.handle_event(event)
             preset_hud.handle_event(event)
             help_overlay.handle_event(event)
+            glossary.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -465,6 +468,7 @@ def run_simulation():
             screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, HEIGHT - 52 + i * 16))
 
         preset_hud.draw(screen)
+        glossary.draw(screen, font)
         help_overlay.draw(screen)
 
         pygame.display.flip()

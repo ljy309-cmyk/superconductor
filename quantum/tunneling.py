@@ -23,6 +23,7 @@ from quantum.ui_common import (
     render_notify,
 )
 from game_base import choose_difficulty_or_quit, finalize_session
+from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -652,6 +653,7 @@ def run_simulation():
     }
     preset_hud = PresetHUD("tunneling", slider_map)
     help_overlay = HelpOverlay("tunneling")
+    glossary = GlossaryOverlay()
 
     # ── 사운드 ──
     snd = get_sound_manager()
@@ -734,6 +736,7 @@ def run_simulation():
                 panel.handle_event(event)
             preset_hud.handle_event(event)
             help_overlay.handle_event(event)
+            glossary.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
@@ -1056,6 +1059,7 @@ def run_simulation():
         toast.draw(screen, info_font)
         toast.draw_history(screen, info_font)
 
+        glossary.draw(screen, info_font)
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, info_font)
         perf.draw_overlay(screen, info_font, x=L.perf_x, y=4)

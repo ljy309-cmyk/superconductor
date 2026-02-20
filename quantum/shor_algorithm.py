@@ -22,6 +22,7 @@ from quantum.ui_common import (
 from config_loader import cfg
 from game_base import finalize_session
 from difficulty_dialog import choose_difficulty
+from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -959,6 +960,7 @@ def run_simulation():
     shor_step(ui.shor)  # INPUT → CLASSICAL_PRECHECK
 
     help_overlay = HelpOverlay("shor_algorithm")
+    glossary = GlossaryOverlay()
     tutorial = TutorialOverlay("shor_algorithm")
     snd = get_sound_manager()
     snd.init()
@@ -996,6 +998,7 @@ def run_simulation():
             if tutorial.handle_event(event):
                 continue
             help_overlay.handle_event(event)
+            glossary.handle_event(event)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.VIDEORESIZE:
@@ -1216,6 +1219,7 @@ def run_simulation():
         toast.update(dt)
         toast.draw(screen, info_font)
         toast.draw_history(screen, info_font)
+        glossary.draw(screen, info_font)
         help_overlay.draw(screen, info_font)
         tutorial.draw(screen, font)
         perf.draw_overlay(screen, info_font, x=L.W - 250, y=4)
