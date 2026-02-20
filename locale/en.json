@@ -489,6 +489,8 @@
   "tn_tunnel_stat": "Tunneled: {count}  ({pct:.1f}%)",
   "tn_reflect_stat": "Reflected: {count}  ({pct:.1f}%)",
   "tn_current_prob": "Current prob: {prob:.1f}%",
+  "tn_rate_chart": "Cumulative Tunnel Rate",
+  "tn_no_data": "No trial data",
 
   "bb84_sender": "Sender",
   "bb84_receiver": "Receiver",

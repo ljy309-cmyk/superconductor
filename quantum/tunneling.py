@@ -85,6 +85,15 @@ _BLOCH_EL_MIN, _BLOCH_EL_MAX = -1.0, 1.0
 _BLOCH_DRAG_SENSITIVITY = 0.008  # 마우스 픽셀 → 라디안
 _CIRCLE_STEPS = 48  # 대원 그리기 해상도
 
+# ── 실시간 확률 차트 레이아웃 ─────────────────────────
+_CHART_X = SIM_LEFT
+_CHART_Y = SIM_TOP + SIM_H + 2  # sim 영역 바로 아래
+_CHART_W = SIM_W
+_CHART_H = 52
+_CHART_PAD_L = 22  # y축 라벨
+_CHART_PAD_T = 3
+_CHART_PAD_B = 10  # x축 라벨
+
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
@@ -244,6 +253,83 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
     for i, (line, color) in enumerate(lines):
         surf = font.render(line, True, color)
         screen.blit(surf, (stats_x, stats_y + i * 17))
+
+
+def _draw_rate_chart(screen, font, trial_history, tunnel_prob):
+    """누적 터널링 확률 실시간 라인 차트."""
+    # 내부 차트 영역
+    cx = _CHART_X + _CHART_PAD_L
+    cy = _CHART_Y + _CHART_PAD_T
+    cw = _CHART_W - _CHART_PAD_L - 4
+    ch = _CHART_H - _CHART_PAD_T - _CHART_PAD_B
+
+    # 배경 (반투명)
+    bg_surf = pygame.Surface((_CHART_W, _CHART_H), pygame.SRCALPHA)
+    bg_surf.fill((*BG[:3], 200))
+    screen.blit(bg_surf, (_CHART_X, _CHART_Y))
+    pygame.draw.rect(screen, OVERLAY_CLR, (_CHART_X, _CHART_Y, _CHART_W, _CHART_H), 1)
+
+    # 타이틀 (우상단)
+    title = font.render(t("tn_rate_chart"), True, TEXT_CLR)
+    screen.blit(title, (cx + cw - title.get_width(), _CHART_Y + 1))
+
+    # y축 눈금선 + 라벨
+    for frac in (1.0, 0.5, 0.0):
+        gy = cy + int((1 - frac) * ch)
+        pygame.draw.line(screen, OVERLAY_CLR, (cx, gy), (cx + cw, gy), 1)
+    l_top = font.render("1.0", True, OVERLAY_CLR)
+    l_bot = font.render("0", True, OVERLAY_CLR)
+    screen.blit(l_top, (_CHART_X + 1, cy - 4))
+    screen.blit(l_bot, (_CHART_X + 10, cy + ch - 6))
+
+    # 이론 확률 (노란 점선)
+    tp = min(max(tunnel_prob, 0.0), 1.0)
+    prob_y = cy + int((1 - tp) * ch)
+    for dx in range(0, cw, 6):
+        x1 = cx + dx
+        x2 = min(x1 + 3, cx + cw)
+        pygame.draw.line(screen, BARRIER_CLR, (x1, prob_y), (x2, prob_y), 1)
+    # 이론 확률 라벨
+    tp_lbl = font.render(f"P={tp * 100:.0f}%", True, BARRIER_CLR)
+    screen.blit(tp_lbl, (cx + cw - tp_lbl.get_width(), prob_y - 12))
+
+    if not trial_history:
+        msg = font.render(t("tn_no_data"), True, OVERLAY_CLR)
+        screen.blit(msg, (cx + cw // 2 - msg.get_width() // 2, cy + ch // 2 - 5))
+        return
+
+    # 누적 터널링 확률 계산
+    n = len(trial_history)
+    tunnels = 0
+    rates = []
+    for i, tr in enumerate(trial_history):
+        if tr["result"]:
+            tunnels += 1
+        rates.append(tunnels / (i + 1))
+
+    # 라인 포인트 생성 (서브샘플링)
+    max_pts = min(n, cw)
+    points = []
+    for i in range(max_pts):
+        idx = int(i * (n - 1) / max(max_pts - 1, 1))
+        px = cx + int(i * cw / max(max_pts - 1, 1))
+        py = cy + int((1 - rates[idx]) * ch)
+        points.append((px, py))
+
+    if len(points) >= 2:
+        pygame.draw.lines(screen, TUNNEL_FLASH, False, points, 2)
+    elif len(points) == 1:
+        pygame.draw.circle(screen, TUNNEL_FLASH, points[0], 3)
+
+    # 최종 누적값 표시
+    last_rate = rates[-1]
+    rate_surf = font.render(f"{last_rate * 100:.1f}%", True, TUNNEL_FLASH)
+    last_py = cy + int((1 - last_rate) * ch)
+    screen.blit(rate_surf, (cx + cw + 2 - rate_surf.get_width() - 50, max(cy - 2, last_py - 10)))
+
+    # 시행 횟수 (x축 우측 하단)
+    n_surf = font.render(f"n={n}", True, OVERLAY_CLR)
+    screen.blit(n_surf, (cx + cw - n_surf.get_width(), cy + ch + 1))
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
@@ -432,6 +518,9 @@ def run_simulation():
 
         # 통계
         _draw_stats(screen, particle, font, tunnel_prob)
+
+        # 실시간 확률 차트
+        _draw_rate_chart(screen, font, trial_history, tunnel_prob)
 
         # 슬라이더 패널 그리기
         panel.draw(screen, font)

@@ -489,6 +489,8 @@
   "tn_tunnel_stat": "터널링: {count}  ({pct:.1f}%)",
   "tn_reflect_stat": "반사: {count}  ({pct:.1f}%)",
   "tn_current_prob": "현재 확률: {prob:.1f}%",
+  "tn_rate_chart": "누적 터널링 확률",
+  "tn_no_data": "시행 데이터 없음",
 
   "bb84_sender": "발신자",
   "bb84_receiver": "수신자",
