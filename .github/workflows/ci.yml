@@ -53,7 +53,7 @@ jobs:
         run: |
           python -m pytest tests/ -v --tb=short \
             --cov=. --cov-report=term-missing --cov-report=xml \
-            --cov-fail-under=40 -x
+            --cov-fail-under=100 -x -W error
 
       - name: Check core imports
         run: |
