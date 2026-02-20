@@ -95,6 +95,9 @@ class TestExportSessionJsonFormat(unittest.TestCase):
         self.assertTrue(result.endswith(".csv"))
 
         with open(result, encoding="utf-8") as f:
+            first_line = f.readline()
+            if not first_line.startswith("#"):
+                f.seek(0)
             reader = csv.DictReader(f)
             rows = list(reader)
         self.assertEqual(len(rows), 2)
@@ -1262,6 +1265,9 @@ class TestExportSession(unittest.TestCase):
         self.assertTrue(path.endswith(".csv"))
 
         with open(path, encoding="utf-8") as f:
+            first_line = f.readline()
+            if not first_line.startswith("#"):
+                f.seek(0)
             reader = csv.DictReader(f)
             rows = list(reader)
         self.assertEqual(len(rows), 3)
@@ -1281,6 +1287,9 @@ class TestExportSession(unittest.TestCase):
         path = export_session("test", {}, fmt="csv",
                               trial_rows=trials, trial_columns=columns, trial_row_fn=row_fn)
         with open(path, encoding="utf-8") as f:
+            first_line = f.readline()
+            if not first_line.startswith("#"):
+                f.seek(0)
             reader = csv.DictReader(f)
             rows = list(reader)
         self.assertEqual(rows[0]["idx"], "1")
@@ -2612,6 +2621,258 @@ class TestEmptyZipRemoveSafe(unittest.TestCase):
             settings_io._EXPORT_FILES = orig_files
             settings_io._EXPORT_DIRS = orig_dirs
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ═══════════════════════════════════════════════════════════
+# 44. _import_btn_rect num_files 파라미터 반영 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestImportBtnRectNumFiles(unittest.TestCase):
+    """_import_btn_rect가 num_files에 따라 패널 높이를 조정하는지 검증."""
+
+    def test_fewer_files_smaller_panel(self):
+        """파일 2개일 때 패널이 6개일 때보다 작아야 한다."""
+        try:
+            import pygame
+            pygame.init()
+        except Exception:
+            self.skipTest("pygame 사용 불가")
+
+        from session_io import _import_btn_rect
+
+        rect2 = _import_btn_rect(800, 600, 0, num_files=2)
+        rect6 = _import_btn_rect(800, 600, 0, num_files=6)
+        # 파일 수가 적으면 패널이 작아서 y 위치가 더 아래(커짐)
+        self.assertGreater(rect2.y, rect6.y)
+
+    def test_default_num_files_is_6(self):
+        """기본값 num_files=6이 적용되는지 확인."""
+        try:
+            import pygame
+            pygame.init()
+        except Exception:
+            self.skipTest("pygame 사용 불가")
+
+        from session_io import _import_btn_rect
+
+        rect_default = _import_btn_rect(800, 600, 0)
+        rect_explicit = _import_btn_rect(800, 600, 0, num_files=6)
+        self.assertEqual(rect_default.y, rect_explicit.y)
+
+    def test_more_than_max_visible_capped(self):
+        """max_visible=6을 초과해도 패널 크기가 동일."""
+        try:
+            import pygame
+            pygame.init()
+        except Exception:
+            self.skipTest("pygame 사용 불가")
+
+        from session_io import _import_btn_rect
+
+        rect6 = _import_btn_rect(800, 600, 0, num_files=6)
+        rect10 = _import_btn_rect(800, 600, 0, num_files=10)
+        self.assertEqual(rect6.y, rect10.y)
+
+
+# ═══════════════════════════════════════════════════════════
+# 45. _auto_parse_csv_values int/float 파싱 순서 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestAutoParseIntFirst(unittest.TestCase):
+    """int를 먼저 시도하고 float로 폴백하는지 검증."""
+
+    def test_integer_stays_int(self):
+        """정수 문자열은 int로 파싱."""
+        from session_io import _auto_parse_csv_values
+
+        row = {"count": "42", "total": "100"}
+        _auto_parse_csv_values(row)
+        self.assertIsInstance(row["count"], int)
+        self.assertEqual(row["count"], 42)
+        self.assertIsInstance(row["total"], int)
+
+    def test_float_stays_float(self):
+        """소수점 문자열은 float로 파싱."""
+        from session_io import _auto_parse_csv_values
+
+        row = {"rate": "0.35", "speed": "2.0"}
+        _auto_parse_csv_values(row)
+        self.assertIsInstance(row["rate"], float)
+        self.assertAlmostEqual(row["rate"], 0.35)
+        self.assertIsInstance(row["speed"], float)
+
+    def test_scientific_notation_as_float(self):
+        """과학 표기법은 float로 파싱."""
+        from session_io import _auto_parse_csv_values
+
+        row = {"tiny": "1e-10", "big": "3.14e5"}
+        _auto_parse_csv_values(row)
+        self.assertIsInstance(row["tiny"], float)
+        self.assertAlmostEqual(row["tiny"], 1e-10)
+        self.assertIsInstance(row["big"], float)
+
+    def test_non_numeric_untouched(self):
+        """숫자가 아닌 문자열은 변경하지 않음."""
+        from session_io import _auto_parse_csv_values
+
+        row = {"name": "hello", "mixed": "12abc"}
+        _auto_parse_csv_values(row)
+        self.assertEqual(row["name"], "hello")
+        self.assertEqual(row["mixed"], "12abc")
+
+
+# ═══════════════════════════════════════════════════════════
+# 46. _load_session_json dict 외 타입 방어 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestLoadSessionJsonTypeGuard(unittest.TestCase):
+    """JSON 최상위가 dict가 아니면 None 반환."""
+
+    def setUp(self):
+        self._tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_list_json_returns_none(self):
+        """최상위가 list인 JSON → None."""
+        from session_io import _load_session_json
+
+        path = os.path.join(self._tmpdir, "list.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump([1, 2, 3], f)
+        self.assertIsNone(_load_session_json(path))
+
+    def test_string_json_returns_none(self):
+        """최상위가 string인 JSON → None."""
+        from session_io import _load_session_json
+
+        path = os.path.join(self._tmpdir, "str.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump("just a string", f)
+        self.assertIsNone(_load_session_json(path))
+
+    def test_valid_dict_returns_dict(self):
+        """최상위가 dict인 JSON → dict 반환."""
+        from session_io import _load_session_json
+
+        path = os.path.join(self._tmpdir, "ok.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"key": "val"}, f)
+        result = _load_session_json(path)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["key"], "val")
+
+    def test_invalid_json_returns_none(self):
+        """유효하지 않은 JSON → None."""
+        from session_io import _load_session_json
+
+        path = os.path.join(self._tmpdir, "bad.json")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("{broken json")
+        self.assertIsNone(_load_session_json(path))
+
+
+# ═══════════════════════════════════════════════════════════
+# 47. trial CSV #timestamp 메타 헤더 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestTrialCsvTimestampMeta(unittest.TestCase):
+    """trial CSV의 #timestamp 메타 헤더 행 검증."""
+
+    def setUp(self):
+        import session_io
+        self._orig = session_io.EXPORT_DIR
+        self._tmpdir = tempfile.mkdtemp()
+        session_io.EXPORT_DIR = self._tmpdir
+
+    def tearDown(self):
+        import session_io
+        session_io.EXPORT_DIR = self._orig
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_trial_csv_has_timestamp_meta_row(self):
+        """trial CSV 첫 행이 #timestamp 메타 헤더."""
+        from session_io import export_session
+
+        trials = [{"x": 1, "y": 2}]
+        columns = ["x", "y"]
+        path = export_session("test", {}, fmt="csv",
+                              trial_rows=trials, trial_columns=columns)
+        self.assertIsNotNone(path)
+
+        with open(path, encoding="utf-8") as f:
+            first_line = f.readline().strip()
+        self.assertTrue(first_line.startswith("#timestamp,"))
+
+    def test_no_trial_csv_has_no_meta_row(self):
+        """trial 없는 CSV는 메타 헤더가 없어야 한다."""
+        from session_io import export_session
+
+        path = export_session("test", {"a": 1}, fmt="csv")
+        self.assertIsNotNone(path)
+
+        with open(path, encoding="utf-8") as f:
+            first_line = f.readline().strip()
+        self.assertFalse(first_line.startswith("#"))
+
+    def test_load_session_csv_skips_meta_header(self):
+        """_load_session_csv가 메타 헤더를 건너뛰고 데이터를 올바르게 로드."""
+        from session_io import export_session, load_session
+
+        trials = [{"idx": 1, "val": 0.5}]
+        columns = ["idx", "val"]
+        path = export_session("test", {}, fmt="csv",
+                              trial_rows=trials, trial_columns=columns)
+        data = load_session(path)
+        self.assertIsNotNone(data)
+        # 다중 행이면 {"rows": [...]}
+        if "rows" in data:
+            self.assertEqual(len(data["rows"]), 1)
+            self.assertEqual(data["rows"][0]["idx"], 1)
+        else:
+            # 단일 행이면 dict
+            self.assertEqual(data["idx"], 1)
+
+    def test_trial_csv_timestamp_is_valid_iso(self):
+        """메타 헤더의 타임스탬프가 유효한 ISO 형식인지 검증."""
+        from session_io import export_session
+
+        trials = [{"a": 1}]
+        columns = ["a"]
+        path = export_session("test", {}, fmt="csv",
+                              trial_rows=trials, trial_columns=columns)
+        with open(path, encoding="utf-8") as f:
+            first_line = f.readline().strip()
+
+        parts = first_line.split(",", 1)
+        self.assertEqual(parts[0], "#timestamp")
+        ts_str = parts[1]
+        # ISO 형식 파싱 가능해야 함
+        from datetime import datetime as dt
+        parsed = dt.fromisoformat(ts_str)
+        self.assertIsNotNone(parsed)
+
+
+# ═══════════════════════════════════════════════════════════
+# 48. settings_io.py docstring 타임스탬프 형식 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestSettingsIoDocstring(unittest.TestCase):
+    """settings_io 모듈 docstring에 마이크로초 포함 타임스탬프 예시 확인."""
+
+    def test_docstring_has_microsecond_timestamp(self):
+        """docstring에 마이크로초 형식 타임스탬프가 포함되어 있는지 확인."""
+        import settings_io
+        doc = settings_io.__doc__
+        self.assertIsNotNone(doc)
+        # settings_export_20260217_153045_123456.zip 형태 확인
+        self.assertIn("settings_export_20260217_153045_123456.zip", doc)
 
 
 if __name__ == "__main__":

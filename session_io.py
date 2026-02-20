@@ -108,6 +108,8 @@ def _export_as_csv(prefix, session_data, ts, now, trial_rows=None, trial_columns
                 _log.warning("trial_rows가 있지만 trial_columns가 없어 시행 데이터 무시")
             if trial_rows and trial_columns:
                 # 시행 데이터가 있으면 시행 데이터를 CSV로
+                # 첫 행: 내보내기 타임스탬프 (메타 헤더)
+                writer.writerow(["#timestamp", now.isoformat()])
                 writer.writerow(trial_columns)
                 for i, row in enumerate(trial_rows, 1):
                     if trial_row_fn:
@@ -183,14 +185,15 @@ def delete_export(path: str) -> bool:
 # ── 파일 선택 UI ──────────────────────────────────────
 
 
-def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int):
+def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int, num_files: int = 6):
     """가져오기 대화상자 버튼 위치."""
     import pygame
 
     btn_w, btn_h = 300, 28
     bx = screen_w // 2 - btn_w // 2
     max_visible = 6
-    panel_h = 50 + max_visible * 34 + 30
+    visible = min(max_visible, num_files)
+    panel_h = 50 + visible * 34 + 30
     py = screen_h // 2 - panel_h // 2
     by = py + 40 + vis_index * 34
     return pygame.Rect(bx, by, btn_w, btn_h)
@@ -224,7 +227,7 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
 
     # Surface 캐싱 — 루프 내 반복 생성 방지
     overlay = pygame.Surface((W, H), pygame.SRCALPHA)
-    btn_sample = _import_btn_rect(W, H, 0)
+    btn_sample = _import_btn_rect(W, H, 0, len(files))
     btn_surf = pygame.Surface((btn_sample.width, btn_sample.height), pygame.SRCALPHA)
     title_surf = font.render(t("import_title"), True, pg.TEXT)
     hint_surf = font.render(t("import_hint"), True, pg.SUBTEXT)
@@ -259,7 +262,7 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
                 mx, my = event.pos
                 for vi in range(min(max_visible, len(files) - scroll)):
                     idx = scroll + vi
-                    btn = _import_btn_rect(W, H, vi)
+                    btn = _import_btn_rect(W, H, vi, len(files))
                     if btn.collidepoint(mx, my):
                         return files[idx][1]
             if event.type == pygame.MOUSEWHEEL:
@@ -275,7 +278,7 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
                 mx, my = event.pos
                 for vi in range(min(max_visible, len(files) - scroll)):
                     idx = scroll + vi
-                    btn = _import_btn_rect(W, H, vi)
+                    btn = _import_btn_rect(W, H, vi, len(files))
                     if btn.collidepoint(mx, my):
                         selected = idx
 
@@ -294,7 +297,7 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
         for vi in range(min(max_visible, len(files) - scroll)):
             idx = scroll + vi
             label, _ = files[idx]
-            btn = _import_btn_rect(W, H, vi)
+            btn = _import_btn_rect(W, H, vi, len(files))
             is_sel = idx == selected
             bg_alpha = 80 if is_sel else 30
             btn_surf.fill((*pg.ACCENT_BLUE[:3], bg_alpha))
@@ -343,7 +346,11 @@ def _load_session_json(json_path: str) -> dict | None:
     """JSON 세션 파일 로드 (내부). 실패 시 ``None``."""
     try:
         with open(json_path, encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        if not isinstance(data, dict):
+            _log.warning("JSON 최상위가 dict가 아님: %s (%s)", json_path, type(data).__name__)
+            return None
+        return data
     except (OSError, json.JSONDecodeError) as e:
         _log.warning("JSON 가져오기 실패: %s", e)
         return None
@@ -358,6 +365,10 @@ def _load_session_csv(csv_path: str) -> dict | None:
     """
     try:
         with open(csv_path, encoding="utf-8") as f:
+            # 메타 헤더 행 건너뛰기 (#timestamp 등)
+            first_line = f.readline()
+            if not first_line.startswith("#"):
+                f.seek(0)  # 메타 헤더가 아니면 되감기
             reader = csv.DictReader(f)
             rows = list(reader)
         if not rows:
@@ -401,13 +412,13 @@ def _auto_parse_csv_values(row: dict):
                     continue
             except (json.JSONDecodeError, ValueError):
                 pass
-        # 숫자 복원
+        # 숫자 복원 (int 먼저, float 폴백으로 과학 표기법도 처리)
         try:
-            if "." in v:
-                row[k] = float(v)
-            else:
-                row[k] = int(v)
+            row[k] = int(v)
         except ValueError:
-            pass
+            try:
+                row[k] = float(v)
+            except ValueError:
+                pass
 
 

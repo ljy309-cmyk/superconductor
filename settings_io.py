@@ -2,7 +2,7 @@
 
 사용법:
     from settings_io import export_settings, import_settings
-    path = export_settings()                   # → settings_export_20260217.zip
+    path = export_settings()                   # → settings_export_20260217_153045_123456.zip
     result = import_settings("backup.zip")     # → {"imported": [...], "skipped": [...]}
 """
 
