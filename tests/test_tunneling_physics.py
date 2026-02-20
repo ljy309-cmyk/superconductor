@@ -15,6 +15,8 @@
 #16 수식 오버레이 동적 계산 검증
 #17 문맥별 힌트 (마우스 위치 기반 툴팁)
 #18 통계 데이터 내보내기 (CSV/JSON)
+#19 텍스트 서피스 캐시 (font.render 반복 호출 제거)
+#20 대원 메시 사전 계산 + 투영 캐시
 """
 
 import math
@@ -1694,6 +1696,186 @@ class TestImportSession(unittest.TestCase):
         self.assertAlmostEqual(rates[1], 0.5)
         self.assertAlmostEqual(rates[2], 2 / 3, places=4)
         self.assertAlmostEqual(rates[3], 0.75)
+
+
+class TestTextCache(unittest.TestCase):
+    """#19 텍스트 서피스 캐시 — font.render() 반복 호출 제거."""
+
+    def setUp(self):
+        from quantum.tunneling import _TextCache
+
+        self.TextCache = _TextCache
+
+    def test_cache_returns_surface(self):
+        """render()가 Surface 객체를 반환."""
+        cache = self.TextCache()
+        font = MagicMock()
+        font.render.return_value = MagicMock()
+        surf = cache.render(font, "hello", (255, 255, 255))
+        self.assertIsNotNone(surf)
+        font.render.assert_called_once()
+
+    def test_cache_hit(self):
+        """동일 (font, text, color) → font.render()가 1회만 호출됨."""
+        cache = self.TextCache()
+        font = MagicMock()
+        font.render.return_value = MagicMock()
+        s1 = cache.render(font, "hello", (255, 255, 255))
+        s2 = cache.render(font, "hello", (255, 255, 255))
+        self.assertIs(s1, s2)
+        self.assertEqual(font.render.call_count, 1)
+
+    def test_cache_miss_different_text(self):
+        """다른 텍스트 → 별도 캐시 엔트리."""
+        cache = self.TextCache()
+        font = MagicMock()
+        font.render.side_effect = [MagicMock(), MagicMock()]
+        s1 = cache.render(font, "hello", (255, 255, 255))
+        s2 = cache.render(font, "world", (255, 255, 255))
+        self.assertIsNot(s1, s2)
+        self.assertEqual(font.render.call_count, 2)
+
+    def test_cache_miss_different_color(self):
+        """다른 색상 → 별도 캐시 엔트리."""
+        cache = self.TextCache()
+        font = MagicMock()
+        font.render.side_effect = [MagicMock(), MagicMock()]
+        s1 = cache.render(font, "hello", (255, 0, 0))
+        s2 = cache.render(font, "hello", (0, 255, 0))
+        self.assertIsNot(s1, s2)
+        self.assertEqual(font.render.call_count, 2)
+
+    def test_cache_clear(self):
+        """clear() 후 동일 키가 다시 font.render() 호출."""
+        cache = self.TextCache()
+        font = MagicMock()
+        font.render.return_value = MagicMock()
+        cache.render(font, "hello", (255, 255, 255))
+        cache.clear()
+        font.render.return_value = MagicMock()
+        cache.render(font, "hello", (255, 255, 255))
+        self.assertEqual(font.render.call_count, 2)
+
+    def test_cache_size_property(self):
+        """size 속성이 캐시 크기 반환."""
+        cache = self.TextCache()
+        self.assertEqual(cache.size, 0)
+        font = MagicMock()
+        font.render.return_value = MagicMock()
+        cache.render(font, "a", (255, 0, 0))
+        cache.render(font, "b", (255, 0, 0))
+        self.assertEqual(cache.size, 2)
+
+    def test_cache_eviction(self):
+        """max_size 초과 시 절반 삭제."""
+        cache = self.TextCache(max_size=4)
+        font = MagicMock()
+        font.render.return_value = MagicMock()
+        for i in range(4):
+            cache.render(font, f"text_{i}", (255, 0, 0))
+        self.assertEqual(cache.size, 4)
+        # 5번째 삽입 → 기존 절반(2개) 삭제 후 새 항목 추가
+        cache.render(font, "text_4", (255, 0, 0))
+        self.assertLessEqual(cache.size, 4)
+
+    def test_global_instance_exists(self):
+        """모듈 레벨 _tcache 인스턴스 존재."""
+        from quantum.tunneling import _tcache
+
+        self.assertIsNotNone(_tcache)
+        self.assertTrue(hasattr(_tcache, "render"))
+
+
+class TestBlochMeshCache(unittest.TestCase):
+    """#20 대원 메시 캐시 — 3D 기저점 사전 계산 + 투영 캐싱."""
+
+    def setUp(self):
+        from quantum.tunneling import (
+            _CIRCLE_STEPS,
+            _EQUATOR_PTS,
+            _MERIDIAN_XZ,
+            _MERIDIAN_YZ,
+            _BlochMeshCache,
+        )
+
+        self.BlochMeshCache = _BlochMeshCache
+        self.EQUATOR = _EQUATOR_PTS
+        self.XZ = _MERIDIAN_XZ
+        self.YZ = _MERIDIAN_YZ
+        self.STEPS = _CIRCLE_STEPS
+
+    def test_precomputed_equator_length(self):
+        """적도 기저점 개수 == _CIRCLE_STEPS."""
+        self.assertEqual(len(self.EQUATOR), self.STEPS)
+
+    def test_precomputed_xz_length(self):
+        """XZ 경선 기저점 개수 == _CIRCLE_STEPS."""
+        self.assertEqual(len(self.XZ), self.STEPS)
+
+    def test_precomputed_yz_length(self):
+        """YZ 경선 기저점 개수 == _CIRCLE_STEPS."""
+        self.assertEqual(len(self.YZ), self.STEPS)
+
+    def test_equator_z_zero(self):
+        """적도 기저점의 z 좌표가 모두 0."""
+        for _, _, z in self.EQUATOR:
+            self.assertAlmostEqual(z, 0.0)
+
+    def test_xz_y_zero(self):
+        """XZ 경선 기저점의 y 좌표가 모두 0."""
+        for _, y, _ in self.XZ:
+            self.assertAlmostEqual(y, 0.0)
+
+    def test_yz_x_zero(self):
+        """YZ 경선 기저점의 x 좌표가 모두 0."""
+        for x, _, _ in self.YZ:
+            self.assertAlmostEqual(x, 0.0)
+
+    def test_equator_unit_circle(self):
+        """적도 기저점이 단위원 위에 있음."""
+        for x, y, z in self.EQUATOR:
+            r = math.sqrt(x * x + y * y + z * z)
+            self.assertAlmostEqual(r, 1.0, places=10)
+
+    def test_cache_returns_projected_points(self):
+        """get()이 투영된 점 리스트 반환 (길이 == STEPS)."""
+        cache = self.BlochMeshCache()
+        pts = cache.get("equator", self.EQUATOR, 0.0, 0.25)
+        self.assertEqual(len(pts), self.STEPS)
+        # 각 점은 (sx, sy, depth) 튜플
+        self.assertEqual(len(pts[0]), 3)
+
+    def test_cache_hit_same_view(self):
+        """동일 view 각도 → 동일 리스트 객체 반환 (캐시 히트)."""
+        cache = self.BlochMeshCache()
+        p1 = cache.get("equator", self.EQUATOR, 0.5, 0.25)
+        p2 = cache.get("equator", self.EQUATOR, 0.5, 0.25)
+        self.assertIs(p1, p2)
+
+    def test_cache_invalidate_on_view_change(self):
+        """view 각도 변경 → 재계산 (다른 객체)."""
+        cache = self.BlochMeshCache()
+        p1 = cache.get("equator", self.EQUATOR, 0.0, 0.0)
+        p2 = cache.get("equator", self.EQUATOR, 1.0, 0.0)
+        self.assertIsNot(p1, p2)
+
+    def test_invalidate_method(self):
+        """invalidate() 후 재계산."""
+        cache = self.BlochMeshCache()
+        p1 = cache.get("equator", self.EQUATOR, 0.5, 0.25)
+        cache.invalidate()
+        p2 = cache.get("equator", self.EQUATOR, 0.5, 0.25)
+        self.assertIsNot(p1, p2)
+
+    def test_multiple_circles_same_view(self):
+        """동일 view에서 여러 대원 캐시 독립 관리."""
+        cache = self.BlochMeshCache()
+        eq = cache.get("equator", self.EQUATOR, 0.0, 0.25)
+        xz = cache.get("xz", self.XZ, 0.0, 0.25)
+        self.assertIsNot(eq, xz)
+        # 재요청 시 캐시 히트
+        eq2 = cache.get("equator", self.EQUATOR, 0.0, 0.25)
+        self.assertIs(eq, eq2)
 
 
 if __name__ == "__main__":

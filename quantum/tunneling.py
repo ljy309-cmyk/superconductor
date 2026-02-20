@@ -129,6 +129,98 @@ _ACH_COMPARE = cfg("achievements", "tn_compare_configs", 3)
 _ACH_BARRIER_W = cfg("achievements", "tn_barrier_master_width", 100)
 
 
+# ── 텍스트 캐시 (#19) ─────────────────────────────────
+
+
+class _TextCache:
+    """font.render() 결과 캐싱 — 동일 (font_id, text, color) 키 → Surface 재사용."""
+
+    __slots__ = ("_cache", "_max_size")
+
+    def __init__(self, max_size: int = 256):
+        self._cache: dict = {}
+        self._max_size = max_size
+
+    def render(self, font, text: str, color) -> pygame.Surface:
+        key = (id(font), text, color[0], color[1], color[2])
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        if len(self._cache) >= self._max_size:
+            keys = list(self._cache.keys())
+            for k in keys[: len(keys) // 2]:
+                del self._cache[k]
+        surf = font.render(text, True, color)
+        self._cache[key] = surf
+        return surf
+
+    def clear(self):
+        self._cache.clear()
+
+    @property
+    def size(self) -> int:
+        return len(self._cache)
+
+
+_tcache = _TextCache()
+
+
+# ── 대원 메시 캐시 (#20) ─────────────────────────────
+
+# 사전 계산된 3D 기저점 (모듈 로드 시 1회 계산)
+_EQUATOR_PTS = tuple(
+    (math.cos(2 * math.pi * i / _CIRCLE_STEPS), math.sin(2 * math.pi * i / _CIRCLE_STEPS), 0.0)
+    for i in range(_CIRCLE_STEPS)
+)
+_MERIDIAN_XZ = tuple(
+    (math.sin(2 * math.pi * i / _CIRCLE_STEPS), 0.0, math.cos(2 * math.pi * i / _CIRCLE_STEPS))
+    for i in range(_CIRCLE_STEPS)
+)
+_MERIDIAN_YZ = tuple(
+    (0.0, math.sin(2 * math.pi * i / _CIRCLE_STEPS), math.cos(2 * math.pi * i / _CIRCLE_STEPS))
+    for i in range(_CIRCLE_STEPS)
+)
+
+
+class _BlochMeshCache:
+    """블로흐 구 대원 투영 결과 캐싱 — view 각도 변경 시에만 재계산."""
+
+    __slots__ = ("_phi", "_el", "_projected")
+
+    def __init__(self):
+        self._phi: float | None = None
+        self._el: float | None = None
+        self._projected: dict[str, list[tuple[int, int, float]]] = {}
+
+    def get(self, name: str, base_pts: tuple, phi: float, el: float) -> list[tuple[int, int, float]]:
+        if phi != self._phi or el != self._el:
+            self._projected.clear()
+            self._phi = phi
+            self._el = el
+        cached = self._projected.get(name)
+        if cached is not None:
+            return cached
+        cp, sp = math.cos(phi), math.sin(phi)
+        ce, se = math.cos(el), math.sin(el)
+        pts: list[tuple[int, int, float]] = []
+        for x3, y3, z3 in base_pts:
+            x1 = x3 * cp - y3 * sp
+            y1 = x3 * sp + y3 * cp
+            depth = y1 * ce + z3 * se
+            z2 = -y1 * se + z3 * ce
+            pts.append((BLOCH_CX + int(x1 * BLOCH_R), BLOCH_CY - int(z2 * BLOCH_R), depth))
+        self._projected[name] = pts
+        return pts
+
+    def invalidate(self):
+        self._phi = None
+        self._el = None
+        self._projected.clear()
+
+
+_bloch_mesh = _BlochMeshCache()
+
+
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
 
@@ -151,18 +243,18 @@ def _draw_sim_area(
         pygame.draw.line(screen, edge_clr, (left_edge, SIM_TOP), (left_edge, SIM_TOP + SIM_H), 2)
         pygame.draw.line(screen, edge_clr, (right_edge, SIM_TOP), (right_edge, SIM_TOP + SIM_H), 2)
         # 두께 표시
-        w_lbl = font.render(f"{barrier_width}px", True, edge_clr)
+        w_lbl = _tcache.render(font, f"{barrier_width}px", edge_clr)
         screen.blit(w_lbl, (BARRIER_X - w_lbl.get_width() // 2, SIM_TOP + SIM_H - 18))
 
     # 장벽 라벨
-    label = font.render(t("tn_barrier"), True, BG)
+    label = _tcache.render(font, t("tn_barrier"), BG)
     label_rot = pygame.transform.rotate(label, 90)
     screen.blit(label_rot, (bx - 2, SIM_TOP + SIM_H // 2 - label_rot.get_height() // 2))
 
     # 영역 라벨
-    left_label = font.render(t("tn_classical"), True, OVERLAY_CLR)
+    left_label = _tcache.render(font, t("tn_classical"), OVERLAY_CLR)
     screen.blit(left_label, (SIM_LEFT + 10, SIM_TOP + 5))
-    right_label = font.render(t("tn_tunneled"), True, OVERLAY_CLR)
+    right_label = _tcache.render(font, t("tn_tunneled"), OVERLAY_CLR)
     screen.blit(right_label, (BARRIER_X + 20, SIM_TOP + 5))
 
 
@@ -222,7 +314,7 @@ def _draw_particle(screen, p: QuantumParticle, font):
 
     # 중첩 |0⟩/|1⟩ 텍스트
     state_text = f"|{p.qubit_state(time_ms)}⟩"
-    surf = font.render(state_text, True, WHITE)
+    surf = _tcache.render(font, state_text, WHITE)
     screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
 
 
@@ -245,20 +337,12 @@ def _project_bloch(x3, y3, z3, phi, el):
     return sx, sy, depth
 
 
-def _draw_great_circle(screen, axis_fn, phi, el, color_front, color_back):
-    """대원 그리기 — 전면/후면 색상 분리.
-
-    Args:
-        axis_fn: angle → (x, y, z) 매핑 함수.
-    """
-    pts = []
-    for i in range(_CIRCLE_STEPS):
-        a = 2 * math.pi * i / _CIRCLE_STEPS
-        x3, y3, z3 = axis_fn(a)
-        sx, sy, d = _project_bloch(x3, y3, z3, phi, el)
-        pts.append((sx, sy, d))
-    for i in range(_CIRCLE_STEPS):
-        j = (i + 1) % _CIRCLE_STEPS
+def _draw_circle_cached(screen, name, base_pts, phi, el, color_front, color_back):
+    """대원 그리기 — 사전 계산된 기저점 + 투영 캐시 사용."""
+    pts = _bloch_mesh.get(name, base_pts, phi, el)
+    n = len(pts)
+    for i in range(n):
+        j = (i + 1) % n
         behind = pts[i][2] > 0 and pts[j][2] > 0
         clr = color_back if behind else color_front
         pygame.draw.line(screen, clr, pts[i][:2], pts[j][:2], 1)
@@ -269,7 +353,7 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font, view_phi, v
     time_ms = pygame.time.get_ticks()
 
     # 타이틀
-    label = title_font.render(t("tn_bloch"), True, ACCENT)
+    label = _tcache.render(title_font, t("tn_bloch"), ACCENT)
     screen.blit(label, (BLOCH_CX - label.get_width() // 2, BLOCH_CY - BLOCH_R - 40))
 
     # 구 외곽 (실루엣)
@@ -278,12 +362,12 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font, view_phi, v
     # 색상: 전면/후면
     dim = tuple(max(c // 3, 0) for c in BLOCH_RING)
 
-    # 적도 (XY 평면, z=0)
-    _draw_great_circle(screen, lambda a: (math.cos(a), math.sin(a), 0), view_phi, view_el, BLOCH_RING, dim)
+    # 적도 (XY 평면, z=0) — 캐시된 기저점 사용
+    _draw_circle_cached(screen, "equator", _EQUATOR_PTS, view_phi, view_el, BLOCH_RING, dim)
     # XZ 경선 (y=0) — 상태 벡터가 위치하는 평면
-    _draw_great_circle(screen, lambda a: (math.sin(a), 0, math.cos(a)), view_phi, view_el, BLOCH_RING, dim)
+    _draw_circle_cached(screen, "xz", _MERIDIAN_XZ, view_phi, view_el, BLOCH_RING, dim)
     # YZ 경선 (x=0)
-    _draw_great_circle(screen, lambda a: (0, math.sin(a), math.cos(a)), view_phi, view_el, BLOCH_RING, dim)
+    _draw_circle_cached(screen, "yz", _MERIDIAN_YZ, view_phi, view_el, BLOCH_RING, dim)
 
     # Z축
     t0x, t0y, _ = _project_bloch(0, 0, 1.12, view_phi, view_el)
@@ -293,14 +377,14 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font, view_phi, v
     # |0⟩, |1⟩ 라벨
     lx0, ly0, _ = _project_bloch(0, 0, 1.22, view_phi, view_el)
     lx1, ly1, _ = _project_bloch(0, 0, -1.22, view_phi, view_el)
-    z0 = font.render("|0⟩", True, TUNNEL_FLASH)
-    z1 = font.render("|1⟩", True, REFLECT_CLR)
+    z0 = _tcache.render(font, "|0⟩", TUNNEL_FLASH)
+    z1 = _tcache.render(font, "|1⟩", REFLECT_CLR)
     screen.blit(z0, (lx0 + 4, ly0 - 8))
     screen.blit(z1, (lx1 + 4, ly1 - 4))
 
     # X축 라벨 (|+⟩)
     lxx, lxy, _ = _project_bloch(1.18, 0, 0, view_phi, view_el)
-    xlab = font.render("|+⟩", True, OVERLAY_CLR)
+    xlab = _tcache.render(font, "|+⟩", OVERLAY_CLR)
     screen.blit(xlab, (lxx - xlab.get_width() // 2, lxy - 14))
 
     # 상태 벡터 (θ 기반, XZ 평면)
@@ -314,7 +398,7 @@ def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font, view_phi, v
     state_label = (
         f"|{'0' if theta < math.pi / 2 else '1'}⟩  θ={math.degrees(theta):.0f}°  φ={math.degrees(view_phi):.0f}°"
     )
-    sl = font.render(state_label, True, TEXT_CLR)
+    sl = _tcache.render(font, state_label, TEXT_CLR)
     screen.blit(sl, (BLOCH_CX - sl.get_width() // 2, BLOCH_CY + BLOCH_R + 26))
 
 
@@ -333,7 +417,7 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
         (t("tn_current_prob", prob=tunnel_prob * 100), TEXT_CLR),
     ]
     for i, (line, color) in enumerate(lines):
-        surf = font.render(line, True, color)
+        surf = _tcache.render(font, line, color)
         screen.blit(surf, (stats_x, stats_y + i * 17))
 
 
@@ -359,21 +443,21 @@ def _draw_formula_overlay(screen, font, ctx):
     pygame.draw.rect(screen, OVERLAY_CLR, (fx, fy, fw, fh), 1)
 
     # 타이틀
-    title = font.render(t("tn_formula_title"), True, ACCENT)
+    title = _tcache.render(font, t("tn_formula_title"), ACCENT)
     screen.blit(title, (fx + fw // 2 - title.get_width() // 2, fy + 3))
 
     y = fy + 18
 
     # ① 수식: P = P₀ × e^(−κ(L−L₀))
-    f1 = font.render("P = P\u2080 \u00d7 e", True, BARRIER_CLR)
+    f1 = _tcache.render(font, "P = P\u2080 \u00d7 e", BARRIER_CLR)
     screen.blit(f1, (fx + 8, y))
-    exp_text = font.render("(\u2212\u03ba(L\u2212L\u2080))", True, TEXT_CLR)
+    exp_text = _tcache.render(font, "(\u2212\u03ba(L\u2212L\u2080))", TEXT_CLR)
     screen.blit(exp_text, (fx + 8 + f1.get_width(), y - 3))
     y += 16
 
     # ② 파라미터 값 (슬라이더에서 실시간 반영)
     params = f"P\u2080={bp:.2f}  \u03ba={_TUNNEL_DECAY}  L={bw}  L\u2080={BARRIER_WIDTH_DEFAULT}"
-    p_surf = font.render(params, True, TEXT_CLR)
+    p_surf = _tcache.render(font, params, TEXT_CLR)
     screen.blit(p_surf, (fx + 8, y))
     y += 16
 
@@ -381,13 +465,13 @@ def _draw_formula_overlay(screen, font, ctx):
     exponent = -_TUNNEL_DECAY * (bw - BARRIER_WIDTH_DEFAULT)
     exp_val = math.exp(max(-500.0, min(500.0, exponent)))
     calc = f"e^({exponent:+.2f}) = {exp_val:.4f}"
-    c_surf = font.render(calc, True, BARRIER_CLR)
+    c_surf = _tcache.render(font, calc, BARRIER_CLR)
     screen.blit(c_surf, (fx + 8, y))
     y += 16
 
     # ④ 최종 결과
     result = f"P = {bp:.2f} \u00d7 {exp_val:.4f} = {tp * 100:.1f}%"
-    r_surf = font.render(result, True, TUNNEL_FLASH)
+    r_surf = _tcache.render(font, result, TUNNEL_FLASH)
     screen.blit(r_surf, (fx + 8, y))
     y += 18
 
@@ -398,10 +482,10 @@ def _draw_formula_overlay(screen, font, ctx):
         diff_sign = "+" if diff >= 0 else ""
         obs_clr = TUNNEL_FLASH if observed >= tp else REFLECT_CLR
         obs_text = f"Obs {observed * 100:.1f}% vs Th {tp * 100:.1f}% ({diff_sign}{diff * 100:.1f}%)"
-        obs_surf = font.render(obs_text, True, obs_clr)
+        obs_surf = _tcache.render(font, obs_text, obs_clr)
         screen.blit(obs_surf, (fx + 8, y))
     else:
-        no_data = font.render("(no trials yet)", True, OVERLAY_CLR)
+        no_data = _tcache.render(font, "(no trials yet)", OVERLAY_CLR)
         screen.blit(no_data, (fx + 8, y))
 
 
@@ -420,15 +504,15 @@ def _draw_rate_chart(screen, font, trial_history, tunnel_prob, imported_trials=N
     pygame.draw.rect(screen, OVERLAY_CLR, (_CHART_X, _CHART_Y, _CHART_W, _CHART_H), 1)
 
     # 타이틀 (우상단)
-    title = font.render(t("tn_rate_chart"), True, TEXT_CLR)
+    title = _tcache.render(font, t("tn_rate_chart"), TEXT_CLR)
     screen.blit(title, (cx + cw - title.get_width(), _CHART_Y + 1))
 
     # y축 눈금선 + 라벨
     for frac in (1.0, 0.5, 0.0):
         gy = cy + int((1 - frac) * ch)
         pygame.draw.line(screen, OVERLAY_CLR, (cx, gy), (cx + cw, gy), 1)
-    l_top = font.render("1.0", True, OVERLAY_CLR)
-    l_bot = font.render("0", True, OVERLAY_CLR)
+    l_top = _tcache.render(font, "1.0", OVERLAY_CLR)
+    l_bot = _tcache.render(font, "0", OVERLAY_CLR)
     screen.blit(l_top, (_CHART_X + 1, cy - 4))
     screen.blit(l_bot, (_CHART_X + 10, cy + ch - 6))
 
@@ -440,7 +524,7 @@ def _draw_rate_chart(screen, font, trial_history, tunnel_prob, imported_trials=N
         x2 = min(x1 + 3, cx + cw)
         pygame.draw.line(screen, BARRIER_CLR, (x1, prob_y), (x2, prob_y), 1)
     # 이론 확률 라벨
-    tp_lbl = font.render(f"P={tp * 100:.0f}%", True, BARRIER_CLR)
+    tp_lbl = _tcache.render(font, f"P={tp * 100:.0f}%", BARRIER_CLR)
     screen.blit(tp_lbl, (cx + cw - tp_lbl.get_width(), prob_y - 12))
 
     # 가져온 비교 데이터 (점선 보라색 라인)
@@ -448,7 +532,7 @@ def _draw_rate_chart(screen, font, trial_history, tunnel_prob, imported_trials=N
         _draw_imported_overlay(screen, font, imported_trials, cx, cy, cw, ch)
 
     if not trial_history:
-        msg = font.render(t("tn_no_data"), True, OVERLAY_CLR)
+        msg = _tcache.render(font, t("tn_no_data"), OVERLAY_CLR)
         screen.blit(msg, (cx + cw // 2 - msg.get_width() // 2, cy + ch // 2 - 5))
         return
 
@@ -477,12 +561,12 @@ def _draw_rate_chart(screen, font, trial_history, tunnel_prob, imported_trials=N
 
     # 최종 누적값 표시
     last_rate = rates[-1]
-    rate_surf = font.render(f"{last_rate * 100:.1f}%", True, TUNNEL_FLASH)
+    rate_surf = _tcache.render(font, f"{last_rate * 100:.1f}%", TUNNEL_FLASH)
     last_py = cy + int((1 - last_rate) * ch)
     screen.blit(rate_surf, (cx + cw + 2 - rate_surf.get_width() - 50, max(cy - 2, last_py - 10)))
 
     # 시행 횟수 (x축 우측 하단)
-    n_surf = font.render(f"n={n}", True, OVERLAY_CLR)
+    n_surf = _tcache.render(font, f"n={n}", OVERLAY_CLR)
     screen.blit(n_surf, (cx + cw - n_surf.get_width(), cy + ch + 1))
 
 
@@ -513,7 +597,7 @@ def _draw_imported_overlay(screen, font, trials, cx, cy, cw, ch):
 
     # 라벨
     imp_rate = rates[-1]
-    imp_surf = font.render(f"imp:{imp_rate * 100:.0f}%", True, ACCENT)
+    imp_surf = _tcache.render(font, f"imp:{imp_rate * 100:.0f}%", ACCENT)
     imp_py = cy + int((1 - imp_rate) * ch)
     screen.blit(imp_surf, (cx + 2, max(cy, imp_py - 10)))
 
@@ -554,7 +638,7 @@ def _draw_achievement_progress(screen, font, ctx):
     rate = p.tunnel_count / max(p.total_attempts, 1)
 
     # 타이틀
-    title_surf = font.render("Achievements", True, ACCENT)
+    title_surf = _tcache.render(font, "Achievements", ACCENT)
     screen.blit(title_surf, (_ACH_X, _ACH_Y))
 
     # 구분선
@@ -630,11 +714,11 @@ def _draw_achievement_progress(screen, font, ctx):
         prefix = "[V]" if completed else "[ ]"
 
         # 아이콘 + 라벨
-        lbl_surf = font.render(f"{prefix}[{icon}] {label}", True, clr)
+        lbl_surf = _tcache.render(font, f"{prefix}[{icon}] {label}", clr)
         screen.blit(lbl_surf, (_ACH_X, y))
 
         # 진행 텍스트
-        prog_surf = font.render(progress_text, True, OVERLAY_CLR if not completed else TUNNEL_FLASH)
+        prog_surf = _tcache.render(font, progress_text, OVERLAY_CLR if not completed else TUNNEL_FLASH)
         screen.blit(prog_surf, (_ACH_X, y + _ACH_LINE_H))
 
         # 진행 바
@@ -1002,7 +1086,7 @@ def _get_contextual_hint(mx: int, my: int, ctx) -> str | None:
 
 def _draw_contextual_hint(screen, font, hint: str, mx: int, my: int):
     """마우스 근처에 툴팁 표시."""
-    surf = font.render(hint, True, TEXT_CLR)
+    surf = _tcache.render(font, hint, TEXT_CLR)
     tw = surf.get_width() + _HINT_PAD * 2
     th = surf.get_height() + _HINT_PAD * 2
 
@@ -1253,7 +1337,7 @@ def _render_frame(ctx: _SimContext):
     ctx.screen.fill(BG)
 
     # 타이틀
-    t_surf = ctx.big_font.render(t("game_title_tunneling"), True, ACCENT)
+    t_surf = _tcache.render(ctx.big_font, t("game_title_tunneling"), ACCENT)
     ctx.screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
 
     _draw_sim_area(ctx.screen, ctx.font, ctx.barrier_width, ctx.barrier_hover, ctx.barrier_dragging)
@@ -1280,7 +1364,7 @@ def _render_frame(ctx: _SimContext):
         t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X/I: Export/Import  |  G: {t('glossary_title')}",
     ]
     for i, h in enumerate(hints):
-        surf = ctx.font.render(h, True, TEXT_CLR)
+        surf = _tcache.render(ctx.font, h, TEXT_CLR)
         ctx.screen.blit(surf, (SIM_LEFT, HEIGHT - 52 + i * 16))
 
     # 문맥별 힌트 (오버레이 렌더링 전)
