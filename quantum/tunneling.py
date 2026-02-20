@@ -99,6 +99,11 @@ _CHART_PAD_B = 10  # x축 라벨
 # ── 장벽 드래그 ──────────────────────────────────────
 _BARRIER_EDGE_TOL = 8  # 장벽 가장자리 감지 허용 범위 (px)
 
+# ── 입자 궤적 잔상 ──────────────────────────────────
+_MAX_TRAILS = 30  # 보존할 최대 궤적 수
+_TRAIL_SAMPLE = 3  # 매 N프레임마다 위치 기록
+_TRAIL_DOT_R = 2  # 잔상 점 반지름
+
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
@@ -135,6 +140,41 @@ def _draw_sim_area(
     screen.blit(left_label, (SIM_LEFT + 10, SIM_TOP + 5))
     right_label = font.render(t("tn_tunneled"), True, OVERLAY_CLR)
     screen.blit(right_label, (BARRIER_X + 20, SIM_TOP + 5))
+
+
+def _draw_trails(screen, trails, current_trail, current_result):
+    """과거 입자 궤적 잔상 렌더링."""
+    if not trails and not current_trail:
+        return
+
+    surf = pygame.Surface((SIM_W, SIM_H), pygame.SRCALPHA)
+    n_trails = len(trails)
+
+    # 과거 궤적 (오래될수록 투명)
+    for i, (pts, result) in enumerate(trails):
+        base_alpha = max(15, int(70 * (i + 1) / max(n_trails, 1)))
+        clr = TUNNEL_FLASH if result else REFLECT_CLR
+        rgba = (*clr[:3], base_alpha)
+        for px, py in pts:
+            sx, sy = px - SIM_LEFT, py - SIM_TOP
+            if 0 <= sx < SIM_W and 0 <= sy < SIM_H:
+                pygame.draw.circle(surf, rgba, (sx, sy), _TRAIL_DOT_R)
+
+    # 현재 진행 중인 궤적
+    if current_trail:
+        if current_result is True:
+            clr = TUNNEL_FLASH
+        elif current_result is False:
+            clr = REFLECT_CLR
+        else:
+            clr = PARTICLE_CLR
+        rgba = (*clr[:3], 100)
+        for px, py in current_trail:
+            sx, sy = px - SIM_LEFT, py - SIM_TOP
+            if 0 <= sx < SIM_W and 0 <= sy < SIM_H:
+                pygame.draw.circle(surf, rgba, (sx, sy), _TRAIL_DOT_R)
+
+    screen.blit(surf, (SIM_LEFT, SIM_TOP))
 
 
 def _draw_particle(screen, p: QuantumParticle, font):
@@ -416,6 +456,12 @@ def run_simulation():
     barrier_dragging = False
     barrier_hover = False
 
+    # ── 입자 궤적 잔상 ──
+    trails: list[tuple[list[tuple[int, int]], bool]] = []  # (points, tunneled)
+    current_trail: list[tuple[int, int]] = []
+    trail_frame = 0
+    prev_tunneled_state: bool | None = None
+
     # ── 슬라이더 패널 ─────────────────────────────────
     panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
     sl_speed = panel.add(0.5, 5.0, 1.0, 0.5, "Speed Mult", ".1f")
@@ -481,6 +527,9 @@ def run_simulation():
                 elif event.key == pygame.K_r:
                     particle = QuantumParticle()
                     panel.reset_all()
+                    trails.clear()
+                    current_trail.clear()
+                    prev_tunneled_state = None
                 elif event.key == pygame.K_UP:
                     sl_speed.value = sl_speed.value + 0.5
                 elif event.key == pygame.K_DOWN:
@@ -575,6 +624,20 @@ def run_simulation():
             elif particle.tunneled is False and particle.flash_timer > 0.3:
                 snd.play("tunnel_reflect")
 
+            # ── 궤적 기록 ──
+            trail_frame += 1
+            if trail_frame % _TRAIL_SAMPLE == 0:
+                current_trail.append((int(particle.x), int(particle.y)))
+
+            # 입자가 리셋되면 (tunneled: non-None → None) 궤적 저장
+            if prev_tunneled_state is not None and particle.tunneled is None:
+                if current_trail:
+                    trails.append((current_trail[:], prev_tunneled_state))
+                    if len(trails) > _MAX_TRAILS:
+                        trails.pop(0)
+                    current_trail.clear()
+            prev_tunneled_state = particle.tunneled
+
             preset_hud.update(dt)
 
             recorder.record_frame(
@@ -597,6 +660,9 @@ def run_simulation():
 
         # 시뮬레이션 영역
         _draw_sim_area(screen, font, barrier_width, barrier_hover, barrier_dragging)
+
+        # 입자 궤적 잔상
+        _draw_trails(screen, trails, current_trail, particle.tunneled)
 
         # 입자
         _draw_particle(screen, particle, font)
