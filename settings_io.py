@@ -43,11 +43,11 @@ def _backup_before_overwrite(dest: str) -> None:
             _log.warning("백업 실패: %s", e)
 
 
-def export_settings(output_dir: str | None = None) -> str:
+def export_settings(output_dir: str | None = None) -> str | None:
     """현재 설정을 ZIP 파일로 내보내기.
 
     Returns:
-        생성된 ZIP 파일 경로 (실패 시 빈 문자열).
+        생성된 ZIP 파일 경로 (실패 시 ``None``).
     """
     dest_dir = output_dir or _EXPORT_DIR
     os.makedirs(dest_dir, exist_ok=True)
@@ -57,12 +57,14 @@ def export_settings(output_dir: str | None = None) -> str:
     zip_path = os.path.join(dest_dir, zip_name)
 
     try:
+        file_count = 0
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             # 개별 파일
             for rel_path in _EXPORT_FILES:
                 abs_path = os.path.join(_BASE, rel_path)
                 if os.path.exists(abs_path):
                     zf.write(abs_path, rel_path)
+                    file_count += 1
                     _log.info("내보내기: %s", rel_path)
 
             # 디렉터리
@@ -74,13 +76,19 @@ def export_settings(output_dir: str | None = None) -> str:
                             fpath = os.path.join(root, fname)
                             arcname = os.path.relpath(fpath, _BASE)
                             zf.write(fpath, arcname)
+                            file_count += 1
                             _log.info("내보내기: %s", arcname)
 
-        _log.info("설정 내보내기 완료: %s", zip_path)
+        if file_count == 0:
+            _log.warning("내보낼 설정 파일이 없음 — 빈 ZIP 삭제")
+            os.remove(zip_path)
+            return None
+
+        _log.info("설정 내보내기 완료: %s (%d개 파일)", zip_path, file_count)
         return zip_path
     except (OSError, zipfile.BadZipFile) as e:
         _log.error("설정 내보내기 실패: %s", e)
-        return ""
+        return None
 
 
 def import_settings(zip_path: str) -> dict:
@@ -101,8 +109,9 @@ def import_settings(zip_path: str) -> dict:
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
             for member in zf.namelist():
-                # 경로 순회 방지
-                if ".." in member or member.startswith("/"):
+                # 경로 순회 방지 (컴포넌트 단위 검사)
+                parts = member.replace("\\", "/").split("/")
+                if any(p == ".." for p in parts) or member.startswith("/"):
                     result["skipped"].append(member)
                     _log.warning("경로 순회 시도 차단: %s", member)
                     continue

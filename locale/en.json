@@ -668,6 +668,7 @@
   "settings_delete": "Delete",
   "settings_export_done": "Settings exported: {path}",
   "settings_import_done": "Settings imported ({count} files)",
+  "settings_import_skipped": "Skipped {count} file(s): {files}",
   "settings_import_fail": "Import failed: Please select a valid ZIP file.",
   "settings_close": "Close",
   "settings_locale_saved": "Language preference saved",

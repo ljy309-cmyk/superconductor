@@ -322,9 +322,13 @@ class SettingsPanel(tk.Toplevel):
         from settings_io import import_settings
         result = import_settings(path)
         if result["imported"]:
+            msg = t("settings_import_done", count=len(result["imported"]))
+            if result["skipped"]:
+                msg += "\n" + t("settings_import_skipped", count=len(result["skipped"]),
+                                files=", ".join(result["skipped"][:5]))
             messagebox.showinfo(
                 t("settings_title"),
-                t("settings_import_done", count=len(result["imported"])),
+                msg,
                 parent=self,
             )
             # 설정 리로드
@@ -383,6 +387,10 @@ class SettingsPanel(tk.Toplevel):
                 messagebox.showinfo(t("settings_title"), t("settings_deleted"), parent=dlg)
             if not exports:
                 dlg.destroy()
+                return
+            # 삭제 후 인접 항목 자동 선택
+            new_idx = min(idx, len(exports) - 1)
+            lb.select_set(new_idx)
 
         btn_frame = tk.Frame(dlg, bg=_tk.BG)
         btn_frame.pack(pady=8)

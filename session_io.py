@@ -103,6 +103,8 @@ def _export_as_csv(prefix, session_data, ts, trial_rows=None, trial_columns=None
     try:
         with open(path, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
+            if trial_rows and not trial_columns:
+                _log.warning("trial_rows가 있지만 trial_columns가 없어 시행 데이터 무시")
             if trial_rows and trial_columns:
                 # 시행 데이터가 있으면 시행 데이터를 CSV로
                 writer.writerow(trial_columns)
@@ -236,6 +238,15 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
                     btn = _import_btn_rect(W, H, vi)
                     if btn.collidepoint(mx, my):
                         return files[idx][1]
+            if event.type == pygame.MOUSEWHEEL:
+                if event.y > 0:  # 위로 스크롤
+                    selected = max(0, selected - 1)
+                    if selected < scroll:
+                        scroll = selected
+                elif event.y < 0:  # 아래로 스크롤
+                    selected = min(len(files) - 1, selected + 1)
+                    if selected >= scroll + max_visible:
+                        scroll = selected - max_visible + 1
             if event.type == pygame.MOUSEMOTION:
                 mx, my = event.pos
                 for vi in range(min(max_visible, len(files) - scroll)):
@@ -296,10 +307,14 @@ def load_session(path: str) -> dict | None:
     """세션 파일 로드 (포맷 자동 감지). 실패 시 ``None``.
 
     ``.json`` → JSON으로 로드, ``.csv`` → CSV로 로드.
+    지원하지 않는 확장자는 경고 후 ``None`` 반환.
     """
     if path.endswith(".csv"):
         return load_session_csv(path)
-    return _load_session_json(path)
+    if path.endswith(".json"):
+        return _load_session_json(path)
+    _log.warning("지원하지 않는 파일 형식: %s (json, csv만 지원)", path)
+    return None
 
 
 def _load_session_json(json_path: str) -> dict | None:

@@ -11,6 +11,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import unittest.mock
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -1912,6 +1913,213 @@ class TestExportCsvBool(unittest.TestCase):
         self.assertIs(loaded["enabled"], True)
         self.assertIs(loaded["visible"], False)
         self.assertEqual(loaded["count"], 42)
+
+
+# ═══════════════════════════════════════════════════════════
+# 27. export_settings 반환값 통일 — 실패 시 None
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportSettingsReturnNone(unittest.TestCase):
+    """export_settings() 실패 시 None 반환 확인."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_failure_returns_none(self):
+        """쓰기 불가 디렉터리에서 실패 시 None 반환."""
+        import settings_io
+
+        with unittest.mock.patch.object(
+            settings_io.zipfile, "ZipFile", side_effect=OSError("mock")
+        ):
+            result = settings_io.export_settings(self.tmpdir)
+        self.assertIsNone(result)
+
+    def test_success_returns_str(self):
+        """정상 내보내기 시 문자열 경로 반환."""
+        import settings_io
+
+        # 설정 파일이 존재할 수 있으므로 임시 환경 구성
+        src = os.path.join(self.tmpdir, "src")
+        os.makedirs(src)
+        cfg = os.path.join(src, "config.json")
+        with open(cfg, "w") as f:
+            json.dump({"test": True}, f)
+
+        orig_base = settings_io._BASE
+        orig_files = settings_io._EXPORT_FILES
+        settings_io._BASE = src
+        settings_io._EXPORT_FILES = ["config.json"]
+        try:
+            out_dir = os.path.join(self.tmpdir, "out")
+            result = settings_io.export_settings(out_dir)
+            self.assertIsNotNone(result)
+            self.assertIsInstance(result, str)
+        finally:
+            settings_io._BASE = orig_base
+            settings_io._EXPORT_FILES = orig_files
+
+
+# ═══════════════════════════════════════════════════════════
+# 28. 경로 순회 검사 — 컴포넌트 단위 검사
+# ═══════════════════════════════════════════════════════════
+
+
+class TestPathTraversalComponent(unittest.TestCase):
+    """import_settings 경로 순회 검사가 컴포넌트 단위인지 확인."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_dotdot_component_blocked(self):
+        """실제 경로 순회(../etc)는 차단."""
+        import settings_io
+
+        zip_path = os.path.join(self.tmpdir, "attack.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("../etc/passwd", "root:x:0:0")
+        result = settings_io.import_settings(zip_path)
+        self.assertIn("../etc/passwd", result["skipped"])
+        self.assertEqual(result["imported"], [])
+
+    def test_dotdot_in_filename_allowed(self):
+        """파일명에 '..'이 포함된 정상 파일(foo..bar.json)은 허용."""
+        import settings_io
+
+        orig_base = settings_io._BASE
+        orig_files = list(settings_io._EXPORT_FILES)
+        settings_io._BASE = self.tmpdir
+        settings_io._EXPORT_FILES = ["foo..bar.json"]
+        try:
+            zip_path = os.path.join(self.tmpdir, "safe.zip")
+            with zipfile.ZipFile(zip_path, "w") as zf:
+                zf.writestr("foo..bar.json", '{"ok": true}')
+            result = settings_io.import_settings(zip_path)
+            self.assertIn("foo..bar.json", result["imported"])
+            self.assertEqual(result["skipped"], [])
+        finally:
+            settings_io._BASE = orig_base
+            settings_io._EXPORT_FILES = orig_files
+
+
+# ═══════════════════════════════════════════════════════════
+# 29. _export_as_csv — trial_rows만 있고 trial_columns 없을 때 경고
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportCsvMissingColumns(unittest.TestCase):
+    """trial_rows 있고 trial_columns 없으면 경고 로그."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_warning_logged(self):
+        """trial_rows만 전달 시 경고 로그가 남는지 확인."""
+        from session_io import export_session
+
+        with unittest.mock.patch("session_io._log") as mock_log:
+            path = export_session(
+                "warn_test", {"a": 1}, fmt="csv",
+                trial_rows=[{"x": 1}], trial_columns=None,
+            )
+        self.assertIsNotNone(path)
+        mock_log.warning.assert_any_call(
+            "trial_rows가 있지만 trial_columns가 없어 시행 데이터 무시"
+        )
+
+
+# ═══════════════════════════════════════════════════════════
+# 30. load_session — 지원하지 않는 확장자
+# ═══════════════════════════════════════════════════════════
+
+
+class TestLoadSessionUnsupportedExt(unittest.TestCase):
+    """지원하지 않는 확장자 파일 로드 시 None 반환."""
+
+    def test_txt_returns_none(self):
+        """'.txt' 확장자 → None."""
+        from session_io import load_session
+
+        result = load_session("/tmp/nonexistent.txt")
+        self.assertIsNone(result)
+
+    def test_xml_returns_none(self):
+        """'.xml' 확장자 → None."""
+        from session_io import load_session
+
+        result = load_session("/tmp/nonexistent.xml")
+        self.assertIsNone(result)
+
+    def test_json_still_works(self):
+        """'.json' 확장자 → 정상 동작 (파일 없으면 None)."""
+        from session_io import load_session
+
+        result = load_session("/tmp/nonexistent_xyz.json")
+        self.assertIsNone(result)
+
+    def test_csv_still_works(self):
+        """'.csv' 확장자 → 정상 동작 (파일 없으면 None)."""
+        from session_io import load_session
+
+        result = load_session("/tmp/nonexistent_xyz.csv")
+        self.assertIsNone(result)
+
+
+# ═══════════════════════════════════════════════════════════
+# 31. export_settings — 빈 ZIP 생성 방지
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportSettingsEmptyZip(unittest.TestCase):
+    """내보낼 파일이 없으면 빈 ZIP 생성하지 않음."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_no_files_returns_none(self):
+        """설정 파일이 없는 디렉터리에서 None 반환."""
+        import settings_io
+
+        empty_base = os.path.join(self.tmpdir, "empty")
+        os.makedirs(empty_base)
+
+        orig_base = settings_io._BASE
+        orig_files = list(settings_io._EXPORT_FILES)
+        orig_dirs = list(settings_io._EXPORT_DIRS)
+        settings_io._BASE = empty_base
+        settings_io._EXPORT_FILES = ["nonexistent.json"]
+        settings_io._EXPORT_DIRS = ["nonexistent_dir"]
+        try:
+            out_dir = os.path.join(self.tmpdir, "out")
+            result = settings_io.export_settings(out_dir)
+            self.assertIsNone(result)
+            # ZIP 파일이 남아있지 않아야 함
+            zips = [f for f in os.listdir(out_dir) if f.endswith(".zip")] if os.path.isdir(out_dir) else []
+            self.assertEqual(len(zips), 0)
+        finally:
+            settings_io._BASE = orig_base
+            settings_io._EXPORT_FILES = orig_files
+            settings_io._EXPORT_DIRS = orig_dirs
 
 
 if __name__ == "__main__":
