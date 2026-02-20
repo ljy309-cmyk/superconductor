@@ -234,10 +234,13 @@ def run_simulation():
     barrier_width = BARRIER_WIDTH_DEFAULT
     tunnel_prob = _calc_tunnel_prob(barrier_width)
 
-    # ── 업적 추적 ──
+    # ── 세션 통계 추적 ──
     start_time = time.monotonic()
     max_tunnel_barrier = 0
     barrier_configs_tried: set[int] = set()
+    trial_history: list[dict] = []
+    peak_rate = 0.0
+    prev_attempts = 0
 
     # ── 시작 시 난이도 선택 ──
     if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
@@ -291,9 +294,23 @@ def run_simulation():
             particle.update(dt, barrier_width, tunnel_prob, sl_boost.value)
             particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
 
-            # ── 업적: 터널링 성공 시 장벽 두께 기록 ──
-            if particle.tunneled is True and particle.flash_timer > 0.5:
-                if barrier_width > max_tunnel_barrier:
+            # ── 시행별 기록 ──
+            if particle.total_attempts > prev_attempts:
+                prev_attempts = particle.total_attempts
+                trial_elapsed = time.monotonic() - start_time
+                tunneled = particle.tunneled is True
+                trial_history.append(
+                    {
+                        "t": round(trial_elapsed, 2),
+                        "barrier": barrier_width,
+                        "prob": round(tunnel_prob, 4),
+                        "result": tunneled,
+                    }
+                )
+                cur_rate = particle.tunnel_count / particle.total_attempts
+                if cur_rate > peak_rate:
+                    peak_rate = cur_rate
+                if tunneled and barrier_width > max_tunnel_barrier:
                     max_tunnel_barrier = barrier_width
 
             # ── 사운드 ──
@@ -310,6 +327,8 @@ def run_simulation():
                     "tunneled": particle.tunneled,
                     "attempts": particle.total_attempts,
                     "tunnels": particle.tunnel_count,
+                    "barrier_w": barrier_width,
+                    "rate": round(particle.tunnel_count / max(particle.total_attempts, 1), 3),
                 }
             )
 
@@ -358,6 +377,8 @@ def run_simulation():
 
     rate = particle.tunnel_count / max(particle.total_attempts, 1)
     elapsed_time = time.monotonic() - start_time
+    elapsed_min = elapsed_time / 60.0 if elapsed_time > 0 else 1.0
+    avg_bw = round(sum(t["barrier"] for t in trial_history) / len(trial_history), 1) if trial_history else barrier_width
     finalize_session(
         "tunneling",
         {
@@ -370,6 +391,12 @@ def run_simulation():
             "elapsed_time": round(elapsed_time, 2),
             "max_tunnel_barrier": max_tunnel_barrier,
             "barrier_configs_tried": len(barrier_configs_tried),
+            "peak_rate": round(peak_rate, 3),
+            "avg_barrier_width": avg_bw,
+            "trials_per_minute": round(particle.total_attempts / elapsed_min, 1),
+            "speed_mult": round(speed_mult, 1),
+            "difficulty": preset_hud.current,
+            "trial_history": trial_history,
         },
         recorder=recorder,
         snd=snd,
