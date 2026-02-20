@@ -100,6 +100,38 @@ def _calc_tunnel_prob(barrier_width: int, base_prob: float | None = None) -> flo
     return prob_base * math.exp(exponent)
 
 
+# ── 에너지 레벨 (#28) ────────────────────────────────
+
+
+def calc_energy_levels(barrier_width: int, tunnel_prob: float) -> dict:
+    """에너지 다이어그램용 정규화된 에너지 레벨 계산.
+
+    교육용 시각화를 위해 정규화(0~1)된 값을 반환합니다.
+
+    Returns:
+        {"particle_energy": float, "barrier_height": float, "ratio": float}
+        - particle_energy: 입자 운동 에너지 (0~1 정규화)
+        - barrier_height: 장벽 퍼텐셜 높이 (0~1 정규화)
+        - ratio: E/V₀ 비율 (1 미만이면 고전적으로 통과 불가)
+    """
+    # 장벽 높이: 두께에 비례 (BARRIER_WIDTH_MIN → 낮음, BARRIER_WIDTH_MAX → 높음)
+    bw_clamped = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, int(barrier_width)))
+    barrier_norm = (bw_clamped - BARRIER_WIDTH_MIN) / max(1, BARRIER_WIDTH_MAX - BARRIER_WIDTH_MIN)
+    v0 = 0.3 + 0.65 * barrier_norm  # V₀ ∈ [0.30, 0.95]
+
+    # 입자 에너지: 고정된 운동 에너지 (고전적으로 항상 장벽보다 낮게 설정)
+    e_particle = 0.25
+
+    # E/V₀ 비율
+    ratio = e_particle / v0 if v0 > 0 else 0.0
+
+    return {
+        "particle_energy": e_particle,
+        "barrier_height": v0,
+        "ratio": ratio,
+    }
+
+
 # ── 파동함수 ψ(x) 계산 (#27) ────────────────────────
 
 _PSI_K_SCALE = cfg("tunneling", "psi_k_scale", 0.12)  # 입사파 파수 스케일

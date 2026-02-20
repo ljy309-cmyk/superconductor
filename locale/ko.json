@@ -505,6 +505,7 @@
   "tn_rate_chart": "누적 터널링 확률",
   "tn_no_data": "시행 데이터 없음",
   "tn_formula_title": "터널링 수식",
+  "tn_energy_title": "에너지 다이어그램",
 
   "glossary_title": "용어집",
   "glossary_nav_hint": "↑↓: 스크롤  |  G/ESC: 닫기",

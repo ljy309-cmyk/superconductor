@@ -135,6 +135,46 @@ class TestComputePsiPBT(unittest.TestCase):
                 break
 
 
+class TestCalcEnergyLevelsPBT(unittest.TestCase):
+    """calc_energy_levels 속성 검증 (#28)."""
+
+    def setUp(self):
+        from quantum.tunneling_physics import calc_energy_levels
+
+        self.fn = calc_energy_levels
+
+    @given(bw=barrier_widths, tp=tunnel_probs)
+    @settings(max_examples=200)
+    def test_keys_present(self, bw, tp):
+        """필수 키 3개 항상 존재."""
+        result = self.fn(bw, tp)
+        self.assertIn("particle_energy", result)
+        self.assertIn("barrier_height", result)
+        self.assertIn("ratio", result)
+
+    @given(bw=barrier_widths, tp=tunnel_probs)
+    @settings(max_examples=200)
+    def test_barrier_height_range(self, bw, tp):
+        """V₀ ∈ [0.30, 0.95]."""
+        v0 = self.fn(bw, tp)["barrier_height"]
+        self.assertGreaterEqual(v0, 0.30 - 1e-9)
+        self.assertLessEqual(v0, 0.95 + 1e-9)
+
+    @given(bw=barrier_widths, tp=tunnel_probs)
+    @settings(max_examples=200)
+    def test_ratio_less_than_one(self, bw, tp):
+        """E/V₀ < 1 (고전적 통과 불가)."""
+        self.assertLess(self.fn(bw, tp)["ratio"], 1.0)
+
+    @given(bw=barrier_widths, tp=tunnel_probs)
+    @settings(max_examples=200)
+    def test_ratio_consistent(self, bw, tp):
+        """ratio = particle_energy / barrier_height."""
+        r = self.fn(bw, tp)
+        expected = r["particle_energy"] / r["barrier_height"]
+        self.assertAlmostEqual(r["ratio"], expected, places=10)
+
+
 class TestQuantumParticle(unittest.TestCase):
     """QuantumParticle 속성 검증."""
 

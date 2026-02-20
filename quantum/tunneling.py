@@ -41,6 +41,7 @@ from quantum.tunneling_physics import (
     TUNNEL_SPEED_BOOST,
     QuantumParticle,
     _calc_tunnel_prob,
+    calc_energy_levels,
     compute_psi,
 )
 from quit_dialog import confirm_quit
@@ -528,6 +529,88 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
     for i, (line, color) in enumerate(lines):
         surf = _tcache.render(font, line, color)
         screen.blit(surf, (stats_x, stats_y + i * 17))
+
+
+# ── 에너지 레벨 다이어그램 (#28) ─────────────────────
+_EDIAG_W = BLOCH_R * 2  # 블로흐 구 직경과 동일
+_EDIAG_H = 80
+_EDIAG_X = BLOCH_CX - BLOCH_R
+_EDIAG_Y = BLOCH_CY + BLOCH_R + 135  # stats 아래
+
+
+def _draw_energy_diagram(screen, font, barrier_width: int, tunnel_prob: float):
+    """에너지 레벨 다이어그램 — 입자 에너지 vs 장벽 높이 시각 비교 (#28)."""
+    levels = calc_energy_levels(barrier_width, tunnel_prob)
+    ex, ey = _EDIAG_X, _EDIAG_Y
+    ew, eh = _EDIAG_W, _EDIAG_H
+
+    e_particle = levels["particle_energy"]
+    v0 = levels["barrier_height"]
+    ratio = levels["ratio"]
+
+    # 반투명 배경
+    bg = pygame.Surface((ew, eh), pygame.SRCALPHA)
+    bg.fill((*BG[:3], 200))
+    screen.blit(bg, (ex, ey))
+    pygame.draw.rect(screen, OVERLAY_CLR, (ex, ey, ew, eh), 1)
+
+    # 타이틀
+    title = _tcache.render(font, t("tn_energy_title"), TEXT_CLR)
+    screen.blit(title, (ex + ew // 2 - title.get_width() // 2, ey + 2))
+
+    # 다이어그램 영역 (패딩)
+    dx = ex + 40  # 좌측 라벨 여유
+    dy = ey + 16
+    dw = ew - 50
+    dh = eh - 24
+
+    # 장벽 높이 바
+    bar_w = dw // 3
+    v0_h = int(dh * v0)
+    v0_y = dy + dh - v0_h
+    pygame.draw.rect(screen, (*BARRIER_CLR[:3], 100), (dx, v0_y, bar_w, v0_h))
+    pygame.draw.rect(screen, BARRIER_CLR, (dx, v0_y, bar_w, v0_h), 1)
+
+    # V₀ 라벨
+    v_lbl = _tcache.render(font, "V\u2080", BARRIER_CLR)
+    screen.blit(v_lbl, (dx + bar_w // 2 - v_lbl.get_width() // 2, v0_y - 12))
+
+    # 입자 에너지 수평선 (전체 너비)
+    e_h = int(dh * e_particle)
+    e_y = dy + dh - e_h
+    pygame.draw.line(screen, PARTICLE_CLR, (dx - 4, e_y), (dx + dw, e_y), 2)
+
+    # E 라벨
+    e_lbl = _tcache.render(font, "E", PARTICLE_CLR)
+    screen.blit(e_lbl, (dx - 14, e_y - 6))
+
+    # 터널링 영역 화살표 (E < V₀ 표시)
+    gap_top = e_y
+    gap_bot = v0_y
+    arrow_x = dx + bar_w + 20
+    if gap_bot > gap_top + 6:
+        # 위/아래 화살표
+        mid_y = (gap_top + gap_bot) // 2
+        pygame.draw.line(screen, ACCENT, (arrow_x, gap_top + 2), (arrow_x, gap_bot - 2), 1)
+        pygame.draw.polygon(
+            screen, ACCENT, [(arrow_x, gap_top + 2), (arrow_x - 3, gap_top + 7), (arrow_x + 3, gap_top + 7)]
+        )
+        pygame.draw.polygon(
+            screen, ACCENT, [(arrow_x, gap_bot - 2), (arrow_x - 3, gap_bot - 7), (arrow_x + 3, gap_bot - 7)]
+        )
+        # V₀ - E 차이 라벨
+        diff_lbl = _tcache.render(font, "V\u2080\u2212E", ACCENT)
+        screen.blit(diff_lbl, (arrow_x + 5, mid_y - 6))
+
+    # 하단: E/V₀ 비율 + 터널링 확률
+    ratio_text = f"E/V\u2080={ratio:.2f}  P={tunnel_prob * 100:.1f}%"
+    r_clr = TUNNEL_FLASH if tunnel_prob > 0.05 else REFLECT_CLR
+    r_surf = _tcache.render(font, ratio_text, r_clr)
+    screen.blit(r_surf, (ex + 4, ey + eh - 13))
+
+    # 기준선 (E=0)
+    base_y = dy + dh
+    pygame.draw.line(screen, (*TEXT_CLR[:3], 60), (dx - 4, base_y), (dx + dw, base_y), 1)
 
 
 # ── 수식 오버레이 레이아웃 ────────────────────────────
@@ -1485,6 +1568,7 @@ def _render_frame(ctx: _SimContext):
     _draw_formula_overlay(ctx.screen, ctx.font, ctx)
     _draw_bloch_sphere(ctx.screen, ctx.particle, ctx.font, ctx.title_font, ctx.bloch_phi, ctx.bloch_el)
     _draw_stats(ctx.screen, ctx.particle, ctx.font, ctx.tunnel_prob)
+    _draw_energy_diagram(ctx.screen, ctx.font, ctx.barrier_width, ctx.tunnel_prob)
     _draw_rate_chart(ctx.screen, ctx.font, ctx.trial_history, ctx.tunnel_prob, ctx.imported_trials)
     ctx.panel.draw(ctx.screen, ctx.font)
     _draw_achievement_progress(ctx.screen, ctx.font, ctx)

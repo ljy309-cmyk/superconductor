@@ -50,6 +50,7 @@ from quantum.tunneling_physics import (
     TUNNEL_PROB_BASE,
     QuantumParticle,
     _calc_tunnel_prob,
+    calc_energy_levels,
 )
 
 
@@ -2213,6 +2214,72 @@ class TestComputePsi(unittest.TestCase):
         right_narrow = [abs(psi) for x, psi in narrow if x > b_right_narrow + 0.05]
         if right_wide and right_narrow:
             self.assertGreater(max(right_narrow), max(right_wide))
+
+
+class TestCalcEnergyLevels(unittest.TestCase):
+    """#28 — 에너지 레벨 다이어그램 계산 테스트."""
+
+    def test_returns_dict_keys(self):
+        """반환 딕셔너리에 필수 키 존재."""
+        result = calc_energy_levels(12, 0.1)
+        self.assertIn("particle_energy", result)
+        self.assertIn("barrier_height", result)
+        self.assertIn("ratio", result)
+
+    def test_particle_energy_fixed(self):
+        """입자 에너지는 0.25 고정."""
+        for bw in (4, 50, 100, 200):
+            result = calc_energy_levels(bw, 0.1)
+            self.assertAlmostEqual(result["particle_energy"], 0.25)
+
+    def test_barrier_height_range(self):
+        """V₀ 는 [0.30, 0.95] 범위."""
+        for bw in (BARRIER_WIDTH_MIN, 50, 100, BARRIER_WIDTH_MAX):
+            result = calc_energy_levels(bw, 0.1)
+            self.assertGreaterEqual(result["barrier_height"], 0.30 - 1e-9)
+            self.assertLessEqual(result["barrier_height"], 0.95 + 1e-9)
+
+    def test_barrier_height_monotonic(self):
+        """장벽이 두꺼울수록 V₀ 증가 (단조 증가)."""
+        prev = 0.0
+        for bw in range(BARRIER_WIDTH_MIN, BARRIER_WIDTH_MAX + 1, 10):
+            result = calc_energy_levels(bw, 0.1)
+            self.assertGreaterEqual(result["barrier_height"], prev)
+            prev = result["barrier_height"]
+
+    def test_min_barrier_gives_lowest_v0(self):
+        """최소 장벽 두께에서 V₀ = 0.30."""
+        result = calc_energy_levels(BARRIER_WIDTH_MIN, 0.1)
+        self.assertAlmostEqual(result["barrier_height"], 0.30, places=2)
+
+    def test_max_barrier_gives_highest_v0(self):
+        """최대 장벽 두께에서 V₀ = 0.95."""
+        result = calc_energy_levels(BARRIER_WIDTH_MAX, 0.1)
+        self.assertAlmostEqual(result["barrier_height"], 0.95, places=2)
+
+    def test_ratio_less_than_one(self):
+        """E/V₀ 비율은 항상 1 미만 (고전적 통과 불가)."""
+        for bw in (4, 12, 50, 100, 200):
+            result = calc_energy_levels(bw, 0.1)
+            self.assertLess(result["ratio"], 1.0)
+
+    def test_ratio_calculation(self):
+        """ratio = particle_energy / barrier_height."""
+        result = calc_energy_levels(60, 0.1)
+        expected = result["particle_energy"] / result["barrier_height"]
+        self.assertAlmostEqual(result["ratio"], expected, places=10)
+
+    def test_clamps_barrier_below_min(self):
+        """barrier_width < MIN 이면 MIN으로 클램핑."""
+        r_min = calc_energy_levels(BARRIER_WIDTH_MIN, 0.1)
+        r_below = calc_energy_levels(0, 0.1)
+        self.assertAlmostEqual(r_min["barrier_height"], r_below["barrier_height"])
+
+    def test_clamps_barrier_above_max(self):
+        """barrier_width > MAX 이면 MAX로 클램핑."""
+        r_max = calc_energy_levels(BARRIER_WIDTH_MAX, 0.1)
+        r_above = calc_energy_levels(9999, 0.1)
+        self.assertAlmostEqual(r_max["barrier_height"], r_above["barrier_height"])
 
 
 if __name__ == "__main__":
