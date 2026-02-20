@@ -21,7 +21,7 @@ ruff format --check --diff .    # Check formatting without changing files
 
 ```bash
 python -m pytest tests/ -v                                    # Run all tests
-python -m pytest tests/ -v --tb=short --cov=. --cov-report=term-missing --cov-fail-under=40 -x  # Run with coverage (CI mode)
+python -m pytest tests/ -v --tb=short --cov=. --cov-report=term-missing --cov-fail-under=90 -x  # Run with coverage (CI mode)
 python -m pytest tests/test_bb84_protocol.py -v               # Run a single test file
 ```
 
@@ -59,7 +59,7 @@ pip install pytest pytest-cov ruff    # Dev dependencies
 - **i18n**: All user-facing strings use `t("key")` from `i18n.py`; never hardcode display text
 - **Theme colors**: Pygame modules use `load_pg_colors()` which injects color constants into module globals dynamically (hence F821 ignores in pyproject.toml)
 - **Physics separation**: Keep physics/logic code separate from Pygame rendering code (e.g., `tunneling_physics.py` vs `tunneling.py`)
-- **Test coverage**: Minimum 40% required by CI; tests live in `tests/` directory
+- **Test coverage**: Minimum 90% required by CI; tests live in `tests/` directory
 - **Comments/docstrings**: Existing code uses Korean comments; follow the same style in existing files
 
 ## CI Pipeline

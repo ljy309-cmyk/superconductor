@@ -21,10 +21,10 @@ jobs:
       - name: Install ruff
         run: pip install ruff
 
-      - name: Run ruff check
-        run: ruff check .
+      - name: Run ruff check (warnings are errors)
+        run: ruff check . --exit-non-zero-on-fix
 
-      - name: Check formatting
+      - name: Check formatting (warnings are errors)
         run: ruff format --check --diff .
 
   test:
@@ -49,11 +49,11 @@ jobs:
           pip install pandas numpy matplotlib requests flask
           pip install pytest pytest-cov hypothesis
 
-      - name: Run unit tests with coverage
+      - name: Run unit tests with coverage (90% minimum, warnings as errors)
         run: |
-          python -m pytest tests/ -v --tb=short \
+          python -W error -m pytest tests/ -v --tb=short \
             --cov=. --cov-report=term-missing --cov-report=xml \
-            --cov-fail-under=40 -x
+            --cov-fail-under=90 -x -W default::DeprecationWarning
 
       - name: Check core imports
         run: |
