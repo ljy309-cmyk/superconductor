@@ -28,6 +28,7 @@ _VY_RANGE = cfg("tunneling", "particle_vy_range", 60.0)
 _TUNNEL_FLASH = cfg("tunneling", "tunnel_flash_sec", 0.6)
 _REFLECT_FLASH = cfg("tunneling", "reflect_flash_sec", 0.4)
 BLOCH_LERP_SPEED = cfg("tunneling", "bloch_lerp_speed", 8.0)
+TRIAL_HISTORY_MAX = cfg("tunneling", "trial_history_max", 5000)
 
 # ── 영역 레이아웃 ────────────────────────────────────
 # 왼쪽: 터널링 시뮬레이션 | 오른쪽: 블로흐 구

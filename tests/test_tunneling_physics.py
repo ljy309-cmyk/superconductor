@@ -5,12 +5,15 @@
 #3  qubit_state() 전용 단위테스트
 #4  superposition_alpha() 구간별 테스트
 #5  reset() 카운터 보존 테스트
+#6  시드 기반 재현성
+#7  trial_history 크기 제한
 """
 
 import math
 import os
 import sys
 import unittest
+from collections import deque
 from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,6 +31,7 @@ from quantum.tunneling_physics import (
     SIM_LEFT,
     SIM_TOP,
     SUPERPOSITION_HZ,
+    TRIAL_HISTORY_MAX,
     TUNNEL_PROB_BASE,
     QuantumParticle,
     _calc_tunnel_prob,
@@ -556,6 +560,126 @@ class TestSeedReproducibility(unittest.TestCase):
         t2, _, vy2 = _simulate(seed=-42)
         self.assertEqual(t1, t2)
         self.assertEqual(vy1, vy2)
+
+
+# ═══════════════════════════════════════════════════════════
+# #7  trial_history 크기 제한 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+def _make_trial(i, tunneled=True):
+    """trial_history용 더미 레코드."""
+    return {"t": round(i * 0.5, 2), "barrier": 12, "prob": 0.10, "result": tunneled}
+
+
+class TestTrialHistoryBounded(unittest.TestCase):
+    """trial_history를 deque(maxlen=TRIAL_HISTORY_MAX)로 사용할 때의 동작."""
+
+    def test_constant_positive(self):
+        """TRIAL_HISTORY_MAX > 0."""
+        self.assertGreater(TRIAL_HISTORY_MAX, 0)
+
+    def test_constant_is_int(self):
+        """TRIAL_HISTORY_MAX는 정수형."""
+        self.assertIsInstance(TRIAL_HISTORY_MAX, int)
+
+    def test_deque_respects_maxlen(self):
+        """deque(maxlen=N) 이 N개 초과 시 오래된 항목 제거."""
+        maxlen = 10
+        history = deque(maxlen=maxlen)
+        for i in range(25):
+            history.append(_make_trial(i))
+        self.assertEqual(len(history), maxlen)
+        # 가장 오래된 것은 15번째 (i=15)
+        self.assertEqual(history[0]["t"], 7.5)  # 15 * 0.5
+        # 가장 최신은 24번째
+        self.assertEqual(history[-1]["t"], 12.0)  # 24 * 0.5
+
+    def test_deque_with_trial_history_max(self):
+        """TRIAL_HISTORY_MAX로 생성된 deque이 정확히 해당 크기로 제한."""
+        history = deque(maxlen=TRIAL_HISTORY_MAX)
+        for i in range(TRIAL_HISTORY_MAX + 100):
+            history.append(_make_trial(i))
+        self.assertEqual(len(history), TRIAL_HISTORY_MAX)
+
+    def test_deque_preserves_order(self):
+        """FIFO: 가장 오래된 것부터 버려지고, 최신이 끝에."""
+        history = deque(maxlen=5)
+        for i in range(8):
+            history.append(_make_trial(i))
+        # 0,1,2 버려지고 3,4,5,6,7 남음
+        times = [r["t"] for r in history]
+        self.assertEqual(times, [1.5, 2.0, 2.5, 3.0, 3.5])
+
+    def test_deque_append_same_as_list(self):
+        """append 동작이 list와 동일 (maxlen 미달 시)."""
+        history = deque(maxlen=100)
+        history.append(_make_trial(0))
+        history.append(_make_trial(1))
+        self.assertEqual(len(history), 2)
+        self.assertEqual(history[0]["t"], 0.0)
+        self.assertEqual(history[1]["t"], 0.5)
+
+    def test_deque_to_list_for_serialization(self):
+        """list(deque) → JSON 직렬화 가능한 리스트로 변환."""
+        history = deque(maxlen=5)
+        for i in range(3):
+            history.append(_make_trial(i))
+        as_list = list(history)
+        self.assertIsInstance(as_list, list)
+        self.assertEqual(len(as_list), 3)
+
+    def test_rate_chart_accuracy_with_bounded_history(self):
+        """제한된 history에서 누적 비율 계산이 정확."""
+        history = deque(maxlen=100)
+        # 처음 50개: 모두 터널링
+        for i in range(50):
+            history.append(_make_trial(i, tunneled=True))
+        # 다음 50개: 모두 반사
+        for i in range(50, 100):
+            history.append(_make_trial(i, tunneled=False))
+
+        # 누적 비율 계산 (차트 로직 재현)
+        tunnels = 0
+        rates = []
+        for j, tr in enumerate(history):
+            if tr["result"]:
+                tunnels += 1
+            rates.append(tunnels / (j + 1))
+
+        self.assertEqual(len(rates), 100)
+        self.assertAlmostEqual(rates[49], 1.0)  # 처음 50개 모두 터널
+        self.assertAlmostEqual(rates[99], 0.5)  # 전체 50/100
+
+    def test_overflow_drops_oldest_tunnels(self):
+        """maxlen 초과 시 오래된 터널링 결과가 사라짐."""
+        history = deque(maxlen=5)
+        # 터널링 3개 추가
+        for i in range(3):
+            history.append(_make_trial(i, tunneled=True))
+        # 반사 4개 추가 → 터널링 2개 밀려남
+        for i in range(3, 7):
+            history.append(_make_trial(i, tunneled=False))
+
+        self.assertEqual(len(history), 5)
+        tunnel_count = sum(1 for r in history if r["result"])
+        self.assertEqual(tunnel_count, 1)  # 터널링 1개만 남음
+
+    def test_empty_deque_behaves_like_empty_list(self):
+        """빈 deque → len=0, iteration 가능."""
+        history = deque(maxlen=TRIAL_HISTORY_MAX)
+        self.assertEqual(len(history), 0)
+        self.assertEqual(list(history), [])
+
+    def test_avg_barrier_from_bounded_history(self):
+        """제한된 history에서 평균 barrier_width 계산."""
+        history = deque(maxlen=10)
+        for i in range(15):
+            history.append({"t": i, "barrier": 10 + i, "prob": 0.1, "result": True})
+        # 5~14 남음 (마지막 10개)
+        avg = sum(r["barrier"] for r in history) / len(history)
+        expected = sum(range(15, 25)) / 10  # 10+5=15 ~ 10+14=24
+        self.assertAlmostEqual(avg, expected)
 
 
 if __name__ == "__main__":

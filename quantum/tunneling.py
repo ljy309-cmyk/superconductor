@@ -6,6 +6,7 @@
 
 import math
 import time
+from collections import deque
 
 import pygame
 
@@ -28,6 +29,7 @@ from quantum.tunneling_physics import (
     SIM_LEFT,
     SIM_TOP,
     SIM_W,
+    TRIAL_HISTORY_MAX,
     TUNNEL_PROB_BASE,
     TUNNEL_SPEED_BOOST,
     QuantumParticle,
@@ -493,7 +495,7 @@ def run_simulation():
     start_time = time.monotonic()
     max_tunnel_barrier = 0
     barrier_configs_tried: set[int] = set()
-    trial_history: list[dict] = []
+    trial_history: deque[dict] = deque(maxlen=TRIAL_HISTORY_MAX)
     peak_rate = 0.0
     prev_attempts = 0
 
@@ -727,7 +729,7 @@ def run_simulation():
             "trials_per_minute": round(particle.total_attempts / elapsed_min, 1),
             "speed_mult": round(speed_mult, 1),
             "difficulty": preset_hud.current,
-            "trial_history": trial_history,
+            "trial_history": list(trial_history),
         },
         recorder=recorder,
         snd=snd,
