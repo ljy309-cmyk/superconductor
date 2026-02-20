@@ -37,6 +37,7 @@ from replay import ReplayRecorder
 from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from sound_manager import get_sound_manager
 from theme import load_pg_colors, on_theme_change
+from tutorial import TutorialOverlay
 from ui.slider import PANEL_W, SliderPanel
 
 _log = get_module_logger("tunneling")
@@ -390,6 +391,7 @@ def run_simulation():
     }
     preset_hud = PresetHUD("tunneling", slider_map)
     help_overlay = HelpOverlay("tunneling")
+    tutorial = TutorialOverlay("tunneling")
 
     # ── 사운드 ──
     snd = get_sound_manager()
@@ -420,6 +422,8 @@ def run_simulation():
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
+            if tutorial.handle_event(event):
+                continue
             panel.handle_event(event)
             preset_hud.handle_event(event)
             help_overlay.handle_event(event)
@@ -586,6 +590,7 @@ def run_simulation():
 
         preset_hud.draw(screen, font)
         help_overlay.draw(screen, font)
+        tutorial.draw(screen, font)
 
         pygame.display.flip()
 
