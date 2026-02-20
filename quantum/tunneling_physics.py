@@ -78,8 +78,13 @@ def _calc_tunnel_prob(barrier_width: int) -> float:
     """벽 두께에 따른 터널링 확률 — 두꺼울수록 확률 감소.
 
     기본 두께(12px)에서 10 %, 두께 200px이면 ~0.5 % 수준으로 지수 감쇠.
+    barrier_width는 [BARRIER_WIDTH_MIN, BARRIER_WIDTH_MAX] 범위로 클램핑됩니다.
     """
-    return TUNNEL_PROB_BASE * math.exp(-_TUNNEL_DECAY * (barrier_width - BARRIER_WIDTH_DEFAULT))
+    barrier_width = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, int(barrier_width)))
+    exponent = -_TUNNEL_DECAY * (barrier_width - BARRIER_WIDTH_DEFAULT)
+    # 오버플로 방어: exp(x)에서 x가 너무 크거나 작으면 클램핑
+    exponent = max(-500.0, min(500.0, exponent))
+    return TUNNEL_PROB_BASE * math.exp(exponent)
 
 
 # ── 입자 클래스 ──────────────────────────────────────
@@ -131,6 +136,13 @@ class QuantumParticle:
     ):
         if not self.alive:
             return
+        if dt <= 0:
+            return
+
+        # 입력 클램핑
+        barrier_width = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, int(barrier_width)))
+        tunnel_prob = max(0.0, min(1.0, float(tunnel_prob)))
+        speed_boost = max(0.0, float(speed_boost))
 
         self.x += self.vx * dt
         self.y += self.vy * dt

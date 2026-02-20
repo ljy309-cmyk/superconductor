@@ -113,7 +113,7 @@ class TestBarrierProbabilityComparison(unittest.TestCase):
 
     def test_symmetric_deviation_from_default(self):
         """기본값 ±Δ 에서 확률이 대칭적 지수 관계."""
-        delta = 30
+        delta = 7  # 범위 내: DEFAULT±7 → [5, 19] ⊂ [MIN, MAX]
         p_thin = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT - delta)
         p_thick = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT + delta)
         # P_thin * P_thick = P_base^2 (지수 대칭)
