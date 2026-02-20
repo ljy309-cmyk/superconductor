@@ -180,11 +180,23 @@ class TestGlossaryLocaleKeys(unittest.TestCase):
             self.assertEqual(has_ko, has_en,
                              f"Formula key mismatch for '{tid}': ko={has_ko}, en={has_en}")
 
-    def test_at_least_half_have_formulas(self):
-        """용어의 절반 이상이 수식을 가져야 한다."""
-        formula_count = sum(1 for tid, _ in _TERMS if f"gl_{tid}_formula" in self.en_data)
-        self.assertGreaterEqual(formula_count, len(_TERMS) // 2,
-                                f"Only {formula_count}/{len(_TERMS)} terms have formulas")
+    def test_all_terms_have_formulas(self):
+        """모든 38개 용어가 수식을 가져야 한다."""
+        for tid, _ in _TERMS:
+            key = f"gl_{tid}_formula"
+            self.assertIn(key, self.en_data, f"Missing en formula: {key}")
+            self.assertIn(key, self.ko_data, f"Missing ko formula: {key}")
+
+    def test_formulas_contain_math_symbols(self):
+        """수식에 수학 기호가 포함되어야 한다."""
+        math_chars = set("=+−×÷∝∝≈≤≥∀∄Σ∫√|⟩⟨αβγδεφψρℏπ²³₀₁₂[](),/")
+        for tid, _ in _TERMS:
+            key = f"gl_{tid}_formula"
+            formula = self.en_data.get(key, "")
+            if formula:
+                has_math = any(c in math_chars for c in formula)
+                self.assertTrue(has_math,
+                                f"Formula for '{tid}' lacks math symbols: {formula[:40]}")
 
     def test_category_keys_in_both_locales(self):
         for ck in _CATEGORY_KEYS:
@@ -828,6 +840,236 @@ class TestGlossaryStateScenarios(unittest.TestCase):
         self.g.handle_event(_make_event(_pg_mock.K_g))  # 다시 열기
         # _apply_filter가 호출되어 현재 상태로 필터가 적용됨
         self.assertTrue(self.g.visible)
+
+
+# ── 모듈 구조·임포트 테스트 ────────────────────────────
+
+
+class TestGlossaryModuleStructure(unittest.TestCase):
+    """glossary.py가 올바른 모듈에서 올바른 함수를 임포트하는지 검증."""
+
+    def test_imports_wrap_text_from_ui_common(self):
+        """wrap_text가 quantum.ui_common에서 임포트되어야 한다."""
+        import inspect
+        src = inspect.getsource(_glossary_mod)
+        self.assertIn("from quantum.ui_common import wrap_text", src)
+        # 로컬 _wrap_text 함수가 없어야 한다
+        self.assertNotIn("def _wrap_text(", src)
+
+    def test_imports_theme_functions(self):
+        """테마 함수 3개가 theme 모듈에서 임포트되어야 한다."""
+        import inspect
+        src = inspect.getsource(_glossary_mod)
+        self.assertIn("from theme import", src)
+        self.assertIn("get_pg_theme", src)
+        self.assertIn("is_high_contrast", src)
+        self.assertIn("is_reduced_motion", src)
+
+    def test_pygame_optional_import(self):
+        """pygame이 try/except로 optional 임포트되어야 한다."""
+        import inspect
+        src = inspect.getsource(_glossary_mod)
+        self.assertIn("try:", src)
+        self.assertIn("import pygame", src)
+        self.assertIn("except ImportError:", src)
+        self.assertIn("pygame = None", src)
+
+    def test_no_hardcoded_rgb_in_draw(self):
+        """draw()에 하드코딩된 RGB 튜플이 없어야 한다 (테마 색상 사용)."""
+        import inspect
+        import re
+        src = inspect.getsource(_glossary_mod.GlossaryOverlay.draw)
+        # (0, 0, 0, 200) 같은 반투명 배경은 허용하되, 일반 RGB 튜플 금지
+        # 3-element RGB tuples like (200, 200, 200) should not appear
+        rgb_pattern = re.compile(r"\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)")
+        matches = rgb_pattern.findall(src)
+        # 유일하게 허용되는 것: (0, 0, 0, 200) 안의 (0, 0, 0 부분 — 실제로는 4-tuple
+        for m in matches:
+            nums = [int(x.strip()) for x in m.strip("()").split(",")]
+            # 0,0,0은 SRCALPHA overlay이므로 허용
+            if nums != [0, 0, 0]:
+                self.fail(f"Hardcoded RGB found in draw(): {m}")
+
+
+# ── draw() 방어 로직 테스트 ────────────────────────────
+
+
+class TestGlossaryDrawGuards(unittest.TestCase):
+    """draw() 메서드의 방어 로직(guard) 테스트."""
+
+    def setUp(self):
+        _reset_i18n()
+        i18n.set_locale("en")
+        self.g = GlossaryOverlay()
+        self.screen = MagicMock()
+        self.font = MagicMock()
+        self.font.render.return_value = MagicMock(
+            get_width=MagicMock(return_value=100),
+            get_height=MagicMock(return_value=16),
+            get_size=MagicMock(return_value=(100, 16)),
+        )
+        self.font.size.return_value = (100, 16)
+
+    def tearDown(self):
+        _reset_i18n()
+
+    def test_pygame_none_guard(self):
+        """pygame이 None이면 draw()가 즉시 반환해야 한다."""
+        original = _glossary_mod.pygame
+        try:
+            _glossary_mod.pygame = None
+            self.g.visible = True
+            # pygame이 None이면 draw()가 에러 없이 반환
+            self.g.draw(self.screen, self.font)
+            # screen.blit이 호출되지 않아야 한다
+            self.screen.blit.assert_not_called()
+        finally:
+            _glossary_mod.pygame = original
+
+    def test_zero_width_screen_guard(self):
+        """화면 너비가 0이면 draw()가 즉시 반환해야 한다."""
+        self.g.visible = True
+        self.screen.get_size.return_value = (0, 600)
+        self.screen.get_width.return_value = 0
+        self.g.draw(self.screen, self.font)
+        # 반투명 배경이 그려지지 않아야 한다 (blit 호출이 최소한이거나 없음)
+        # get_size 이후의 Surface 생성이 없어야 함
+        calls = [str(c) for c in self.screen.blit.call_args_list]
+        # overlay surface blit이 없어야 한다
+        self.assertEqual(len(self.screen.blit.call_args_list), 0,
+                         "Should not render when width is 0")
+
+    def test_zero_height_screen_guard(self):
+        """화면 높이가 0이면 draw()가 즉시 반환해야 한다."""
+        self.g.visible = True
+        self.screen.get_size.return_value = (800, 0)
+        self.screen.get_width.return_value = 800
+        self.g.draw(self.screen, self.font)
+        self.assertEqual(len(self.screen.blit.call_args_list), 0,
+                         "Should not render when height is 0")
+
+    def test_negative_size_screen_guard(self):
+        """화면 크기가 음수면 draw()가 즉시 반환해야 한다."""
+        self.g.visible = True
+        self.screen.get_size.return_value = (-1, -1)
+        self.screen.get_width.return_value = -1
+        self.g.draw(self.screen, self.font)
+        self.assertEqual(len(self.screen.blit.call_args_list), 0,
+                         "Should not render when size is negative")
+
+    def test_hidden_draws_hint_only(self):
+        """visible=False일 때 G키 힌트만 그려야 한다."""
+        self.g.visible = False
+        self.screen.get_width.return_value = 800
+        self.g.draw(self.screen, self.font)
+        # font.render가 호출되어야 한다 (힌트 텍스트)
+        self.assertTrue(self.font.render.called)
+        # screen.blit이 1번 호출 (힌트만)
+        self.assertEqual(self.screen.blit.call_count, 1)
+
+
+# ── 테마·접근성 통합 테스트 ────────────────────────────
+
+
+class TestGlossaryThemeAccessibility(unittest.TestCase):
+    """테마 시스템 및 접근성 기능(고대비, 감소 모션) 통합 테스트."""
+
+    def setUp(self):
+        _reset_i18n()
+        i18n.set_locale("en")
+        self.g = GlossaryOverlay()
+
+    def tearDown(self):
+        _reset_i18n()
+
+    def test_draw_calls_get_pg_theme(self):
+        """draw()가 get_pg_theme()를 호출해야 한다."""
+        from unittest.mock import patch
+        screen = MagicMock()
+        screen.get_size.return_value = (800, 600)
+        screen.get_width.return_value = 800
+        font = MagicMock()
+        font.render.return_value = MagicMock(
+            get_width=MagicMock(return_value=100),
+            get_height=MagicMock(return_value=16),
+            get_size=MagicMock(return_value=(100, 16)),
+        )
+        font.size.return_value = (100, 16)
+
+        self.g.visible = True
+        with patch("glossary.get_pg_theme") as mock_theme:
+            mock_pg = MagicMock()
+            mock_theme.return_value = mock_pg
+            with patch("glossary.is_high_contrast", return_value=False), \
+                 patch("glossary.is_reduced_motion", return_value=False):
+                self.g.draw(screen, font)
+            mock_theme.assert_called()
+
+    def test_draw_calls_is_high_contrast(self):
+        """draw()가 is_high_contrast()를 호출해야 한다."""
+        from unittest.mock import patch
+        screen = MagicMock()
+        screen.get_size.return_value = (800, 600)
+        screen.get_width.return_value = 800
+        font = MagicMock()
+        font.render.return_value = MagicMock(
+            get_width=MagicMock(return_value=100),
+            get_height=MagicMock(return_value=16),
+            get_size=MagicMock(return_value=(100, 16)),
+        )
+        font.size.return_value = (100, 16)
+
+        self.g.visible = True
+        with patch("glossary.get_pg_theme") as mock_theme, \
+             patch("glossary.is_high_contrast") as mock_hc, \
+             patch("glossary.is_reduced_motion", return_value=False):
+            mock_hc.return_value = False
+            mock_theme.return_value = MagicMock()
+            self.g.draw(screen, font)
+            mock_hc.assert_called()
+
+    def test_draw_calls_is_reduced_motion(self):
+        """draw()가 is_reduced_motion()를 호출해야 한다."""
+        from unittest.mock import patch
+        screen = MagicMock()
+        screen.get_size.return_value = (800, 600)
+        screen.get_width.return_value = 800
+        font = MagicMock()
+        font.render.return_value = MagicMock(
+            get_width=MagicMock(return_value=100),
+            get_height=MagicMock(return_value=16),
+            get_size=MagicMock(return_value=(100, 16)),
+        )
+        font.size.return_value = (100, 16)
+
+        self.g.visible = True
+        with patch("glossary.get_pg_theme") as mock_theme, \
+             patch("glossary.is_high_contrast", return_value=False), \
+             patch("glossary.is_reduced_motion") as mock_rm:
+            mock_rm.return_value = False
+            mock_theme.return_value = MagicMock()
+            self.g.draw(screen, font)
+            mock_rm.assert_called()
+
+    def test_high_contrast_uses_thicker_border(self):
+        """고대비 모드에서 border_w가 2여야 한다."""
+        import inspect
+        src = inspect.getsource(_glossary_mod.GlossaryOverlay.draw)
+        # border_w = 2 if hc else 1 패턴이 있어야 한다
+        self.assertIn("2 if hc else 1", src)
+
+    def test_reduced_motion_cursor_logic(self):
+        """감소 모션 모드에서 커서 깜박임을 건너뛰는 로직이 있어야 한다."""
+        import inspect
+        src = inspect.getsource(_glossary_mod.GlossaryOverlay.draw)
+        # reduced 변수를 사용한 조건분기가 있어야 한다
+        self.assertIn("reduced", src)
+
+    def test_hidden_state_uses_theme_subtext_color(self):
+        """hidden 상태에서 힌트가 테마의 SUBTEXT 색상을 사용해야 한다."""
+        import inspect
+        src = inspect.getsource(_glossary_mod.GlossaryOverlay.draw)
+        self.assertIn("pg.SUBTEXT", src)
 
 
 if __name__ == "__main__":
