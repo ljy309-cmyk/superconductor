@@ -61,8 +61,8 @@ def draw_page_dots(screen, x, cy, total_pages, current_page,
             if i == current_page:
                 pygame.draw.circle(screen, active_clr, (cx, cy), dot_r)
             else:
-                pygame.draw.circle(screen, inactive_clr, (cx, cy), dot_r)
-                pygame.draw.circle(screen, border_clr, (cx, cy), dot_r, 1)
+                pygame.draw.circle(screen, inactive_clr, (cx, cy), small_r)
+                pygame.draw.circle(screen, border_clr, (cx, cy), small_r, 1)
         return
 
     # 많은 페이지: [첫] ... [현재 주변] ... [끝] 축약
