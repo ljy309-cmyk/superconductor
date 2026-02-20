@@ -11,6 +11,7 @@ import pygame
 
 from config_loader import cfg
 from game_base import choose_difficulty_or_quit, finalize_session
+from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -430,6 +431,7 @@ def run_simulation():
     preset_hud = PresetHUD("tunneling", slider_map)
     help_overlay = HelpOverlay("tunneling")
     tutorial = TutorialOverlay("tunneling")
+    glossary = GlossaryOverlay()
 
     # ── 사운드 ──
     snd = get_sound_manager()
@@ -461,6 +463,8 @@ def run_simulation():
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
             if tutorial.handle_event(event):
+                continue
+            if glossary.handle_event(event):
                 continue
             panel.handle_event(event)
             preset_hud.handle_event(event)
@@ -623,7 +627,7 @@ def run_simulation():
                 pause_state=t("paused") if paused else t("running_state"),
             ),
             t("hint_click_launch"),
-            t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})",
+            t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  G: {t('glossary_title')}",
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
@@ -631,6 +635,7 @@ def run_simulation():
 
         preset_hud.draw(screen, font)
         help_overlay.draw(screen, font)
+        glossary.draw(screen, font)
         tutorial.draw(screen, font)
 
         pygame.display.flip()

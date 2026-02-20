@@ -493,6 +493,9 @@
   "tn_no_data": "No trial data",
   "tn_formula_title": "Tunneling Equations",
 
+  "glossary_title": "Glossary",
+  "glossary_nav_hint": "Up/Down: Scroll  |  G/ESC: Close",
+
   "bb84_sender": "Sender",
   "bb84_receiver": "Receiver",
   "bb84_eavesdropper": "Eavesdropper",

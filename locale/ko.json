@@ -493,6 +493,9 @@
   "tn_no_data": "시행 데이터 없음",
   "tn_formula_title": "터널링 수식",
 
+  "glossary_title": "용어집",
+  "glossary_nav_hint": "↑↓: 스크롤  |  G/ESC: 닫기",
+
   "bb84_sender": "발신자",
   "bb84_receiver": "수신자",
   "bb84_eavesdropper": "도청자",
