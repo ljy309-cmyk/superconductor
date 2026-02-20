@@ -27,9 +27,15 @@ def paginate(items, page, page_size=HISTORY_PAGE_SIZE):
 # ── 페이지 도트 인디케이터 ────────────────────────────
 
 
+MAX_PAGE_DOTS = 9
+
+
 def draw_page_dots(screen, x, cy, total_pages, current_page,
                    active_clr, inactive_clr, border_clr):
     """페이지 도트 인디케이터.
+
+    페이지 수가 MAX_PAGE_DOTS를 초과하면 현재 페이지 주변만 표시하고
+    양쪽 끝을 작은 도트(...)로 축약합니다.
 
     Args:
         screen: Pygame 화면.
@@ -45,14 +51,63 @@ def draw_page_dots(screen, x, cy, total_pages, current_page,
         return
     hc = is_high_contrast()
     dot_r = 4 if hc else 3
+    small_r = max(1, dot_r - 1)
     gap = dot_r * 2 + 5
-    for i in range(total_pages):
-        cx = x + i * gap + dot_r
-        if i == current_page:
+
+    # 페이지 수가 적으면 전부 표시
+    if total_pages <= MAX_PAGE_DOTS:
+        for i in range(total_pages):
+            cx = x + i * gap + dot_r
+            if i == current_page:
+                pygame.draw.circle(screen, active_clr, (cx, cy), dot_r)
+            else:
+                pygame.draw.circle(screen, inactive_clr, (cx, cy), dot_r)
+                pygame.draw.circle(screen, border_clr, (cx, cy), dot_r, 1)
+        return
+
+    # 많은 페이지: [첫] ... [현재 주변] ... [끝] 축약
+    # 슬롯: first, ellipsis, window(5), ellipsis, last = 9
+    window = MAX_PAGE_DOTS - 4  # 양쪽 끝점(2) + 줄임표(2) = 4 제외
+    half = window // 2
+
+    # 윈도우 범위 계산
+    win_start = current_page - half
+    win_end = current_page + half
+
+    # 경계 클램프
+    if win_start <= 1:
+        win_start = 1
+        win_end = win_start + window - 1
+    if win_end >= total_pages - 2:
+        win_end = total_pages - 2
+        win_start = win_end - window + 1
+
+    show_left_ellipsis = win_start > 1
+    show_right_ellipsis = win_end < total_pages - 2
+
+    # 표시할 인덱스 목록 구축
+    slots: list[tuple[str, int]] = []  # ("dot"|"ellipsis", page_index)
+    slots.append(("dot", 0))
+    if show_left_ellipsis:
+        slots.append(("ellipsis", -1))
+    for i in range(win_start, win_end + 1):
+        slots.append(("dot", i))
+    if show_right_ellipsis:
+        slots.append(("ellipsis", -1))
+    slots.append(("dot", total_pages - 1))
+
+    # 렌더링
+    for si, (kind, page_idx) in enumerate(slots):
+        cx = x + si * gap + dot_r
+        if kind == "ellipsis":
+            # 작은 도트 3개로 줄임표 표현
+            for dx in (-3, 0, 3):
+                pygame.draw.circle(screen, border_clr, (cx + dx, cy), 1)
+        elif page_idx == current_page:
             pygame.draw.circle(screen, active_clr, (cx, cy), dot_r)
         else:
-            pygame.draw.circle(screen, inactive_clr, (cx, cy), dot_r)
-            pygame.draw.circle(screen, border_clr, (cx, cy), dot_r, 1)
+            pygame.draw.circle(screen, inactive_clr, (cx, cy), small_r)
+            pygame.draw.circle(screen, border_clr, (cx, cy), small_r, 1)
 
 
 # ── 색맹 보조 막대 패턴 ──────────────────────────────

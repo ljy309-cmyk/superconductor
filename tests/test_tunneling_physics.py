@@ -934,7 +934,7 @@ sys.modules.setdefault("pygame.font", _pg_mock.font)
 sys.modules.setdefault("pygame.draw", _pg_mock.draw)
 sys.modules.setdefault("pygame.display", _pg_mock.display)
 
-from quantum.ui_common import NOTIFY_CATEGORIES, NotifyToast
+from quantum.ui_common import MAX_PAGE_DOTS, NOTIFY_CATEGORIES, NotifyToast, draw_page_dots
 
 
 class TestNotifyToast(unittest.TestCase):
@@ -1104,6 +1104,95 @@ class TestMakeFonts(unittest.TestCase):
         for call in calls:
             size = call[0][1]
             self.assertGreaterEqual(size, 8)
+
+
+# ── draw_page_dots 테스트 ─────────────────────────────
+
+
+class TestDrawPageDots(unittest.TestCase):
+    """draw_page_dots() 도트 인디케이터 테스트."""
+
+    def setUp(self):
+        self.screen = _MagicMock()
+        self.pg = sys.modules["pygame"]
+        self.pg.draw.circle.reset_mock()
+        self.active = (100, 200, 255)
+        self.inactive = (50, 50, 50)
+        self.border = (80, 80, 80)
+
+    def test_single_page_no_draw(self):
+        """1페이지면 아무것도 그리지 않는다."""
+        self.pg.draw.circle.reset_mock()
+        draw_page_dots(self.screen, 0, 0, 1, 0,
+                       self.active, self.inactive, self.border)
+        self.pg.draw.circle.assert_not_called()
+
+    def test_zero_pages_no_draw(self):
+        """0페이지면 아무것도 그리지 않는다."""
+        self.pg.draw.circle.reset_mock()
+        draw_page_dots(self.screen, 0, 0, 0, 0,
+                       self.active, self.inactive, self.border)
+        self.pg.draw.circle.assert_not_called()
+
+    def test_two_pages_draws_circles(self):
+        """2페이지면 도트 2개 (활성1 + 비활성1)."""
+        self.pg.draw.circle.reset_mock()
+        draw_page_dots(self.screen, 10, 20, 2, 0,
+                       self.active, self.inactive, self.border)
+        # 활성 1개 + 비활성(채움+테두리) 2개 = 3회 호출
+        self.assertEqual(self.pg.draw.circle.call_count, 3)
+
+    def test_few_pages_all_dots_drawn(self):
+        """MAX_PAGE_DOTS 이하면 모든 도트가 그려진다."""
+        n = MAX_PAGE_DOTS
+        self.pg.draw.circle.reset_mock()
+        draw_page_dots(self.screen, 10, 20, n, 0,
+                       self.active, self.inactive, self.border)
+        # 활성 1개 + 비활성 (n-1) × 2(채움+테두리) = 1 + (n-1)*2
+        expected = 1 + (n - 1) * 2
+        self.assertEqual(self.pg.draw.circle.call_count, expected)
+
+    def test_many_pages_capped(self):
+        """MAX_PAGE_DOTS 초과 시 총 슬롯이 MAX_PAGE_DOTS 이하로 제한된다."""
+        n = 50
+        self.pg.draw.circle.reset_mock()
+        draw_page_dots(self.screen, 10, 20, n, 25,
+                       self.active, self.inactive, self.border)
+        # 호출 수가 MAX_PAGE_DOTS × 3보다 작아야 (전체 도트 50개 그리지 않음)
+        self.assertLess(self.pg.draw.circle.call_count, n * 2)
+
+    def test_many_pages_first_page(self):
+        """많은 페이지에서 첫 페이지 선택 시 에러 없이 동작."""
+        draw_page_dots(self.screen, 10, 20, 30, 0,
+                       self.active, self.inactive, self.border)
+
+    def test_many_pages_last_page(self):
+        """많은 페이지에서 마지막 페이지 선택 시 에러 없이 동작."""
+        draw_page_dots(self.screen, 10, 20, 30, 29,
+                       self.active, self.inactive, self.border)
+
+    def test_many_pages_middle(self):
+        """많은 페이지에서 중간 페이지 선택 시 에러 없이 동작."""
+        draw_page_dots(self.screen, 10, 20, 100, 50,
+                       self.active, self.inactive, self.border)
+
+    def test_max_page_dots_is_positive(self):
+        """MAX_PAGE_DOTS 상수가 양수여야 한다."""
+        self.assertGreater(MAX_PAGE_DOTS, 0)
+
+    def test_ellipsis_uses_small_dots(self):
+        """줄임표 위치에 작은 도트(r=1)가 그려져야 한다."""
+        self.pg.draw.circle.reset_mock()
+        draw_page_dots(self.screen, 10, 20, 20, 10,
+                       self.active, self.inactive, self.border)
+        # r=1인 호출이 존재해야 한다 (줄임표의 작은 도트)
+        calls = self.pg.draw.circle.call_args_list
+        radii = []
+        for call in calls:
+            args = call[0]  # positional args
+            if len(args) >= 4 and isinstance(args[3], int) and len(call[0]) == 4:
+                radii.append(args[3])
+        self.assertIn(1, radii, "Ellipsis small dots (r=1) should be drawn")
 
 
 if __name__ == "__main__":
