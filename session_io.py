@@ -71,6 +71,10 @@ def export_session(
     os.makedirs(EXPORT_DIR, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    if fmt not in ("json", "csv"):
+        _log.warning("지원하지 않는 포맷: %s (json으로 대체)", fmt)
+        fmt = "json"
+
     if fmt == "csv":
         return _export_as_csv(prefix, session_data, ts, trial_rows, trial_columns, trial_row_fn)
     return _export_as_json(prefix, session_data, ts, trial_rows)
@@ -115,7 +119,9 @@ def _export_as_csv(prefix, session_data, ts, trial_rows=None, trial_columns=None
                 values = []
                 for k in headers:
                     v = data[k]
-                    if isinstance(v, (dict, list)):
+                    if isinstance(v, bool):
+                        values.append(str(v))
+                    elif isinstance(v, (dict, list)):
                         values.append(json.dumps(v, ensure_ascii=False))
                     else:
                         values.append(v)
@@ -127,44 +133,6 @@ def _export_as_csv(prefix, session_data, ts, trial_rows=None, trial_columns=None
     _log.info("데이터 내보내기 완료: %s", path)
     return path
 
-
-def export_session_json(
-    prefix: str,
-    session_data: dict,
-    *,
-    trial_rows: list[dict] | None = None,
-    trial_columns: list[str] | None = None,
-    trial_row_fn=None,
-) -> str | None:
-    """세션 데이터를 JSON(+선택적 CSV)으로 내보내기.
-
-    .. deprecated::
-        하위 호환용. 새 코드에서는 ``export_session(fmt="json")`` 사용 권장.
-    """
-    os.makedirs(EXPORT_DIR, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    # JSON
-    json_path = _export_as_json(prefix, session_data, ts)
-    if json_path is None:
-        return None
-
-    # CSV (선택 — 하위 호환용 별도 파일)
-    if trial_rows and trial_columns:
-        csv_path = os.path.join(EXPORT_DIR, f"{prefix}_trials_{ts}.csv")
-        try:
-            with open(csv_path, "w", encoding="utf-8", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow(trial_columns)
-                for i, row in enumerate(trial_rows, 1):
-                    if trial_row_fn:
-                        writer.writerow(trial_row_fn(i, row))
-                    else:
-                        writer.writerow([row.get(c, "") for c in trial_columns])
-        except OSError:
-            _log.warning("CSV 내보내기 실패: %s", csv_path)
-
-    return json_path
 
 
 # ── 파일 목록 ─────────────────────────────────────────
@@ -229,6 +197,14 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
     W, H = screen.get_size()
     files = list_export_files(prefix)
     if not files:
+        # 빈 목록 안내 표시 (1.5초)
+        overlay = pygame.Surface((W, H), pygame.SRCALPHA)
+        overlay.fill((*pg.BG, 200))
+        screen.blit(overlay, (0, 0))
+        msg = font.render(t("import_empty"), True, pg.SUBTEXT)
+        screen.blit(msg, (W // 2 - msg.get_width() // 2, H // 2 - msg.get_height() // 2))
+        pygame.display.flip()
+        pygame.time.wait(1500)
         return None
 
     selected = 0
@@ -323,11 +299,11 @@ def load_session(path: str) -> dict | None:
     """
     if path.endswith(".csv"):
         return load_session_csv(path)
-    return load_session_json(path)
+    return _load_session_json(path)
 
 
-def load_session_json(json_path: str) -> dict | None:
-    """JSON 세션 파일 로드. 실패 시 ``None``."""
+def _load_session_json(json_path: str) -> dict | None:
+    """JSON 세션 파일 로드 (내부). 실패 시 ``None``."""
     try:
         with open(json_path, encoding="utf-8") as f:
             return json.load(f)
@@ -394,44 +370,3 @@ def _auto_parse_csv_values(row: dict):
             pass
 
 
-def load_session_with_trials(
-    json_path: str,
-    prefix: str,
-    trial_parse_fn=None,
-) -> tuple[dict | None, list[dict]]:
-    """JSON 세션 + 매칭 CSV 시행 이력 로드.
-
-    Parameters
-    ----------
-    json_path : str
-        JSON 파일 경로.
-    prefix : str
-        파일명 접두사 (CSV 매칭에 사용).
-    trial_parse_fn : callable | None
-        ``(csv_row_dict) -> dict`` 형태의 변환 함수.
-        미지정 시 CSV 행을 그대로 dict로 반환.
-
-    Returns
-    -------
-    tuple[dict | None, list[dict]]
-        ``(session_dict, trial_list)``. JSON 실패 시 ``(None, [])``.
-    """
-    session = load_session_json(json_path)
-    if session is None:
-        return None, []
-
-    trials: list[dict] = []
-    csv_path = json_path.replace(f"{prefix}_stats_", f"{prefix}_trials_").replace(".json", ".csv")
-    if os.path.exists(csv_path):
-        try:
-            with open(csv_path, encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if trial_parse_fn:
-                        trials.append(trial_parse_fn(row))
-                    else:
-                        trials.append(dict(row))
-        except (OSError, KeyError, ValueError) as e:
-            _log.warning("CSV 가져오기 실패: %s", e)
-
-    return session, trials

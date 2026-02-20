@@ -151,6 +151,10 @@ class SettingsPanel(tk.Toplevel):
         tk.Button(btn_frame, text=t("settings_import"), font=FONTS.BODY, width=16, command=self._import_settings).pack(side="left", padx=4)
         tk.Button(btn_frame, text=t("settings_profiles"), font=FONTS.BODY, width=16, command=self._open_profiles).pack(side="left", padx=4)
 
+        btn_frame2 = tk.Frame(main, bg=_tk.BG)
+        btn_frame2.pack(fill="x", pady=2)
+        tk.Button(btn_frame2, text=t("settings_manage_exports"), font=FONTS.BODY, width=16, command=self._manage_exports).pack(side="left", padx=4)
+
         # ── 닫기 버튼 ──
         tk.Button(main, text=t("settings_close"), font=FONTS.BODY, width=12, command=self.destroy).pack(pady=(16, 0))
 
@@ -334,6 +338,56 @@ class SettingsPanel(tk.Toplevel):
             self._rebuild()
         else:
             messagebox.showwarning(t("settings_title"), t("settings_import_fail"), parent=self)
+
+    def _manage_exports(self):
+        from settings_io import delete_export, list_exports
+
+        exports = list_exports()
+        if not exports:
+            messagebox.showinfo(t("settings_title"), t("settings_no_exports"), parent=self)
+            return
+
+        _tk = get_tk_theme()
+        dlg = tk.Toplevel(self)
+        dlg.title(t("settings_manage_exports"))
+        dlg.configure(bg=_tk.BG)
+        dlg.geometry("420x300")
+        dlg.transient(self)
+        dlg.grab_set()
+
+        tk.Label(dlg, text=t("settings_manage_exports"), font=FONTS.HEADING, bg=_tk.BG, fg=_tk.TEXT).pack(pady=(10, 4))
+
+        frame = tk.Frame(dlg, bg=_tk.BG)
+        frame.pack(fill="both", expand=True, padx=10)
+
+        lb = tk.Listbox(frame, font=FONTS.BODY, selectmode="single")
+        lb.pack(fill="both", expand=True)
+
+        import os
+        for path in exports:
+            lb.insert("end", os.path.basename(path))
+        if exports:
+            lb.select_set(0)
+
+        def _delete():
+            sel = lb.curselection()
+            if not sel:
+                return
+            idx = sel[0]
+            path = exports[idx]
+            if not messagebox.askyesno(t("settings_title"), t("settings_delete_confirm", name=os.path.basename(path)), parent=dlg):
+                return
+            if delete_export(path):
+                exports.pop(idx)
+                lb.delete(idx)
+                messagebox.showinfo(t("settings_title"), t("settings_deleted"), parent=dlg)
+            if not exports:
+                dlg.destroy()
+
+        btn_frame = tk.Frame(dlg, bg=_tk.BG)
+        btn_frame.pack(pady=8)
+        tk.Button(btn_frame, text=t("settings_delete"), font=FONTS.BODY, width=10, command=_delete).pack(side="left", padx=4)
+        tk.Button(btn_frame, text=t("settings_close"), font=FONTS.BODY, width=10, command=dlg.destroy).pack(side="left", padx=4)
 
     def _open_profiles(self):
         from profile_manager import open_profile_manager

@@ -17,12 +17,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # ═══════════════════════════════════════════════════════════
-# 1. session_io — export_session_json 테스트
+# 1. session_io — export_session (JSON) 테스트
 # ═══════════════════════════════════════════════════════════
 
 
-class TestExportSessionJson(unittest.TestCase):
-    """session_io.export_session_json 함수 검증."""
+class TestExportSessionJsonFormat(unittest.TestCase):
+    """session_io.export_session(fmt='json') 함수 검증."""
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -39,53 +39,44 @@ class TestExportSessionJson(unittest.TestCase):
 
     def test_json_only_export(self):
         """trial 없이 JSON만 내보내기."""
-        from session_io import export_session_json
+        from session_io import export_session
 
         session = {"total_attempts": 100, "tunnel_rate": 0.35}
-        result = export_session_json("test", session)
+        result = export_session("test", session)
         self.assertIsNotNone(result)
 
-        # JSON 파일 존재 확인
         json_files = [f for f in os.listdir(self.tmpdir) if f.endswith(".json")]
         self.assertEqual(len(json_files), 1)
         self.assertTrue(json_files[0].startswith("test_stats_"))
 
-        # 내용 확인
         with open(os.path.join(self.tmpdir, json_files[0]), encoding="utf-8") as f:
             data = json.load(f)
         self.assertEqual(data["total_attempts"], 100)
         self.assertAlmostEqual(data["tunnel_rate"], 0.35)
         self.assertIn("timestamp", data)
 
-    def test_json_with_csv_export(self):
-        """JSON + CSV 동시 내보내기."""
-        from session_io import export_session_json
+    def test_json_with_trial_rows(self):
+        """trial_rows 포함 시 JSON에 trial_history 포함."""
+        from session_io import export_session
 
-        session = {"total_attempts": 3, "tunnel_rate": 0.33}
+        session = {"total_attempts": 3}
         trials = [
-            {"trial": 1, "time_s": 1.0, "barrier_width": 12, "tunnel_prob": 0.1, "result": 1},
-            {"trial": 2, "time_s": 2.5, "barrier_width": 20, "tunnel_prob": 0.05, "result": 0},
-            {"trial": 3, "time_s": 4.0, "barrier_width": 12, "tunnel_prob": 0.1, "result": 1},
+            {"t": 1.0, "barrier": 12, "prob": 0.1, "result": True},
+            {"t": 2.5, "barrier": 20, "prob": 0.05, "result": False},
         ]
-        columns = ["trial", "time_s", "barrier_width", "tunnel_prob", "result"]
-        result = export_session_json("test", session, trial_rows=trials, trial_columns=columns)
+        result = export_session("test", session, trial_rows=trials)
         self.assertIsNotNone(result)
 
-        csv_files = [f for f in os.listdir(self.tmpdir) if f.endswith(".csv")]
-        self.assertEqual(len(csv_files), 1)
-        self.assertTrue(csv_files[0].startswith("test_trials_"))
+        with open(result, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual(data["total_attempts"], 3)
+        self.assertEqual(len(data["trial_history"]), 2)
+        self.assertTrue(data["trial_history"][0]["result"])
+        self.assertFalse(data["trial_history"][1]["result"])
 
-        # CSV 내용 확인
-        with open(os.path.join(self.tmpdir, csv_files[0]), encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-        self.assertEqual(len(rows), 3)
-        self.assertEqual(rows[0]["trial"], "1")
-        self.assertEqual(rows[1]["result"], "0")
-
-    def test_csv_with_custom_row_fn(self):
-        """custom trial_row_fn을 사용한 CSV 내보내기."""
-        from session_io import export_session_json
+    def test_csv_format_with_trial_row_fn(self):
+        """CSV 포맷 + custom trial_row_fn."""
+        from session_io import export_session
 
         session = {"count": 2}
         trials = [
@@ -95,14 +86,14 @@ class TestExportSessionJson(unittest.TestCase):
         columns = ["trial", "time_s", "barrier_width", "tunnel_prob", "result"]
         row_fn = lambda i, tr: [i, tr["t"], tr["barrier"], tr["prob"], int(tr["result"])]
 
-        result = export_session_json(
-            "tunneling", session,
+        result = export_session(
+            "tunneling", session, fmt="csv",
             trial_rows=trials, trial_columns=columns, trial_row_fn=row_fn,
         )
         self.assertIsNotNone(result)
+        self.assertTrue(result.endswith(".csv"))
 
-        csv_files = [f for f in os.listdir(self.tmpdir) if f.endswith(".csv")]
-        with open(os.path.join(self.tmpdir, csv_files[0]), encoding="utf-8") as f:
+        with open(result, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
         self.assertEqual(len(rows), 2)
@@ -112,82 +103,86 @@ class TestExportSessionJson(unittest.TestCase):
 
     def test_unicode_data_export(self):
         """유니코드(한글) 데이터 내보내기."""
-        from session_io import export_session_json
+        from session_io import export_session
 
         session = {"메모": "터널링 실험 결과", "난이도": "쉬움"}
-        result = export_session_json("unicode_test", session)
+        result = export_session("unicode_test", session)
         self.assertIsNotNone(result)
 
-        json_files = [f for f in os.listdir(self.tmpdir) if f.endswith(".json")]
-        with open(os.path.join(self.tmpdir, json_files[0]), encoding="utf-8") as f:
+        with open(result, encoding="utf-8") as f:
             data = json.load(f)
         self.assertEqual(data["메모"], "터널링 실험 결과")
 
     def test_timestamp_added_to_export(self):
         """내보낸 JSON에 timestamp 필드가 자동 추가되는지 확인."""
-        from session_io import export_session_json
+        from session_io import export_session
 
         session = {"key": "value"}
-        export_session_json("ts_test", session)
+        path = export_session("ts_test", session)
 
-        json_files = [f for f in os.listdir(self.tmpdir) if f.endswith(".json")]
-        with open(os.path.join(self.tmpdir, json_files[0]), encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         self.assertIn("timestamp", data)
-        # ISO 형식 확인
         self.assertIn("T", data["timestamp"])
 
     def test_original_session_dict_not_mutated(self):
         """원본 session_data 딕셔너리가 변형되지 않는지 확인."""
-        from session_io import export_session_json
+        from session_io import export_session
 
         session = {"original_key": "original_value"}
         original_keys = set(session.keys())
-        export_session_json("mutate_test", session)
-        # timestamp가 원본에 추가되면 안 됨
+        export_session("mutate_test", session)
         self.assertEqual(set(session.keys()), original_keys)
 
-    def test_empty_trial_rows_no_csv(self):
-        """trial_rows가 빈 리스트면 CSV 생성 안 함."""
-        from session_io import export_session_json
+    def test_empty_trial_rows_no_trial_history(self):
+        """trial_rows가 빈 리스트면 trial_history 미포함."""
+        from session_io import export_session
 
         session = {"count": 0}
-        export_session_json("empty_trial", session, trial_rows=[], trial_columns=["a", "b"])
+        path = export_session("empty_trial", session, trial_rows=[])
 
-        csv_files = [f for f in os.listdir(self.tmpdir) if f.endswith(".csv")]
-        self.assertEqual(len(csv_files), 0)
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertNotIn("trial_history", data)
 
     def test_export_creates_dir_if_missing(self):
         """EXPORT_DIR이 없으면 자동 생성."""
         import session_io
-        from session_io import export_session_json
+        from session_io import export_session
 
         nested_dir = os.path.join(self.tmpdir, "sub", "dir")
         session_io.EXPORT_DIR = nested_dir
 
-        result = export_session_json("mkdir_test", {"a": 1})
+        result = export_session("mkdir_test", {"a": 1})
         self.assertIsNotNone(result)
         self.assertTrue(os.path.isdir(nested_dir))
 
     def test_multiple_exports_create_separate_files(self):
         """여러 번 내보내기하면 각각 별도 파일 생성."""
-        from session_io import export_session_json
+        from session_io import export_session
 
-        export_session_json("multi", {"seq": 1})
-        export_session_json("multi", {"seq": 2})
+        export_session("multi", {"seq": 1})
+        export_session("multi", {"seq": 2})
 
         json_files = [f for f in os.listdir(self.tmpdir) if f.endswith(".json")]
-        # 타임스탬프가 같은 초에 생성되면 1개일 수도 있으나 최소 1개 이상
         self.assertGreaterEqual(len(json_files), 1)
 
+    def test_invalid_fmt_falls_back_to_json(self):
+        """잘못된 fmt 값은 json으로 대체."""
+        from session_io import export_session
+
+        result = export_session("fallback", {"a": 1}, fmt="xml")
+        self.assertIsNotNone(result)
+        self.assertTrue(result.endswith(".json"))
+
 
 # ═══════════════════════════════════════════════════════════
-# 2. session_io — load_session_json / load_session_with_trials 테스트
+# 2. session_io — load_session 테스트
 # ═══════════════════════════════════════════════════════════
 
 
-class TestLoadSessionJson(unittest.TestCase):
-    """session_io.load_session_json 함수 검증."""
+class TestLoadSession(unittest.TestCase):
+    """session_io.load_session 함수 검증."""
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -196,145 +191,89 @@ class TestLoadSessionJson(unittest.TestCase):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_load_valid_json(self):
-        from session_io import load_session_json
+        from session_io import load_session
 
         data = {"total": 42, "rate": 0.5}
         path = os.path.join(self.tmpdir, "test.json")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
-        result = load_session_json(path)
+        result = load_session(path)
         self.assertIsNotNone(result)
         self.assertEqual(result["total"], 42)
 
     def test_load_nonexistent_returns_none(self):
-        from session_io import load_session_json
+        from session_io import load_session
 
-        result = load_session_json("/nonexistent/path/data.json")
+        result = load_session("/nonexistent/path/data.json")
         self.assertIsNone(result)
 
     def test_load_invalid_json_returns_none(self):
-        from session_io import load_session_json
+        from session_io import load_session
 
         path = os.path.join(self.tmpdir, "bad.json")
         with open(path, "w") as f:
             f.write("{invalid json content!!!")
 
-        result = load_session_json(path)
+        result = load_session(path)
         self.assertIsNone(result)
 
     def test_load_empty_file_returns_none(self):
-        from session_io import load_session_json
+        from session_io import load_session
 
         path = os.path.join(self.tmpdir, "empty.json")
         with open(path, "w") as f:
-            pass  # 빈 파일
+            pass
 
-        result = load_session_json(path)
+        result = load_session(path)
         self.assertIsNone(result)
 
     def test_load_unicode_json(self):
         """유니코드 JSON 파일 로드."""
-        from session_io import load_session_json
+        from session_io import load_session
 
         data = {"이름": "실험1", "결과": "성공"}
         path = os.path.join(self.tmpdir, "unicode.json")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
 
-        result = load_session_json(path)
+        result = load_session(path)
         self.assertEqual(result["이름"], "실험1")
 
+    def test_load_csv_auto_detect(self):
+        """CSV 확장자 자동 감지."""
+        from session_io import load_session
 
-class TestLoadSessionWithTrials(unittest.TestCase):
-    """session_io.load_session_with_trials 함수 검증."""
-
-    def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
-
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir, ignore_errors=True)
-
-    def _create_json_and_csv(self, prefix, session_data, trial_rows, columns):
-        """테스트용 JSON+CSV 쌍 생성."""
-        ts = "20260220_120000"
-        json_path = os.path.join(self.tmpdir, f"{prefix}_stats_{ts}.json")
-        csv_path = os.path.join(self.tmpdir, f"{prefix}_trials_{ts}.csv")
-
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(session_data, f)
-
-        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        path = os.path.join(self.tmpdir, "test.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(columns)
-            for row in trial_rows:
-                writer.writerow(row)
+            writer.writerow(["total", "rate"])
+            writer.writerow([42, 0.5])
 
-        return json_path
+        result = load_session(path)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["total"], 42)
+        self.assertAlmostEqual(result["rate"], 0.5)
 
-    def test_load_json_and_csv_together(self):
-        """JSON + CSV 동시 로드."""
-        from session_io import load_session_with_trials
+    def test_load_json_with_trial_history(self):
+        """trial_history 포함 JSON 로드."""
+        from session_io import load_session
 
-        json_path = self._create_json_and_csv(
-            "tunneling",
-            {"total": 3, "rate": 0.33},
-            [[1, 1.0, 12, 0.1, 1], [2, 2.5, 20, 0.05, 0], [3, 4.0, 12, 0.1, 1]],
-            ["trial", "time_s", "barrier_width", "tunnel_prob", "result"],
-        )
-
-        session, trials = load_session_with_trials(json_path, "tunneling")
-        self.assertIsNotNone(session)
-        self.assertEqual(session["total"], 3)
-        self.assertEqual(len(trials), 3)
-        self.assertEqual(trials[0]["trial"], "1")
-
-    def test_load_json_without_csv(self):
-        """CSV 없이 JSON만 있을 때."""
-        from session_io import load_session_with_trials
-
-        json_path = os.path.join(self.tmpdir, "tunneling_stats_20260220_120000.json")
-        with open(json_path, "w") as f:
-            json.dump({"total": 5}, f)
-
-        session, trials = load_session_with_trials(json_path, "tunneling")
-        self.assertIsNotNone(session)
-        self.assertEqual(session["total"], 5)
-        self.assertEqual(trials, [])
-
-    def test_load_with_custom_parse_fn(self):
-        """custom trial_parse_fn으로 CSV 행 변환."""
-        from session_io import load_session_with_trials
-
-        json_path = self._create_json_and_csv(
-            "tunneling",
-            {"total": 2},
-            [[1, 1.5, 10, 0.2, 1], [2, 3.0, 15, 0.1, 0]],
-            ["trial", "time_s", "barrier_width", "tunnel_prob", "result"],
-        )
-
-        parse_fn = lambda row: {
-            "t": float(row["time_s"]),
-            "barrier": int(row["barrier_width"]),
-            "prob": float(row["tunnel_prob"]),
-            "result": bool(int(row["result"])),
+        data = {
+            "total": 3,
+            "trial_history": [
+                {"t": 1.0, "result": True},
+                {"t": 2.0, "result": False},
+            ],
         }
+        path = os.path.join(self.tmpdir, "test.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
 
-        session, trials = load_session_with_trials(json_path, "tunneling", trial_parse_fn=parse_fn)
-        self.assertIsNotNone(session)
-        self.assertEqual(len(trials), 2)
-        self.assertAlmostEqual(trials[0]["t"], 1.5)
-        self.assertEqual(trials[0]["barrier"], 10)
-        self.assertTrue(trials[0]["result"])
-        self.assertFalse(trials[1]["result"])
-
-    def test_load_invalid_json_returns_none_empty(self):
-        """잘못된 JSON은 (None, []) 반환."""
-        from session_io import load_session_with_trials
-
-        session, trials = load_session_with_trials("/nonexistent.json", "test")
-        self.assertIsNone(session)
-        self.assertEqual(trials, [])
+        result = load_session(path)
+        self.assertEqual(result["total"], 3)
+        self.assertEqual(len(result["trial_history"]), 2)
+        self.assertTrue(result["trial_history"][0]["result"])
 
 
 # ═══════════════════════════════════════════════════════════
@@ -812,50 +751,35 @@ class TestSessionIoRoundtrip(unittest.TestCase):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_json_export_then_load(self):
-        """JSON 내보내기 → load_session_json으로 로드."""
-        from session_io import export_session_json, load_session_json
+        """JSON 내보내기 → load_session으로 로드."""
+        from session_io import export_session, load_session
 
         session = {"attempts": 50, "rate": 0.4, "speed": 2.0}
-        export_session_json("roundtrip", session)
+        path = export_session("roundtrip", session)
 
-        json_files = [
-            os.path.join(self.tmpdir, f)
-            for f in os.listdir(self.tmpdir)
-            if f.endswith(".json")
-        ]
-        self.assertEqual(len(json_files), 1)
-
-        loaded = load_session_json(json_files[0])
+        loaded = load_session(path)
         self.assertIsNotNone(loaded)
         self.assertEqual(loaded["attempts"], 50)
         self.assertAlmostEqual(loaded["rate"], 0.4)
 
-    def test_json_csv_export_then_load_with_trials(self):
-        """JSON+CSV 내보내기 → load_session_with_trials로 로드."""
-        from session_io import export_session_json, load_session_with_trials
+    def test_json_with_trials_export_then_load(self):
+        """JSON + trial_rows 내보내기 → load_session으로 로드."""
+        from session_io import export_session, load_session
 
         session = {"total": 3}
         trials = [
-            {"trial": 1, "time_s": 1.0, "width": 10, "prob": 0.2, "res": 1},
-            {"trial": 2, "time_s": 2.0, "width": 15, "prob": 0.1, "res": 0},
-            {"trial": 3, "time_s": 3.5, "width": 10, "prob": 0.2, "res": 1},
+            {"t": 1.0, "width": 10, "prob": 0.2, "result": True},
+            {"t": 2.0, "width": 15, "prob": 0.1, "result": False},
+            {"t": 3.5, "width": 10, "prob": 0.2, "result": True},
         ]
-        columns = ["trial", "time_s", "width", "prob", "res"]
-        export_session_json("rt", session, trial_rows=trials, trial_columns=columns)
+        path = export_session("rt", session, trial_rows=trials)
 
-        json_files = [
-            os.path.join(self.tmpdir, f)
-            for f in os.listdir(self.tmpdir)
-            if f.startswith("rt_stats_") and f.endswith(".json")
-        ]
-        self.assertEqual(len(json_files), 1)
-
-        loaded_session, loaded_trials = load_session_with_trials(json_files[0], "rt")
-        self.assertIsNotNone(loaded_session)
-        self.assertEqual(loaded_session["total"], 3)
-        self.assertEqual(len(loaded_trials), 3)
-        self.assertEqual(loaded_trials[0]["trial"], "1")
-        self.assertEqual(loaded_trials[2]["res"], "1")
+        loaded = load_session(path)
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded["total"], 3)
+        self.assertEqual(len(loaded["trial_history"]), 3)
+        self.assertTrue(loaded["trial_history"][0]["result"])
+        self.assertFalse(loaded["trial_history"][1]["result"])
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1034,10 +958,10 @@ class TestExportFilenameUniqueness(unittest.TestCase):
 
     def test_different_prefixes_create_different_files(self):
         """다른 prefix는 다른 파일 생성."""
-        from session_io import export_session_json
+        from session_io import export_session
 
-        export_session_json("module_a", {"type": "a"})
-        export_session_json("module_b", {"type": "b"})
+        export_session("module_a", {"type": "a"})
+        export_session("module_b", {"type": "b"})
 
         files = os.listdir(self.tmpdir)
         a_files = [f for f in files if f.startswith("module_a")]
@@ -1047,27 +971,26 @@ class TestExportFilenameUniqueness(unittest.TestCase):
 
     def test_export_filename_format(self):
         """파일명이 {prefix}_stats_{timestamp}.json 형식인지."""
-        from session_io import export_session_json
+        from session_io import export_session
 
-        export_session_json("fmt_test", {"a": 1})
+        export_session("fmt_test", {"a": 1})
 
         files = os.listdir(self.tmpdir)
         self.assertEqual(len(files), 1)
         name = files[0]
         self.assertTrue(name.startswith("fmt_test_stats_"))
         self.assertTrue(name.endswith(".json"))
-        # timestamp 부분 추출: YYYYMMDD_HHMMSS
         ts_part = name.replace("fmt_test_stats_", "").replace(".json", "")
         self.assertEqual(len(ts_part), 15)  # 20260220_120000
 
 
 # ═══════════════════════════════════════════════════════════
-# 13. export_session_json 반환값이 JSON 파일 경로인지 확인
+# 13. export_session 반환값 검증
 # ═══════════════════════════════════════════════════════════
 
 
 class TestExportReturnValue(unittest.TestCase):
-    """export_session_json 반환값이 JSON 파일 경로인지 검증."""
+    """export_session 반환값 검증."""
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -1084,21 +1007,30 @@ class TestExportReturnValue(unittest.TestCase):
 
     def test_returns_json_file_path(self):
         """반환값이 .json 파일 경로여야 함."""
-        from session_io import export_session_json
+        from session_io import export_session
 
-        result = export_session_json("ret_test", {"key": "value"})
+        result = export_session("ret_test", {"key": "value"})
         self.assertIsNotNone(result)
         self.assertTrue(result.endswith(".json"))
         self.assertTrue(os.path.isfile(result))
 
     def test_returned_path_is_loadable(self):
-        """반환된 경로로 바로 load_session_json 호출 가능."""
-        from session_io import export_session_json, load_session_json
+        """반환된 경로로 바로 load_session 호출 가능."""
+        from session_io import export_session, load_session
 
-        path = export_session_json("load_test", {"count": 42})
-        loaded = load_session_json(path)
+        path = export_session("load_test", {"count": 42})
+        loaded = load_session(path)
         self.assertIsNotNone(loaded)
         self.assertEqual(loaded["count"], 42)
+
+    def test_csv_returns_csv_file_path(self):
+        """CSV 포맷 반환값이 .csv 파일 경로."""
+        from session_io import export_session
+
+        result = export_session("csv_ret", {"key": "value"}, fmt="csv")
+        self.assertIsNotNone(result)
+        self.assertTrue(result.endswith(".csv"))
+        self.assertTrue(os.path.isfile(result))
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1836,6 +1768,150 @@ class TestAutoParseCSVBool(unittest.TestCase):
         self.assertIs(result["enabled"], True)
         self.assertIs(result["visible"], False)
         shutil.rmtree(os.path.dirname(path), ignore_errors=True)
+
+
+# ═══════════════════════════════════════════════════════════
+# 24. settings_io — 가져오기 전 백업 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestImportSettingsBackup(unittest.TestCase):
+    """import_settings 시 기존 파일의 .bak 백업 생성 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.fake_base = tempfile.mkdtemp()
+        import settings_io
+
+        self._orig_base = settings_io._BASE
+        settings_io._BASE = self.fake_base
+
+    def tearDown(self):
+        import settings_io
+
+        settings_io._BASE = self._orig_base
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        shutil.rmtree(self.fake_base, ignore_errors=True)
+
+    def test_backup_created_on_overwrite(self):
+        """기존 config.json이 있으면 .bak 백업 생성."""
+        from settings_io import import_settings
+
+        # 기존 파일 생성
+        existing = os.path.join(self.fake_base, "config.json")
+        with open(existing, "w") as f:
+            json.dump({"old": "data"}, f)
+
+        # ZIP 생성
+        zip_path = os.path.join(self.tmpdir, "test.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("config.json", json.dumps({"new": "data"}))
+
+        import_settings(zip_path)
+
+        # .bak 파일 생성 확인
+        bak_path = existing + ".bak"
+        self.assertTrue(os.path.exists(bak_path))
+        with open(bak_path, encoding="utf-8") as f:
+            bak_data = json.load(f)
+        self.assertEqual(bak_data["old"], "data")
+
+        # 새 파일 확인
+        with open(existing, encoding="utf-8") as f:
+            new_data = json.load(f)
+        self.assertEqual(new_data["new"], "data")
+
+    def test_no_backup_for_new_file(self):
+        """기존 파일이 없으면 .bak 미생성."""
+        from settings_io import import_settings
+
+        zip_path = os.path.join(self.tmpdir, "test.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("config.json", json.dumps({"new": "data"}))
+
+        import_settings(zip_path)
+
+        bak_path = os.path.join(self.fake_base, "config.json.bak")
+        self.assertFalse(os.path.exists(bak_path))
+
+
+# ═══════════════════════════════════════════════════════════
+# 25. export_session — fmt 검증 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportSessionFmtValidation(unittest.TestCase):
+    """export_session의 fmt 파라미터 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig_export_dir = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig_export_dir
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_invalid_fmt_falls_back_to_json(self):
+        """잘못된 fmt → json 폴백."""
+        from session_io import export_session
+
+        path = export_session("fb", {"a": 1}, fmt="xml")
+        self.assertIsNotNone(path)
+        self.assertTrue(path.endswith(".json"))
+
+    def test_csv_fmt_creates_csv(self):
+        """fmt='csv' → .csv 파일 생성."""
+        from session_io import export_session
+
+        path = export_session("fmt", {"a": 1}, fmt="csv")
+        self.assertIsNotNone(path)
+        self.assertTrue(path.endswith(".csv"))
+
+    def test_json_fmt_creates_json(self):
+        """fmt='json' → .json 파일 생성."""
+        from session_io import export_session
+
+        path = export_session("fmt", {"a": 1}, fmt="json")
+        self.assertIsNotNone(path)
+        self.assertTrue(path.endswith(".json"))
+
+
+# ═══════════════════════════════════════════════════════════
+# 26. _export_as_csv — bool 명시적 처리 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExportCsvBool(unittest.TestCase):
+    """CSV 내보내기에서 bool 값의 라운드트립."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig_export_dir = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig_export_dir
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_bool_roundtrip_csv(self):
+        """bool 값 CSV 라운드트립: True/False → 'True'/'False' → True/False."""
+        from session_io import export_session, load_session
+
+        session = {"enabled": True, "visible": False, "count": 42}
+        path = export_session("bool_rt", session, fmt="csv")
+        loaded = load_session(path)
+        self.assertIs(loaded["enabled"], True)
+        self.assertIs(loaded["visible"], False)
+        self.assertEqual(loaded["count"], 42)
 
 
 if __name__ == "__main__":

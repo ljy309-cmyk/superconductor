@@ -32,6 +32,17 @@ _EXPORT_DIRS = [
 ]
 
 
+def _backup_before_overwrite(dest: str) -> None:
+    """기존 파일이 있으면 ``.bak`` 백업 생성."""
+    if os.path.exists(dest):
+        bak = dest + ".bak"
+        try:
+            shutil.copy2(dest, bak)
+            _log.info("백업 생성: %s", bak)
+        except OSError as e:
+            _log.warning("백업 실패: %s", e)
+
+
 def export_settings(output_dir: str | None = None) -> str:
     """현재 설정을 ZIP 파일로 내보내기.
 
@@ -115,12 +126,14 @@ def import_settings(zip_path: str) -> dict:
                     dest = os.path.join(_BASE, member)
                     dest_dir = os.path.dirname(dest)
                     os.makedirs(dest_dir, exist_ok=True)
+                    _backup_before_overwrite(dest)
                     with open(dest, "wb") as dst:
                         dst.write(raw)
                 else:
                     dest = os.path.join(_BASE, member)
                     dest_dir = os.path.dirname(dest)
                     os.makedirs(dest_dir, exist_ok=True)
+                    _backup_before_overwrite(dest)
                     with zf.open(member) as src, open(dest, "wb") as dst:
                         shutil.copyfileobj(src, dst)
                 result["imported"].append(member)
