@@ -25,6 +25,8 @@ from quantum.tunneling_physics import (
     SIM_TOP,
     SIM_W,
     SUPERPOSITION_HZ,
+    TRAIL_MAX_LENGTH,
+    TRAIL_RECORD_INTERVAL,
     TUNNEL_PROB_BASE,
     TUNNEL_SPEED_BOOST,
     _NUM_SHAPES,
@@ -2010,6 +2012,98 @@ class TestBarrierPotential(unittest.TestCase):
             v_right = barrier_potential(br - d, BARRIER_WIDTH_DEFAULT, SHAPE_TRIANGLE)
             self.assertAlmostEqual(v_left, v_right, places=5,
                                    msg=f"d={d}: left={v_left}, right={v_right}")
+
+
+class TestParticleTrail(unittest.TestCase):
+    """입자 궤적 잔상(trail) 테스트."""
+
+    def test_trail_starts_empty(self):
+        """새 입자의 trail은 비어 있어야 한다."""
+        p = QuantumParticle()
+        self.assertEqual(p.trail, [])
+
+    def test_trail_records_positions(self):
+        """update 호출 시 trail에 위치가 기록된다."""
+        p = QuantumParticle()
+        # record_interval 이상의 dt로 업데이트
+        dt = TRAIL_RECORD_INTERVAL + 0.001
+        p.update(dt)
+        self.assertGreaterEqual(len(p.trail), 1)
+        x, y, tunneled = p.trail[0]
+        self.assertIsInstance(x, float)
+        self.assertIsInstance(y, float)
+
+    def test_trail_stores_tunneled_state(self):
+        """trail 항목은 (x, y, tunneled) 형태이다."""
+        p = QuantumParticle()
+        dt = TRAIL_RECORD_INTERVAL + 0.001
+        p.update(dt)
+        self.assertEqual(len(p.trail[0]), 3)
+        # 초기 상태: tunneled는 None
+        self.assertIsNone(p.trail[0][2])
+
+    def test_trail_max_length(self):
+        """trail은 TRAIL_MAX_LENGTH를 초과하지 않는다."""
+        p = QuantumParticle()
+        dt = TRAIL_RECORD_INTERVAL + 0.001
+        for _ in range(TRAIL_MAX_LENGTH + 50):
+            p.update(dt)
+        self.assertLessEqual(len(p.trail), TRAIL_MAX_LENGTH)
+
+    def test_trail_clears_on_reset(self):
+        """reset() 호출 시 trail이 초기화된다."""
+        p = QuantumParticle()
+        dt = TRAIL_RECORD_INTERVAL + 0.001
+        for _ in range(10):
+            p.update(dt)
+        self.assertGreater(len(p.trail), 0)
+        p.reset()
+        self.assertEqual(p.trail, [])
+
+    def test_trail_not_recorded_below_interval(self):
+        """record_interval보다 짧은 dt에서는 기록되지 않을 수 있다."""
+        p = QuantumParticle()
+        tiny_dt = TRAIL_RECORD_INTERVAL * 0.1
+        p.update(tiny_dt)
+        # 간격 미달 시 기록 없음
+        self.assertEqual(len(p.trail), 0)
+
+    def test_trail_accumulates_timer(self):
+        """작은 dt를 반복하면 타이머 누적으로 결국 기록된다."""
+        p = QuantumParticle()
+        tiny_dt = TRAIL_RECORD_INTERVAL * 0.3
+        for _ in range(10):
+            p.update(tiny_dt)
+        # 3~4회 누적이면 간격 초과 → 기록 있어야 함
+        self.assertGreater(len(p.trail), 0)
+
+    def test_new_particle_trail_independent(self):
+        """새 QuantumParticle은 독립적인 trail을 가진다."""
+        p1 = QuantumParticle()
+        dt = TRAIL_RECORD_INTERVAL + 0.001
+        for _ in range(5):
+            p1.update(dt)
+        p2 = QuantumParticle()
+        self.assertEqual(len(p2.trail), 0)
+        self.assertGreater(len(p1.trail), 0)
+
+    def test_trail_positions_match_particle(self):
+        """기록된 trail 위치는 입자의 실제 이동 경로상에 있다."""
+        p = QuantumParticle()
+        dt = TRAIL_RECORD_INTERVAL + 0.001
+        p.update(dt)
+        if p.trail:
+            tx, ty, _ = p.trail[-1]
+            # 시뮬레이션 영역 내에 있어야 함
+            self.assertGreaterEqual(tx, SIM_LEFT - 30)
+            self.assertLessEqual(tx, SIM_LEFT + SIM_W + 30)
+            self.assertGreaterEqual(ty, SIM_TOP - PARTICLE_RADIUS)
+            self.assertLessEqual(ty, SIM_TOP + SIM_H + PARTICLE_RADIUS)
+
+    def test_trail_config_constants(self):
+        """trail 설정 상수가 유효한 범위이다."""
+        self.assertGreater(TRAIL_MAX_LENGTH, 0)
+        self.assertGreater(TRAIL_RECORD_INTERVAL, 0)
 
 
 if __name__ == "__main__":

@@ -900,6 +900,9 @@
   "tn_dm_on": "확률밀도 히트맵 ON",
   "tn_dm_off": "확률밀도 히트맵 OFF",
 
+  "tn_trail_on": "입자 궤적 잔상 ON",
+  "tn_trail_off": "입자 궤적 잔상 OFF",
+
   "tn_shape_rect": "사각형",
   "tn_shape_triangle": "삼각형",
   "tn_shape_trapezoid": "사다리꼴",

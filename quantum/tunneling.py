@@ -42,6 +42,7 @@ from quantum.tunneling_physics import (
     SIM_LEFT,
     SIM_TOP,
     SIM_W,
+    TRAIL_MAX_LENGTH,
     TUNNEL_PROB_BASE,
     TUNNEL_SPEED_BOOST,
     SHAPE_DOUBLE,
@@ -351,6 +352,59 @@ def _draw_particle(screen, p: QuantumParticle, font):
     state_text = f"|{p.qubit_state(time_ms)}⟩"
     surf = font.render(state_text, True, WHITE)
     screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
+
+
+# ── 입자 궤적 잔상 ────────────────────────────────────
+
+_trail_visible = False
+
+
+def _draw_particle_trail(screen, p: QuantumParticle):
+    """입자의 이전 경로를 반투명 잔상으로 렌더링.
+
+    각 잔상 점은 시간이 지남에 따라 투명도가 증가하며,
+    터널링 상태에 따라 색상이 변화하여 확률 분포를 직관적으로 표현한다.
+    """
+    trail = p.trail
+    n = len(trail)
+    if n < 2:
+        return
+
+    reduced = is_reduced_motion()
+    trail_surf = pygame.Surface((SIM_W, SIM_H), pygame.SRCALPHA)
+    ox, oy = SIM_LEFT, SIM_TOP
+
+    for i in range(n - 1):
+        x0, y0, st0 = trail[i]
+        x1, y1, st1 = trail[i + 1]
+
+        # 오래된 점일수록 투명 (0→거의 투명, n-1→가장 진함)
+        frac = (i + 1) / n
+        alpha = int(20 + 100 * frac)
+
+        # 터널링 상태에 따른 색상 결정
+        if st1 is True:
+            color = TUNNEL_FLASH
+        elif st1 is False:
+            color = REFLECT_CLR
+        else:
+            color = PARTICLE_CLR
+
+        sx0 = int(x0) - ox
+        sy0 = int(y0) - oy
+        sx1 = int(x1) - ox
+        sy1 = int(y1) - oy
+
+        # 선분 잔상
+        line_w = max(1, int(3 * frac))
+        pygame.draw.line(trail_surf, (*color[:3], alpha), (sx0, sy0), (sx1, sy1), line_w)
+
+        # 잔상 점 (reduced-motion에서는 점 생략)
+        if not reduced and i % 2 == 0:
+            dot_r = max(1, int(PARTICLE_RADIUS * 0.4 * frac))
+            pygame.draw.circle(trail_surf, (*color[:3], alpha // 2), (sx1, sy1), dot_r)
+
+    screen.blit(trail_surf, (ox, oy))
 
 
 def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
@@ -1289,6 +1343,12 @@ def run_simulation():
                     shape_key = f"tn_shape_{SHAPE_NAMES[_barrier_shape]}"
                     _notify(t("tn_shape_changed", shape=t(shape_key)), "info", 1.5)
                     snd.play("click")
+                elif event.key == pygame.K_t:
+                    global _trail_visible
+                    _trail_visible = not _trail_visible
+                    key = "tn_trail_on" if _trail_visible else "tn_trail_off"
+                    _notify(t(key), "info", 1.0)
+                    snd.play("click")
                 elif event.key == pygame.K_l:
                     toggle_locale()
                 elif event.key == pygame.K_g:
@@ -1455,6 +1515,10 @@ def run_simulation():
             if _wf_visible:
                 _draw_wavefunction(screen, font, barrier_width,
                                    pygame.time.get_ticks())
+
+            # 입자 궤적 잔상
+            if _trail_visible:
+                _draw_particle_trail(screen, particle)
 
             # 입자
             _draw_particle(screen, particle, font)

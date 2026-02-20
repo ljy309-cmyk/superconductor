@@ -31,6 +31,8 @@ _TUNNEL_DECAY = cfg("tunneling", "tunnel_decay_rate", 0.02)
 _VY_RANGE = cfg("tunneling", "particle_vy_range", 60.0)
 _TUNNEL_FLASH = cfg("tunneling", "tunnel_flash_sec", 0.6)
 _REFLECT_FLASH = cfg("tunneling", "reflect_flash_sec", 0.4)
+TRAIL_MAX_LENGTH = cfg("tunneling", "trail_max_length", 60)
+TRAIL_RECORD_INTERVAL = cfg("tunneling", "trail_record_interval", 0.016)
 
 # ── 영역 레이아웃 ────────────────────────────────────
 # 왼쪽: 터널링 시뮬레이션 | 오른쪽: 블로흐 구
@@ -317,6 +319,8 @@ class QuantumParticle:
         self.tunnel_count = 0
         self.reflect_count = 0
         self.total_attempts = 0
+        self.trail: list[tuple[float, float, bool | None]] = []
+        self._trail_timer = 0.0
 
     def reset(self):
         """입자를 왼쪽에서 다시 발사."""
@@ -327,6 +331,8 @@ class QuantumParticle:
         self.alive = True
         self.tunneled: bool | None = None  # None=미결정, True=터널링, False=반사
         self.flash_timer = 0.0
+        self.trail = []
+        self._trail_timer = 0.0
 
     def qubit_state(self, time_ms: float) -> int:
         """현재 중첩 상태에서의 '관측값' (빠르게 교차).
@@ -410,3 +416,11 @@ class QuantumParticle:
 
         if self.flash_timer > 0:
             self.flash_timer = max(0.0, self.flash_timer - dt)
+
+        # ── 궤적 잔상 기록 ──
+        self._trail_timer += dt
+        if self._trail_timer >= TRAIL_RECORD_INTERVAL:
+            self._trail_timer = 0.0
+            self.trail.append((self.x, self.y, self.tunneled))
+            if len(self.trail) > TRAIL_MAX_LENGTH:
+                self.trail.pop(0)

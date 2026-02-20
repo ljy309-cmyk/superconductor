@@ -900,6 +900,9 @@
   "tn_dm_on": "Density heatmap ON",
   "tn_dm_off": "Density heatmap OFF",
 
+  "tn_trail_on": "Particle trail ON",
+  "tn_trail_off": "Particle trail OFF",
+
   "tn_shape_rect": "Rectangular",
   "tn_shape_triangle": "Triangular",
   "tn_shape_trapezoid": "Trapezoidal",

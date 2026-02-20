@@ -59,7 +59,9 @@
     "tunnel_decay_rate": 0.02,
     "particle_vy_range": 60.0,
     "tunnel_flash_sec": 0.6,
-    "reflect_flash_sec": 0.4
+    "reflect_flash_sec": 0.4,
+    "trail_max_length": 60,
+    "trail_record_interval": 0.016
   },
   "qec_shield": {
     "noise_rate": 5.0,
