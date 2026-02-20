@@ -1118,6 +1118,12 @@ class _SimContext:
         # 배리어 스위퍼 (#29)
         self.sweeper: BarrierSweeper | None = None
 
+        # 스텝별 실행 모드 (#30)
+        self.step_mode = False
+        self.step_pending = False  # N 키로 한 프레임 진행 요청
+        self.step_count = 0  # 스텝 모드에서 진행한 총 프레임 수
+        self.step_dt = 0.0  # 마지막 스텝의 dt 값
+
     def read_sliders(self):
         """슬라이더 값 → 물리 파라미터 동기화."""
         self.speed_mult = self.sl_speed.value
@@ -1247,6 +1253,20 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         else:
             ctx.sweeper = None
             _log.info("배리어 스위퍼 취소 (F3)")
+    elif key == pygame.K_F4:
+        # 스텝별 실행 모드 토글 (#30)
+        ctx.step_mode = not ctx.step_mode
+        if ctx.step_mode:
+            ctx.paused = True  # 스텝 모드 진입 시 자동 일시정지
+            ctx.step_count = 0
+            _log.info("스텝 모드 ON")
+        else:
+            _log.info("스텝 모드 OFF")
+    elif key == pygame.K_n:
+        # 스텝 모드에서 한 프레임 진행 (#30)
+        if ctx.step_mode:
+            ctx.step_pending = True
+            _log.debug("스텝 진행 요청 (프레임 #%d)", ctx.step_count + 1)
     return running
 
 
@@ -1677,6 +1697,12 @@ def _render_frame(ctx: _SimContext):
     t_surf = _tcache.render(ctx.big_font, t("game_title_tunneling"), ACCENT)
     ctx.screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
 
+    # 스텝 모드 인디케이터 (#30)
+    if ctx.step_mode:
+        step_label = t("tn_step_indicator", frame=ctx.step_count, dt=ctx.step_dt * 1000)
+        step_surf = _tcache.render(ctx.font, step_label, TUNNEL_FLASH)
+        ctx.screen.blit(step_surf, (SIM_LEFT, 38))
+
     _draw_sim_area(ctx.screen, ctx.font, ctx.barrier_width, ctx.barrier_hover, ctx.barrier_dragging)
     _draw_wavefunction(ctx.screen, ctx.barrier_width, ctx.tunnel_prob, pygame.time.get_ticks())
     _draw_trails(ctx.screen, ctx.trail_cache, ctx.trails, ctx.current_trail, ctx.particle.tunneled)
@@ -1699,12 +1725,12 @@ def _render_frame(ctx: _SimContext):
             sim_speed=speed_label(),
             width=ctx.barrier_width,
             prob=ctx.tunnel_prob * 100,
-            pause_state=t("paused") if ctx.paused else t("running_state"),
+            pause_state=t("tn_step_mode") if ctx.step_mode else (t("paused") if ctx.paused else t("running_state")),
         ),
         t("hint_click_launch"),
         t("hint_pause_reset")
         + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X/I: Export/Import"
-        + f"  |  F3: {t('tn_sweep_title')}  |  G: {t('glossary_title')}",
+        + f"  |  F3: {t('tn_sweep_title')}  |  F4: {t('tn_step_mode')}  |  G: {t('glossary_title')}",
     ]
     for i, h in enumerate(hints):
         surf = _tcache.render(ctx.font, h, TEXT_CLR)
@@ -1776,7 +1802,13 @@ def run_simulation():
         running = _handle_events(ctx)
         ctx.read_sliders()
 
-        if not ctx.paused:
+        # 스텝 모드 (#30): N 키로 한 프레임씩 진행
+        if ctx.step_mode and ctx.step_pending:
+            ctx.step_pending = False
+            ctx.step_count += 1
+            ctx.step_dt = dt
+            _step_physics(ctx, dt)
+        elif not ctx.paused:
             _step_physics(ctx, dt)
 
         ctx.toast.update(raw_dt)

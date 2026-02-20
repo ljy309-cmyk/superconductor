@@ -513,6 +513,9 @@
   "tn_sweep_theory": "이론",
   "tn_sweep_restart": "재시작",
 
+  "tn_step_mode": "스텝 모드",
+  "tn_step_indicator": "[STEP] 프레임 #{frame}  dt={dt:.1f}ms  (N: 다음 스텝)",
+
   "glossary_title": "용어집",
   "glossary_nav_hint": "↑↓: 스크롤  |  G/ESC: 닫기",
 

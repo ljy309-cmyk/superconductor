@@ -2094,6 +2094,56 @@ class TestHelpOverlayShortcuts(unittest.TestCase):
         self.assertIn("SPACE", joined)
 
 
+class TestStepMode(unittest.TestCase):
+    """#30 — 스텝별 실행 모드 테스트."""
+
+    def test_help_has_f4(self):
+        """터널링 도움말에 F4 스텝 모드 안내 포함."""
+        from help_overlay import _HELP_TEXTS
+
+        lines = _HELP_TEXTS.get("tunneling", [])
+        joined = " ".join(lines)
+        self.assertIn("F4", joined)
+
+    def test_help_has_step_n(self):
+        """터널링 도움말에 N (한 프레임 진행) 안내 포함."""
+        from help_overlay import _HELP_TEXTS
+
+        lines = _HELP_TEXTS.get("tunneling", [])
+        joined = " ".join(lines)
+        self.assertIn("N:", joined)
+
+    def test_i18n_step_keys_exist_ko(self):
+        """한국어 로케일에 스텝 모드 i18n 키 존재."""
+        import json
+
+        with open("locale/ko.json", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIn("tn_step_mode", data)
+        self.assertIn("tn_step_indicator", data)
+
+    def test_i18n_step_keys_exist_en(self):
+        """영어 로케일에 스텝 모드 i18n 키 존재."""
+        import json
+
+        with open("locale/en.json", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIn("tn_step_mode", data)
+        self.assertIn("tn_step_indicator", data)
+
+    def test_step_indicator_format(self):
+        """스텝 인디케이터 문자열 포맷 유효."""
+        import json
+
+        with open("locale/en.json", encoding="utf-8") as f:
+            data = json.load(f)
+        tmpl = data["tn_step_indicator"]
+        # frame과 dt 파라미터로 포맷 가능해야 함
+        result = tmpl.format(frame=10, dt=16.7)
+        self.assertIn("10", result)
+        self.assertIn("16.7", result)
+
+
 class TestPhysicsLogging(unittest.TestCase):
     """#25 — 물리 엔진 로깅 테스트."""
 

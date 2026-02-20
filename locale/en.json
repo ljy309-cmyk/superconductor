@@ -513,6 +513,9 @@
   "tn_sweep_theory": "Theory",
   "tn_sweep_restart": "Restart",
 
+  "tn_step_mode": "Step Mode",
+  "tn_step_indicator": "[STEP] Frame #{frame}  dt={dt:.1f}ms  (N: next step)",
+
   "glossary_title": "Glossary",
   "glossary_nav_hint": "Up/Down: Scroll  |  G/ESC: Close",
 
