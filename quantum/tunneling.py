@@ -46,6 +46,7 @@ from quantum.tunneling_physics import (
     TUNNEL_SPEED_BOOST,
     QuantumParticle,
     _calc_tunnel_prob,
+    compute_potential_profile,
     compute_wavefunction,
 )
 from quit_dialog import confirm_quit
@@ -170,6 +171,12 @@ class Layout:
         self.wf_h = int(120 * sy)                       # 그래프 높이
         self.wf_label_x = SIM_LEFT + int(5 * sx)        # 라벨 X
         self.wf_label_y = SIM_TOP + SIM_H - int(135 * sy)  # 라벨 Y
+
+        # 포텐셜 에너지 다이어그램 (시뮬레이션 영역 상단에 오버레이)
+        self.pe_h = int(100 * sy)                        # 그래프 높이
+        self.pe_y = SIM_TOP + int(22 * sy)               # 그래프 시작 Y
+        self.pe_label_x = SIM_LEFT + int(5 * sx)         # 라벨 X
+        self.pe_label_y = SIM_TOP + int(8 * sy)          # 라벨 Y
 
         # Compare 모드 레이아웃
         self.cmp_title_y = int(50 * sy)
@@ -484,6 +491,122 @@ def _draw_wavefunction(screen, font, barrier_width: int, time_ms: float):
         (PARTICLE_CLR, t("tn_wf_incident")),
         (BARRIER_CLR, t("tn_wf_decay")),
         (TUNNEL_FLASH, t("tn_wf_transmitted")),
+    ]
+    for i, (clr, txt) in enumerate(legend_items):
+        lx = legend_x
+        ly = legend_y + i * (L.line_h_sm + 1)
+        pygame.draw.rect(screen, clr, (lx, ly + 2, 10, 8))
+        ls = font.render(txt, True, TEXT_CLR)
+        screen.blit(ls, (lx + 14, ly))
+
+
+# ── 포텐셜 에너지 다이어그램 ──────────────────────────
+
+_pe_visible = False
+_PE_N_POINTS = 200
+
+
+def _draw_potential_energy(screen, font, barrier_width: int):
+    """포텐셜 에너지 V(x) 다이어그램을 시뮬레이션 영역 상단에 오버레이.
+
+    - V(x): 장벽 영역 = V₀ (노란색), 그 외 = 0
+    - E: 입자 에너지 수평 점선 (파란색)
+    - E < V₀ 이므로 고전역학적으로 장벽 통과 불가능을 시각적으로 표현
+    """
+    L = _layout
+    hc = is_high_contrast()
+
+    xs, potentials, energy = compute_potential_profile(
+        barrier_width, _PE_N_POINTS
+    )
+
+    # 그래프 영역 배경 (반투명)
+    graph_rect = (SIM_LEFT, L.pe_y, SIM_W, L.pe_h)
+    bg_surf = pygame.Surface((SIM_W, L.pe_h), pygame.SRCALPHA)
+    bg_surf.fill((*BG[:3], 180))
+    screen.blit(bg_surf, (SIM_LEFT, L.pe_y))
+
+    # 프레임
+    frame_w = 2 if hc else 1
+    pygame.draw.rect(screen, OVERLAY_CLR, graph_rect, frame_w)
+
+    base_y = L.pe_y + L.pe_h - 4  # 바닥선 (V=0)
+    top_y = L.pe_y + 4              # 천장 (V=V₀)
+    usable_h = base_y - top_y
+
+    # V=0 기준선
+    pygame.draw.line(screen, BLOCH_RING, (SIM_LEFT, base_y),
+                     (SIM_LEFT + SIM_W, base_y), 1)
+
+    # V(x) 장벽 채움 — 사각형 포텐셜 장벽
+    half_w = barrier_width / 2.0
+    bx_left = int(BARRIER_X - half_w)
+    bx_right = int(BARRIER_X + half_w)
+    bw_px = max(bx_right - bx_left, 1)
+
+    # 장벽 영역 채움 (반투명 노란색)
+    fill_surf = pygame.Surface((bw_px, usable_h), pygame.SRCALPHA)
+    fill_surf.fill((*BARRIER_CLR[:3], 60))
+    screen.blit(fill_surf, (bx_left, top_y))
+
+    # V(x) 윤곽선 — 계단 형태
+    v_line_w = 2 if hc else 2
+    # 바닥 → 장벽 좌측 상승
+    pygame.draw.line(screen, BARRIER_CLR, (SIM_LEFT, base_y),
+                     (bx_left, base_y), v_line_w)
+    pygame.draw.line(screen, BARRIER_CLR, (bx_left, base_y),
+                     (bx_left, top_y), v_line_w)
+    # 장벽 상단
+    pygame.draw.line(screen, BARRIER_CLR, (bx_left, top_y),
+                     (bx_right, top_y), v_line_w)
+    # 장벽 우측 하강 → 바닥
+    pygame.draw.line(screen, BARRIER_CLR, (bx_right, top_y),
+                     (bx_right, base_y), v_line_w)
+    pygame.draw.line(screen, BARRIER_CLR, (bx_right, base_y),
+                     (SIM_LEFT + SIM_W, base_y), v_line_w)
+
+    # E (입자 에너지) 수평 점선 — 파란색
+    e_y = int(base_y - energy * usable_h)
+    dash_len = 8
+    gap_len = 5
+    e_line_w = 2 if hc else 1
+    x_cursor = SIM_LEFT
+    while x_cursor < SIM_LEFT + SIM_W:
+        x_end = min(x_cursor + dash_len, SIM_LEFT + SIM_W)
+        pygame.draw.line(screen, PARTICLE_CLR, (x_cursor, e_y),
+                         (x_end, e_y), e_line_w)
+        x_cursor = x_end + gap_len
+
+    # V₀ 라벨 (장벽 높이)
+    v_label = font.render("V₀", True, BARRIER_CLR)
+    screen.blit(v_label, (bx_left - v_label.get_width() - 4, top_y - 2))
+
+    # E 라벨 (입자 에너지)
+    e_label = font.render("E", True, PARTICLE_CLR)
+    screen.blit(e_label, (SIM_LEFT + SIM_W + 4, e_y - e_label.get_height() // 2))
+
+    # E < V₀ 영역 표시 — 장벽 내에서 E와 V₀ 사이 해칭
+    if energy < 1.0:
+        forbidden_h = int((1.0 - energy) * usable_h)
+        forbidden_y = top_y
+        hatch_surf = pygame.Surface((bw_px, forbidden_h), pygame.SRCALPHA)
+        # 사선 해칭 패턴
+        for y_off in range(0, forbidden_h + bw_px, 8):
+            pygame.draw.line(hatch_surf, (*REFLECT_CLR[:3], 50),
+                             (0, y_off), (min(y_off, bw_px), max(y_off - bw_px, 0)), 1)
+        screen.blit(hatch_surf, (bx_left, forbidden_y))
+
+    # 타이틀 라벨
+    title = font.render(t("tn_pe_title"), True, ACCENT)
+    screen.blit(title, (L.pe_label_x, L.pe_label_y))
+
+    # 범례
+    legend_x = SIM_LEFT + SIM_W - 180
+    legend_y = L.pe_y + 5
+    legend_items = [
+        (BARRIER_CLR, t("tn_pe_barrier_v")),
+        (PARTICLE_CLR, t("tn_pe_particle_e")),
+        (REFLECT_CLR, t("tn_pe_forbidden")),
     ]
     for i, (clr, txt) in enumerate(legend_items):
         lx = legend_x
@@ -963,6 +1086,12 @@ def run_simulation():
                     key = "tn_wf_on" if _wf_visible else "tn_wf_off"
                     _notify(t(key), "info", 1.0)
                     snd.play("click")
+                elif event.key == pygame.K_e:
+                    global _pe_visible
+                    _pe_visible = not _pe_visible
+                    key = "tn_pe_on" if _pe_visible else "tn_pe_off"
+                    _notify(t(key), "info", 1.0)
+                    snd.play("click")
                 elif event.key == pygame.K_l:
                     toggle_locale()
                 elif event.key == pygame.K_g:
@@ -1112,6 +1241,10 @@ def run_simulation():
 
             # 시뮬레이션 영역
             _draw_sim_area(screen, font, barrier_width)
+
+            # 포텐셜 에너지 다이어그램 (시뮬레이션 영역 상단)
+            if _pe_visible:
+                _draw_potential_energy(screen, font, barrier_width)
 
             # 파동함수 오버레이 (입자 아래, 시뮬레이션 영역 내)
             if _wf_visible:

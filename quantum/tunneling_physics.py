@@ -142,6 +142,54 @@ def compute_wavefunction(
     return xs, amplitudes, regions
 
 
+# ── 포텐셜 에너지 다이어그램 ──────────────────────────
+# V(x): 장벽 영역에서만 V > 0, 나머지는 V = 0
+# E  : 입자 운동에너지 (장벽보다 낮으므로 고전역학적으로 통과 불가)
+#
+# 정규화 기준: V_max = 1.0, E = E_ratio (0 < E < 1)
+
+_PE_ENERGY_RATIO = 0.4  # 입자 에너지 / 장벽 높이 비율 (기본 40%)
+
+
+def compute_potential_profile(
+    barrier_width: int = BARRIER_WIDTH_DEFAULT,
+    n_points: int = 200,
+    energy_ratio: float = _PE_ENERGY_RATIO,
+) -> tuple[list[float], list[float], float]:
+    """1D 포텐셜 에너지 V(x) 프로필과 입자 에너지 E를 계산.
+
+    Args:
+        barrier_width: 장벽 두께 (px 단위, 시뮬레이션 좌표계).
+        n_points: 계산할 x 좌표 개수.
+        energy_ratio: 입자 에너지 / 장벽 높이 비율 (0.0~1.0).
+
+    Returns:
+        (xs, potentials, energy) 튜플:
+        - xs: x 좌표 리스트 (SIM_LEFT ~ SIM_LEFT+SIM_W)
+        - potentials: V(x) 값 (0.0 또는 1.0, 정규화됨)
+        - energy: 입자 에너지 E (0.0~1.0, 정규화됨)
+    """
+    half_w = barrier_width / 2.0
+    barrier_left = BARRIER_X - half_w
+    barrier_right = BARRIER_X + half_w
+
+    xs: list[float] = []
+    potentials: list[float] = []
+
+    dx = SIM_W / max(n_points - 1, 1)
+
+    for i in range(n_points):
+        x = SIM_LEFT + i * dx
+        xs.append(x)
+        if barrier_left <= x <= barrier_right:
+            potentials.append(1.0)
+        else:
+            potentials.append(0.0)
+
+    energy = max(0.0, min(1.0, energy_ratio))
+    return xs, potentials, energy
+
+
 # ── 입자 클래스 ──────────────────────────────────────
 
 

@@ -28,6 +28,7 @@ from quantum.tunneling_physics import (
     _TUNNEL_FLASH,
     _VY_RANGE,
     _calc_tunnel_prob,
+    compute_potential_profile,
     compute_wavefunction,
 )
 
@@ -1618,6 +1619,118 @@ class TestComputeWavefunction(unittest.TestCase):
     def test_x_monotonically_increasing(self):
         """x 좌표가 단조 증가해야 한다."""
         xs, _, _ = compute_wavefunction()
+        for i in range(1, len(xs)):
+            self.assertGreater(xs[i], xs[i - 1])
+
+
+# ── 포텐셜 에너지 프로필 compute_potential_profile 테스트 ──
+
+
+class TestComputePotentialProfile(unittest.TestCase):
+    """compute_potential_profile() 반환값 검증."""
+
+    def test_returns_tuple_of_three(self):
+        """반환 타입이 (list, list, float) 튜플이어야 한다."""
+        xs, potentials, energy = compute_potential_profile()
+        self.assertIsInstance(xs, list)
+        self.assertIsInstance(potentials, list)
+        self.assertIsInstance(energy, float)
+
+    def test_default_n_points(self):
+        """기본 n_points=200이면 200개 포인트를 반환."""
+        xs, pots, _ = compute_potential_profile(n_points=200)
+        self.assertEqual(len(xs), 200)
+        self.assertEqual(len(pots), 200)
+
+    def test_custom_n_points(self):
+        """사용자 지정 n_points가 반영된다."""
+        xs, pots, _ = compute_potential_profile(n_points=50)
+        self.assertEqual(len(xs), 50)
+
+    def test_x_range(self):
+        """x 좌표가 시뮬레이션 영역 내에 있어야 한다."""
+        xs, _, _ = compute_potential_profile()
+        self.assertAlmostEqual(xs[0], SIM_LEFT, places=1)
+        self.assertAlmostEqual(xs[-1], SIM_LEFT + SIM_W, places=1)
+
+    def test_potential_values_binary(self):
+        """V(x) 값이 0.0 또는 1.0이어야 한다."""
+        _, pots, _ = compute_potential_profile()
+        for v in pots:
+            self.assertIn(v, (0.0, 1.0))
+
+    def test_barrier_region_has_potential(self):
+        """장벽 영역 내 포인트의 V(x) = 1.0."""
+        bw = 40
+        xs, pots, _ = compute_potential_profile(barrier_width=bw, n_points=400)
+        half = bw / 2.0
+        for x, v in zip(xs, pots):
+            if BARRIER_X - half + 1 < x < BARRIER_X + half - 1:
+                self.assertEqual(v, 1.0, f"x={x} should be inside barrier")
+
+    def test_outside_barrier_zero_potential(self):
+        """장벽 외부의 V(x) = 0.0."""
+        bw = 40
+        xs, pots, _ = compute_potential_profile(barrier_width=bw, n_points=400)
+        half = bw / 2.0
+        for x, v in zip(xs, pots):
+            if x < BARRIER_X - half - 1 or x > BARRIER_X + half + 1:
+                self.assertEqual(v, 0.0, f"x={x} should be outside barrier")
+
+    def test_energy_default_range(self):
+        """기본 에너지가 0~1 범위여야 한다."""
+        _, _, energy = compute_potential_profile()
+        self.assertGreater(energy, 0.0)
+        self.assertLess(energy, 1.0)
+
+    def test_energy_ratio_clamped(self):
+        """에너지 비율이 0~1로 클램프된다."""
+        _, _, e_neg = compute_potential_profile(energy_ratio=-0.5)
+        self.assertGreaterEqual(e_neg, 0.0)
+        _, _, e_over = compute_potential_profile(energy_ratio=1.5)
+        self.assertLessEqual(e_over, 1.0)
+
+    def test_custom_energy_ratio(self):
+        """사용자 지정 에너지 비율이 반영된다."""
+        _, _, energy = compute_potential_profile(energy_ratio=0.7)
+        self.assertAlmostEqual(energy, 0.7, places=5)
+
+    def test_energy_less_than_barrier(self):
+        """기본 설정에서 E < V₀ (터널링 조건)."""
+        _, pots, energy = compute_potential_profile()
+        v_max = max(pots)
+        self.assertLess(energy, v_max)
+
+    def test_wider_barrier_more_potential_points(self):
+        """두꺼운 장벽은 더 많은 V=1.0 포인트를 생성."""
+        _, pots_thin, _ = compute_potential_profile(barrier_width=10, n_points=400)
+        _, pots_thick, _ = compute_potential_profile(barrier_width=100, n_points=400)
+        count_thin = sum(1 for v in pots_thin if v == 1.0)
+        count_thick = sum(1 for v in pots_thick if v == 1.0)
+        self.assertGreater(count_thick, count_thin)
+
+    def test_minimum_barrier_width(self):
+        """최소 장벽 두께에서 정상 동작."""
+        xs, pots, energy = compute_potential_profile(barrier_width=BARRIER_WIDTH_MIN)
+        self.assertEqual(len(xs), 200)
+        self.assertIn(1.0, pots)
+
+    def test_maximum_barrier_width(self):
+        """최대 장벽 두께에서 정상 동작."""
+        xs, pots, energy = compute_potential_profile(barrier_width=BARRIER_WIDTH_MAX)
+        self.assertEqual(len(xs), 200)
+        # 장벽 영역 비율: BARRIER_WIDTH_MAX / SIM_W ≈ 38%
+        count_barrier = sum(1 for v in pots if v == 1.0)
+        self.assertGreater(count_barrier, len(pots) // 4)
+
+    def test_single_point(self):
+        """n_points=1에서도 크래시 없이 동작."""
+        xs, pots, energy = compute_potential_profile(n_points=1)
+        self.assertEqual(len(xs), 1)
+
+    def test_x_monotonically_increasing(self):
+        """x 좌표가 단조 증가해야 한다."""
+        xs, _, _ = compute_potential_profile()
         for i in range(1, len(xs)):
             self.assertGreater(xs[i], xs[i - 1])
 
