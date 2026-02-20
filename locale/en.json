@@ -295,6 +295,14 @@
   "hint_click_launch": "Click: Relaunch  |  Drag Barrier Edge: Width  |  Drag Bloch: Rotate  |  Arrows: Params",
   "hint_pause_reset": "SPACE: Pause  |  R: Reset  |  ESC: Exit",
 
+  "ctx_hint_barrier": "Drag edge to adjust barrier width (← → keys)",
+  "ctx_hint_bloch": "Drag to rotate Bloch sphere 3D view",
+  "ctx_hint_formula": "Real-time tunnel probability (P = P₀ × e^(−κΔL))",
+  "ctx_hint_chart": "Rate converges to theory as trials increase",
+  "ctx_hint_sliders": "Adjust simulation parameters with sliders",
+  "ctx_hint_sim": "Click: Relaunch particle",
+  "ctx_hint_stats": "Tunneling/reflection stats and probability",
+
   "hint_reduction_info": "Reduction: x{red:.1f}  |  {shield_state}  |  {pause_state}",
   "hint_qec_controls": "S: Shield  |  H: Healing  |  Left/Right: Reduction  |  Right Panel: Sliders",
 

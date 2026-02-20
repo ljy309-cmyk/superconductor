@@ -898,6 +898,80 @@ def _step_physics(ctx: _SimContext, dt: float):
     )
 
 
+# ── 문맥별 힌트 ──────────────────────────────────────
+
+_HINT_PAD = 6
+
+
+def _get_contextual_hint(mx: int, my: int, ctx) -> str | None:
+    """마우스 위치에 따른 문맥별 힌트 반환. 우선순위 순으로 검사."""
+    # 오버레이 활성 시 / 드래그 중에는 숨김
+    if ctx.tutorial.visible or ctx.help_overlay.visible or ctx.glossary.visible:
+        return None
+    if ctx.barrier_dragging or ctx.bloch_dragging:
+        return None
+
+    in_sim_y = SIM_TOP <= my <= SIM_TOP + SIM_H
+
+    # ① 장벽 가장자리 (최우선 — 시뮬레이션 영역보다 우선)
+    left_edge = BARRIER_X - ctx.barrier_width // 2
+    right_edge = BARRIER_X + ctx.barrier_width // 2
+    tol2 = _BARRIER_EDGE_TOL * 2
+    if in_sim_y and (abs(mx - left_edge) <= tol2 or abs(mx - right_edge) <= tol2):
+        return t("ctx_hint_barrier")
+
+    # ② 블로흐 구
+    dx_b, dy_b = mx - BLOCH_CX, my - BLOCH_CY
+    if dx_b * dx_b + dy_b * dy_b <= (BLOCH_R + 10) ** 2:
+        return t("ctx_hint_bloch")
+
+    # ③ 수식 오버레이
+    if _FORMULA_X <= mx <= _FORMULA_X + _FORMULA_W and _FORMULA_Y <= my <= _FORMULA_Y + _FORMULA_H:
+        return t("ctx_hint_formula")
+
+    # ④ 확률 차트
+    if _CHART_X <= mx <= _CHART_X + _CHART_W and _CHART_Y <= my <= _CHART_Y + _CHART_H:
+        return t("ctx_hint_chart")
+
+    # ⑤ 통계 패널 (블로흐 구 아래)
+    stats_x = BLOCH_CX - BLOCH_R
+    stats_y = BLOCH_CY + BLOCH_R + 60
+    if stats_x <= mx <= stats_x + BLOCH_R * 2 and stats_y <= my <= stats_y + 70:
+        return t("ctx_hint_stats")
+
+    # ⑥ 슬라이더 패널
+    if mx >= WIDTH + 5 and 40 <= my <= 200:
+        return t("ctx_hint_sliders")
+
+    # ⑦ 시뮬레이션 영역 (최하위 — 장벽 힌트에 덮이지 않는 영역)
+    if SIM_LEFT <= mx <= SIM_LEFT + SIM_W and in_sim_y:
+        return t("ctx_hint_sim")
+
+    return None
+
+
+def _draw_contextual_hint(screen, font, hint: str, mx: int, my: int):
+    """마우스 근처에 툴팁 표시."""
+    surf = font.render(hint, True, TEXT_CLR)
+    tw = surf.get_width() + _HINT_PAD * 2
+    th = surf.get_height() + _HINT_PAD * 2
+
+    # 위치: 마우스 우하단, 화면 초과 시 조정
+    tx = mx + 14
+    ty = my + 18
+    sw = WIDTH + PANEL_W
+    if tx + tw > sw:
+        tx = mx - tw - 4
+    if ty + th > HEIGHT:
+        ty = my - th - 4
+
+    bg = pygame.Surface((tw, th), pygame.SRCALPHA)
+    bg.fill((*BG[:3], 220))
+    screen.blit(bg, (tx, ty))
+    pygame.draw.rect(screen, ACCENT, (tx, ty, tw, th), 1)
+    screen.blit(surf, (tx + _HINT_PAD, ty + _HINT_PAD))
+
+
 # ── 렌더링 ───────────────────────────────────────────
 
 
@@ -935,6 +1009,12 @@ def _render_frame(ctx: _SimContext):
     for i, h in enumerate(hints):
         surf = ctx.font.render(h, True, TEXT_CLR)
         ctx.screen.blit(surf, (SIM_LEFT, HEIGHT - 52 + i * 16))
+
+    # 문맥별 힌트 (오버레이 렌더링 전)
+    _mx, _my = pygame.mouse.get_pos()
+    _ctx_hint = _get_contextual_hint(_mx, _my, ctx)
+    if _ctx_hint:
+        _draw_contextual_hint(ctx.screen, ctx.font, _ctx_hint, _mx, _my)
 
     ctx.preset_hud.draw(ctx.screen, ctx.font)
     ctx.help_overlay.draw(ctx.screen, ctx.font)

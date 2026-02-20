@@ -295,6 +295,14 @@
   "hint_click_launch": "클릭: 재발사  |  장벽 가장자리 드래그: 두께  |  블로흐 드래그: 회전  |  ↑↓←→: 파라미터",
   "hint_pause_reset": "SPACE: 일시정지  |  R: 리셋  |  ESC: 종료",
 
+  "ctx_hint_barrier": "가장자리 드래그로 장벽 두께 조절 (←→ 키)",
+  "ctx_hint_bloch": "드래그로 블로흐 구 3D 회전",
+  "ctx_hint_formula": "실시간 터널링 확률 계산 (P = P₀ × e^(−κΔL))",
+  "ctx_hint_chart": "시행이 늘면 관측 확률이 이론값에 수렴",
+  "ctx_hint_sliders": "슬라이더로 시뮬레이션 파라미터 조절",
+  "ctx_hint_sim": "클릭: 입자 재발사",
+  "ctx_hint_stats": "터널링/반사 통계 및 현재 확률",
+
   "hint_reduction_info": "감쇠: x{red:.1f}  |  {shield_state}  |  {pause_state}",
   "hint_qec_controls": "S: 방어막  |  H: 힐링  |  ←→: 감쇠  |  우측 패널: 슬라이더",
 

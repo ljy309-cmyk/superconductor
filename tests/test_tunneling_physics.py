@@ -13,6 +13,7 @@
 #14 프리셋 중간 전환 (base_prob 파라미터)
 #15 사운드 이펙트 (배리어/업적/속도/프리셋)
 #16 수식 오버레이 동적 계산 검증
+#17 문맥별 힌트 (마우스 위치 기반 툴팁)
 """
 
 import math
@@ -1236,6 +1237,137 @@ class TestFormulaOverlayCalculations(unittest.TestCase):
             manual_result = bp * exp_val
             engine_result = _calc_tunnel_prob(bw, bp)
             self.assertAlmostEqual(manual_result, engine_result, places=10)
+
+
+class TestContextualHints(unittest.TestCase):
+    """#17 문맥별 힌트 — 마우스 위치에 따른 툴팁 반환."""
+
+    def setUp(self):
+        from quantum.tunneling import (
+            _BARRIER_EDGE_TOL,
+            _CHART_H,
+            _CHART_W,
+            _CHART_X,
+            _CHART_Y,
+            _FORMULA_H,
+            _FORMULA_W,
+            _FORMULA_X,
+            _FORMULA_Y,
+            BLOCH_CX,
+            BLOCH_CY,
+            BLOCH_R,
+            HEIGHT,
+            WIDTH,
+            _get_contextual_hint,
+        )
+
+        self._get_hint = _get_contextual_hint
+        self.BLOCH_CX = BLOCH_CX
+        self.BLOCH_CY = BLOCH_CY
+        self.BLOCH_R = BLOCH_R
+        self.WIDTH = WIDTH
+        self.HEIGHT = HEIGHT
+        self.EDGE_TOL = _BARRIER_EDGE_TOL
+        self.CHART_X = _CHART_X
+        self.CHART_Y = _CHART_Y
+        self.CHART_W = _CHART_W
+        self.CHART_H = _CHART_H
+        self.FORMULA_X = _FORMULA_X
+        self.FORMULA_Y = _FORMULA_Y
+        self.FORMULA_W = _FORMULA_W
+        self.FORMULA_H = _FORMULA_H
+
+        # 간이 ctx 목 객체
+        self.ctx = MagicMock()
+        self.ctx.barrier_width = BARRIER_WIDTH_DEFAULT
+        self.ctx.barrier_dragging = False
+        self.ctx.bloch_dragging = False
+        self.ctx.tutorial.visible = False
+        self.ctx.help_overlay.visible = False
+        self.ctx.glossary.visible = False
+
+    def test_barrier_edge_hint(self):
+        """장벽 가장자리 근처에서 barrier 힌트 반환."""
+        left_edge = BARRIER_X - self.ctx.barrier_width // 2
+        hint = self._get_hint(left_edge + 2, SIM_TOP + 100, self.ctx)
+        self.assertIsNotNone(hint)
+
+    def test_bloch_sphere_hint(self):
+        """블로흐 구 중심에서 bloch 힌트 반환."""
+        hint = self._get_hint(self.BLOCH_CX, self.BLOCH_CY, self.ctx)
+        self.assertIsNotNone(hint)
+
+    def test_formula_overlay_hint(self):
+        """수식 오버레이 영역에서 formula 힌트 반환."""
+        hint = self._get_hint(self.FORMULA_X + 10, self.FORMULA_Y + 10, self.ctx)
+        self.assertIsNotNone(hint)
+
+    def test_chart_hint(self):
+        """확률 차트 영역에서 chart 힌트 반환."""
+        hint = self._get_hint(self.CHART_X + 10, self.CHART_Y + 5, self.ctx)
+        self.assertIsNotNone(hint)
+
+    def test_slider_panel_hint(self):
+        """슬라이더 패널 영역에서 sliders 힌트 반환."""
+        hint = self._get_hint(self.WIDTH + 20, 80, self.ctx)
+        self.assertIsNotNone(hint)
+
+    def test_sim_area_hint(self):
+        """시뮬레이션 영역 (장벽 멀리)에서 sim 힌트 반환."""
+        hint = self._get_hint(SIM_LEFT + 10, SIM_TOP + 10, self.ctx)
+        self.assertIsNotNone(hint)
+
+    def test_no_hint_outside(self):
+        """모든 영역 밖 → None 반환."""
+        hint = self._get_hint(0, 0, self.ctx)
+        self.assertIsNone(hint)
+
+    def test_overlay_active_hides_hint(self):
+        """튜토리얼 오버레이 활성 시 힌트 숨김."""
+        self.ctx.tutorial.visible = True
+        hint = self._get_hint(SIM_LEFT + 10, SIM_TOP + 10, self.ctx)
+        self.assertIsNone(hint)
+
+    def test_help_overlay_hides_hint(self):
+        """도움말 오버레이 활성 시 힌트 숨김."""
+        self.ctx.help_overlay.visible = True
+        hint = self._get_hint(SIM_LEFT + 10, SIM_TOP + 10, self.ctx)
+        self.assertIsNone(hint)
+
+    def test_glossary_overlay_hides_hint(self):
+        """용어집 오버레이 활성 시 힌트 숨김."""
+        self.ctx.glossary.visible = True
+        hint = self._get_hint(SIM_LEFT + 10, SIM_TOP + 10, self.ctx)
+        self.assertIsNone(hint)
+
+    def test_barrier_drag_hides_hint(self):
+        """장벽 드래그 중에는 힌트 숨김."""
+        self.ctx.barrier_dragging = True
+        hint = self._get_hint(SIM_LEFT + 10, SIM_TOP + 10, self.ctx)
+        self.assertIsNone(hint)
+
+    def test_bloch_drag_hides_hint(self):
+        """블로흐 드래그 중에는 힌트 숨김."""
+        self.ctx.bloch_dragging = True
+        hint = self._get_hint(self.BLOCH_CX, self.BLOCH_CY, self.ctx)
+        self.assertIsNone(hint)
+
+    def test_barrier_priority_over_sim(self):
+        """장벽 가장자리 힌트가 시뮬레이션 영역 힌트보다 우선."""
+        left_edge = BARRIER_X - self.ctx.barrier_width // 2
+        hint_edge = self._get_hint(left_edge, SIM_TOP + 100, self.ctx)
+        hint_sim = self._get_hint(SIM_LEFT + 10, SIM_TOP + 10, self.ctx)
+        # 둘 다 힌트가 있지만 내용이 다름 (edge는 barrier, sim은 click)
+        self.assertIsNotNone(hint_edge)
+        self.assertIsNotNone(hint_sim)
+        self.assertNotEqual(hint_edge, hint_sim)
+
+    def test_stats_area_hint(self):
+        """통계 패널 영역에서 stats 힌트 반환."""
+        stats_x = self.BLOCH_CX - self.BLOCH_R
+        stats_y = self.BLOCH_CY + self.BLOCH_R + 60
+        hint = self._get_hint(stats_x + 10, stats_y + 10, self.ctx)
+        self.assertIsNotNone(hint)
 
 
 if __name__ == "__main__":
