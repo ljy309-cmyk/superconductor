@@ -421,18 +421,141 @@ class TestResetCounterPreservation(unittest.TestCase):
 
     def test_counters_accumulate_across_resets(self):
         """reset + update 반복 시 카운터 누적."""
+        p = QuantumParticle(seed=42)
+        for _ in range(50):
+            p.reset()
+            for _ in range(600):
+                p.update(1 / 60, barrier_width=12, tunnel_prob=0.5)
+                if p.tunneled is not None:
+                    break
+        total = p.tunnel_count + p.reflect_count
+        self.assertEqual(total, p.total_attempts)
+        self.assertGreater(p.total_attempts, 0)
+
+
+# ═══════════════════════════════════════════════════════════
+# #6  시드 기반 재현성 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+def _simulate(seed, n_trials=30, barrier_width=12, tunnel_prob=0.10):
+    """동일 시드로 n_trials 반복 → (tunnel_count, reflect_count, vy 리스트)."""
+    p = QuantumParticle(seed=seed)
+    vy_list = [p.vy]
+    for _ in range(n_trials):
+        p.reset()
+        vy_list.append(p.vy)
+        for _ in range(600):
+            p.update(1 / 60, barrier_width=barrier_width, tunnel_prob=tunnel_prob)
+            if p.tunneled is not None:
+                break
+    return p.tunnel_count, p.reflect_count, vy_list
+
+
+class TestSeedReproducibility(unittest.TestCase):
+    """QuantumParticle(seed=...) — 시드 기반 재현성."""
+
+    def test_same_seed_same_result(self):
+        """동일 시드 → 동일 결과."""
+        t1, r1, vy1 = _simulate(seed=123)
+        t2, r2, vy2 = _simulate(seed=123)
+        self.assertEqual(t1, t2)
+        self.assertEqual(r1, r2)
+        self.assertEqual(vy1, vy2)
+
+    def test_different_seed_different_result(self):
+        """다른 시드 → 다른 vy 시퀀스."""
+        _, _, vy1 = _simulate(seed=100)
+        _, _, vy2 = _simulate(seed=200)
+        self.assertNotEqual(vy1, vy2)
+
+    def test_none_seed_nondeterministic(self):
+        """seed=None → 비결정적 (두 인스턴스의 vy가 다를 가능성 매우 높음)."""
+        p1 = QuantumParticle(seed=None)
+        p2 = QuantumParticle(seed=None)
+        # vy는 random이므로 동일할 확률은 극히 낮음
+        # 10회 reset으로 시퀀스 비교
+        vy1 = [p1.vy]
+        vy2 = [p2.vy]
+        for _ in range(10):
+            p1.reset()
+            p2.reset()
+            vy1.append(p1.vy)
+            vy2.append(p2.vy)
+        self.assertNotEqual(vy1, vy2)
+
+    def test_seed_zero(self):
+        """seed=0 도 유효한 시드."""
+        t1, r1, vy1 = _simulate(seed=0)
+        t2, r2, vy2 = _simulate(seed=0)
+        self.assertEqual(t1, t2)
+        self.assertEqual(vy1, vy2)
+
+    def test_seed_does_not_affect_global_random(self):
+        """인스턴스 RNG가 글로벌 random 모듈에 영향 주지 않음."""
         import random
 
-        random.seed(42)
-        for _ in range(50):
-            self.p.reset()
-            for _ in range(600):
-                self.p.update(1 / 60, barrier_width=12, tunnel_prob=0.5)
-                if self.p.tunneled is not None:
-                    break
-        total = self.p.tunnel_count + self.p.reflect_count
-        self.assertEqual(total, self.p.total_attempts)
-        self.assertGreater(self.p.total_attempts, 0)
+        random.seed(999)
+        global_before = [random.random() for _ in range(5)]
+
+        random.seed(999)
+        _ = QuantumParticle(seed=42)  # 인스턴스 생성 (reset 포함)
+        global_after = [random.random() for _ in range(5)]
+
+        self.assertEqual(global_before, global_after)
+
+    def test_reproducible_tunnel_sequence(self):
+        """동일 시드 → 터널링/반사 시퀀스 동일."""
+
+        def _get_sequence(seed):
+            p = QuantumParticle(seed=seed)
+            results = []
+            for _ in range(20):
+                p.reset()
+                for _ in range(600):
+                    p.update(1 / 60, barrier_width=12, tunnel_prob=0.3)
+                    if p.tunneled is not None:
+                        results.append(p.tunneled)
+                        break
+            return results
+
+        seq1 = _get_sequence(seed=777)
+        seq2 = _get_sequence(seed=777)
+        self.assertEqual(seq1, seq2)
+        # 시퀀스에 True와 False가 섞여 있어야 함 (prob=0.3)
+        self.assertIn(True, seq1)
+        self.assertIn(False, seq1)
+
+    def test_reproducible_vy_values(self):
+        """동일 시드 → reset마다 동일한 vy."""
+        p1 = QuantumParticle(seed=55)
+        p2 = QuantumParticle(seed=55)
+        for _ in range(20):
+            self.assertEqual(p1.vy, p2.vy)
+            p1.reset()
+            p2.reset()
+
+    def test_backward_compatible_no_seed(self):
+        """seed 없이 생성 → 기존처럼 동작."""
+        p = QuantumParticle()
+        self.assertIsNotNone(p._rng)
+        # 정상 작동 확인
+        p.update(1 / 60)
+        self.assertNotEqual(p.x, SIM_LEFT + 40.0)
+
+    def test_large_seed(self):
+        """큰 시드값도 정상 동작."""
+        t1, r1, vy1 = _simulate(seed=2**31 - 1)
+        t2, r2, vy2 = _simulate(seed=2**31 - 1)
+        self.assertEqual(t1, t2)
+        self.assertEqual(vy1, vy2)
+
+    def test_negative_seed(self):
+        """음수 시드도 정상 동작."""
+        t1, _, vy1 = _simulate(seed=-42)
+        t2, _, vy2 = _simulate(seed=-42)
+        self.assertEqual(t1, t2)
+        self.assertEqual(vy1, vy2)
 
 
 if __name__ == "__main__":

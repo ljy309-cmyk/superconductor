@@ -91,9 +91,15 @@ def _calc_tunnel_prob(barrier_width: int) -> float:
 
 
 class QuantumParticle:
-    """양자 입자 — 중첩 상태 + 터널링."""
+    """양자 입자 — 중첩 상태 + 터널링.
 
-    def __init__(self):
+    Args:
+        seed: 난수 시드. 지정하면 재현 가능한 시뮬레이션.
+              None이면 비결정적 (기본 동작).
+    """
+
+    def __init__(self, seed: int | None = None):
+        self._rng = random.Random(seed)
         self.reset()
         self.tunnel_count = 0
         self.reflect_count = 0
@@ -104,7 +110,7 @@ class QuantumParticle:
         self.x = SIM_LEFT + 40.0
         self.y = SIM_TOP + SIM_H / 2.0
         self.vx = PARTICLE_SPEED
-        self.vy = (random.random() - 0.5) * _VY_RANGE  # 약간의 수직 랜덤
+        self.vy = (self._rng.random() - 0.5) * _VY_RANGE  # 약간의 수직 랜덤
         self.alive = True
         self.tunneled: bool | None = None  # None=미결정, True=터널링, False=반사
         self.flash_timer = 0.0
@@ -160,7 +166,7 @@ class QuantumParticle:
             # 오른쪽으로 진행 중, 장벽에 도달
             if self.x + PARTICLE_RADIUS >= BARRIER_X - barrier_width / 2:
                 self.total_attempts += 1
-                if random.random() < tunnel_prob:
+                if self._rng.random() < tunnel_prob:
                     # 터널링 성공! 장벽 반대편으로 좌표 이동 + 속도 부스트
                     self.x = BARRIER_X + barrier_width / 2 + PARTICLE_RADIUS + 5
                     self.vx = abs(self.vx) * speed_boost
