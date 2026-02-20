@@ -719,9 +719,9 @@
   "tn_tab_auto": "Auto Run",
   "tn_tab_compare": "Width Compare",
   "tn_hint_step_1": "SPACE: Launch  |  P: Pause  |  . : Step Frame  |  R: Reset  |  Tab: Mode",
-  "tn_hint_step_2": "↑/↓: Speed  |  ←/→: Barrier Width  |  PgUp/PgDn: History  |  L: Language  |  ESC: Exit",
+  "tn_hint_step_2": "↑/↓: Speed  |  ←/→: Barrier Width  |  W: Wave ψ  |  PgUp/PgDn: History  |  L: Lang  |  ESC: Exit",
   "tn_hint_auto_1": "SPACE/P: Pause  |  . : Step Frame  |  Click: Relaunch  |  R: Reset  |  Tab: Mode",
-  "tn_hint_auto_2": "↑/↓: Speed  |  ←/→: Barrier Width  |  PgUp/PgDn: History  |  L: Language  |  ESC: Exit",
+  "tn_hint_auto_2": "↑/↓: Speed  |  ←/→: Barrier Width  |  W: Wave ψ  |  PgUp/PgDn: History  |  L: Lang  |  ESC: Exit",
   "tn_hint_compare_1": "SPACE: Start Race  |  ↑/↓: Thick Barrier Size  |  Tab: Mode",
   "tn_hint_compare_2": "R: Reset  |  L: Language  |  ESC: Exit",
   "tn_compare_title": "Thin vs Thick Barrier — Tunneling Race",
@@ -879,6 +879,13 @@
 
   "tn_paused": "Paused",
   "tn_paused_banner": "PAUSED — P/SPACE: Resume  |  . : Step 1 Frame",
+
+  "tn_wf_title": "|ψ(x)|²  Wave Function",
+  "tn_wf_incident": "Incident+Reflected",
+  "tn_wf_decay": "Barrier (exp decay)",
+  "tn_wf_transmitted": "Transmitted",
+  "tn_wf_on": "Wave function ON",
+  "tn_wf_off": "Wave function OFF",
 
   "glossary_title": "Physics Glossary",
   "glossary_search_placeholder": "Type to search…",

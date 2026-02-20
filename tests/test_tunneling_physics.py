@@ -28,6 +28,7 @@ from quantum.tunneling_physics import (
     _TUNNEL_FLASH,
     _VY_RANGE,
     _calc_tunnel_prob,
+    compute_wavefunction,
 )
 
 # ── 헬퍼 ─────────────────────────────────────────────
@@ -1485,6 +1486,140 @@ class TestPageDotsWidth(unittest.TestCase):
         # (3-1)*11 + 6 = 28
         w = page_dots_width(3)
         self.assertEqual(w, 28)
+
+
+# ── 파동함수 compute_wavefunction 테스트 ────────────
+
+
+class TestComputeWavefunction(unittest.TestCase):
+    """compute_wavefunction() 반환값 검증."""
+
+    def test_returns_three_lists(self):
+        """반환 타입이 (list, list, list) 튜플이어야 한다."""
+        xs, amps, regions = compute_wavefunction()
+        self.assertIsInstance(xs, list)
+        self.assertIsInstance(amps, list)
+        self.assertIsInstance(regions, list)
+
+    def test_default_n_points(self):
+        """기본 n_points=200이면 200개 포인트를 반환."""
+        xs, amps, regions = compute_wavefunction(n_points=200)
+        self.assertEqual(len(xs), 200)
+        self.assertEqual(len(amps), 200)
+        self.assertEqual(len(regions), 200)
+
+    def test_custom_n_points(self):
+        """사용자 지정 n_points가 반영된다."""
+        xs, amps, _ = compute_wavefunction(n_points=50)
+        self.assertEqual(len(xs), 50)
+
+    def test_x_range_within_sim_area(self):
+        """x 좌표가 시뮬레이션 영역(SIM_LEFT ~ SIM_LEFT+SIM_W) 내에 있어야 한다."""
+        xs, _, _ = compute_wavefunction()
+        self.assertAlmostEqual(xs[0], SIM_LEFT, places=1)
+        self.assertAlmostEqual(xs[-1], SIM_LEFT + SIM_W, places=1)
+
+    def test_amplitudes_normalized(self):
+        """진폭이 0.0~1.0 범위로 정규화되어야 한다."""
+        _, amps, _ = compute_wavefunction()
+        self.assertAlmostEqual(max(amps), 1.0, places=5)
+        for a in amps:
+            self.assertGreaterEqual(a, 0.0)
+            self.assertLessEqual(a, 1.0 + 1e-9)
+
+    def test_regions_classification(self):
+        """영역이 0(입사측), 1(장벽), 2(투과측) 중 하나여야 한다."""
+        _, _, regions = compute_wavefunction()
+        for r in regions:
+            self.assertIn(r, (0, 1, 2))
+
+    def test_region_order(self):
+        """영역이 0 → 1 → 2 순서로 전환된다 (역전 없음)."""
+        _, _, regions = compute_wavefunction()
+        seen_max = 0
+        for r in regions:
+            self.assertGreaterEqual(r, seen_max)
+            seen_max = max(seen_max, r)
+
+    def test_all_three_regions_present(self):
+        """기본 설정에서 세 영역 모두 나타난다."""
+        _, _, regions = compute_wavefunction(barrier_width=BARRIER_WIDTH_DEFAULT)
+        self.assertIn(0, regions)
+        self.assertIn(1, regions)
+        self.assertIn(2, regions)
+
+    def test_barrier_region_inside_barrier(self):
+        """영역 1 포인트의 x 좌표가 장벽 내부에 있어야 한다."""
+        bw = 40
+        xs, _, regions = compute_wavefunction(barrier_width=bw)
+        half = bw / 2.0
+        for x, r in zip(xs, regions):
+            if r == 1:
+                self.assertGreaterEqual(x, BARRIER_X - half - 1)
+                self.assertLessEqual(x, BARRIER_X + half + 1)
+
+    def test_decay_inside_barrier(self):
+        """장벽 내부에서 진폭이 감소(지수감쇠)해야 한다."""
+        bw = 60
+        _, amps, regions = compute_wavefunction(barrier_width=bw, n_points=400)
+        barrier_amps = [a for a, r in zip(amps, regions) if r == 1]
+        if len(barrier_amps) >= 3:
+            # 처음 > 마지막 (감쇠)
+            self.assertGreater(barrier_amps[0], barrier_amps[-1])
+
+    def test_transmitted_amplitude_less_than_incident(self):
+        """투과측 최대 진폭이 입사측 최대 진폭보다 작아야 한다."""
+        bw = 40
+        _, amps, regions = compute_wavefunction(barrier_width=bw)
+        incident = [a for a, r in zip(amps, regions) if r == 0]
+        transmitted = [a for a, r in zip(amps, regions) if r == 2]
+        if incident and transmitted:
+            self.assertGreater(max(incident), max(transmitted))
+
+    def test_thicker_barrier_lower_transmission(self):
+        """두꺼운 장벽이 더 낮은 투과 진폭을 보여야 한다."""
+        _, amps_thin, reg_thin = compute_wavefunction(barrier_width=10)
+        _, amps_thick, reg_thick = compute_wavefunction(barrier_width=100)
+        trans_thin = [a for a, r in zip(amps_thin, reg_thin) if r == 2]
+        trans_thick = [a for a, r in zip(amps_thick, reg_thick) if r == 2]
+        if trans_thin and trans_thick:
+            self.assertGreater(max(trans_thin), max(trans_thick))
+
+    def test_time_phase_changes_wavefunction(self):
+        """시간 위상이 다르면 입사측 패턴이 변한다."""
+        _, amps_0, _ = compute_wavefunction(time_phase=0.0)
+        _, amps_pi, _ = compute_wavefunction(time_phase=math.pi)
+        # 전체가 동일하지 않아야 함
+        self.assertFalse(
+            all(abs(a - b) < 1e-9 for a, b in zip(amps_0, amps_pi)),
+            "다른 시간 위상은 다른 파동 패턴을 생성해야 한다",
+        )
+
+    def test_minimum_barrier_width(self):
+        """최소 장벽 두께에서도 정상 작동."""
+        xs, amps, regions = compute_wavefunction(barrier_width=BARRIER_WIDTH_MIN)
+        self.assertEqual(len(xs), 200)
+        self.assertIn(1, regions)
+
+    def test_maximum_barrier_width(self):
+        """최대 장벽 두께에서도 정상 작동."""
+        xs, amps, regions = compute_wavefunction(barrier_width=BARRIER_WIDTH_MAX)
+        self.assertEqual(len(xs), 200)
+        # 투과 진폭이 극히 작아야 함
+        trans = [a for a, r in zip(amps, regions) if r == 2]
+        if trans:
+            self.assertLess(max(trans), 0.01)
+
+    def test_single_point(self):
+        """n_points=1에서도 크래시 없이 동작."""
+        xs, amps, regions = compute_wavefunction(n_points=1)
+        self.assertEqual(len(xs), 1)
+
+    def test_x_monotonically_increasing(self):
+        """x 좌표가 단조 증가해야 한다."""
+        xs, _, _ = compute_wavefunction()
+        for i in range(1, len(xs)):
+            self.assertGreater(xs[i], xs[i - 1])
 
 
 if __name__ == "__main__":

@@ -46,6 +46,7 @@ from quantum.tunneling_physics import (
     TUNNEL_SPEED_BOOST,
     QuantumParticle,
     _calc_tunnel_prob,
+    compute_wavefunction,
 )
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
@@ -163,6 +164,12 @@ class Layout:
         self.bloch_z1_y = max(2, int(4 * fs))
         self.bloch_state_y = int(26 * fs)         # 상태 텍스트 Y 오프셋
         self.bloch_stats_gap = int(60 * fs)       # 구-통계 간격
+
+        # 파동함수 그래프 (시뮬레이션 영역 하단에 오버레이)
+        self.wf_y = SIM_TOP + SIM_H - int(130 * sy)   # 그래프 시작 Y
+        self.wf_h = int(120 * sy)                       # 그래프 높이
+        self.wf_label_x = SIM_LEFT + int(5 * sx)        # 라벨 X
+        self.wf_label_y = SIM_TOP + SIM_H - int(135 * sy)  # 라벨 Y
 
         # Compare 모드 레이아웃
         self.cmp_title_y = int(50 * sy)
@@ -368,6 +375,122 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
     for i, (line, color) in enumerate(lines):
         surf = font.render(line, True, color)
         screen.blit(surf, (stats_x, stats_y + i * L.line_h))
+
+
+# ── 파동함수 시각화 ────────────────────────────────────
+
+# 파동함수 오버레이 전역 상태
+_wf_visible = False
+_WF_N_POINTS = 200
+_WF_ANIM_SPEED = 1.5  # 파동 진행 속도 (rad/s)
+
+
+def _draw_wavefunction(screen, font, barrier_width: int, time_ms: float):
+    """파동함수 |ψ(x)|² 오버레이를 시뮬레이션 영역 하단에 그린다.
+
+    영역별 색상:
+    - 입사측(Region I): PARTICLE_CLR (파란색) — 정재파 패턴
+    - 장벽 내부(Region II): BARRIER_CLR (노란색) — 지수감쇠
+    - 투과측(Region III): TUNNEL_FLASH (녹색) — 투과파
+    """
+    L = _layout
+    hc = is_high_contrast()
+
+    # 시간 위상 (감쇠 모드에서는 고정)
+    if is_reduced_motion():
+        phase = 0.0
+    else:
+        phase = time_ms / 1000.0 * _WF_ANIM_SPEED
+
+    xs, amps, regions = compute_wavefunction(barrier_width, _WF_N_POINTS, phase)
+
+    # 그래프 영역 배경 (반투명)
+    graph_rect = (SIM_LEFT, L.wf_y, SIM_W, L.wf_h)
+    bg_surf = pygame.Surface((SIM_W, L.wf_h), pygame.SRCALPHA)
+    bg_surf.fill((*BG[:3], 180))
+    screen.blit(bg_surf, (SIM_LEFT, L.wf_y))
+
+    # 그래프 프레임
+    frame_w = 2 if hc else 1
+    pygame.draw.rect(screen, OVERLAY_CLR, graph_rect, frame_w)
+
+    # 제로 라인 (y축 기준선)
+    base_y = L.wf_y + L.wf_h - 4
+    pygame.draw.line(
+        screen, BLOCH_RING,
+        (SIM_LEFT, base_y), (SIM_LEFT + SIM_W, base_y), 1,
+    )
+
+    # 장벽 영역 표시 (반투명 채움)
+    half_w = barrier_width / 2.0
+    bx_left = int(BARRIER_X - half_w)
+    bx_right = int(BARRIER_X + half_w)
+    b_surf = pygame.Surface((max(bx_right - bx_left, 1), L.wf_h), pygame.SRCALPHA)
+    b_surf.fill((*BARRIER_CLR[:3], 40))
+    screen.blit(b_surf, (bx_left, L.wf_y))
+
+    # 영역별 색상 매핑
+    region_colors = {
+        0: PARTICLE_CLR,   # 입사측 (파란색)
+        1: BARRIER_CLR,    # 장벽 내부 (노란색)
+        2: TUNNEL_FLASH,   # 투과측 (녹색)
+    }
+
+    # 곡선 그리기 — 영역별로 분리하여 색상 적용
+    usable_h = L.wf_h - 8  # 상하 패딩
+
+    # 포인트 좌표 계산
+    points_by_region: dict[int, list[tuple[int, int]]] = {0: [], 1: [], 2: []}
+    all_points: list[tuple[int, int, int]] = []  # (x, y, region)
+
+    for i in range(len(xs)):
+        px = int(xs[i])
+        py = int(base_y - amps[i] * usable_h)
+        py = max(L.wf_y + 2, min(base_y, py))
+        region = regions[i]
+        points_by_region[region].append((px, py))
+        all_points.append((px, py, region))
+
+    # 채움 영역 그리기 (반투명 그라데이션 효과)
+    for region_id, color in region_colors.items():
+        pts = points_by_region[region_id]
+        if len(pts) < 2:
+            continue
+        # 폴리곤: 곡선 + 베이스 라인
+        fill_pts = list(pts) + [(pts[-1][0], base_y), (pts[0][0], base_y)]
+        fill_surf = pygame.Surface((SIM_W, L.wf_h), pygame.SRCALPHA)
+        shifted = [(p[0] - SIM_LEFT, p[1] - L.wf_y) for p in fill_pts]
+        if len(shifted) >= 3:
+            pygame.draw.polygon(fill_surf, (*color[:3], 45), shifted)
+            screen.blit(fill_surf, (SIM_LEFT, L.wf_y))
+
+    # 곡선 선 그리기 (영역 전환점에서 연결)
+    line_w = 2 if hc else 2
+    for i in range(1, len(all_points)):
+        x0, y0, r0 = all_points[i - 1]
+        x1, y1, r1 = all_points[i]
+        # 전환 경계에서는 두 영역 모두와 잘 어울리도록 뒤쪽 영역 색상 사용
+        color = region_colors[r1]
+        pygame.draw.line(screen, color, (x0, y0), (x1, y1), line_w)
+
+    # 라벨: "|ψ(x)|²"
+    label = font.render(t("tn_wf_title"), True, ACCENT)
+    screen.blit(label, (L.wf_label_x, L.wf_label_y))
+
+    # 범례 (영역 설명)
+    legend_x = SIM_LEFT + SIM_W - 200
+    legend_y = L.wf_y + 5
+    legend_items = [
+        (PARTICLE_CLR, t("tn_wf_incident")),
+        (BARRIER_CLR, t("tn_wf_decay")),
+        (TUNNEL_FLASH, t("tn_wf_transmitted")),
+    ]
+    for i, (clr, txt) in enumerate(legend_items):
+        lx = legend_x
+        ly = legend_y + i * (L.line_h_sm + 1)
+        pygame.draw.rect(screen, clr, (lx, ly + 2, 10, 8))
+        ls = font.render(txt, True, TEXT_CLR)
+        screen.blit(ls, (lx + 14, ly))
 
 
 # ── 모드 탭 / 비교 모드 렌더링 ────────────────────────
@@ -834,6 +957,12 @@ def run_simulation():
                         paused = not paused
                         if paused:
                             _notify(t("tn_paused"), "info", 0.8)
+                elif event.key == pygame.K_w:
+                    global _wf_visible
+                    _wf_visible = not _wf_visible
+                    key = "tn_wf_on" if _wf_visible else "tn_wf_off"
+                    _notify(t(key), "info", 1.0)
+                    snd.play("click")
                 elif event.key == pygame.K_l:
                     toggle_locale()
                 elif event.key == pygame.K_g:
@@ -983,6 +1112,11 @@ def run_simulation():
 
             # 시뮬레이션 영역
             _draw_sim_area(screen, font, barrier_width)
+
+            # 파동함수 오버레이 (입자 아래, 시뮬레이션 영역 내)
+            if _wf_visible:
+                _draw_wavefunction(screen, font, barrier_width,
+                                   pygame.time.get_ticks())
 
             # 입자
             _draw_particle(screen, particle, font)

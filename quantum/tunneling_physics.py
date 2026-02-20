@@ -4,9 +4,13 @@
 
 사용법:
     from quantum.tunneling_physics import QuantumParticle, _calc_tunnel_prob
+    from quantum.tunneling_physics import compute_wavefunction
 
     p = QuantumParticle()
     p.update(dt, barrier_width=12, tunnel_prob=0.1)
+
+    # 파동함수 시각화 데이터 생성
+    xs, psi = compute_wavefunction(barrier_width=12, n_points=200)
 """
 
 import math
@@ -43,6 +47,99 @@ def _calc_tunnel_prob(barrier_width: int) -> float:
     기본 두께(12px)에서 10 %, 두께 200px이면 ~0.5 % 수준으로 지수 감쇠.
     """
     return TUNNEL_PROB_BASE * math.exp(-_TUNNEL_DECAY * (barrier_width - BARRIER_WIDTH_DEFAULT))
+
+
+# ── 파동함수 계산 ────────────────────────────────────
+# 1D 구형 포텐셜 장벽 터널링: ψ(x) 시각화용 진폭 계산
+#
+# 영역 구분:
+#   I   (x < barrier_left)  : 입사파 + 반사파  → ψ = e^{ikx} + R·e^{-ikx}
+#   II  (barrier 내부)       : 지수감쇠파       → ψ = C·e^{-κx'} + D·e^{κx'}
+#   III (x > barrier_right) : 투과파            → ψ = T·e^{ikx}
+#
+# k  = 입자 파수 (에너지 비례)
+# κ  = 장벽 내 감쇠율 (두꺼울수록 급격 감소)
+# T  = 투과 계수 (터널링 확률의 진폭)
+# R  = 반사 계수
+
+# 파동함수 계산용 물리 파라미터
+_WF_K_BASE = 0.15           # 기본 파수 k (입사파 파장 결정)
+_WF_KAPPA_SCALE = 0.04      # 장벽 내 감쇠율 스케일
+
+
+def compute_wavefunction(
+    barrier_width: int = BARRIER_WIDTH_DEFAULT,
+    n_points: int = 200,
+    time_phase: float = 0.0,
+) -> tuple[list[float], list[float], list[int]]:
+    """1D 포텐셜 장벽에 대한 파동함수 |ψ(x)|² 를 계산.
+
+    Args:
+        barrier_width: 장벽 두께 (px 단위, 시뮬레이션 좌표계).
+        n_points: 계산할 x 좌표 개수.
+        time_phase: 시간 위상 (라디안). 실시간 파동 진행 애니메이션용.
+
+    Returns:
+        (xs, amplitudes, regions) 튜플:
+        - xs: x 좌표 리스트 (시뮬레이션 영역 내, SIM_LEFT ~ SIM_LEFT+SIM_W)
+        - amplitudes: |ψ(x)|² 진폭 (0.0~1.0 정규화)
+        - regions: 영역 분류 (0=입사측, 1=장벽내부, 2=투과측)
+    """
+    half_w = barrier_width / 2.0
+    barrier_left = BARRIER_X - half_w
+    barrier_right = BARRIER_X + half_w
+
+    k = _WF_K_BASE
+    kappa = _WF_KAPPA_SCALE * barrier_width
+
+    # 투과 계수 T (지수감쇠 모델)
+    decay = math.exp(-kappa)
+    t_coeff = max(decay, 1e-6)
+    # 반사 계수 R (|R|² + |T|² = 1 근사)
+    r_coeff = math.sqrt(max(1.0 - t_coeff * t_coeff, 0.0))
+
+    xs: list[float] = []
+    amplitudes: list[float] = []
+    regions: list[int] = []
+
+    dx = SIM_W / max(n_points - 1, 1)
+    raw_max = 0.0
+
+    for i in range(n_points):
+        x = SIM_LEFT + i * dx
+        xs.append(x)
+
+        if x < barrier_left:
+            # 영역 I: 입사파 + 반사파 → 정재파 패턴
+            rel = x - barrier_left
+            # ψ = e^{ikx} + R·e^{-ikx} → |ψ|² = 1 + R² + 2R·cos(2kx + φ)
+            psi_sq = 1.0 + r_coeff ** 2 + 2.0 * r_coeff * math.cos(
+                2.0 * k * rel + time_phase
+            )
+            regions.append(0)
+        elif x > barrier_right:
+            # 영역 III: 투과파 → |ψ|² = T²
+            rel = x - barrier_right
+            psi_sq = t_coeff ** 2 * (
+                1.0 + 0.3 * math.cos(2.0 * k * rel + time_phase)
+            )
+            regions.append(2)
+        else:
+            # 영역 II: 장벽 내부 → 지수감쇠
+            frac = (x - barrier_left) / max(barrier_width, 1)
+            # 왼쪽 경계에서 오른쪽으로 지수감쇠
+            psi_sq = math.exp(-2.0 * kappa * frac)
+            regions.append(1)
+
+        amplitudes.append(psi_sq)
+        if psi_sq > raw_max:
+            raw_max = psi_sq
+
+    # 정규화 (0~1)
+    if raw_max > 0:
+        amplitudes = [a / raw_max for a in amplitudes]
+
+    return xs, amplitudes, regions
 
 
 # ── 입자 클래스 ──────────────────────────────────────
