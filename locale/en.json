@@ -507,6 +507,12 @@
   "tn_formula_title": "Tunneling Equations",
   "tn_energy_title": "Energy Diagram",
 
+  "tn_sweep_title": "Barrier Sweep",
+  "tn_sweep_running": "Sweeping...",
+  "tn_sweep_measured": "Measured",
+  "tn_sweep_theory": "Theory",
+  "tn_sweep_restart": "Restart",
+
   "glossary_title": "Glossary",
   "glossary_nav_hint": "Up/Down: Scroll  |  G/ESC: Close",
 

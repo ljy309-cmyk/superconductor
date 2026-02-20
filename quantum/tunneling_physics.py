@@ -296,3 +296,150 @@ class QuantumParticle:
 
         if self.flash_timer > 0:
             self.flash_timer -= dt
+
+
+# ── 배리어 스위퍼 (#29) ──────────────────────────────
+
+
+# 스위퍼 설정 (config.json에서 로드)
+SWEEP_TRIALS_PER_WIDTH = cfg("tunneling", "sweep_trials_per_width", 50)
+SWEEP_STEP = cfg("tunneling", "sweep_step", 10)
+SWEEP_BATCH_SIZE = cfg("tunneling", "sweep_batch_per_frame", 10)
+
+
+class BarrierSweeper:
+    """자동으로 장벽 폭 범위를 순회하며 터널링 통계 수집.
+
+    프레임마다 ``advance()``를 호출하면 내부적으로 소량의 시행(batch)을
+    수행하여 UI 프레임 드롭 없이 점진적으로 스위프를 진행합니다.
+
+    Args:
+        base_prob: 기본 터널링 확률 (슬라이더 값).
+        width_min: 스위프 시작 폭 (px).
+        width_max: 스위프 종료 폭 (px).
+        step: 폭 증가 단위.
+        trials_per_width: 각 폭에서의 시행 횟수.
+        batch_size: 프레임당 진행할 시행 수.
+        seed: 난수 시드 (재현성).
+    """
+
+    def __init__(
+        self,
+        base_prob: float = TUNNEL_PROB_BASE,
+        width_min: int = BARRIER_WIDTH_MIN,
+        width_max: int = BARRIER_WIDTH_MAX,
+        step: int = SWEEP_STEP,
+        trials_per_width: int = SWEEP_TRIALS_PER_WIDTH,
+        batch_size: int = SWEEP_BATCH_SIZE,
+        seed: int | None = None,
+    ):
+        self.base_prob = max(0.0, min(1.0, float(base_prob)))
+        self.width_min = max(BARRIER_WIDTH_MIN, int(width_min))
+        self.width_max = min(BARRIER_WIDTH_MAX, int(width_max))
+        self.step = max(1, int(step))
+        self.trials_per_width = max(1, int(trials_per_width))
+        self.batch_size = max(1, int(batch_size))
+        self._rng = random.Random(seed)
+
+        # 스위프할 폭 목록
+        self.widths: list[int] = list(range(self.width_min, self.width_max + 1, self.step))
+        if not self.widths:
+            self.widths = [self.width_min]
+
+        # 결과: {width: {"tunnel": int, "reflect": int, "total": int, "rate": float}}
+        self.results: dict[int, dict] = {}
+
+        # 진행 상태
+        self._width_idx = 0  # 현재 폭 인덱스
+        self._trial_count = 0  # 현재 폭에서 완료된 시행 수
+        self.done = False
+
+        _log.info(
+            "배리어 스위퍼 시작: %d~%dpx step=%d trials=%d",
+            self.width_min,
+            self.width_max,
+            self.step,
+            self.trials_per_width,
+        )
+
+    @property
+    def current_width(self) -> int:
+        """현재 스위프 중인 장벽 폭."""
+        if self._width_idx < len(self.widths):
+            return self.widths[self._width_idx]
+        return self.widths[-1]
+
+    @property
+    def progress(self) -> float:
+        """전체 진행률 (0.0~1.0)."""
+        total = len(self.widths) * self.trials_per_width
+        if total == 0:
+            return 1.0
+        completed = self._width_idx * self.trials_per_width + self._trial_count
+        return min(1.0, completed / total)
+
+    def advance(self) -> bool:
+        """프레임당 호출 — batch_size만큼 시행 진행.
+
+        Returns:
+            True면 아직 진행 중, False면 스위프 완료.
+        """
+        if self.done:
+            return False
+
+        remaining_batch = self.batch_size
+        while remaining_batch > 0 and not self.done:
+            w = self.widths[self._width_idx]
+            prob = _calc_tunnel_prob(w, self.base_prob)
+
+            # 현재 폭에서 남은 시행 수
+            remaining_for_width = self.trials_per_width - self._trial_count
+            do_now = min(remaining_batch, remaining_for_width)
+
+            # 결과 딕셔너리 초기화
+            if w not in self.results:
+                self.results[w] = {"tunnel": 0, "reflect": 0, "total": 0, "rate": 0.0}
+
+            # 시행 실행 (순수 확률 판정)
+            for _ in range(do_now):
+                if self._rng.random() < prob:
+                    self.results[w]["tunnel"] += 1
+                else:
+                    self.results[w]["reflect"] += 1
+                self.results[w]["total"] += 1
+
+            self._trial_count += do_now
+            remaining_batch -= do_now
+
+            # 현재 폭 완료 → 확률 계산 후 다음 폭으로
+            if self._trial_count >= self.trials_per_width:
+                r = self.results[w]
+                r["rate"] = r["tunnel"] / r["total"] if r["total"] > 0 else 0.0
+                _log.debug(
+                    "스위프 w=%dpx: %d/%d = %.1f%% (이론 %.1f%%)",
+                    w,
+                    r["tunnel"],
+                    r["total"],
+                    r["rate"] * 100,
+                    prob * 100,
+                )
+                self._width_idx += 1
+                self._trial_count = 0
+                if self._width_idx >= len(self.widths):
+                    self.done = True
+                    _log.info("배리어 스위퍼 완료: %d개 폭 스위프", len(self.widths))
+
+        return not self.done
+
+    def get_sorted_results(self) -> list[tuple[int, float, float]]:
+        """완료된 결과를 (width, measured_rate, theory_rate) 리스트로 반환.
+
+        폭 기준 오름차순 정렬.
+        """
+        out: list[tuple[int, float, float]] = []
+        for w in sorted(self.results):
+            r = self.results[w]
+            measured = r["rate"]
+            theory = _calc_tunnel_prob(w, self.base_prob)
+            out.append((w, measured, theory))
+        return out

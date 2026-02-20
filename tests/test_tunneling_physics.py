@@ -48,6 +48,7 @@ from quantum.tunneling_physics import (
     SUPERPOSITION_HZ,
     TRIAL_HISTORY_MAX,
     TUNNEL_PROB_BASE,
+    BarrierSweeper,
     QuantumParticle,
     _calc_tunnel_prob,
     calc_energy_levels,
@@ -2280,6 +2281,127 @@ class TestCalcEnergyLevels(unittest.TestCase):
         r_max = calc_energy_levels(BARRIER_WIDTH_MAX, 0.1)
         r_above = calc_energy_levels(9999, 0.1)
         self.assertAlmostEqual(r_max["barrier_height"], r_above["barrier_height"])
+
+
+class TestBarrierSweeper(unittest.TestCase):
+    """#29 — 배리어 스위퍼 테스트."""
+
+    def test_init_default(self):
+        """기본 생성 시 done=False, 결과 비어 있음."""
+        sw = BarrierSweeper(seed=42)
+        self.assertFalse(sw.done)
+        self.assertEqual(len(sw.results), 0)
+        self.assertGreater(len(sw.widths), 0)
+
+    def test_progress_starts_zero(self):
+        """초기 진행률 0."""
+        sw = BarrierSweeper(seed=42)
+        self.assertAlmostEqual(sw.progress, 0.0)
+
+    def test_advance_returns_true_while_running(self):
+        """완료 전까지 advance()는 True 반환."""
+        sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=2)
+        result = sw.advance()
+        self.assertTrue(result)
+        self.assertFalse(sw.done)
+
+    def test_sweep_completes(self):
+        """충분히 advance()하면 done=True."""
+        sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=100)
+        while sw.advance():
+            pass
+        self.assertTrue(sw.done)
+        self.assertAlmostEqual(sw.progress, 1.0)
+
+    def test_results_cover_all_widths(self):
+        """완료 후 모든 폭에 결과 존재."""
+        sw = BarrierSweeper(seed=42, trials_per_width=10, batch_size=1000)
+        while sw.advance():
+            pass
+        for w in sw.widths:
+            self.assertIn(w, sw.results)
+            self.assertEqual(sw.results[w]["total"], 10)
+
+    def test_results_totals_correct(self):
+        """tunnel + reflect = total."""
+        sw = BarrierSweeper(seed=42, trials_per_width=20, batch_size=500)
+        while sw.advance():
+            pass
+        for _w, r in sw.results.items():
+            self.assertEqual(r["tunnel"] + r["reflect"], r["total"])
+
+    def test_rate_matches_counts(self):
+        """rate = tunnel / total."""
+        sw = BarrierSweeper(seed=42, trials_per_width=50, batch_size=1000)
+        while sw.advance():
+            pass
+        for _w, r in sw.results.items():
+            expected = r["tunnel"] / r["total"] if r["total"] > 0 else 0.0
+            self.assertAlmostEqual(r["rate"], expected)
+
+    def test_sorted_results_ascending(self):
+        """get_sorted_results()는 폭 기준 오름차순."""
+        sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=1000)
+        while sw.advance():
+            pass
+        sorted_r = sw.get_sorted_results()
+        widths = [w for w, _, _ in sorted_r]
+        self.assertEqual(widths, sorted(widths))
+
+    def test_sorted_results_has_theory(self):
+        """get_sorted_results()의 theory 값이 양수."""
+        sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=1000)
+        while sw.advance():
+            pass
+        for _w, meas, theory in sw.get_sorted_results():
+            self.assertGreaterEqual(theory, 0.0)
+            self.assertGreaterEqual(meas, 0.0)
+
+    def test_seed_reproducibility(self):
+        """같은 시드로 동일 결과."""
+        def run_sweep(seed):
+            sw = BarrierSweeper(seed=seed, trials_per_width=20, batch_size=500)
+            while sw.advance():
+                pass
+            return sw.get_sorted_results()
+
+        r1 = run_sweep(123)
+        r2 = run_sweep(123)
+        self.assertEqual(r1, r2)
+
+    def test_thin_barrier_higher_rate(self):
+        """얇은 장벽에서 통과율이 두꺼운 장벽보다 높음 (충분한 시행)."""
+        sw = BarrierSweeper(seed=42, trials_per_width=500, batch_size=5000)
+        while sw.advance():
+            pass
+        results = sw.get_sorted_results()
+        # 첫 번째(얇은)와 마지막(두꺼운) 비교
+        if len(results) >= 2:
+            thin_rate = results[0][1]
+            thick_rate = results[-1][1]
+            self.assertGreater(thin_rate, thick_rate)
+
+    def test_advance_after_done_returns_false(self):
+        """완료 후 advance()는 False 반환."""
+        sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=1000)
+        while sw.advance():
+            pass
+        self.assertFalse(sw.advance())
+
+    def test_current_width_in_widths(self):
+        """current_width는 항상 widths 내의 값."""
+        sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=2)
+        for _ in range(3):
+            sw.advance()
+            self.assertIn(sw.current_width, sw.widths)
+
+    def test_custom_range(self):
+        """사용자 지정 범위 (width_min=10, width_max=50, step=20)."""
+        sw = BarrierSweeper(seed=42, width_min=10, width_max=50, step=20, trials_per_width=10, batch_size=500)
+        while sw.advance():
+            pass
+        self.assertEqual(sw.widths, [10, 30, 50])
+        self.assertEqual(len(sw.results), 3)
 
 
 if __name__ == "__main__":

@@ -39,6 +39,7 @@ from quantum.tunneling_physics import (
     TRIAL_HISTORY_MAX,
     TUNNEL_PROB_BASE,
     TUNNEL_SPEED_BOOST,
+    BarrierSweeper,
     QuantumParticle,
     _calc_tunnel_prob,
     calc_energy_levels,
@@ -794,6 +795,106 @@ def _draw_imported_overlay(screen, font, trials, cx, cy, cw, ch):
     screen.blit(imp_surf, (cx + 2, max(cy, imp_py - 10)))
 
 
+# ── 배리어 스위퍼 차트 (#29) ──────────────────────────
+
+_SWEEP_CHART_H = 90  # rate chart보다 더 큰 영역
+
+
+def _draw_sweep_chart(screen, font, sweeper: BarrierSweeper):
+    """배리어 스위퍼 결과를 rate chart 위치에 오버레이 렌더링."""
+    # 차트 영역 (rate chart와 동일한 X, 약간 위로 확장)
+    sx = _CHART_X
+    sy = _CHART_Y - (_SWEEP_CHART_H - _CHART_H)
+    sw = _CHART_W
+    sh = _SWEEP_CHART_H
+
+    pad_l, pad_t, pad_b = _CHART_PAD_L, _CHART_PAD_T, _CHART_PAD_B
+    cx = sx + pad_l
+    cy = sy + pad_t
+    cw = sw - pad_l - 4
+    ch = sh - pad_t - pad_b
+
+    # 배경 (반투명)
+    bg_surf = pygame.Surface((sw, sh), pygame.SRCALPHA)
+    bg_surf.fill((*BG[:3], 220))
+    screen.blit(bg_surf, (sx, sy))
+    pygame.draw.rect(screen, OVERLAY_CLR, (sx, sy, sw, sh), 1)
+
+    # 타이틀
+    title = _tcache.render(font, t("tn_sweep_title"), TEXT_CLR)
+    screen.blit(title, (cx + cw - title.get_width(), sy + 1))
+
+    # 진행률 바 (스위프 진행 중일 때)
+    if not sweeper.done:
+        prog = sweeper.progress
+        bar_w = int(cw * prog)
+        pygame.draw.rect(screen, ACCENT, (cx, sy + 12, bar_w, 4))
+        pygame.draw.rect(screen, OVERLAY_CLR, (cx, sy + 12, cw, 4), 1)
+        pct_lbl = _tcache.render(font, f"{prog * 100:.0f}%  w={sweeper.current_width}px", OVERLAY_CLR)
+        screen.blit(pct_lbl, (cx + bar_w + 4, sy + 9))
+
+    results = sweeper.get_sorted_results()
+    if not results:
+        msg = _tcache.render(font, t("tn_sweep_running"), OVERLAY_CLR)
+        screen.blit(msg, (cx + cw // 2 - msg.get_width() // 2, cy + ch // 2 - 5))
+        return
+
+    # y축: 확률 0~max, x축: 장벽 폭
+    max_rate = max(max(r[1] for r in results), max(r[2] for r in results), 0.01)
+
+    # y축 눈금
+    for frac in (1.0, 0.5, 0.0):
+        gy = cy + int((1 - frac) * ch)
+        pygame.draw.line(screen, OVERLAY_CLR, (cx, gy), (cx + cw, gy), 1)
+    l_top = _tcache.render(font, f"{max_rate * 100:.0f}%", OVERLAY_CLR)
+    l_bot = _tcache.render(font, "0", OVERLAY_CLR)
+    screen.blit(l_top, (sx + 1, cy - 4))
+    screen.blit(l_bot, (sx + 10, cy + ch - 6))
+
+    n = len(results)
+
+    # 이론 곡선 (노란 점선)
+    theory_pts = []
+    for i, (_w, _meas, theory) in enumerate(results):
+        px = cx + int(i * cw / max(n - 1, 1))
+        py = cy + int((1 - theory / max_rate) * ch)
+        theory_pts.append((px, py))
+    if len(theory_pts) >= 2:
+        for i in range(0, len(theory_pts) - 1, 2):
+            j = min(i + 1, len(theory_pts) - 1)
+            pygame.draw.line(screen, BARRIER_CLR, theory_pts[i], theory_pts[j], 1)
+
+    # 측정 곡선 (녹색 실선)
+    meas_pts = []
+    for i, (_w, meas, _theory) in enumerate(results):
+        px = cx + int(i * cw / max(n - 1, 1))
+        py = cy + int((1 - meas / max_rate) * ch)
+        meas_pts.append((px, py))
+    if len(meas_pts) >= 2:
+        pygame.draw.lines(screen, TUNNEL_FLASH, False, meas_pts, 2)
+    elif len(meas_pts) == 1:
+        pygame.draw.circle(screen, TUNNEL_FLASH, meas_pts[0], 3)
+
+    # x축 라벨 (첫/끝 장벽 폭)
+    x_lbl_l = _tcache.render(font, f"{results[0][0]}px", OVERLAY_CLR)
+    screen.blit(x_lbl_l, (cx, cy + ch + 1))
+    if n > 1:
+        x_lbl_r = _tcache.render(font, f"{results[-1][0]}px", OVERLAY_CLR)
+        screen.blit(x_lbl_r, (cx + cw - x_lbl_r.get_width(), cy + ch + 1))
+
+    # 범례
+    leg_y = sy + 2
+    leg_meas = _tcache.render(font, t("tn_sweep_measured"), TUNNEL_FLASH)
+    leg_theory = _tcache.render(font, t("tn_sweep_theory"), BARRIER_CLR)
+    screen.blit(leg_meas, (cx, leg_y))
+    screen.blit(leg_theory, (cx + leg_meas.get_width() + 8, leg_y))
+
+    # F3 토글 안내
+    if sweeper.done:
+        hint = _tcache.render(font, "F3: " + t("tn_sweep_restart"), OVERLAY_CLR)
+        screen.blit(hint, (cx + cw - hint.get_width(), cy + ch + 1))
+
+
 # ── 업적 진행도 ──────────────────────────────────────
 
 
@@ -1014,6 +1115,9 @@ class _SimContext:
         self.imported_trials: list[dict] | None = None
         self.imported_label: str = ""
 
+        # 배리어 스위퍼 (#29)
+        self.sweeper: BarrierSweeper | None = None
+
     def read_sliders(self):
         """슬라이더 값 → 물리 파라미터 동기화."""
         self.speed_mult = self.sl_speed.value
@@ -1135,6 +1239,14 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         if _import_session(ctx):
             ctx.toast.show({"title": t("import_success"), "desc": ctx.imported_label})
             ctx.snd.play("achievement")
+    elif key == pygame.K_F3:
+        # 배리어 스위퍼 토글 (#29)
+        if ctx.sweeper is None or ctx.sweeper.done:
+            ctx.sweeper = BarrierSweeper(base_prob=ctx.base_prob)
+            _log.info("배리어 스위퍼 시작 (F3)")
+        else:
+            ctx.sweeper = None
+            _log.info("배리어 스위퍼 취소 (F3)")
     return running
 
 
@@ -1237,6 +1349,10 @@ def _step_physics(ctx: _SimContext, dt: float):
     ctx.prev_tunneled_state = p.tunneled
 
     ctx.preset_hud.update(dt)
+
+    # 배리어 스위퍼 진행 (#29)
+    if ctx.sweeper is not None and not ctx.sweeper.done:
+        ctx.sweeper.advance()
 
     ctx.recorder.record_frame(
         {
@@ -1570,6 +1686,8 @@ def _render_frame(ctx: _SimContext):
     _draw_stats(ctx.screen, ctx.particle, ctx.font, ctx.tunnel_prob)
     _draw_energy_diagram(ctx.screen, ctx.font, ctx.barrier_width, ctx.tunnel_prob)
     _draw_rate_chart(ctx.screen, ctx.font, ctx.trial_history, ctx.tunnel_prob, ctx.imported_trials)
+    if ctx.sweeper is not None:
+        _draw_sweep_chart(ctx.screen, ctx.font, ctx.sweeper)
     ctx.panel.draw(ctx.screen, ctx.font)
     _draw_achievement_progress(ctx.screen, ctx.font, ctx)
 
@@ -1585,7 +1703,8 @@ def _render_frame(ctx: _SimContext):
         ),
         t("hint_click_launch"),
         t("hint_pause_reset")
-        + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X/I: Export/Import  |  G: {t('glossary_title')}",
+        + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X/I: Export/Import"
+        + f"  |  F3: {t('tn_sweep_title')}  |  G: {t('glossary_title')}",
     ]
     for i, h in enumerate(hints):
         surf = _tcache.render(ctx.font, h, TEXT_CLR)

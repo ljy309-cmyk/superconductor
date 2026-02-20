@@ -507,6 +507,12 @@
   "tn_formula_title": "터널링 수식",
   "tn_energy_title": "에너지 다이어그램",
 
+  "tn_sweep_title": "배리어 스위프",
+  "tn_sweep_running": "스위프 진행 중...",
+  "tn_sweep_measured": "측정",
+  "tn_sweep_theory": "이론",
+  "tn_sweep_restart": "재시작",
+
   "glossary_title": "용어집",
   "glossary_nav_hint": "↑↓: 스크롤  |  G/ESC: 닫기",
 

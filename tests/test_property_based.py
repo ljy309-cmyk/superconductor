@@ -175,6 +175,51 @@ class TestCalcEnergyLevelsPBT(unittest.TestCase):
         self.assertAlmostEqual(r["ratio"], expected, places=10)
 
 
+class TestBarrierSweeperPBT(unittest.TestCase):
+    """BarrierSweeper 속성 검증 (#29)."""
+
+    @given(bp=base_probs, seed=st.integers(min_value=0, max_value=10000))
+    @settings(max_examples=50)
+    def test_completes_and_covers_all(self, bp, seed):
+        """항상 완료되며 모든 폭에 결과 존재."""
+        from quantum.tunneling_physics import BarrierSweeper
+
+        sw = BarrierSweeper(base_prob=bp, trials_per_width=5, batch_size=500, seed=seed)
+        iters = 0
+        while sw.advance():
+            iters += 1
+            if iters > 10000:
+                break
+        self.assertTrue(sw.done)
+        for w in sw.widths:
+            self.assertIn(w, sw.results)
+
+    @given(bp=base_probs, seed=st.integers(min_value=0, max_value=10000))
+    @settings(max_examples=50)
+    def test_tunnel_reflect_sum(self, bp, seed):
+        """tunnel + reflect = total 불변식."""
+        from quantum.tunneling_physics import BarrierSweeper
+
+        sw = BarrierSweeper(base_prob=bp, trials_per_width=10, batch_size=500, seed=seed)
+        while sw.advance():
+            pass
+        for r in sw.results.values():
+            self.assertEqual(r["tunnel"] + r["reflect"], r["total"])
+
+    @given(bp=base_probs, seed=st.integers(min_value=0, max_value=10000))
+    @settings(max_examples=50)
+    def test_progress_monotonic(self, bp, seed):
+        """진행률은 단조 증가."""
+        from quantum.tunneling_physics import BarrierSweeper
+
+        sw = BarrierSweeper(base_prob=bp, trials_per_width=10, batch_size=3, seed=seed)
+        prev = 0.0
+        while sw.advance():
+            cur = sw.progress
+            self.assertGreaterEqual(cur, prev - 1e-9)
+            prev = cur
+
+
 class TestQuantumParticle(unittest.TestCase):
     """QuantumParticle 속성 검증."""
 
