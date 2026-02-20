@@ -2669,6 +2669,8 @@ class TestImportBtnRectNumFiles(unittest.TestCase):
             import pygame
 
             pygame.init()
+            if not hasattr(pygame.Rect, "__mro__"):
+                raise ImportError("mocked pygame")
         except Exception:
             self.skipTest("pygame 사용 불가")
 
@@ -2685,6 +2687,8 @@ class TestImportBtnRectNumFiles(unittest.TestCase):
             import pygame
 
             pygame.init()
+            if not hasattr(pygame.Rect, "__mro__"):
+                raise ImportError("mocked pygame")
         except Exception:
             self.skipTest("pygame 사용 불가")
 
