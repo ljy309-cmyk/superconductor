@@ -1565,7 +1565,15 @@ class TestImportSession(unittest.TestCase):
         self.export_dir = os.path.join(self.tmpdir, "exports")
         os.makedirs(self.export_dir, exist_ok=True)
 
-        # 테스트용 JSON 파일 생성
+        # 테스트용 trial_history
+        self.trial_history = [
+            {"t": 1.0, "barrier": 30, "prob": 0.105, "result": True},
+            {"t": 2.0, "barrier": 30, "prob": 0.105, "result": False},
+            {"t": 3.5, "barrier": 30, "prob": 0.105, "result": True},
+            {"t": 4.0, "barrier": 30, "prob": 0.105, "result": True},
+        ]
+
+        # 테스트용 JSON 파일 생성 (trial_history 포함)
         self.session_data = {
             "total_attempts": 50,
             "tunnel_count": 20,
@@ -1578,24 +1586,11 @@ class TestImportSession(unittest.TestCase):
             "speed_mult": 2.0,
             "difficulty": "hard",
             "timestamp": "2026-01-15T12:00:00",
+            "trial_history": self.trial_history,
         }
         self.json_path = os.path.join(self.export_dir, "tunneling_stats_20260115_120000.json")
         with open(self.json_path, "w", encoding="utf-8") as f:
             json.dump(self.session_data, f, indent=2)
-
-        # 테스트용 CSV 파일 생성
-        self.csv_path = os.path.join(self.export_dir, "tunneling_trials_20260115_120000.csv")
-        self.trial_rows = [
-            {"trial": 1, "time_s": 1.0, "barrier_width": 30, "tunnel_prob": 0.105, "result": 1},
-            {"trial": 2, "time_s": 2.0, "barrier_width": 30, "tunnel_prob": 0.105, "result": 0},
-            {"trial": 3, "time_s": 3.5, "barrier_width": 30, "tunnel_prob": 0.105, "result": 1},
-            {"trial": 4, "time_s": 4.0, "barrier_width": 30, "tunnel_prob": 0.105, "result": 1},
-        ]
-        with open(self.csv_path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["trial", "time_s", "barrier_width", "tunnel_prob", "result"])
-            for row in self.trial_rows:
-                writer.writerow([row["trial"], row["time_s"], row["barrier_width"], row["tunnel_prob"], row["result"]])
 
     def tearDown(self):
         import shutil
@@ -1612,8 +1607,8 @@ class TestImportSession(unittest.TestCase):
         self.assertEqual(session["base_prob"], 0.15)
         self.assertEqual(session["barrier_width"], 30)
 
-    def test_load_import_csv(self):
-        """매칭 CSV 파일에서 시행 이력 로드."""
+    def test_load_import_trials(self):
+        """JSON에 포함된 trial_history 로드."""
         from quantum.tunneling_data import _load_import_data
 
         _, trials = _load_import_data(self.json_path)
@@ -1621,7 +1616,7 @@ class TestImportSession(unittest.TestCase):
         self.assertTrue(trials[0]["result"])
         self.assertFalse(trials[1]["result"])
 
-    def test_load_import_csv_fields(self):
+    def test_load_import_trial_fields(self):
         """가져온 시행 데이터의 필드 구조."""
         from quantum.tunneling_data import _load_import_data
 

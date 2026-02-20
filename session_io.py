@@ -145,17 +145,11 @@ def export_session_json(
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # JSON
-    data = dict(session_data)
-    data["timestamp"] = datetime.now().isoformat()
-    json_path = os.path.join(EXPORT_DIR, f"{prefix}_stats_{ts}.json")
-    try:
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-    except OSError:
-        _log.warning("JSON 내보내기 실패: %s", json_path)
+    json_path = _export_as_json(prefix, session_data, ts)
+    if json_path is None:
         return None
 
-    # CSV (선택)
+    # CSV (선택 — 하위 호환용 별도 파일)
     if trial_rows and trial_columns:
         csv_path = os.path.join(EXPORT_DIR, f"{prefix}_trials_{ts}.csv")
         try:
@@ -170,7 +164,6 @@ def export_session_json(
         except OSError:
             _log.warning("CSV 내보내기 실패: %s", csv_path)
 
-    _log.info("데이터 내보내기 완료: %s", json_path)
     return json_path
 
 
@@ -198,6 +191,17 @@ def list_export_files(prefix: str) -> list[tuple[str, str]]:
     return files
 
 
+def delete_export(path: str) -> bool:
+    """내보내기 파일 삭제. 성공 시 ``True``."""
+    try:
+        os.remove(path)
+        _log.info("내보내기 파일 삭제: %s", path)
+        return True
+    except OSError as e:
+        _log.warning("파일 삭제 실패: %s", e)
+        return False
+
+
 # ── 파일 선택 UI ──────────────────────────────────────
 
 
@@ -215,7 +219,7 @@ def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int):
 
 
 def choose_import_file(screen, font, prefix: str) -> str | None:
-    """내보내기 파일 선택 대화상자 (Pygame). JSON 경로 반환, 취소 시 ``None``."""
+    """내보내기 파일 선택 대화상자 (Pygame). 선택한 파일 경로 반환, 취소 시 ``None``."""
     import pygame
 
     from i18n import t
@@ -363,6 +367,13 @@ def _auto_parse_csv_values(row: dict):
     """CSV 행의 문자열 값을 원래 타입으로 복원 (in-place)."""
     for k, v in row.items():
         if not isinstance(v, str):
+            continue
+        # bool 복원
+        if v.lower() == "true":
+            row[k] = True
+            continue
+        if v.lower() == "false":
+            row[k] = False
             continue
         # JSON 인코딩된 dict/list 복원
         if v.startswith(("{", "[")):

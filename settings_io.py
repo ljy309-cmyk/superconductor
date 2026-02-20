@@ -133,6 +133,17 @@ def import_settings(zip_path: str) -> dict:
     return result
 
 
+def delete_export(zip_path: str) -> bool:
+    """내보내기 ZIP 파일 삭제. 성공 시 ``True``."""
+    try:
+        os.remove(zip_path)
+        _log.info("내보내기 파일 삭제: %s", zip_path)
+        return True
+    except OSError as e:
+        _log.warning("파일 삭제 실패: %s", e)
+        return False
+
+
 def list_exports() -> list[str]:
     """내보내기 디렉터리의 ZIP 파일 목록."""
     if not os.path.isdir(_EXPORT_DIR):

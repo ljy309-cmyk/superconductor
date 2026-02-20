@@ -1,7 +1,7 @@
 """터널링 시뮬레이션 데이터 관리 — 세션 내보내기/가져오기.
 
 ``quantum.tunneling`` 에서 분리된 데이터 I/O 전용 모듈.
-공통 ``session_io`` 를 활용하여 JSON+CSV export/import 처리.
+공통 ``session_io`` 를 활용하여 export/import 처리.
 """
 
 import os
@@ -14,15 +14,13 @@ from quantum.tunneling_physics import (
 )
 from session_io import (
     choose_import_file,
-    export_session_json,
-    load_session_with_trials,
+    export_session,
+    load_session,
 )
 
 _log = get_module_logger("tunneling")
 
 _PREFIX = "tunneling"
-
-_TRIAL_COLUMNS = ["trial", "time_s", "barrier_width", "tunnel_prob", "result"]
 
 
 # ── 세션 데이터 빌드 ────────────────────────────────
@@ -63,42 +61,31 @@ def _build_session_data(ctx) -> dict:
 
 
 def _export_session(ctx) -> str | None:
-    """세션 통계를 JSON + CSV로 내보내기. 저장 경로 반환 (실패 시 None)."""
+    """세션 통계를 내보내기. 저장 경로 반환 (실패 시 None)."""
     session = _build_session_data(ctx)
     trials = session.pop("trial_history", [])
-    return export_session_json(
-        _PREFIX,
-        session,
-        trial_rows=trials,
-        trial_columns=_TRIAL_COLUMNS,
-        trial_row_fn=lambda i, tr: [i, tr["t"], tr["barrier"], tr["prob"], int(tr["result"])],
-    )
+    return export_session(_PREFIX, session, trial_rows=trials)
 
 
 # ── 데이터 가져오기 ──────────────────────────────────
 
 
-def _load_import_data(json_path: str) -> tuple[dict | None, list[dict]]:
-    """JSON 세션 + CSV 시행 이력 로드."""
-    return load_session_with_trials(
-        json_path,
-        _PREFIX,
-        trial_parse_fn=lambda row: {
-            "t": float(row["time_s"]),
-            "barrier": int(row["barrier_width"]),
-            "prob": float(row["tunnel_prob"]),
-            "result": bool(int(row["result"])),
-        },
-    )
+def _load_import_data(path: str) -> tuple[dict | None, list[dict]]:
+    """세션 파일 로드 (포맷 자동 감지)."""
+    data = load_session(path)
+    if data is None:
+        return None, []
+    trials = data.pop("trial_history", [])
+    return data, trials
 
 
 def _import_session(ctx) -> bool:
     """내보내기 파일을 선택하고 파라미터 적용 + 비교 데이터 로드."""
-    json_path = choose_import_file(ctx.screen, ctx.font, _PREFIX)
-    if json_path is None:
+    path = choose_import_file(ctx.screen, ctx.font, _PREFIX)
+    if path is None:
         return False
 
-    session, trials = _load_import_data(json_path)
+    session, trials = _load_import_data(path)
     if session is None:
         return False
 
@@ -114,8 +101,9 @@ def _import_session(ctx) -> bool:
     # 비교용 시행 이력 저장
     if trials:
         ctx.imported_trials = trials
-        ts_label = os.path.basename(json_path).replace("tunneling_stats_", "").replace(".json", "")
+        fname = os.path.basename(path).replace("tunneling_stats_", "")
+        ts_label = os.path.splitext(fname)[0]
         ctx.imported_label = ts_label
 
-    _log.info("데이터 가져오기 완료: %s (%d trials)", json_path, len(trials))
+    _log.info("데이터 가져오기 완료: %s (%d trials)", path, len(trials))
     return True

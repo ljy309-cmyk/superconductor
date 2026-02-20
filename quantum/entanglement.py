@@ -671,18 +671,18 @@ def run_simulation():
                     toggle_locale()
 
                 elif event.key == pygame.K_x and (pygame.key.get_mods() & pygame.KMOD_CTRL):
-                    from session_io import export_session_json
-                    export_session_json("entanglement", {
+                    from session_io import export_session
+                    export_session("entanglement", {
                         "play_time": round(time.time() - gs.start_time, 1),
                         "total_measurements": gs.total_measurements,
                         "chsh_experiments": gs.chsh_experiments,
                         "teleport_completions": gs.teleport_completions,
                     })
                 elif event.key == pygame.K_i and (pygame.key.get_mods() & pygame.KMOD_CTRL):
-                    from session_io import choose_import_file, load_session_json
+                    from session_io import choose_import_file, load_session
                     _imp_path = choose_import_file(screen, info_font, "entanglement")
                     if _imp_path:
-                        load_session_json(_imp_path)
+                        load_session(_imp_path)
 
                 elif event.key == pygame.K_LEFTBRACKET:
                     cycle_sim_speed(-1)

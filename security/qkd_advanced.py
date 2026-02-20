@@ -1780,7 +1780,7 @@ def _draw_benchmark_overlay(screen, results: list[dict], font, big_font):
 
 def _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp):
     """현재 시뮬레이션 통계를 JSON 파일로 내보내기."""
-    from session_io import export_session_json
+    from session_io import export_session
 
     data = {
         "mode": ["E91", "Sift", "GHZ", "Compare"][mode],
@@ -1816,17 +1816,17 @@ def _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp):
             "pa_done": e91_cmp.pa_done,
         },
     }
-    return export_session_json("qkd", data)
+    return export_session("qkd", data)
 
 
 def _import_qkd_stats(screen, font) -> dict | None:
     """이전 QKD 세션 데이터 가져오기. 세션 딕셔너리 반환, 취소 시 None."""
-    from session_io import choose_import_file, load_session_json
+    from session_io import choose_import_file, load_session
 
-    json_path = choose_import_file(screen, font, "qkd")
-    if json_path is None:
+    path = choose_import_file(screen, font, "qkd")
+    if path is None:
         return None
-    return load_session_json(json_path)
+    return load_session(path)
 
 
 def _show_session_summary(screen, font, big_font, mode, e91, ghz, bb84_cmp, e91_cmp):

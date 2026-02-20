@@ -872,50 +872,40 @@ class TestTunnelingDataImport(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
-    def _create_tunneling_files(self, session_data, trial_rows):
+    def _create_json_with_trials(self, session_data, trial_history):
+        """trial_history가 포함된 JSON 파일 생성."""
         ts = "20260220_120000"
         json_path = os.path.join(self.tmpdir, f"tunneling_stats_{ts}.json")
-        csv_path = os.path.join(self.tmpdir, f"tunneling_trials_{ts}.csv")
-
+        data = dict(session_data)
+        data["trial_history"] = trial_history
         with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(session_data, f)
-
-        columns = ["trial", "time_s", "barrier_width", "tunnel_prob", "result"]
-        with open(csv_path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(columns)
-            for row in trial_rows:
-                writer.writerow(row)
-
+            json.dump(data, f)
         return json_path
 
-    def test_load_tunneling_data_parses_types(self):
-        """tunneling trial_parse_fn이 올바른 타입 변환."""
+    def test_load_tunneling_data_with_trial_history(self):
+        """JSON에 포함된 trial_history 추출."""
         from quantum.tunneling_data import _load_import_data
 
-        json_path = self._create_tunneling_files(
-            {"total_attempts": 2, "tunnel_rate": 0.5},
-            [[1, "1.5", 12, "0.1", 1], [2, "3.0", 20, "0.05", 0]],
+        trials = [
+            {"t": 1.5, "barrier": 12, "prob": 0.1, "result": True},
+            {"t": 3.0, "barrier": 20, "prob": 0.05, "result": False},
+        ]
+        json_path = self._create_json_with_trials(
+            {"total_attempts": 2, "tunnel_rate": 0.5}, trials,
         )
 
-        session, trials = _load_import_data(json_path)
+        session, loaded_trials = _load_import_data(json_path)
         self.assertIsNotNone(session)
-        self.assertEqual(len(trials), 2)
+        self.assertEqual(len(loaded_trials), 2)
+        self.assertAlmostEqual(loaded_trials[0]["t"], 1.5)
+        self.assertEqual(loaded_trials[0]["barrier"], 12)
+        self.assertTrue(loaded_trials[0]["result"])
+        self.assertFalse(loaded_trials[1]["result"])
+        # session에서 trial_history가 제거되었는지 확인
+        self.assertNotIn("trial_history", session)
 
-        # 타입 확인
-        self.assertIsInstance(trials[0]["t"], float)
-        self.assertIsInstance(trials[0]["barrier"], int)
-        self.assertIsInstance(trials[0]["prob"], float)
-        self.assertIsInstance(trials[0]["result"], bool)
-
-        # 값 확인
-        self.assertAlmostEqual(trials[0]["t"], 1.5)
-        self.assertEqual(trials[0]["barrier"], 12)
-        self.assertTrue(trials[0]["result"])
-        self.assertFalse(trials[1]["result"])
-
-    def test_load_tunneling_no_csv(self):
-        """CSV 없이 JSON만 있을 때."""
+    def test_load_tunneling_no_trials(self):
+        """trial_history 없는 JSON."""
         from quantum.tunneling_data import _load_import_data
 
         json_path = os.path.join(self.tmpdir, "tunneling_stats_20260220_120000.json")
@@ -1746,6 +1736,106 @@ class TestListExportFilesDualFormat(unittest.TestCase):
         self.assertIn("20260103", result[0][0])
         self.assertIn("(CSV)", result[0][0])
         self.assertIn("20260101", result[2][0])
+
+
+# ═══════════════════════════════════════════════════════════
+# 21. session_io — delete_export 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestSessionDeleteExport(unittest.TestCase):
+    """session_io.delete_export 함수 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_delete_existing_file(self):
+        from session_io import delete_export
+
+        path = os.path.join(self.tmpdir, "test.json")
+        with open(path, "w") as f:
+            f.write("{}")
+        self.assertTrue(delete_export(path))
+        self.assertFalse(os.path.exists(path))
+
+    def test_delete_nonexistent_file(self):
+        from session_io import delete_export
+
+        self.assertFalse(delete_export("/nonexistent/file.json"))
+
+
+# ═══════════════════════════════════════════════════════════
+# 22. settings_io — delete_export 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestSettingsDeleteExport(unittest.TestCase):
+    """settings_io.delete_export 함수 검증."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_delete_existing_zip(self):
+        from settings_io import delete_export
+
+        path = os.path.join(self.tmpdir, "backup.zip")
+        with open(path, "w") as f:
+            f.write("data")
+        self.assertTrue(delete_export(path))
+        self.assertFalse(os.path.exists(path))
+
+    def test_delete_nonexistent_zip(self):
+        from settings_io import delete_export
+
+        self.assertFalse(delete_export("/nonexistent/backup.zip"))
+
+
+# ═══════════════════════════════════════════════════════════
+# 23. _auto_parse_csv_values — bool 타입 복원 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestAutoParseCSVBool(unittest.TestCase):
+    """_auto_parse_csv_values의 bool 타입 복원 검증."""
+
+    def test_bool_true_restored(self):
+        from session_io import _auto_parse_csv_values
+
+        row = {"flag": "true", "FLAG2": "True", "FLAG3": "TRUE"}
+        _auto_parse_csv_values(row)
+        self.assertIs(row["flag"], True)
+        self.assertIs(row["FLAG2"], True)
+        self.assertIs(row["FLAG3"], True)
+
+    def test_bool_false_restored(self):
+        from session_io import _auto_parse_csv_values
+
+        row = {"flag": "false", "FLAG2": "False", "FLAG3": "FALSE"}
+        _auto_parse_csv_values(row)
+        self.assertIs(row["flag"], False)
+        self.assertIs(row["FLAG2"], False)
+        self.assertIs(row["FLAG3"], False)
+
+    def test_bool_roundtrip_via_csv(self):
+        """CSV export → load 라운드트립에서 bool 복원."""
+        from session_io import load_session_csv
+
+        path = os.path.join(tempfile.mkdtemp(), "bool_test.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["name", "enabled", "visible"])
+            writer.writerow(["test", "True", "False"])
+
+        result = load_session_csv(path)
+        self.assertIs(result["enabled"], True)
+        self.assertIs(result["visible"], False)
+        shutil.rmtree(os.path.dirname(path), ignore_errors=True)
 
 
 if __name__ == "__main__":
