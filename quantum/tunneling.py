@@ -13,6 +13,7 @@ import pygame
 from achievement_toast import AchievementToast
 from achievements import check_achievements
 from config_loader import cfg
+from difficulty_dialog import choose_difficulty
 from game_base import choose_difficulty_or_quit, finalize_session
 from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
@@ -621,6 +622,7 @@ class _SimContext:
 
         # 슬라이더 패널
         self.panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
+        self.sl_prob = self.panel.add(0.01, 0.50, TUNNEL_PROB_BASE, 0.01, "Base Prob", ".2f")
         self.sl_speed = self.panel.add(0.5, 5.0, 1.0, 0.5, "Speed Mult", ".1f")
         self.sl_barrier = self.panel.add(
             BARRIER_WIDTH_MIN, BARRIER_WIDTH_MAX, BARRIER_WIDTH_DEFAULT, 2, "Barrier W", ".0f"
@@ -629,7 +631,7 @@ class _SimContext:
 
         # 프리셋 HUD / 오버레이
         slider_map = {
-            ("tunneling", "tunnel_prob_base"): self.sl_speed,
+            ("tunneling", "tunnel_prob_base"): self.sl_prob,
             ("tunneling", "barrier_width_default"): self.sl_barrier,
             ("tunneling", "tunnel_speed_boost"): self.sl_boost,
         }
@@ -645,7 +647,8 @@ class _SimContext:
 
         # 물리 상태
         self.barrier_width = BARRIER_WIDTH_DEFAULT
-        self.tunnel_prob = _calc_tunnel_prob(self.barrier_width)
+        self.base_prob = TUNNEL_PROB_BASE
+        self.tunnel_prob = _calc_tunnel_prob(self.barrier_width, self.base_prob)
         self.speed_mult = 1.0
 
         # 세션 통계
@@ -664,8 +667,24 @@ class _SimContext:
         """슬라이더 값 → 물리 파라미터 동기화."""
         self.speed_mult = self.sl_speed.value
         self.barrier_width = int(self.sl_barrier.value)
-        self.tunnel_prob = _calc_tunnel_prob(self.barrier_width)
+        self.base_prob = self.sl_prob.value
+        self.tunnel_prob = _calc_tunnel_prob(self.barrier_width, self.base_prob)
         self.barrier_configs_tried.add(self.barrier_width)
+
+
+# ── 중간 난이도 전환 ──────────────────────────────────
+
+
+def _switch_difficulty_midgame(ctx: _SimContext):
+    """플레이 중 난이도 다이얼로그를 열어 프리셋 전환.
+
+    ESC 시 기존 난이도 유지, 선택 시 슬라이더에 즉시 적용.
+    """
+    chosen = choose_difficulty(ctx.screen, ctx.font)
+    if chosen is None:
+        return  # ESC → 취소, 기존 유지
+    ctx.preset_hud._apply_preset(chosen)
+    ctx.read_sliders()
 
 
 # ── 이벤트 처리 ──────────────────────────────────────
@@ -721,6 +740,8 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         ctx.sl_barrier.value = ctx.sl_barrier.value - 10
     elif key == pygame.K_l:
         toggle_locale()
+    elif key == pygame.K_d:
+        _switch_difficulty_midgame(ctx)
     elif key == pygame.K_TAB:
         ctx.toast.toggle_history()
     elif key == pygame.K_LEFTBRACKET:
@@ -869,7 +890,7 @@ def _render_frame(ctx: _SimContext):
             pause_state=t("paused") if ctx.paused else t("running_state"),
         ),
         t("hint_click_launch"),
-        t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  G: {t('glossary_title')}",
+        t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  G: {t('glossary_title')}",
     ]
     for i, h in enumerate(hints):
         surf = ctx.font.render(h, True, TEXT_CLR)
@@ -903,6 +924,7 @@ def _build_session_data(ctx: _SimContext) -> dict:
         "reflect_count": p.reflect_count,
         "tunnel_rate": round(rate, 3),
         "barrier_width": ctx.barrier_width,
+        "base_prob": round(ctx.base_prob, 3),
         "tunnel_prob": round(ctx.tunnel_prob, 3),
         "elapsed_time": round(elapsed_time, 2),
         "max_tunnel_barrier": ctx.max_tunnel_barrier,

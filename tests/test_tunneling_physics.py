@@ -10,6 +10,7 @@
 #9  config 기반 레이아웃 상수
 #10 반사 감쇠 계수 config 분리
 #12 업적 진행도 데이터 검증
+#14 프리셋 중간 전환 (base_prob 파라미터)
 """
 
 import math
@@ -932,6 +933,141 @@ class TestAchievementProgressData(unittest.TestCase):
         self.assertTrue(speed_ach["condition"]({"tunnel_count": 20, "elapsed_time": 25}))
         # 시간 내 부족한 터널 → 실패
         self.assertFalse(speed_ach["condition"]({"tunnel_count": 5, "elapsed_time": 10}))
+
+
+# ── #14 프리셋 중간 전환 ─────────────────────────────
+
+
+class TestCalcTunnelProbBaseProb(unittest.TestCase):
+    """_calc_tunnel_prob의 base_prob 파라미터 테스트."""
+
+    def test_default_base_prob(self):
+        """base_prob=None이면 TUNNEL_PROB_BASE 사용."""
+        result_none = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT, None)
+        result_default = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT)
+        self.assertAlmostEqual(result_none, result_default)
+
+    def test_custom_base_prob_higher(self):
+        """base_prob가 높으면 결과 확률도 높아짐."""
+        low = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT, 0.1)
+        high = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT, 0.3)
+        self.assertGreater(high, low)
+
+    def test_custom_base_prob_at_default_width(self):
+        """기본 두께에서 base_prob와 결과가 동일."""
+        # BARRIER_WIDTH_DEFAULT에서 exp 항은 e^0 = 1
+        result = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT, 0.25)
+        self.assertAlmostEqual(result, 0.25, places=6)
+
+    def test_custom_base_prob_zero(self):
+        """base_prob=0이면 결과도 0."""
+        result = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT, 0.0)
+        self.assertAlmostEqual(result, 0.0)
+
+    def test_custom_base_prob_one(self):
+        """base_prob=1.0이면 기본 두께에서 1.0."""
+        result = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT, 1.0)
+        self.assertAlmostEqual(result, 1.0, places=6)
+
+    def test_custom_base_prob_clamped_negative(self):
+        """음수 base_prob는 0으로 클램핑."""
+        result = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT, -0.5)
+        self.assertAlmostEqual(result, 0.0)
+
+    def test_custom_base_prob_clamped_over_one(self):
+        """1 초과 base_prob는 1로 클램핑."""
+        result = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT, 1.5)
+        self.assertAlmostEqual(result, 1.0, places=6)
+
+    def test_wider_barrier_reduces_prob_with_custom_base(self):
+        """두꺼운 장벽 + 커스텀 base_prob에서도 확률 감소."""
+        base = _calc_tunnel_prob(BARRIER_WIDTH_DEFAULT, 0.25)
+        wide = _calc_tunnel_prob(100, 0.25)
+        self.assertGreater(base, wide)
+
+    def test_easy_preset_prob(self):
+        """easy 프리셋 값(0.25)이 normal(0.1)보다 높음."""
+        easy = _calc_tunnel_prob(8, 0.25)  # easy preset
+        normal = _calc_tunnel_prob(12, 0.1)  # normal preset
+        self.assertGreater(easy, normal)
+
+    def test_hard_preset_prob(self):
+        """hard 프리셋 값(0.03, 40px)이 normal보다 낮음."""
+        hard = _calc_tunnel_prob(40, 0.03)  # hard preset
+        normal = _calc_tunnel_prob(12, 0.1)  # normal preset
+        self.assertLess(hard, normal)
+
+
+class TestMidSessionPresetSwitch(unittest.TestCase):
+    """플레이 중 프리셋 전환 통합 테스트."""
+
+    def test_preset_slider_map_has_prob(self):
+        """slider_map에 tunnel_prob_base가 올바르게 매핑됨."""
+        from presets import get_preset
+
+        preset = get_preset("easy")
+        self.assertIn("tunneling", preset)
+        self.assertIn("tunnel_prob_base", preset["tunneling"])
+
+    def test_all_presets_have_tunneling_keys(self):
+        """easy/normal/hard 모두 터널링 설정 포함."""
+        from presets import get_preset
+
+        for name in ("easy", "normal", "hard"):
+            preset = get_preset(name)
+            self.assertIn("tunneling", preset, f"{name} preset missing tunneling section")
+            tn = preset["tunneling"]
+            self.assertIn("tunnel_prob_base", tn, f"{name} missing tunnel_prob_base")
+            self.assertIn("barrier_width_default", tn, f"{name} missing barrier_width_default")
+
+    def test_preset_prob_range(self):
+        """프리셋 확률 값이 0~1 범위."""
+        from presets import get_preset
+
+        for name in ("easy", "normal", "hard"):
+            prob = get_preset(name)["tunneling"]["tunnel_prob_base"]
+            self.assertGreaterEqual(prob, 0.0, f"{name} prob < 0")
+            self.assertLessEqual(prob, 1.0, f"{name} prob > 1")
+
+    def test_preset_difficulty_ordering_prob(self):
+        """easy > normal > hard 확률 순서."""
+        from presets import get_preset
+
+        easy_prob = get_preset("easy")["tunneling"]["tunnel_prob_base"]
+        normal_prob = get_preset("normal")["tunneling"]["tunnel_prob_base"]
+        hard_prob = get_preset("hard")["tunneling"]["tunnel_prob_base"]
+        self.assertGreater(easy_prob, normal_prob)
+        self.assertGreater(normal_prob, hard_prob)
+
+    def test_preset_difficulty_ordering_barrier(self):
+        """easy < normal < hard 장벽 두께 순서."""
+        from presets import get_preset
+
+        easy_bw = get_preset("easy")["tunneling"]["barrier_width_default"]
+        normal_bw = get_preset("normal")["tunneling"]["barrier_width_default"]
+        hard_bw = get_preset("hard")["tunneling"]["barrier_width_default"]
+        self.assertLess(easy_bw, normal_bw)
+        self.assertLess(normal_bw, hard_bw)
+
+    def test_calc_tunnel_prob_with_preset_values(self):
+        """각 프리셋 값으로 _calc_tunnel_prob 계산이 유효."""
+        from presets import get_preset
+
+        for name in ("easy", "normal", "hard"):
+            tn = get_preset(name)["tunneling"]
+            prob = _calc_tunnel_prob(
+                int(tn["barrier_width_default"]),
+                tn["tunnel_prob_base"],
+            )
+            self.assertGreater(prob, 0.0, f"{name} calculated prob is 0")
+            self.assertLessEqual(prob, 1.0, f"{name} calculated prob > 1")
+
+    def test_base_prob_proportional(self):
+        """같은 장벽 두께에서 base_prob에 비례."""
+        p1 = _calc_tunnel_prob(50, 0.1)
+        p2 = _calc_tunnel_prob(50, 0.2)
+        # base_prob 2배이면 결과도 정확히 2배
+        self.assertAlmostEqual(p2 / p1, 2.0, places=5)
 
 
 if __name__ == "__main__":

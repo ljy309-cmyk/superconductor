@@ -78,17 +78,23 @@ def _bloch_smooth_theta(
     return max(0.0, min(math.pi, result))
 
 
-def _calc_tunnel_prob(barrier_width: int) -> float:
+def _calc_tunnel_prob(barrier_width: int, base_prob: float | None = None) -> float:
     """벽 두께에 따른 터널링 확률 — 두꺼울수록 확률 감소.
 
     기본 두께(12px)에서 10 %, 두께 200px이면 ~0.5 % 수준으로 지수 감쇠.
     barrier_width는 [BARRIER_WIDTH_MIN, BARRIER_WIDTH_MAX] 범위로 클램핑됩니다.
+
+    Args:
+        barrier_width: 장벽 두께 (px).
+        base_prob: 기본 확률. None이면 config 값(TUNNEL_PROB_BASE) 사용.
+                   프리셋 전환 시 런타임 값을 전달합니다.
     """
     barrier_width = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, int(barrier_width)))
+    prob_base = TUNNEL_PROB_BASE if base_prob is None else max(0.0, min(1.0, float(base_prob)))
     exponent = -_TUNNEL_DECAY * (barrier_width - BARRIER_WIDTH_DEFAULT)
     # 오버플로 방어: exp(x)에서 x가 너무 크거나 작으면 클램핑
     exponent = max(-500.0, min(500.0, exponent))
-    return TUNNEL_PROB_BASE * math.exp(exponent)
+    return prob_base * math.exp(exponent)
 
 
 # ── 입자 클래스 ──────────────────────────────────────
