@@ -100,6 +100,58 @@ def _calc_tunnel_prob(barrier_width: int, base_prob: float | None = None) -> flo
     return prob_base * math.exp(exponent)
 
 
+# ── 파동함수 ψ(x) 계산 (#27) ────────────────────────
+
+_PSI_K_SCALE = cfg("tunneling", "psi_k_scale", 0.12)  # 입사파 파수 스케일
+
+
+def compute_psi(
+    barrier_width: int,
+    tunnel_prob: float,
+    n_points: int = 200,
+) -> list[tuple[float, float]]:
+    """시뮬레이션 영역 전체에 걸친 ψ(x) 계산 (정규화 좌표).
+
+    3개 영역:
+      - 장벽 왼쪽: 입사파 sin(k·x)
+      - 장벽 내부: 지수 감쇠 exp(-κ·x)
+      - 장벽 오른쪽: 투과파 T·sin(k·x)
+
+    Returns:
+        (x_norm, psi) 리스트. x_norm ∈ [0, 1], psi ∈ [-1, 1].
+    """
+    barrier_cx = 0.5  # 장벽 중심 (정규화)
+    half_w = (barrier_width / SIM_W) * 0.5
+    b_left = barrier_cx - half_w
+    b_right = barrier_cx + half_w
+
+    k = _PSI_K_SCALE * math.pi  # 입사파 파수
+    # 감쇠 상수 κ: 장벽이 두꺼울수록 더 빠르게 감쇠
+    kappa = _TUNNEL_DECAY * 80.0 + 0.5
+
+    # 투과 계수 T (장벽 투과 후 진폭 비율)
+    t_coeff = max(0.01, math.sqrt(max(0.0, min(1.0, tunnel_prob))))
+
+    points: list[tuple[float, float]] = []
+    for i in range(n_points):
+        x = i / (n_points - 1)
+
+        if x < b_left:
+            # 입사파 영역
+            psi = math.sin(k * (x - b_left) * SIM_W)
+        elif x <= b_right:
+            # 장벽 내부: 왼쪽 경계에서 오른쪽으로 지수 감쇠
+            dx = (x - b_left) * SIM_W
+            psi = math.exp(-kappa * dx)
+        else:
+            # 투과파 영역: 감쇠된 진폭
+            psi = t_coeff * math.sin(k * (x - b_right) * SIM_W)
+
+        points.append((x, psi))
+
+    return points
+
+
 # ── 입자 클래스 ──────────────────────────────────────
 
 

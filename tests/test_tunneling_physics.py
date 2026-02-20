@@ -2128,5 +2128,92 @@ class TestPhysicsLogging(unittest.TestCase):
         self.assertTrue(any("반사" in msg for msg in cm.output))
 
 
+class TestComputePsi(unittest.TestCase):
+    """#27 — 파동함수 ψ(x) 계산 테스트."""
+
+    def setUp(self):
+        from quantum.tunneling_physics import SIM_W, compute_psi
+
+        self.compute_psi = compute_psi
+        self.SIM_W = SIM_W
+
+    def test_returns_list_of_tuples(self):
+        """compute_psi는 (x_norm, psi) 튜플 리스트 반환."""
+        pts = self.compute_psi(12, 0.1)
+        self.assertIsInstance(pts, list)
+        self.assertGreater(len(pts), 0)
+        for x, psi in pts:
+            self.assertIsInstance(x, float)
+            self.assertIsInstance(psi, float)
+
+    def test_n_points_count(self):
+        """n_points 파라미터가 반환 개수 결정."""
+        for n in (50, 100, 200):
+            pts = self.compute_psi(12, 0.1, n_points=n)
+            self.assertEqual(len(pts), n)
+
+    def test_x_range_zero_to_one(self):
+        """x_norm 값은 [0, 1] 범위."""
+        pts = self.compute_psi(12, 0.1, n_points=100)
+        for x, _ in pts:
+            self.assertGreaterEqual(x, 0.0)
+            self.assertLessEqual(x, 1.0)
+
+    def test_x_monotonic_increasing(self):
+        """x_norm 값은 단조 증가."""
+        pts = self.compute_psi(12, 0.1, n_points=100)
+        for i in range(len(pts) - 1):
+            self.assertLess(pts[i][0], pts[i + 1][0])
+
+    def test_barrier_region_decay(self):
+        """장벽 내부에서 psi는 지수 감쇠 (왼쪽 > 오른쪽)."""
+        barrier_width = 60
+        pts = self.compute_psi(barrier_width, 0.1, n_points=500)
+        # 장벽 경계 (정규화)
+        b_left = 0.5 - (barrier_width / self.SIM_W) * 0.5
+        b_right = 0.5 + (barrier_width / self.SIM_W) * 0.5
+        # 장벽 내부 점들만 추출
+        barrier_pts = [(x, psi) for x, psi in pts if b_left < x < b_right]
+        self.assertGreater(len(barrier_pts), 2)
+        # 첫 번째 장벽 점이 마지막보다 큰 psi (감쇠)
+        self.assertGreater(barrier_pts[0][1], barrier_pts[-1][1])
+
+    def test_transmitted_amplitude_scales_with_prob(self):
+        """투과파 진폭은 tunnel_prob에 비례."""
+        pts_low = self.compute_psi(12, 0.01, n_points=200)
+        pts_high = self.compute_psi(12, 0.50, n_points=200)
+        # 장벽 오른쪽 영역 최대 절대 psi 비교
+        b_right = 0.5 + (12 / self.SIM_W) * 0.5
+        max_low = max(abs(psi) for x, psi in pts_low if x > b_right + 0.05)
+        max_high = max(abs(psi) for x, psi in pts_high if x > b_right + 0.05)
+        self.assertGreater(max_high, max_low)
+
+    def test_all_finite(self):
+        """모든 psi 값은 유한."""
+        import math
+
+        for bw in (4, 50, 200):
+            for tp in (0.01, 0.1, 0.5):
+                pts = self.compute_psi(bw, tp, n_points=100)
+                for _, psi in pts:
+                    self.assertTrue(math.isfinite(psi))
+
+    def test_wider_barrier_more_decay(self):
+        """장벽이 두꺼울수록 투과 영역 진폭 감소 (_calc_tunnel_prob 사용)."""
+        from quantum.tunneling_physics import _calc_tunnel_prob
+
+        # 실제 확률 계산 (두꺼울수록 확률 낮음)
+        prob_narrow = _calc_tunnel_prob(10, 0.3)
+        prob_wide = _calc_tunnel_prob(100, 0.3)
+        narrow = self.compute_psi(10, prob_narrow, n_points=200)
+        wide = self.compute_psi(100, prob_wide, n_points=200)
+        b_right_wide = 0.5 + (100 / self.SIM_W) * 0.5
+        right_wide = [abs(psi) for x, psi in wide if x > b_right_wide + 0.05]
+        b_right_narrow = 0.5 + (10 / self.SIM_W) * 0.5
+        right_narrow = [abs(psi) for x, psi in narrow if x > b_right_narrow + 0.05]
+        if right_wide and right_narrow:
+            self.assertGreater(max(right_narrow), max(right_wide))
+
+
 if __name__ == "__main__":
     unittest.main()

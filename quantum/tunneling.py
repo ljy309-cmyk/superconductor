@@ -41,6 +41,7 @@ from quantum.tunneling_physics import (
     TUNNEL_SPEED_BOOST,
     QuantumParticle,
     _calc_tunnel_prob,
+    compute_psi,
 )
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
@@ -317,6 +318,60 @@ def _draw_sim_area(
     screen.blit(left_label, (SIM_LEFT + 10, SIM_TOP + 5))
     right_label = _tcache.render(font, t("tn_tunneled"), OVERLAY_CLR)
     screen.blit(right_label, (BARRIER_X + 20, SIM_TOP + 5))
+
+
+def _draw_wavefunction(screen, barrier_width: int, tunnel_prob: float, time_ms: float):
+    """파동함수 ψ(x) 시각화 — 장벽 아래 지수 감쇠 표시 (#27)."""
+    points = compute_psi(barrier_width, tunnel_prob)
+    if len(points) < 2:
+        return
+
+    # 파동함수를 시뮬레이션 영역 하단 1/3에 그리기
+    psi_y_center = SIM_TOP + SIM_H * 0.72
+    psi_amplitude = SIM_H * 0.18
+
+    # 시간에 따라 위상 이동 (진행파 효과)
+    phase = time_ms * 0.003
+
+    surf = pygame.Surface((SIM_W, SIM_H), pygame.SRCALPHA)
+
+    # 영역별 색상 결정을 위한 장벽 경계 (정규화 좌표)
+    b_left = 0.5 - (barrier_width / SIM_W) * 0.5
+    b_right = 0.5 + (barrier_width / SIM_W) * 0.5
+
+    prev = None
+    for x_norm, psi in points:
+        # 시간 진행파: 입사/투과 영역에서만 위상 이동
+        if x_norm < b_left or x_norm > b_right:
+            animated = psi * math.cos(phase)
+        else:
+            animated = psi  # 장벽 내부: 감쇠만 (진행 없음)
+
+        sx = int(x_norm * SIM_W)
+        sy = int(psi_y_center - SIM_TOP + psi_amplitude * animated)
+        sy = max(0, min(SIM_H - 1, sy))
+
+        # 영역별 색상
+        if x_norm < b_left:
+            clr = (*PARTICLE_CLR[:3], 100)
+        elif x_norm <= b_right:
+            clr = (*BARRIER_CLR[:3], 120)
+        else:
+            clr = (*TUNNEL_FLASH[:3], 80)
+
+        if prev is not None:
+            pygame.draw.line(surf, clr, prev, (sx, sy), 2)
+        prev = (sx, sy)
+
+    # 중심선 (ψ=0 기준선)
+    base_y = int(psi_y_center - SIM_TOP)
+    pygame.draw.line(surf, (*TEXT_CLR[:3], 30), (0, base_y), (SIM_W, base_y), 1)
+
+    # ψ(x) 라벨
+    lbl = _tcache.render(pygame.font.SysFont("Consolas", 10), "\u03c8(x)", (*ACCENT[:3],))
+    surf.blit(lbl, (4, base_y - 14))
+
+    screen.blit(surf, (SIM_LEFT, SIM_TOP))
 
 
 def _draw_trails(screen, trail_cache, trails, current_trail, current_result):
@@ -1424,6 +1479,7 @@ def _render_frame(ctx: _SimContext):
     ctx.screen.blit(t_surf, (WIDTH // 2 - t_surf.get_width() // 2, 12))
 
     _draw_sim_area(ctx.screen, ctx.font, ctx.barrier_width, ctx.barrier_hover, ctx.barrier_dragging)
+    _draw_wavefunction(ctx.screen, ctx.barrier_width, ctx.tunnel_prob, pygame.time.get_ticks())
     _draw_trails(ctx.screen, ctx.trail_cache, ctx.trails, ctx.current_trail, ctx.particle.tunneled)
     _draw_particle(ctx.screen, ctx.particle, ctx.font)
     _draw_formula_overlay(ctx.screen, ctx.font, ctx)

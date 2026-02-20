@@ -90,6 +90,51 @@ class TestCalcTunnelProb(unittest.TestCase):
         self.assertTrue(math.isfinite(result))
 
 
+class TestComputePsiPBT(unittest.TestCase):
+    """compute_psi 속성 검증 (#27)."""
+
+    def setUp(self):
+        from quantum.tunneling_physics import compute_psi
+
+        self.fn = compute_psi
+
+    @given(bw=barrier_widths, tp=tunnel_probs)
+    @settings(max_examples=200)
+    def test_all_finite(self, bw, tp):
+        """모든 (x, psi) 값은 유한."""
+        for x, psi in self.fn(bw, tp, n_points=50):
+            self.assertTrue(math.isfinite(x))
+            self.assertTrue(math.isfinite(psi))
+
+    @given(bw=barrier_widths, tp=tunnel_probs)
+    @settings(max_examples=200)
+    def test_x_range(self, bw, tp):
+        """x_norm ∈ [0, 1]."""
+        for x, _ in self.fn(bw, tp, n_points=50):
+            self.assertGreaterEqual(x, 0.0)
+            self.assertLessEqual(x, 1.0)
+
+    @given(bw=barrier_widths, tp=tunnel_probs)
+    @settings(max_examples=100)
+    def test_correct_count(self, bw, tp):
+        """반환 포인트 수 = n_points."""
+        self.assertEqual(len(self.fn(bw, tp, n_points=77)), 77)
+
+    @given(bw=barrier_widths, tp=tunnel_probs)
+    @settings(max_examples=100)
+    def test_barrier_entry_positive(self, bw, tp):
+        """장벽 진입점 psi > 0 (지수 감쇠 시작)."""
+        from quantum.tunneling_physics import SIM_W
+
+        b_left = 0.5 - (bw / SIM_W) * 0.5
+        pts = self.fn(bw, tp, n_points=500)
+        # 장벽 진입 직후 점 찾기
+        for x, psi in pts:
+            if x > b_left and x < b_left + 0.02:
+                self.assertGreater(psi, 0.0)
+                break
+
+
 class TestQuantumParticle(unittest.TestCase):
     """QuantumParticle 속성 검증."""
 
