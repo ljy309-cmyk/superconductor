@@ -52,7 +52,7 @@ def export_settings(output_dir: str | None = None) -> str | None:
     dest_dir = output_dir or _EXPORT_DIR
     os.makedirs(dest_dir, exist_ok=True)
 
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     zip_name = f"settings_export_{ts}.zip"
     zip_path = os.path.join(dest_dir, zip_name)
 
@@ -132,17 +132,16 @@ def import_settings(zip_path: str) -> dict:
                         result["skipped"].append(member)
                         _log.warning("유효하지 않은 JSON 건너뜀: %s", member)
                         continue
-                    dest = os.path.join(_BASE, member)
-                    dest_dir = os.path.dirname(dest)
-                    os.makedirs(dest_dir, exist_ok=True)
-                    _backup_before_overwrite(dest)
+
+                # 공통: 대상 경로 준비 및 백업
+                dest = os.path.join(_BASE, member)
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                _backup_before_overwrite(dest)
+
+                if member.endswith(".json"):
                     with open(dest, "wb") as dst:
-                        dst.write(raw)
+                        dst.write(raw)  # noqa: F821 — JSON 분기에서 이미 읽음
                 else:
-                    dest = os.path.join(_BASE, member)
-                    dest_dir = os.path.dirname(dest)
-                    os.makedirs(dest_dir, exist_ok=True)
-                    _backup_before_overwrite(dest)
                     with zf.open(member) as src, open(dest, "wb") as dst:
                         shutil.copyfileobj(src, dst)
                 result["imported"].append(member)

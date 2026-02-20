@@ -306,7 +306,7 @@
 
   "export_success": "Data exported successfully",
   "import_title": "Import Data",
-  "import_hint": "Enter: Select  |  ESC: Cancel",
+  "import_hint": "Enter: Select  |  D: Delete  |  ESC: Cancel",
   "import_empty": "No files to import",
   "import_success": "Data imported successfully",
 
@@ -667,6 +667,7 @@
   "settings_deleted": "Deleted",
   "settings_delete": "Delete",
   "settings_export_done": "Settings exported: {path}",
+  "settings_export_fail": "Export failed: No settings files to export or write error occurred.",
   "settings_import_done": "Settings imported ({count} files)",
   "settings_import_skipped": "Skipped {count} file(s): {files}",
   "settings_import_fail": "Import failed: Please select a valid ZIP file.",

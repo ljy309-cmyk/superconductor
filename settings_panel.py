@@ -310,6 +310,8 @@ class SettingsPanel(tk.Toplevel):
         path = export_settings()
         if path:
             messagebox.showinfo(t("settings_title"), t("settings_export_done", path=path), parent=self)
+        else:
+            messagebox.showwarning(t("settings_title"), t("settings_export_fail"), parent=self)
 
     def _import_settings(self):
         path = filedialog.askopenfilename(
@@ -364,8 +366,11 @@ class SettingsPanel(tk.Toplevel):
         frame = tk.Frame(dlg, bg=_tk.BG)
         frame.pack(fill="both", expand=True, padx=10)
 
-        lb = tk.Listbox(frame, font=FONTS.BODY, selectmode="single")
-        lb.pack(fill="both", expand=True)
+        scrollbar = tk.Scrollbar(frame, orient="vertical")
+        lb = tk.Listbox(frame, font=FONTS.BODY, selectmode="single", yscrollcommand=scrollbar.set)
+        scrollbar.config(command=lb.yview)
+        scrollbar.pack(side="right", fill="y")
+        lb.pack(side="left", fill="both", expand=True)
 
         import os
         for path in exports:

@@ -69,7 +69,7 @@ def export_session(
         저장된 파일 경로. 실패 시 ``None``.
     """
     os.makedirs(EXPORT_DIR, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
     if fmt not in ("json", "csv"):
         _log.warning("지원하지 않는 포맷: %s (json으로 대체)", fmt)
@@ -121,7 +121,9 @@ def _export_as_csv(prefix, session_data, ts, trial_rows=None, trial_columns=None
                 values = []
                 for k in headers:
                     v = data[k]
-                    if isinstance(v, bool):
+                    if v is None:
+                        values.append("")
+                    elif isinstance(v, bool):
                         values.append(str(v))
                     elif isinstance(v, (dict, list)):
                         values.append(json.dumps(v, ensure_ascii=False))
@@ -182,7 +184,7 @@ def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int):
     btn_w, btn_h = 300, 28
     bx = screen_w // 2 - btn_w // 2
     max_visible = 6
-    panel_h = 50 + min(max_visible, 6) * 34 + 30
+    panel_h = 50 + max_visible * 34 + 30
     py = screen_h // 2 - panel_h // 2
     by = py + 40 + vis_index * 34
     return pygame.Rect(bx, by, btn_w, btn_h)
@@ -231,6 +233,15 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
                         scroll = selected - max_visible + 1
                 if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                     return files[selected][1]
+                if event.key == pygame.K_d and files:
+                    # 선택된 파일 삭제
+                    _, del_path = files[selected]
+                    if delete_export(del_path):
+                        files.pop(selected)
+                        if not files:
+                            return None
+                        selected = min(selected, len(files) - 1)
+                        scroll = min(scroll, max(0, len(files) - max_visible))
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mx, my = event.pos
                 for vi in range(min(max_visible, len(files) - scroll)):
@@ -310,7 +321,7 @@ def load_session(path: str) -> dict | None:
     지원하지 않는 확장자는 경고 후 ``None`` 반환.
     """
     if path.endswith(".csv"):
-        return load_session_csv(path)
+        return _load_session_csv(path)
     if path.endswith(".json"):
         return _load_session_json(path)
     _log.warning("지원하지 않는 파일 형식: %s (json, csv만 지원)", path)
@@ -327,7 +338,7 @@ def _load_session_json(json_path: str) -> dict | None:
         return None
 
 
-def load_session_csv(csv_path: str) -> dict | None:
+def _load_session_csv(csv_path: str) -> dict | None:
     """CSV 세션 파일 로드. 실패 시 ``None``.
 
     단일 행 CSV (세션 요약)는 dict로 반환.
@@ -358,6 +369,10 @@ def _auto_parse_csv_values(row: dict):
     """CSV 행의 문자열 값을 원래 타입으로 복원 (in-place)."""
     for k, v in row.items():
         if not isinstance(v, str):
+            continue
+        # 빈 문자열 → None 복원
+        if v == "":
+            row[k] = None
             continue
         # bool 복원
         if v.lower() == "true":

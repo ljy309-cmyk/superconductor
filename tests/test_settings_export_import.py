@@ -982,7 +982,7 @@ class TestExportFilenameUniqueness(unittest.TestCase):
         self.assertTrue(name.startswith("fmt_test_stats_"))
         self.assertTrue(name.endswith(".json"))
         ts_part = name.replace("fmt_test_stats_", "").replace(".json", "")
-        self.assertEqual(len(ts_part), 15)  # 20260220_120000
+        self.assertEqual(len(ts_part), 22)  # 20260220_120000_123456
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1348,12 +1348,12 @@ class TestExportSession(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# 18. load_session / load_session_csv — 통합 로드 함수
+# 18. load_session / _load_session_csv — 통합 로드 함수
 # ═══════════════════════════════════════════════════════════
 
 
 class TestLoadSession(unittest.TestCase):
-    """load_session (포맷 자동 감지) 및 load_session_csv 검증."""
+    """load_session (포맷 자동 감지) 및 _load_session_csv 검증."""
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -1389,9 +1389,9 @@ class TestLoadSession(unittest.TestCase):
         self.assertEqual(result["name"], "test")
         self.assertEqual(result["value"], 123)
 
-    def test_load_session_csv_single_row(self):
-        """load_session_csv: 단일 행 → dict 반환."""
-        from session_io import load_session_csv
+    def test__load_session_csv_single_row(self):
+        """_load_session_csv: 단일 행 → dict 반환."""
+        from session_io import _load_session_csv
 
         path = os.path.join(self.tmpdir, "single.csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
@@ -1399,15 +1399,15 @@ class TestLoadSession(unittest.TestCase):
             writer.writerow(["attempts", "rate", "speed"])
             writer.writerow(["100", "0.35", "2.0"])
 
-        result = load_session_csv(path)
+        result = _load_session_csv(path)
         self.assertIsNotNone(result)
         self.assertEqual(result["attempts"], 100)
         self.assertAlmostEqual(result["rate"], 0.35)
         self.assertAlmostEqual(result["speed"], 2.0)
 
-    def test_load_session_csv_multi_rows(self):
-        """load_session_csv: 다중 행 → {"rows": [...]} 반환."""
-        from session_io import load_session_csv
+    def test__load_session_csv_multi_rows(self):
+        """_load_session_csv: 다중 행 → {"rows": [...]} 반환."""
+        from session_io import _load_session_csv
 
         path = os.path.join(self.tmpdir, "multi.csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
@@ -1417,16 +1417,16 @@ class TestLoadSession(unittest.TestCase):
             writer.writerow(["2", "3.0", "0"])
             writer.writerow(["3", "4.5", "1"])
 
-        result = load_session_csv(path)
+        result = _load_session_csv(path)
         self.assertIsNotNone(result)
         self.assertIn("rows", result)
         self.assertEqual(len(result["rows"]), 3)
         self.assertEqual(result["rows"][0]["trial"], 1)
         self.assertAlmostEqual(result["rows"][1]["time_s"], 3.0)
 
-    def test_load_session_csv_empty_file(self):
-        """load_session_csv: 빈 CSV → None."""
-        from session_io import load_session_csv
+    def test__load_session_csv_empty_file(self):
+        """_load_session_csv: 빈 CSV → None."""
+        from session_io import _load_session_csv
 
         path = os.path.join(self.tmpdir, "empty.csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
@@ -1434,19 +1434,19 @@ class TestLoadSession(unittest.TestCase):
             writer.writerow(["col1", "col2"])
             # 데이터 행 없음
 
-        result = load_session_csv(path)
+        result = _load_session_csv(path)
         self.assertIsNone(result)
 
-    def test_load_session_csv_nonexistent(self):
-        """load_session_csv: 존재하지 않는 파일 → None."""
-        from session_io import load_session_csv
+    def test__load_session_csv_nonexistent(self):
+        """_load_session_csv: 존재하지 않는 파일 → None."""
+        from session_io import _load_session_csv
 
-        result = load_session_csv("/nonexistent/path/data.csv")
+        result = _load_session_csv("/nonexistent/path/data.csv")
         self.assertIsNone(result)
 
-    def test_load_session_csv_json_encoded_fields(self):
-        """load_session_csv: JSON 인코딩된 dict/list 필드 자동 파싱."""
-        from session_io import load_session_csv
+    def test__load_session_csv_json_encoded_fields(self):
+        """_load_session_csv: JSON 인코딩된 dict/list 필드 자동 파싱."""
+        from session_io import _load_session_csv
 
         path = os.path.join(self.tmpdir, "nested.csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
@@ -1454,7 +1454,7 @@ class TestLoadSession(unittest.TestCase):
             writer.writerow(["name", "config", "tags"])
             writer.writerow(["test", '{"fps": 60}', '[1, 2, 3]'])
 
-        result = load_session_csv(path)
+        result = _load_session_csv(path)
         self.assertIsNotNone(result)
         self.assertEqual(result["name"], "test")
         self.assertIsInstance(result["config"], dict)
@@ -1462,9 +1462,9 @@ class TestLoadSession(unittest.TestCase):
         self.assertIsInstance(result["tags"], list)
         self.assertEqual(result["tags"], [1, 2, 3])
 
-    def test_load_session_csv_numeric_conversion(self):
-        """load_session_csv: 숫자 문자열 자동 변환."""
-        from session_io import load_session_csv
+    def test__load_session_csv_numeric_conversion(self):
+        """_load_session_csv: 숫자 문자열 자동 변환."""
+        from session_io import _load_session_csv
 
         path = os.path.join(self.tmpdir, "nums.csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
@@ -1472,7 +1472,7 @@ class TestLoadSession(unittest.TestCase):
             writer.writerow(["int_val", "float_val", "str_val"])
             writer.writerow(["42", "3.14", "hello"])
 
-        result = load_session_csv(path)
+        result = _load_session_csv(path)
         self.assertEqual(result["int_val"], 42)
         self.assertIsInstance(result["int_val"], int)
         self.assertAlmostEqual(result["float_val"], 3.14)
@@ -1757,7 +1757,7 @@ class TestAutoParseCSVBool(unittest.TestCase):
 
     def test_bool_roundtrip_via_csv(self):
         """CSV export → load 라운드트립에서 bool 복원."""
-        from session_io import load_session_csv
+        from session_io import _load_session_csv
 
         path = os.path.join(tempfile.mkdtemp(), "bool_test.csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
@@ -1765,7 +1765,7 @@ class TestAutoParseCSVBool(unittest.TestCase):
             writer.writerow(["name", "enabled", "visible"])
             writer.writerow(["test", "True", "False"])
 
-        result = load_session_csv(path)
+        result = _load_session_csv(path)
         self.assertIs(result["enabled"], True)
         self.assertIs(result["visible"], False)
         shutil.rmtree(os.path.dirname(path), ignore_errors=True)
@@ -2116,6 +2116,168 @@ class TestExportSettingsEmptyZip(unittest.TestCase):
             # ZIP 파일이 남아있지 않아야 함
             zips = [f for f in os.listdir(out_dir) if f.endswith(".zip")] if os.path.isdir(out_dir) else []
             self.assertEqual(len(zips), 0)
+        finally:
+            settings_io._BASE = orig_base
+            settings_io._EXPORT_FILES = orig_files
+            settings_io._EXPORT_DIRS = orig_dirs
+
+
+# ═══════════════════════════════════════════════════════════
+# 32. CSV None 값 라운드트립 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestCsvNoneRoundtrip(unittest.TestCase):
+    """CSV 내보내기에서 None 값의 라운드트립."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_none_roundtrip_csv(self):
+        """None → 빈 문자열 → None 라운드트립."""
+        from session_io import export_session, load_session
+
+        session = {"name": "test", "extra": None, "count": 5}
+        path = export_session("none_rt", session, fmt="csv")
+        loaded = load_session(path)
+        self.assertIsNone(loaded["extra"])
+        self.assertEqual(loaded["count"], 5)
+        self.assertEqual(loaded["name"], "test")
+
+
+# ═══════════════════════════════════════════════════════════
+# 33. 타임스탬프 마이크로초 — 파일명 고유성 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestTimestampMicroseconds(unittest.TestCase):
+    """연속 내보내기 시 파일명이 겹치지 않음."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+
+        self._orig = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+
+        session_io.EXPORT_DIR = self._orig
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_rapid_exports_unique(self):
+        """빠르게 연속 내보내기 해도 파일명 중복 없음."""
+        from session_io import export_session
+
+        paths = []
+        for i in range(5):
+            p = export_session("rapid", {"i": i})
+            self.assertIsNotNone(p)
+            paths.append(p)
+        # 모든 경로가 고유해야 함
+        self.assertEqual(len(set(paths)), 5)
+
+
+# ═══════════════════════════════════════════════════════════
+# 34. _load_session_csv 내부 전용화 확인
+# ═══════════════════════════════════════════════════════════
+
+
+class TestLoadSessionCsvPrivate(unittest.TestCase):
+    """_load_session_csv는 내부 함수이지만 기능은 유지."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_private_function_exists(self):
+        """_load_session_csv 함수가 존재함."""
+        from session_io import _load_session_csv
+
+        self.assertTrue(callable(_load_session_csv))
+
+    def test_load_session_dispatches_to_csv(self):
+        """load_session이 .csv 파일을 _load_session_csv로 디스패치."""
+        from session_io import load_session
+
+        path = os.path.join(self.tmpdir, "test.csv")
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["a", "b"])
+            writer.writerow(["1", "2"])
+        result = load_session(path)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["a"], 1)
+
+
+# ═══════════════════════════════════════════════════════════
+# 35. import_settings 중복 코드 제거 후 동작 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestImportSettingsRefactored(unittest.TestCase):
+    """import_settings 리팩토링 후 JSON/비JSON 모두 정상 동작."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_json_and_non_json_imported(self):
+        """JSON 파일과 비JSON 파일이 모두 정상 가져오기."""
+        import settings_io
+
+        src = os.path.join(self.tmpdir, "src")
+        os.makedirs(os.path.join(src, "profiles"))
+        # JSON 설정 파일
+        with open(os.path.join(src, "config.json"), "w") as f:
+            json.dump({"theme": "dark"}, f)
+        # 비JSON 프로필 파일
+        with open(os.path.join(src, "profiles", "user.dat"), "w") as f:
+            f.write("profile-data")
+
+        orig_base = settings_io._BASE
+        orig_files = list(settings_io._EXPORT_FILES)
+        orig_dirs = list(settings_io._EXPORT_DIRS)
+        settings_io._BASE = src
+        settings_io._EXPORT_FILES = ["config.json"]
+        settings_io._EXPORT_DIRS = ["profiles"]
+
+        try:
+            # 내보내기
+            out_dir = os.path.join(self.tmpdir, "out")
+            zip_path = settings_io.export_settings(out_dir)
+            self.assertIsNotNone(zip_path)
+
+            # 대상 디렉터리 초기화
+            dest = os.path.join(self.tmpdir, "dest")
+            os.makedirs(os.path.join(dest, "profiles"), exist_ok=True)
+            settings_io._BASE = dest
+
+            # 가져오기
+            result = settings_io.import_settings(zip_path)
+            self.assertIn("config.json", result["imported"])
+            self.assertTrue(any("profiles/" in f for f in result["imported"]))
+            self.assertEqual(result["skipped"], [])
+
+            # 파일 내용 검증
+            with open(os.path.join(dest, "config.json")) as f:
+                cfg = json.load(f)
+            self.assertEqual(cfg["theme"], "dark")
         finally:
             settings_io._BASE = orig_base
             settings_io._EXPORT_FILES = orig_files
