@@ -192,7 +192,7 @@ class GlossaryOverlay:
                 self._page -= 1
             return True
 
-        return True  # 오버레이 열린 동안 다른 키 소비
+        return False  # 처리하지 않은 키는 다른 핸들러에 전달
 
     # ── rendering ─────────────────────────────────────────
 

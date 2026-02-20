@@ -575,12 +575,12 @@ class TestGlossaryEventHandling(unittest.TestCase):
         consumed = self.g.handle_event(ev)
         self.assertFalse(consumed)
 
-    def test_other_keys_consumed_when_visible(self):
-        """오버레이 열린 상태에서 다른 키도 소비해야 한다."""
+    def test_unhandled_keys_not_consumed_when_visible(self):
+        """오버레이 열린 상태에서 처리하지 않는 키는 소비하지 않아야 한다."""
         self.g.visible = True
         ev = _make_event(_pg_mock.K_SPACE)
         consumed = self.g.handle_event(ev)
-        self.assertTrue(consumed)
+        self.assertFalse(consumed)
 
     def test_other_keys_not_consumed_when_hidden(self):
         """오버레이 닫힌 상태에서 G 이외의 키는 소비하지 않아야 한다."""
