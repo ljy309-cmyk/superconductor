@@ -272,6 +272,44 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
         screen.blit(surf, (stats_x, stats_y + i * 17))
 
 
+# ── 수식 오버레이 레이아웃 ────────────────────────────
+_FORMULA_X = BLOCH_CX - BLOCH_R  # 블로흐 구 좌측 정렬
+_FORMULA_Y = 45
+_FORMULA_W = BLOCH_R * 2  # 블로흐 구 직경과 동일
+_FORMULA_H = 80
+
+
+def _draw_formula_overlay(screen, font, barrier_width, tunnel_prob):
+    """핵심 터널링 수식 오버레이."""
+    fx, fy, fw, fh = _FORMULA_X, _FORMULA_Y, _FORMULA_W, _FORMULA_H
+
+    # 반투명 배경
+    bg_surf = pygame.Surface((fw, fh), pygame.SRCALPHA)
+    bg_surf.fill((*BG[:3], 200))
+    screen.blit(bg_surf, (fx, fy))
+    pygame.draw.rect(screen, OVERLAY_CLR, (fx, fy, fw, fh), 1)
+
+    # 타이틀
+    title = font.render(t("tn_formula_title"), True, ACCENT)
+    screen.blit(title, (fx + fw // 2 - title.get_width() // 2, fy + 3))
+
+    # ① 투과 계수: T ≈ e^(−2κL)
+    f1 = font.render("T ≈ e", True, BARRIER_CLR)
+    screen.blit(f1, (fx + 8, fy + 20))
+    # 지수 부분 (위 첨자 느낌으로 작은 오프셋)
+    exp_text = font.render("(−2κL)", True, TEXT_CLR)
+    screen.blit(exp_text, (fx + 8 + f1.get_width(), fy + 17))
+
+    # ② 감쇠 상수: κ = √(2m(V−E)) / ℏ
+    f2 = font.render("κ = √(2m(V−E)) / ℏ", True, BARRIER_CLR)
+    screen.blit(f2, (fx + 8, fy + 37))
+
+    # ③ 현재 시뮬레이션 값
+    val_text = f"L={barrier_width}px  →  P={tunnel_prob * 100:.1f}%"
+    val_surf = font.render(val_text, True, TUNNEL_FLASH)
+    screen.blit(val_surf, (fx + 8, fy + 57))
+
+
 def _draw_rate_chart(screen, font, trial_history, tunnel_prob):
     """누적 터널링 확률 실시간 라인 차트."""
     # 내부 차트 영역
@@ -558,6 +596,9 @@ def run_simulation():
 
         # 입자
         _draw_particle(screen, particle, font)
+
+        # 수식 오버레이
+        _draw_formula_overlay(screen, font, barrier_width, tunnel_prob)
 
         # 블로흐 구
         _draw_bloch_sphere(screen, particle, font, title_font, bloch_phi, bloch_el)
