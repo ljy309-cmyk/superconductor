@@ -15,7 +15,6 @@ from i18n import t
 from quantum.tunneling_experiment import (
     compute_fit_stats,
     generate_theory_curve,
-    get_dataset_ids,
     get_experiment_data,
     get_experiment_datasets,
 )
@@ -38,7 +37,6 @@ from quantum.tunneling_physics import (
     calc_energy_levels,
     compute_psi,
 )
-from sim_speed import speed_label
 from theme import load_pg_colors
 from ui.slider import PANEL_W
 

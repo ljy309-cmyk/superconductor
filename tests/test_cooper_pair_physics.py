@@ -45,7 +45,7 @@ class TestEnergyGap(unittest.TestCase):
         temps = [i * 5.0 for i in range(int(TC_KELVIN // 5) + 1)]
         gaps = [energy_gap(t) for t in temps]
         for i in range(len(gaps) - 1):
-            self.assertGreaterEqual(gaps[i], gaps[i + 1], f"T={temps[i]} → T={temps[i+1]}")
+            self.assertGreaterEqual(gaps[i], gaps[i + 1], f"T={temps[i]} → T={temps[i + 1]}")
 
     def test_always_non_negative(self):
         """에너지 갭은 항상 0 이상이어야 한다."""

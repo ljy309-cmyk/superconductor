@@ -1557,7 +1557,6 @@ class TestImportSession(unittest.TestCase):
     """#18 데이터 가져오기 — JSON/CSV 로드 및 파라미터 적용."""
 
     def setUp(self):
-        import csv
         import json
         import tempfile
 

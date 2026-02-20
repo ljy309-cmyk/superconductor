@@ -85,11 +85,17 @@ class TestExportSessionJsonFormat(unittest.TestCase):
             {"t": 3.0, "barrier": 15, "prob": 0.1, "result": False},
         ]
         columns = ["trial", "time_s", "barrier_width", "tunnel_prob", "result"]
-        row_fn = lambda i, tr: [i, tr["t"], tr["barrier"], tr["prob"], int(tr["result"])]
+
+        def row_fn(i, tr):
+            return [i, tr["t"], tr["barrier"], tr["prob"], int(tr["result"])]
 
         result = export_session(
-            "tunneling", session, fmt="csv",
-            trial_rows=trials, trial_columns=columns, trial_row_fn=row_fn,
+            "tunneling",
+            session,
+            fmt="csv",
+            trial_rows=trials,
+            trial_columns=columns,
+            trial_row_fn=row_fn,
         )
         self.assertIsNotNone(result)
         self.assertTrue(result.endswith(".csv"))
@@ -226,7 +232,7 @@ class TestLoadSession(unittest.TestCase):
         from session_io import load_session
 
         path = os.path.join(self.tmpdir, "empty.json")
-        with open(path, "w") as f:
+        with open(path, "w"):
             pass
 
         result = load_session(path)
@@ -528,17 +534,18 @@ class TestSettingsIoSecurity(unittest.TestCase):
         """허용된 파일 목록에 없는 최상위 파일 차단."""
         from settings_io import import_settings
 
-        zip_path = self._make_zip({
-            "config.json": "{}",
-            "achievements.json": "{}",
-            "tutorial_state.json": "{}",
-            "main.py": "import os; os.system('rm -rf /')",
-            "settings_io.py": "# malicious override",
-            ".env": "SECRET_KEY=abc123",
-        })
+        zip_path = self._make_zip(
+            {
+                "config.json": "{}",
+                "achievements.json": "{}",
+                "tutorial_state.json": "{}",
+                "main.py": "import os; os.system('rm -rf /')",
+                "settings_io.py": "# malicious override",
+                ".env": "SECRET_KEY=abc123",
+            }
+        )
         result = import_settings(zip_path)
-        self.assertEqual(sorted(result["imported"]),
-                         ["achievements.json", "config.json", "tutorial_state.json"])
+        self.assertEqual(sorted(result["imported"]), ["achievements.json", "config.json", "tutorial_state.json"])
         self.assertIn("main.py", result["skipped"])
         self.assertIn("settings_io.py", result["skipped"])
         self.assertIn(".env", result["skipped"])
@@ -819,7 +826,8 @@ class TestTunnelingDataImport(unittest.TestCase):
             {"t": 3.0, "barrier": 20, "prob": 0.05, "result": False},
         ]
         json_path = self._create_json_with_trials(
-            {"total_attempts": 2, "tunnel_rate": 0.5}, trials,
+            {"total_attempts": 2, "tunnel_rate": 0.5},
+            trials,
         )
 
         session, loaded_trials = _load_import_data(json_path)
@@ -851,7 +859,6 @@ class TestTunnelingDataImport(unittest.TestCase):
         session, trials = _load_import_data("/nonexistent/tunneling_stats_x.json")
         self.assertIsNone(session)
         self.assertEqual(trials, [])
-
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1090,11 +1097,13 @@ class TestImportSettingsJsonValidation(unittest.TestCase):
         """유효/무효 JSON이 섞인 경우 유효한 것만 가져오기."""
         from settings_io import import_settings
 
-        zip_path = self._make_zip({
-            "config.json": '{"ok": true}',
-            "achievements.json": "not valid json {{{",
-            "tutorial_state.json": '{"step": 3}',
-        })
+        zip_path = self._make_zip(
+            {
+                "config.json": '{"ok": true}',
+                "achievements.json": "not valid json {{{",
+                "tutorial_state.json": '{"step": 3}',
+            }
+        )
         result = import_settings(zip_path)
         self.assertIn("config.json", result["imported"])
         self.assertIn("tutorial_state.json", result["imported"])
@@ -1104,10 +1113,12 @@ class TestImportSettingsJsonValidation(unittest.TestCase):
         """JSON이 아닌 파일(profiles 내)은 유효성 검사 없이 가져오기."""
         from settings_io import import_settings
 
-        zip_path = self._make_zip({
-            "profiles/user1.json": '{"name": "user1"}',
-            "profiles/avatar.png": b"PNG binary data".decode("latin-1"),
-        })
+        zip_path = self._make_zip(
+            {
+                "profiles/user1.json": '{"name": "user1"}',
+                "profiles/avatar.png": b"PNG binary data".decode("latin-1"),
+            }
+        )
         result = import_settings(zip_path)
         # profiles/ 내 파일은 허용됨 — .json은 유효성 검사, .png는 바이패스 가능
         # (profiles/ prefix가 허용되므로 .png도 통과)
@@ -1259,8 +1270,7 @@ class TestExportSession(unittest.TestCase):
         ]
         columns = ["trial", "time_s", "prob", "result"]
 
-        path = export_session("test", session, fmt="csv",
-                              trial_rows=trials, trial_columns=columns)
+        path = export_session("test", session, fmt="csv", trial_rows=trials, trial_columns=columns)
         self.assertIsNotNone(path)
         self.assertTrue(path.endswith(".csv"))
 
@@ -1282,10 +1292,11 @@ class TestExportSession(unittest.TestCase):
             {"t": 1.5, "barrier": 10, "prob": 0.2, "result": True},
         ]
         columns = ["idx", "time", "width", "prob", "res"]
-        row_fn = lambda i, tr: [i, tr["t"], tr["barrier"], tr["prob"], int(tr["result"])]
 
-        path = export_session("test", {}, fmt="csv",
-                              trial_rows=trials, trial_columns=columns, trial_row_fn=row_fn)
+        def row_fn(i, tr):
+            return [i, tr["t"], tr["barrier"], tr["prob"], int(tr["result"])]
+
+        path = export_session("test", {}, fmt="csv", trial_rows=trials, trial_columns=columns, trial_row_fn=row_fn)
         with open(path, encoding="utf-8") as f:
             first_line = f.readline()
             if not first_line.startswith("#"):
@@ -1361,7 +1372,7 @@ class TestExportSession(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 
 
-class TestLoadSession(unittest.TestCase):
+class TestLoadSessionFormats(unittest.TestCase):
     """load_session (포맷 자동 감지) 및 _load_session_csv 검증."""
 
     def setUp(self):
@@ -1461,7 +1472,7 @@ class TestLoadSession(unittest.TestCase):
         with open(path, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["name", "config", "tags"])
-            writer.writerow(["test", '{"fps": 60}', '[1, 2, 3]'])
+            writer.writerow(["test", '{"fps": 60}', "[1, 2, 3]"])
 
         result = _load_session_csv(path)
         self.assertIsNotNone(result)
@@ -1548,8 +1559,7 @@ class TestExportLoadRoundtrip(unittest.TestCase):
             {"trial": 2, "time_s": 2.5, "result": 0},
         ]
         columns = ["trial", "time_s", "result"]
-        path = export_session("rt", {}, fmt="csv",
-                              trial_rows=trials, trial_columns=columns)
+        path = export_session("rt", {}, fmt="csv", trial_rows=trials, trial_columns=columns)
 
         loaded = load_session(path)
         self.assertIsNotNone(loaded)
@@ -1942,9 +1952,7 @@ class TestExportSettingsReturnNone(unittest.TestCase):
         """쓰기 불가 디렉터리에서 실패 시 None 반환."""
         import settings_io
 
-        with unittest.mock.patch.object(
-            settings_io.zipfile, "ZipFile", side_effect=OSError("mock")
-        ):
+        with unittest.mock.patch.object(settings_io.zipfile, "ZipFile", side_effect=OSError("mock")):
             result = settings_io.export_settings(self.tmpdir)
         self.assertIsNone(result)
 
@@ -2045,13 +2053,14 @@ class TestExportCsvMissingColumns(unittest.TestCase):
 
         with unittest.mock.patch("session_io._log") as mock_log:
             path = export_session(
-                "warn_test", {"a": 1}, fmt="csv",
-                trial_rows=[{"x": 1}], trial_columns=None,
+                "warn_test",
+                {"a": 1},
+                fmt="csv",
+                trial_rows=[{"x": 1}],
+                trial_columns=None,
             )
         self.assertIsNotNone(path)
-        mock_log.warning.assert_any_call(
-            "trial_rows가 있지만 trial_columns가 없어 시행 데이터 무시"
-        )
+        mock_log.warning.assert_any_call("trial_rows가 있지만 trial_columns가 없어 시행 데이터 무시")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -2304,17 +2313,21 @@ class TestExportOSErrorDetail(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         import session_io
+
         self._orig = session_io.EXPORT_DIR
         session_io.EXPORT_DIR = self.tmpdir
 
     def tearDown(self):
         import session_io
+
         session_io.EXPORT_DIR = self._orig
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_json_error_includes_detail(self):
         import builtins
+
         import session_io
+
         real_open = builtins.open
 
         def mock_open_fail(path, *a, **kw):
@@ -2332,7 +2345,9 @@ class TestExportOSErrorDetail(unittest.TestCase):
 
     def test_csv_error_includes_detail(self):
         import builtins
+
         import session_io
+
         real_open = builtins.open
 
         def mock_open_fail(path, *a, **kw):
@@ -2359,6 +2374,7 @@ class TestListExportsExceptionHandling(unittest.TestCase):
 
     def test_oserror_returns_empty(self):
         import settings_io
+
         orig = settings_io._EXPORT_DIR
         tmpdir = tempfile.mkdtemp()
         try:
@@ -2372,6 +2388,7 @@ class TestListExportsExceptionHandling(unittest.TestCase):
 
     def test_normal_listing_still_works(self):
         import settings_io
+
         orig = settings_io._EXPORT_DIR
         tmpdir = tempfile.mkdtemp()
         try:
@@ -2397,10 +2414,12 @@ class TestLoadSessionNullGuard(unittest.TestCase):
 
     def test_none_returns_none(self):
         from session_io import load_session
+
         self.assertIsNone(load_session(None))
 
     def test_empty_string_returns_none(self):
         from session_io import load_session
+
         self.assertIsNone(load_session(""))
 
 
@@ -2420,6 +2439,7 @@ class TestConfigHelpers(unittest.TestCase):
     def setUpClass(cls):
         try:
             import settings_panel  # noqa: F401
+
             cls._skip = False
         except (ImportError, ModuleNotFoundError):
             cls._skip = True
@@ -2428,6 +2448,7 @@ class TestConfigHelpers(unittest.TestCase):
         if self._skip:
             self.skipTest("settings_panel import 불가 (tkinter 미설치)")
         import settings_panel
+
         self._orig_path = settings_panel._CFG_PATH
         self.tmpdir = tempfile.mkdtemp()
         self.cfg_path = os.path.join(self.tmpdir, "config.json")
@@ -2437,15 +2458,18 @@ class TestConfigHelpers(unittest.TestCase):
         if self._skip:
             return
         import settings_panel
+
         settings_panel._CFG_PATH = self._orig_path
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_read_missing_returns_empty_dict(self):
         from settings_panel import _read_config
+
         self.assertEqual(_read_config(), {})
 
     def test_write_and_read_roundtrip(self):
         from settings_panel import _read_config, _write_config
+
         cfg = {"display": {"fps": 120}, "default_difficulty": "hard"}
         self.assertTrue(_write_config(cfg))
         loaded = _read_config()
@@ -2454,6 +2478,7 @@ class TestConfigHelpers(unittest.TestCase):
 
     def test_write_failure_returns_false(self):
         from settings_panel import _write_config
+
         with unittest.mock.patch("builtins.open", side_effect=OSError("read-only")):
             self.assertFalse(_write_config({"a": 1}))
 
@@ -2468,6 +2493,7 @@ class TestBackupOverwriteWarning(unittest.TestCase):
 
     def test_existing_bak_logs_overwrite(self):
         import settings_io
+
         tmpdir = tempfile.mkdtemp()
         try:
             dest = os.path.join(tmpdir, "config.json")
@@ -2488,6 +2514,7 @@ class TestBackupOverwriteWarning(unittest.TestCase):
 
     def test_no_existing_bak_no_overwrite_log(self):
         import settings_io
+
         tmpdir = tempfile.mkdtemp()
         try:
             dest = os.path.join(tmpdir, "config.json")
@@ -2512,6 +2539,7 @@ class TestListExportFilesExceptionHandling(unittest.TestCase):
 
     def test_oserror_returns_empty(self):
         import session_io
+
         orig = session_io.EXPORT_DIR
         tmpdir = tempfile.mkdtemp()
         try:
@@ -2535,11 +2563,13 @@ class TestTimestampConsistency(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         import session_io
+
         self._orig = session_io.EXPORT_DIR
         session_io.EXPORT_DIR = self.tmpdir
 
     def tearDown(self):
         import session_io
+
         session_io.EXPORT_DIR = self._orig
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
@@ -2580,6 +2610,7 @@ class TestTimestampConsistency(unittest.TestCase):
 
         with open(path, encoding="utf-8") as f:
             import csv as csv_mod
+
             reader = csv_mod.DictReader(f)
             row = next(reader)
         iso_ts = row["timestamp"]
@@ -2603,6 +2634,7 @@ class TestEmptyZipRemoveSafe(unittest.TestCase):
 
     def test_remove_failure_still_returns_none(self):
         import settings_io
+
         orig_base = settings_io._BASE
         orig_files = settings_io._EXPORT_FILES
         orig_dirs = settings_io._EXPORT_DIRS
@@ -2635,6 +2667,7 @@ class TestImportBtnRectNumFiles(unittest.TestCase):
         """파일 2개일 때 패널이 6개일 때보다 작아야 한다."""
         try:
             import pygame
+
             pygame.init()
         except Exception:
             self.skipTest("pygame 사용 불가")
@@ -2650,6 +2683,7 @@ class TestImportBtnRectNumFiles(unittest.TestCase):
         """기본값 num_files=6이 적용되는지 확인."""
         try:
             import pygame
+
             pygame.init()
         except Exception:
             self.skipTest("pygame 사용 불가")
@@ -2664,6 +2698,7 @@ class TestImportBtnRectNumFiles(unittest.TestCase):
         """max_visible=6을 초과해도 패널 크기가 동일."""
         try:
             import pygame
+
             pygame.init()
         except Exception:
             self.skipTest("pygame 사용 불가")
@@ -2786,12 +2821,14 @@ class TestTrialCsvTimestampMeta(unittest.TestCase):
 
     def setUp(self):
         import session_io
+
         self._orig = session_io.EXPORT_DIR
         self._tmpdir = tempfile.mkdtemp()
         session_io.EXPORT_DIR = self._tmpdir
 
     def tearDown(self):
         import session_io
+
         session_io.EXPORT_DIR = self._orig
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
@@ -2801,8 +2838,7 @@ class TestTrialCsvTimestampMeta(unittest.TestCase):
 
         trials = [{"x": 1, "y": 2}]
         columns = ["x", "y"]
-        path = export_session("test", {}, fmt="csv",
-                              trial_rows=trials, trial_columns=columns)
+        path = export_session("test", {}, fmt="csv", trial_rows=trials, trial_columns=columns)
         self.assertIsNotNone(path)
 
         with open(path, encoding="utf-8") as f:
@@ -2826,8 +2862,7 @@ class TestTrialCsvTimestampMeta(unittest.TestCase):
 
         trials = [{"idx": 1, "val": 0.5}]
         columns = ["idx", "val"]
-        path = export_session("test", {}, fmt="csv",
-                              trial_rows=trials, trial_columns=columns)
+        path = export_session("test", {}, fmt="csv", trial_rows=trials, trial_columns=columns)
         data = load_session(path)
         self.assertIsNotNone(data)
         # 다중 행이면 {"rows": [...]}
@@ -2844,8 +2879,7 @@ class TestTrialCsvTimestampMeta(unittest.TestCase):
 
         trials = [{"a": 1}]
         columns = ["a"]
-        path = export_session("test", {}, fmt="csv",
-                              trial_rows=trials, trial_columns=columns)
+        path = export_session("test", {}, fmt="csv", trial_rows=trials, trial_columns=columns)
         with open(path, encoding="utf-8") as f:
             first_line = f.readline().strip()
 
@@ -2854,6 +2888,7 @@ class TestTrialCsvTimestampMeta(unittest.TestCase):
         ts_str = parts[1]
         # ISO 형식 파싱 가능해야 함
         from datetime import datetime as dt
+
         parsed = dt.fromisoformat(ts_str)
         self.assertIsNotNone(parsed)
 
@@ -2869,6 +2904,7 @@ class TestSettingsIoDocstring(unittest.TestCase):
     def test_docstring_has_microsecond_timestamp(self):
         """docstring에 마이크로초 형식 타임스탬프가 포함되어 있는지 확인."""
         import settings_io
+
         doc = settings_io.__doc__
         self.assertIsNotNone(doc)
         # settings_export_20260217_153045_123456.zip 형태 확인

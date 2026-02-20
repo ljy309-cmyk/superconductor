@@ -13,7 +13,6 @@
   Phase 3: Protected — QKD 인증 적용, 공격자 차단
 """
 
-import math
 import random
 from dataclasses import dataclass, field
 
@@ -44,6 +43,7 @@ PHASE_NAMES = ["NORMAL", "ATTACK", "DETECTED", "PROTECTED"]
 
 
 # ── BB84 미니 프로토콜 ────────────────────────────────
+
 
 @dataclass
 class QKDChannel:
@@ -86,9 +86,7 @@ class QKDChannel:
         self.qber = sum(self.qber_history) / len(self.qber_history)
 
         # 탐지 판정
-        if (self.qber > QBER_DETECT_THRESHOLD
-                and len(self.qber_history) >= 5
-                and not self.detection_triggered):
+        if self.qber > QBER_DETECT_THRESHOLD and len(self.qber_history) >= 5 and not self.detection_triggered:
             self.detection_triggered = True
 
     def reset(self):
@@ -103,17 +101,18 @@ class QKDChannel:
 
 # ── 센서 시스템 ──────────────────────────────────────
 
+
 @dataclass
 class SensorReading:
     """센서 읽기 스냅샷."""
-    real_temp: float        # 실제 온도
-    displayed_temp: float   # HMI에 표시되는 온도 (공격 시 조작됨)
-    spoofed: bool           # 조작 여부
-    noise: float            # 센서 노이즈
+
+    real_temp: float  # 실제 온도
+    displayed_temp: float  # HMI에 표시되는 온도 (공격 시 조작됨)
+    spoofed: bool  # 조작 여부
+    noise: float  # 센서 노이즈
 
 
-def sensor_read(real_temp: float, under_attack: bool,
-                attack_intensity: float) -> SensorReading:
+def sensor_read(real_temp: float, under_attack: bool, attack_intensity: float) -> SensorReading:
     """센서 판독 시뮬레이션.
 
     Args:
@@ -142,6 +141,7 @@ def sensor_read(real_temp: float, under_attack: bool,
 
 
 # ── 메인 시나리오 상태 ───────────────────────────────
+
 
 @dataclass
 class ScadaSecurityState:
@@ -206,13 +206,11 @@ def update_scenario(gs: ScadaSecurityState, dt: float):
 
     # ── MITM 공격 강도 램프 ──
     if gs.attack_active:
-        gs.attack_intensity = min(1.0,
-                                  gs.attack_intensity + MITM_RAMP_SPEED * dt)
+        gs.attack_intensity = min(1.0, gs.attack_intensity + MITM_RAMP_SPEED * dt)
         gs.attack_duration += dt
         gs.time_under_attack += dt
     else:
-        gs.attack_intensity = max(0.0,
-                                  gs.attack_intensity - MITM_RAMP_SPEED * 2 * dt)
+        gs.attack_intensity = max(0.0, gs.attack_intensity - MITM_RAMP_SPEED * 2 * dt)
 
     # ── 센서 판독 ──
     reading = sensor_read(gs.real_temp, gs.attack_active, gs.attack_intensity)
@@ -264,7 +262,7 @@ def _update_temperature(gs: ScadaSecurityState, dt: float):
     if gs.attack_active and gs.attack_intensity > 0.3:
         # 공격 강도에 비례하여 냉각 효율 감소
         sabotage = gs.attack_intensity * 0.6
-        cool *= (1.0 - sabotage)
+        cool *= 1.0 - sabotage
         heat += gs.attack_intensity * 0.4 * dt  # 추가 열 유입
 
     gs.real_temp += heat + cool

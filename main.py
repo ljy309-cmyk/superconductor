@@ -3,7 +3,7 @@
 import tkinter as tk
 
 from data_ai.launcher import open_data_ai_launcher
-from i18n import set_locale, t
+from i18n import t
 from physics.launcher import open_physics_launcher
 from quantum.launcher import open_quantum_launcher
 from scada.dashboard import open_dashboard
@@ -13,7 +13,6 @@ from theme import (
     FONTS,
     get_tk_theme,
     load_preferences,
-    save_preferences,
 )
 
 

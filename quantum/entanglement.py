@@ -7,7 +7,6 @@
 """
 
 import math
-import random
 import time
 from dataclasses import dataclass, field
 
@@ -37,7 +36,7 @@ from quantum.entanglement_physics import (
 )
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
-from sim_speed import apply_speed, cycle_sim_speed, speed_label
+from sim_speed import apply_speed, cycle_sim_speed
 from sound_manager import get_sound_manager
 from theme import load_pg_colors, on_theme_change
 from tutorial import TutorialOverlay
@@ -95,6 +94,7 @@ MODE_NAMES = ["Bell States", "CHSH Inequality", "Teleportation"]
 @dataclass
 class EntanglementState:
     """얽힘 시뮬레이션 전체 상태."""
+
     mode: int = MODE_BELL
     t: float = 0.0
     paused: bool = False
@@ -102,9 +102,14 @@ class EntanglementState:
     # ── Bell States ──
     bell_selected: int = 0  # 0~3 (Φ+, Φ-, Ψ+, Ψ-)
     bell_measurements: list[tuple[int, int]] = field(default_factory=list)
-    bell_counts: dict[str, int] = field(default_factory=lambda: {
-        "00": 0, "01": 0, "10": 0, "11": 0,
-    })
+    bell_counts: dict[str, int] = field(
+        default_factory=lambda: {
+            "00": 0,
+            "01": 0,
+            "10": 0,
+            "11": 0,
+        }
+    )
     bell_total: int = 0
 
     # ── CHSH ──
@@ -141,15 +146,13 @@ class EntanglementState:
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
-def _draw_qubit_sphere(screen, cx, cy, radius, state_label, color,
-                       font, glow_t=0.0):
+
+def _draw_qubit_sphere(screen, cx, cy, radius, state_label, color, font, glow_t=0.0):
     """큐비트 시각화 (원 + 라벨)."""
     pulse = int(4 * math.sin(glow_t * 3))
     if pulse > 0:
-        glow_surf = pygame.Surface(
-            (2 * (radius + pulse), 2 * (radius + pulse)), pygame.SRCALPHA)
-        pygame.draw.circle(glow_surf, (*color, 40),
-                           (radius + pulse, radius + pulse), radius + pulse)
+        glow_surf = pygame.Surface((2 * (radius + pulse), 2 * (radius + pulse)), pygame.SRCALPHA)
+        pygame.draw.circle(glow_surf, (*color, 40), (radius + pulse, radius + pulse), radius + pulse)
         screen.blit(glow_surf, (cx - radius - pulse, cy - radius - pulse))
 
     pygame.draw.circle(screen, color, (cx, cy), radius)
@@ -158,8 +161,7 @@ def _draw_qubit_sphere(screen, cx, cy, radius, state_label, color,
     screen.blit(lbl, (cx - lbl.get_width() // 2, cy - lbl.get_height() // 2))
 
 
-def _draw_entanglement_line(screen, x1, y1, x2, y2, t_val,
-                            color=PURPLE):
+def _draw_entanglement_line(screen, x1, y1, x2, y2, t_val, color=PURPLE):
     """얽힘 연결선 (파동 효과)."""
     segments = 20
     points = []
@@ -169,7 +171,7 @@ def _draw_entanglement_line(screen, x1, y1, x2, y2, t_val,
         y = y1 + (y2 - y1) * frac
         wave = math.sin(frac * math.pi * 4 + t_val * 3) * 8
         nx = -(y2 - y1)
-        ny = (x2 - x1)
+        ny = x2 - x1
         length = math.hypot(nx, ny)
         if length > 0:
             nx /= length
@@ -181,8 +183,7 @@ def _draw_entanglement_line(screen, x1, y1, x2, y2, t_val,
         pygame.draw.lines(screen, color, False, points, 2)
 
 
-def _draw_bar_chart(screen, x, y, w, h, data, colors, labels,
-                    font, title=""):
+def _draw_bar_chart(screen, x, y, w, h, data, colors, labels, font, title=""):
     """수평 바 차트."""
     if title:
         t_surf = font.render(title, True, ACCENT)
@@ -206,22 +207,17 @@ def _draw_bar_chart(screen, x, y, w, h, data, colors, labels,
         screen.blit(v_surf, (x + w - 45, bar_y))
 
 
-def _draw_bloch_mini(screen, cx, cy, radius, alpha, beta, font,
-                     label=""):
+def _draw_bloch_mini(screen, cx, cy, radius, alpha, beta, font, label=""):
     """미니 블로흐 구 시각화."""
     bx, by, bz = bloch_xyz(alpha, beta)
 
     # 원 (적도)
     pygame.draw.circle(screen, OVERLAY_CLR, (cx, cy), radius, 1)
     # 타원 (측면)
-    pygame.draw.ellipse(screen, OVERLAY_CLR,
-                        (cx - radius, cy - radius // 3,
-                         2 * radius, 2 * radius // 3), 1)
+    pygame.draw.ellipse(screen, OVERLAY_CLR, (cx - radius, cy - radius // 3, 2 * radius, 2 * radius // 3), 1)
     # 축
-    pygame.draw.line(screen, (*TEXT_CLR, 80), (cx, cy - radius),
-                     (cx, cy + radius), 1)
-    pygame.draw.line(screen, (*TEXT_CLR, 80), (cx - radius, cy),
-                     (cx + radius, cy), 1)
+    pygame.draw.line(screen, (*TEXT_CLR, 80), (cx, cy - radius), (cx, cy + radius), 1)
+    pygame.draw.line(screen, (*TEXT_CLR, 80), (cx - radius, cy), (cx + radius, cy), 1)
 
     # 상태 벡터 포인트 (3D → 2D 사영)
     px = cx + int(bx * radius * 0.9)
@@ -236,6 +232,7 @@ def _draw_bloch_mini(screen, cx, cy, radius, alpha, beta, font,
 
 # ── 모드별 렌더링 ────────────────────────────────────
 
+
 def _draw_bell_mode(screen, gs, font, title_font, info_font):
     """벨 상태 모드 렌더링."""
     bell_name = BELL_LABELS[gs.bell_selected]
@@ -243,8 +240,7 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
     probs = bell_probabilities(state)
 
     # 제목
-    title = title_font.render(
-        f"Bell State: |{bell_name}⟩", True, ACCENT)
+    title = title_font.render(f"Bell State: |{bell_name}⟩", True, ACCENT)
     screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 45))
 
     desc = info_font.render(BELL_DESCRIPTIONS[bell_name], True, PURPLE)
@@ -254,12 +250,9 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
     alice_x, alice_y = WIDTH // 2 - 140, 180
     bob_x, bob_y = WIDTH // 2 + 140, 180
 
-    _draw_qubit_sphere(screen, alice_x, alice_y, 35, "A", ACCENT,
-                       title_font, gs.t)
-    _draw_qubit_sphere(screen, bob_x, bob_y, 35, "B", PURPLE,
-                       title_font, gs.t)
-    _draw_entanglement_line(screen, alice_x + 35, alice_y,
-                            bob_x - 35, bob_y, gs.t)
+    _draw_qubit_sphere(screen, alice_x, alice_y, 35, "A", ACCENT, title_font, gs.t)
+    _draw_qubit_sphere(screen, bob_x, bob_y, 35, "B", PURPLE, title_font, gs.t)
+    _draw_entanglement_line(screen, alice_x + 35, alice_y, bob_x - 35, bob_y, gs.t)
 
     lbl_a = info_font.render("Alice", True, ACCENT)
     lbl_b = info_font.render("Bob", True, PURPLE)
@@ -283,29 +276,22 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
         max_h = 80
         bar_h = int(max_h * p)
         bar_top = by + 18 + (max_h - bar_h)
-        pygame.draw.rect(screen, OVERLAY_CLR,
-                         (bx + 30, by + 18, bar_w - 60, max_h))
-        pygame.draw.rect(screen, clr,
-                         (bx + 30, bar_top, bar_w - 60, bar_h))
-        pygame.draw.rect(screen, TEXT_CLR,
-                         (bx + 30, by + 18, bar_w - 60, max_h), 1)
+        pygame.draw.rect(screen, OVERLAY_CLR, (bx + 30, by + 18, bar_w - 60, max_h))
+        pygame.draw.rect(screen, clr, (bx + 30, bar_top, bar_w - 60, bar_h))
+        pygame.draw.rect(screen, TEXT_CLR, (bx + 30, by + 18, bar_w - 60, max_h), 1)
 
         # 확률값
         ps = info_font.render(f"{p:.3f}", True, clr)
-        screen.blit(ps, (bx + bar_w // 2 - ps.get_width() // 2,
-                         by + 18 + max_h + 4))
+        screen.blit(ps, (bx + bar_w // 2 - ps.get_width() // 2, by + 18 + max_h + 4))
 
     # 측정 통계
     stat_y = 400
-    stat_title = info_font.render(
-        f"Measurements: {gs.bell_total}", True, ACCENT)
+    stat_title = info_font.render(f"Measurements: {gs.bell_total}", True, ACCENT)
     screen.blit(stat_title, (80, stat_y))
 
     if gs.bell_total > 0:
-        counts = [gs.bell_counts["00"], gs.bell_counts["01"],
-                  gs.bell_counts["10"], gs.bell_counts["11"]]
-        _draw_bar_chart(screen, 80, stat_y + 22, 400, 100,
-                        counts, prob_colors, prob_labels, info_font)
+        counts = [gs.bell_counts["00"], gs.bell_counts["01"], gs.bell_counts["10"], gs.bell_counts["11"]]
+        _draw_bar_chart(screen, 80, stat_y + 22, 400, 100, counts, prob_colors, prob_labels, info_font)
 
     # 최근 측정 결과 표시
     if gs.bell_measurements:
@@ -321,15 +307,12 @@ def _draw_bell_mode(screen, gs, font, title_font, info_font):
     # 벨 상태 선택 가이드
     sel_y = HEIGHT - 100
     for i, name in enumerate(BELL_LABELS):
-        is_sel = (i == gs.bell_selected)
+        is_sel = i == gs.bell_selected
         clr = ACCENT if is_sel else OVERLAY_CLR
         bx = 120 + i * 170
-        pygame.draw.rect(screen, clr, (bx, sel_y, 150, 28), 0 if is_sel else 1,
-                         border_radius=4)
-        key_s = info_font.render(f"[{i + 1}] |{name}⟩", True,
-                                 BG if is_sel else TEXT_CLR)
-        screen.blit(key_s, (bx + 75 - key_s.get_width() // 2,
-                            sel_y + 6))
+        pygame.draw.rect(screen, clr, (bx, sel_y, 150, 28), 0 if is_sel else 1, border_radius=4)
+        key_s = info_font.render(f"[{i + 1}] |{name}⟩", True, BG if is_sel else TEXT_CLR)
+        screen.blit(key_s, (bx + 75 - key_s.get_width() // 2, sel_y + 6))
 
 
 def _draw_chsh_mode(screen, gs, font, title_font, info_font):
@@ -350,20 +333,15 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
     alice_x, bob_x = 200, 700
     mid_y = 180
 
-    _draw_qubit_sphere(screen, alice_x, mid_y, 30, "A", ACCENT,
-                       font, gs.t)
-    _draw_qubit_sphere(screen, bob_x, mid_y, 30, "B", PURPLE,
-                       font, gs.t)
-    _draw_entanglement_line(screen, alice_x + 30, mid_y,
-                            bob_x - 30, mid_y, gs.t)
+    _draw_qubit_sphere(screen, alice_x, mid_y, 30, "A", ACCENT, font, gs.t)
+    _draw_qubit_sphere(screen, bob_x, mid_y, 30, "B", PURPLE, font, gs.t)
+    _draw_entanglement_line(screen, alice_x + 30, mid_y, bob_x - 30, mid_y, gs.t)
 
     # 측정 각도 표시
     angles_a = ["0°", "45°"]
     angles_b = ["22.5°", "67.5°"]
-    a_lbl = info_font.render(
-        f"Alice angles: {', '.join(angles_a)}", True, ACCENT)
-    b_lbl = info_font.render(
-        f"Bob angles: {', '.join(angles_b)}", True, PURPLE)
+    a_lbl = info_font.render(f"Alice angles: {', '.join(angles_a)}", True, ACCENT)
+    b_lbl = info_font.render(f"Bob angles: {', '.join(angles_b)}", True, PURPLE)
     screen.blit(a_lbl, (alice_x - 60, mid_y + 40))
     screen.blit(b_lbl, (bob_x - 60, mid_y + 40))
 
@@ -397,8 +375,7 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         s_txt = title_font.render(f"S = {s_val:+.4f}", True, s_clr)
         screen.blit(s_txt, (WIDTH // 2 - s_txt.get_width() // 2, s_y))
 
-        verdict = ("VIOLATED! (Quantum)" if violated
-                   else "Not violated (Classical)")
+        verdict = "VIOLATED! (Quantum)" if violated else "Not violated (Classical)"
         v_clr = RED if violated else GREEN
         v_surf = info_font.render(verdict, True, v_clr)
         screen.blit(v_surf, (WIDTH // 2 - v_surf.get_width() // 2, s_y + 28))
@@ -409,18 +386,15 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         gauge_x = WIDTH // 2 - gauge_w // 2
         gauge_h = 20
 
-        pygame.draw.rect(screen, OVERLAY_CLR,
-                         (gauge_x, gauge_y, gauge_w, gauge_h))
+        pygame.draw.rect(screen, OVERLAY_CLR, (gauge_x, gauge_y, gauge_w, gauge_h))
         # 고전 한계 마커
         cl_x = gauge_x + int(gauge_w * CHSH_CLASSICAL_BOUND / 4.0)
-        pygame.draw.line(screen, YELLOW, (cl_x, gauge_y - 4),
-                         (cl_x, gauge_y + gauge_h + 4), 2)
+        pygame.draw.line(screen, YELLOW, (cl_x, gauge_y - 4), (cl_x, gauge_y + gauge_h + 4), 2)
         cl_lbl = info_font.render("2.0", True, YELLOW)
         screen.blit(cl_lbl, (cl_x - 8, gauge_y - 16))
         # 양자 한계 마커
         qm_x = gauge_x + int(gauge_w * CHSH_QUANTUM_BOUND / 4.0)
-        pygame.draw.line(screen, PURPLE, (qm_x, gauge_y - 4),
-                         (qm_x, gauge_y + gauge_h + 4), 2)
+        pygame.draw.line(screen, PURPLE, (qm_x, gauge_y - 4), (qm_x, gauge_y + gauge_h + 4), 2)
         qm_lbl = info_font.render("2√2", True, PURPLE)
         screen.blit(qm_lbl, (qm_x - 10, gauge_y - 16))
         # S 포인터
@@ -428,8 +402,7 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
         sp_x = gauge_x + int(gauge_w * s_clamped / 4.0)
         fill_w = sp_x - gauge_x
         pygame.draw.rect(screen, s_clr, (gauge_x, gauge_y, fill_w, gauge_h))
-        pygame.draw.rect(screen, TEXT_CLR,
-                         (gauge_x, gauge_y, gauge_w, gauge_h), 1)
+        pygame.draw.rect(screen, TEXT_CLR, (gauge_x, gauge_y, gauge_w, gauge_h), 1)
         # S 마커
         pygame.draw.circle(screen, WHITE, (sp_x, gauge_y + gauge_h // 2), 6)
         pygame.draw.circle(screen, s_clr, (sp_x, gauge_y + gauge_h // 2), 4)
@@ -444,8 +417,7 @@ def _draw_chsh_mode(screen, gs, font, title_font, info_font):
     # S 값 히스토리
     if gs.chsh_history:
         hist_y = 460
-        hist_title = info_font.render(
-            f"S-value history ({len(gs.chsh_history)} runs):", True, ACCENT)
+        hist_title = info_font.render(f"S-value history ({len(gs.chsh_history)} runs):", True, ACCENT)
         screen.blit(hist_title, (80, hist_y))
 
         # 미니 히스토리 바
@@ -468,16 +440,15 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
 
     ts = gs.teleport
     step = ts.step
-    step_name = ts.step_names[min(step, 5)]
+    _ = ts.step_names[min(step, 5)]  # noqa: F841
 
     # 단계 표시
     steps_y = 75
-    step_labels = ["Prepare", "Bell Pair", "Entangle", "Measure",
-                   "Classical", "Correct"]
+    step_labels = ["Prepare", "Bell Pair", "Entangle", "Measure", "Classical", "Correct"]
     for i, sl in enumerate(step_labels):
         sx = 60 + i * 138
-        is_current = (i == min(step, 5))
-        is_done = (i < step)
+        is_current = i == min(step, 5)
+        is_done = i < step
         if is_done:
             clr = GREEN
             bg_clr = (*GREEN, 40)
@@ -492,8 +463,7 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
         step_surf = pygame.Surface((130, 22), pygame.SRCALPHA)
         step_surf.fill(bg_clr)
         screen.blit(step_surf, (sx, steps_y))
-        pygame.draw.rect(screen, clr, (sx, steps_y, 130, 22), 1,
-                         border_radius=3)
+        pygame.draw.rect(screen, clr, (sx, steps_y, 130, 22), 1, border_radius=3)
         ss = info_font.render(f"{i + 1}. {sl}", True, clr)
         screen.blit(ss, (sx + 65 - ss.get_width() // 2, steps_y + 3))
 
@@ -505,65 +475,52 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
 
     # Input qubit
     if step <= 2:
-        _draw_qubit_sphere(screen, input_x, q_y, 30, "ψ", YELLOW,
-                           font, gs.t)
+        _draw_qubit_sphere(screen, input_x, q_y, 30, "ψ", YELLOW, font, gs.t)
         il = info_font.render("Input", True, YELLOW)
         screen.blit(il, (input_x - il.get_width() // 2, q_y + 36))
         # 블로흐
-        _draw_bloch_mini(screen, input_x, q_y + 110, 40,
-                         ts.alpha, ts.beta, info_font, "Input State")
+        _draw_bloch_mini(screen, input_x, q_y + 110, 40, ts.alpha, ts.beta, info_font, "Input State")
     elif step >= 3:
         # 측정된 상태
         m0, m1 = ts.measurement_result
         m_lbl = f"|{m0}{m1}⟩" if step >= 3 else "?"
-        _draw_qubit_sphere(screen, input_x, q_y, 30, m_lbl, RED,
-                           font, gs.t if step == 3 else 0)
+        _draw_qubit_sphere(screen, input_x, q_y, 30, m_lbl, RED, font, gs.t if step == 3 else 0)
         il = info_font.render("Measured", True, RED)
         screen.blit(il, (input_x - il.get_width() // 2, q_y + 36))
 
     # Alice
     a_clr = ACCENT if step >= 1 else OVERLAY_CLR
-    _draw_qubit_sphere(screen, alice_x, q_y, 30, "A", a_clr, font,
-                       gs.t if step >= 1 else 0)
+    _draw_qubit_sphere(screen, alice_x, q_y, 30, "A", a_clr, font, gs.t if step >= 1 else 0)
     al = info_font.render("Alice", True, a_clr)
     screen.blit(al, (alice_x - al.get_width() // 2, q_y + 36))
 
     # Bob
     b_clr = PURPLE if step >= 1 else OVERLAY_CLR
-    _draw_qubit_sphere(screen, bob_x, q_y, 30, "B", b_clr, font,
-                       gs.t if step >= 1 else 0)
+    _draw_qubit_sphere(screen, bob_x, q_y, 30, "B", b_clr, font, gs.t if step >= 1 else 0)
     bl = info_font.render("Bob", True, b_clr)
     screen.blit(bl, (bob_x - bl.get_width() // 2, q_y + 36))
 
     # 얽힘 연결선
     if 1 <= step <= 3:
-        _draw_entanglement_line(screen, alice_x + 30, q_y,
-                                bob_x - 30, q_y, gs.t, PURPLE)
+        _draw_entanglement_line(screen, alice_x + 30, q_y, bob_x - 30, q_y, gs.t, PURPLE)
     if 2 <= step <= 3:
-        _draw_entanglement_line(screen, input_x + 30, q_y,
-                                alice_x - 30, q_y, gs.t, YELLOW)
+        _draw_entanglement_line(screen, input_x + 30, q_y, alice_x - 30, q_y, gs.t, YELLOW)
 
     # 고전 채널 (파선)
     if step >= 4:
         dash_y = q_y - 10
         for dx in range(0, bob_x - alice_x - 60, 15):
             px = alice_x + 30 + dx
-            alpha = max(0, min(255, int(200 * (1 - abs(
-                math.sin(gs.t * 2 + dx * 0.05))))))
-            pygame.draw.line(screen, (*YELLOW, alpha),
-                             (px, dash_y), (px + 8, dash_y), 2)
+            alpha = max(0, min(255, int(200 * (1 - abs(math.sin(gs.t * 2 + dx * 0.05))))))
+            pygame.draw.line(screen, (*YELLOW, alpha), (px, dash_y), (px + 8, dash_y), 2)
         cc_lbl = info_font.render("Classical Channel", True, YELLOW)
-        screen.blit(cc_lbl, (WIDTH // 2 - cc_lbl.get_width() // 2,
-                              dash_y - 16))
+        screen.blit(cc_lbl, (WIDTH // 2 - cc_lbl.get_width() // 2, dash_y - 16))
 
     # Bob 최종 상태 블로흐
     if step >= 6:
-        _draw_bloch_mini(screen, bob_x, q_y + 110, 40,
-                         ts.bob_alpha, ts.bob_beta, info_font,
-                         "Bob's State")
+        _draw_bloch_mini(screen, bob_x, q_y + 110, 40, ts.bob_alpha, ts.bob_beta, info_font, "Bob's State")
         fid_clr = GREEN if ts.fidelity > 0.99 else YELLOW
-        fid = info_font.render(
-            f"Fidelity: {ts.fidelity:.4f}", True, fid_clr)
+        fid = info_font.render(f"Fidelity: {ts.fidelity:.4f}", True, fid_clr)
         screen.blit(fid, (bob_x - fid.get_width() // 2, q_y + 170))
 
     # 확률 분포 (3큐비트 상태벡터)
@@ -583,19 +540,15 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
             ls = info_font.render(lbl, True, TEXT_CLR)
             screen.blit(ls, (bx + 30 - ls.get_width() // 2, by + max_h + 4))
 
-            pygame.draw.rect(screen, OVERLAY_CLR,
-                             (bx + 10, by, 40, max_h))
+            pygame.draw.rect(screen, OVERLAY_CLR, (bx + 10, by, 40, max_h))
             if bar_h > 0:
                 clr = GREEN if p > 0.01 else OVERLAY_CLR
-                pygame.draw.rect(screen, clr,
-                                 (bx + 10, by + max_h - bar_h, 40, bar_h))
-            pygame.draw.rect(screen, TEXT_CLR,
-                             (bx + 10, by, 40, max_h), 1)
+                pygame.draw.rect(screen, clr, (bx + 10, by + max_h - bar_h, 40, bar_h))
+            pygame.draw.rect(screen, TEXT_CLR, (bx + 10, by, 40, max_h), 1)
 
             if p > 0.01:
                 ps = info_font.render(f"{p:.2f}", True, GREEN)
-                screen.blit(ps, (bx + 30 - ps.get_width() // 2,
-                                 by - 14))
+                screen.blit(ps, (bx + 30 - ps.get_width() // 2, by - 14))
 
     # 프로토콜 로그
     log_y = 420
@@ -608,6 +561,7 @@ def _draw_teleport_mode(screen, gs, font, title_font, info_font):
 
 
 # ── 메인 시뮬레이션 ──────────────────────────────────
+
 
 def run_simulation():
     """Pygame 시뮬레이션 실행."""
@@ -672,14 +626,19 @@ def run_simulation():
 
                 elif event.key == pygame.K_x and (pygame.key.get_mods() & pygame.KMOD_CTRL):
                     from session_io import export_session
-                    export_session("entanglement", {
-                        "play_time": round(time.time() - gs.start_time, 1),
-                        "total_measurements": gs.total_measurements,
-                        "chsh_experiments": gs.chsh_experiments,
-                        "teleport_completions": gs.teleport_completions,
-                    })
+
+                    export_session(
+                        "entanglement",
+                        {
+                            "play_time": round(time.time() - gs.start_time, 1),
+                            "total_measurements": gs.total_measurements,
+                            "chsh_experiments": gs.chsh_experiments,
+                            "teleport_completions": gs.teleport_completions,
+                        },
+                    )
                 elif event.key == pygame.K_i and (pygame.key.get_mods() & pygame.KMOD_CTRL):
                     from session_io import choose_import_file, load_session
+
                     _imp_path = choose_import_file(screen, info_font, "entanglement")
                     if _imp_path:
                         load_session(_imp_path)
@@ -691,8 +650,7 @@ def run_simulation():
 
                 # ── Bell 모드 키 ──
                 elif gs.mode == MODE_BELL:
-                    if event.key in (pygame.K_1, pygame.K_2,
-                                     pygame.K_3, pygame.K_4):
+                    if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4):
                         gs.bell_selected = event.key - pygame.K_1
                         gs.reset_bell()
                         snd.play("click")
@@ -723,8 +681,7 @@ def run_simulation():
                     if event.key == pygame.K_SPACE and not gs.chsh_running:
                         gs.chsh_running = True
                         state = BELL_STATES["Φ+"]
-                        result = run_chsh_experiment(
-                            state, n_shots=CHSH_SHOTS)
+                        result = run_chsh_experiment(state, n_shots=CHSH_SHOTS)
                         gs.chsh_result = result
                         gs.chsh_history.append(result["S"])
                         gs.chsh_experiments += 1
@@ -751,13 +708,15 @@ def run_simulation():
 
         # ── 레코딩 ──
         if not gs.paused:
-            recorder.record_frame({
-                "mode": gs.mode,
-                "t": round(gs.t, 2),
-                "bell_total": gs.bell_total,
-                "chsh_experiments": gs.chsh_experiments,
-                "teleport_step": gs.teleport.step,
-            })
+            recorder.record_frame(
+                {
+                    "mode": gs.mode,
+                    "t": round(gs.t, 2),
+                    "bell_total": gs.bell_total,
+                    "chsh_experiments": gs.chsh_experiments,
+                    "teleport_step": gs.teleport.step,
+                }
+            )
 
         # ── 렌더링 ──
         screen.fill(BG)
@@ -765,11 +724,9 @@ def run_simulation():
         # 상단: 모드 탭
         for i, name in enumerate(MODE_NAMES):
             tab_x = 20 + i * 280
-            is_sel = (i == gs.mode)
+            is_sel = i == gs.mode
             tab_clr = ACCENT if is_sel else OVERLAY_CLR
-            pygame.draw.rect(screen, tab_clr,
-                             (tab_x, 8, 260, 28), 0 if is_sel else 1,
-                             border_radius=4)
+            pygame.draw.rect(screen, tab_clr, (tab_x, 8, 260, 28), 0 if is_sel else 1, border_radius=4)
             ts_text = font.render(name, True, BG if is_sel else TEXT_CLR)
             screen.blit(ts_text, (tab_x + 130 - ts_text.get_width() // 2, 14))
 
@@ -799,8 +756,7 @@ def run_simulation():
             ]
         for i, hint in enumerate(hints):
             hs = info_font.render(hint, True, TEXT_CLR)
-            screen.blit(hs, (WIDTH // 2 - hs.get_width() // 2,
-                             HEIGHT - 38 + i * 16))
+            screen.blit(hs, (WIDTH // 2 - hs.get_width() // 2, HEIGHT - 38 + i * 16))
 
         # 오버레이
         toast.update(dt)

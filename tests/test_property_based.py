@@ -36,15 +36,18 @@ phases = st.floats(min_value=-10 * math.pi, max_value=10 * math.pi, allow_nan=Fa
 positive_ic = st.floats(min_value=0.01, max_value=10.0, allow_nan=False, allow_infinity=False)
 bias_currents = st.floats(min_value=-5.0, max_value=5.0, allow_nan=False, allow_infinity=False)
 
+
 # 양자 상태 벡터 (4-요소, 정규화)
 def _normalized_state():
     """정규화된 4-요소 상태 벡터 전략."""
-    return st.lists(
-        st.floats(min_value=-1.0, max_value=1.0, allow_nan=False, allow_infinity=False),
-        min_size=4,
-        max_size=4,
-    ).filter(lambda v: sum(x * x for x in v) > 1e-8).map(
-        lambda v: [x / math.sqrt(sum(a * a for a in v)) for x in v]
+    return (
+        st.lists(
+            st.floats(min_value=-1.0, max_value=1.0, allow_nan=False, allow_infinity=False),
+            min_size=4,
+            max_size=4,
+        )
+        .filter(lambda v: sum(x * x for x in v) > 1e-8)
+        .map(lambda v: [x / math.sqrt(sum(a * a for a in v)) for x in v])
     )
 
 

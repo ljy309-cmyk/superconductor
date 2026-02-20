@@ -8,12 +8,10 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from quantum.gate_builder_engine import (
-    GATE_MATRICES,
     MAX_GATES,
     QuantumCircuit,
     bloch_coords,
 )
-
 
 SQRT2_INV = 1.0 / math.sqrt(2)
 

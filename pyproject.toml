@@ -24,7 +24,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # F821: theme colors injected dynamically via load_pg_colors(_COLOR_MAP, globals())
-"quantum/tunneling.py" = ["F821"]
+"quantum/tunneling.py" = ["F821", "E402"]
+"quantum/tunneling_render.py" = ["F821"]
 "quantum/qec_shield.py" = ["F821"]
 "quantum/qubit_chain.py" = ["F821"]
 "security/bb84_defense.py" = ["F821"]

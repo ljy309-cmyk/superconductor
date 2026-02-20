@@ -14,9 +14,9 @@ import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from logger import get_module_logger
 from font_helper import get_font_family, get_user_font, set_user_font
 from i18n import get_locale, set_locale, t
+from logger import get_module_logger
 from sound_manager import get_sound_manager
 from theme import (
     FONTS,
@@ -85,7 +85,9 @@ class SettingsPanel(tk.Toplevel):
         # 테마
         row = tk.Frame(main, bg=_tk.BG)
         row.pack(fill="x", pady=2)
-        tk.Label(row, text=t("settings_theme"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(side="left")
+        tk.Label(row, text=t("settings_theme"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(
+            side="left"
+        )
         theme_name = t("theme_dark") if get_theme() == "dark" else t("theme_light")
         self._theme_btn = tk.Button(row, text=theme_name, font=FONTS.BODY, width=12, command=self._toggle_theme)
         self._theme_btn.pack(side="left", padx=4)
@@ -93,7 +95,9 @@ class SettingsPanel(tk.Toplevel):
         # 색맹 모드
         row = tk.Frame(main, bg=_tk.BG)
         row.pack(fill="x", pady=2)
-        tk.Label(row, text=t("settings_colorblind"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(side="left")
+        tk.Label(
+            row, text=t("settings_colorblind"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w"
+        ).pack(side="left")
         cb_text = "ON" if is_colorblind() else "OFF"
         self._cb_btn = tk.Button(row, text=cb_text, font=FONTS.BODY, width=12, command=self._toggle_colorblind)
         self._cb_btn.pack(side="left", padx=4)
@@ -101,14 +105,18 @@ class SettingsPanel(tk.Toplevel):
         # 언어
         row = tk.Frame(main, bg=_tk.BG)
         row.pack(fill="x", pady=2)
-        tk.Label(row, text=t("settings_language"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(side="left")
+        tk.Label(row, text=t("settings_language"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(
+            side="left"
+        )
         self._locale_var = tk.StringVar(value=get_locale())
         tk.OptionMenu(row, self._locale_var, "ko", "en", command=self._change_locale).pack(side="left", padx=4)
 
         # FPS
         row = tk.Frame(main, bg=_tk.BG)
         row.pack(fill="x", pady=2)
-        tk.Label(row, text=t("settings_fps"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(side="left")
+        tk.Label(row, text=t("settings_fps"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(
+            side="left"
+        )
         self._fps_var = tk.StringVar(value=str(self._get_fps()))
         tk.OptionMenu(row, self._fps_var, "30", "60", "120", command=self._change_fps).pack(side="left", padx=4)
 
@@ -118,7 +126,9 @@ class SettingsPanel(tk.Toplevel):
         # 폰트 종류
         row = tk.Frame(main, bg=_tk.BG)
         row.pack(fill="x", pady=2)
-        tk.Label(row, text=t("settings_font_family"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(side="left")
+        tk.Label(
+            row, text=t("settings_font_family"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w"
+        ).pack(side="left")
 
         font_choices = self._get_font_choices()
         current_font = get_user_font() or get_font_family()
@@ -130,9 +140,13 @@ class SettingsPanel(tk.Toplevel):
         # 폰트 크기
         row = tk.Frame(main, bg=_tk.BG)
         row.pack(fill="x", pady=2)
-        tk.Label(row, text=t("settings_font_scale"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(side="left")
+        tk.Label(
+            row, text=t("settings_font_scale"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w"
+        ).pack(side="left")
         tk.Button(row, text="A-", font=FONTS.BODY, width=3, command=self._decrease_font).pack(side="left", padx=2)
-        self._scale_label = tk.Label(row, text=f"{get_font_scale():.1f}x", font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=5)
+        self._scale_label = tk.Label(
+            row, text=f"{get_font_scale():.1f}x", font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=5
+        )
         self._scale_label.pack(side="left", padx=4)
         tk.Button(row, text="A+", font=FONTS.BODY, width=3, command=self._increase_font).pack(side="left", padx=2)
 
@@ -144,7 +158,9 @@ class SettingsPanel(tk.Toplevel):
         # 효과음 ON/OFF
         row = tk.Frame(main, bg=_tk.BG)
         row.pack(fill="x", pady=2)
-        tk.Label(row, text=t("settings_sound_enabled"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(side="left")
+        tk.Label(
+            row, text=t("settings_sound_enabled"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w"
+        ).pack(side="left")
         snd_text = "ON" if snd.enabled else "OFF"
         self._snd_btn = tk.Button(row, text=snd_text, font=FONTS.BODY, width=12, command=self._toggle_sound)
         self._snd_btn.pack(side="left", padx=4)
@@ -152,11 +168,21 @@ class SettingsPanel(tk.Toplevel):
         # 볼륨
         row = tk.Frame(main, bg=_tk.BG)
         row.pack(fill="x", pady=2)
-        tk.Label(row, text=t("settings_volume"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(side="left")
+        tk.Label(row, text=t("settings_volume"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(
+            side="left"
+        )
         self._vol_scale = tk.Scale(
-            row, from_=0, to=100, orient="horizontal", length=180,
-            font=FONTS.SMALL, bg=_tk.BG, fg=_tk.TEXT, highlightthickness=0,
-            troughcolor=_tk.SURFACE, command=self._change_volume,
+            row,
+            from_=0,
+            to=100,
+            orient="horizontal",
+            length=180,
+            font=FONTS.SMALL,
+            bg=_tk.BG,
+            fg=_tk.TEXT,
+            highlightthickness=0,
+            troughcolor=_tk.SURFACE,
+            command=self._change_volume,
         )
         self._vol_scale.set(int(snd.volume * 100))
         self._vol_scale.pack(side="left", padx=4)
@@ -164,22 +190,34 @@ class SettingsPanel(tk.Toplevel):
         # ── 기본 난이도 ──
         row = tk.Frame(main, bg=_tk.BG)
         row.pack(fill="x", pady=(8, 2))
-        tk.Label(row, text=t("settings_default_difficulty"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w").pack(side="left")
+        tk.Label(
+            row, text=t("settings_default_difficulty"), font=FONTS.BODY, bg=_tk.BG, fg=_tk.TEXT, width=14, anchor="w"
+        ).pack(side="left")
         self._diff_var = tk.StringVar(value=self._get_default_difficulty())
-        tk.OptionMenu(row, self._diff_var, "easy", "normal", "hard", command=self._change_difficulty).pack(side="left", padx=4)
+        tk.OptionMenu(row, self._diff_var, "easy", "normal", "hard", command=self._change_difficulty).pack(
+            side="left", padx=4
+        )
 
         # ── 데이터 관리 섹션 ──
         self._section_label(main, t("settings_section_data"))
 
         btn_frame = tk.Frame(main, bg=_tk.BG)
         btn_frame.pack(fill="x", pady=4)
-        tk.Button(btn_frame, text=t("settings_export"), font=FONTS.BODY, width=16, command=self._export_settings).pack(side="left", padx=4)
-        tk.Button(btn_frame, text=t("settings_import"), font=FONTS.BODY, width=16, command=self._import_settings).pack(side="left", padx=4)
-        tk.Button(btn_frame, text=t("settings_profiles"), font=FONTS.BODY, width=16, command=self._open_profiles).pack(side="left", padx=4)
+        tk.Button(btn_frame, text=t("settings_export"), font=FONTS.BODY, width=16, command=self._export_settings).pack(
+            side="left", padx=4
+        )
+        tk.Button(btn_frame, text=t("settings_import"), font=FONTS.BODY, width=16, command=self._import_settings).pack(
+            side="left", padx=4
+        )
+        tk.Button(btn_frame, text=t("settings_profiles"), font=FONTS.BODY, width=16, command=self._open_profiles).pack(
+            side="left", padx=4
+        )
 
         btn_frame2 = tk.Frame(main, bg=_tk.BG)
         btn_frame2.pack(fill="x", pady=2)
-        tk.Button(btn_frame2, text=t("settings_manage_exports"), font=FONTS.BODY, width=16, command=self._manage_exports).pack(side="left", padx=4)
+        tk.Button(
+            btn_frame2, text=t("settings_manage_exports"), font=FONTS.BODY, width=16, command=self._manage_exports
+        ).pack(side="left", padx=4)
 
         # ── 닫기 버튼 ──
         tk.Button(main, text=t("settings_close"), font=FONTS.BODY, width=12, command=self.destroy).pack(pady=(16, 0))
@@ -236,13 +274,11 @@ class SettingsPanel(tk.Toplevel):
         try:
             result = subprocess.run(
                 ["fc-list", "--format", "%{family}\n"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
-            families = sorted(set(
-                line.split(",")[0].strip()
-                for line in result.stdout.split("\n")
-                if line.strip()
-            ))
+            families = sorted(set(line.split(",")[0].strip() for line in result.stdout.split("\n") if line.strip()))
             # CJK 지원 폰트를 앞에 배치
             cjk_keywords = ["wen", "cjk", "gothic", "nanum", "dotum", "gulim", "noto sans", "unifont"]
             cjk = [f for f in families if any(kw in f.lower() for kw in cjk_keywords)]
@@ -299,6 +335,7 @@ class SettingsPanel(tk.Toplevel):
 
     def _export_settings(self):
         from settings_io import export_settings
+
         path = export_settings()
         if path:
             messagebox.showinfo(t("settings_title"), t("settings_export_done", path=path), parent=self)
@@ -314,12 +351,14 @@ class SettingsPanel(tk.Toplevel):
         if not path:
             return
         from settings_io import import_settings
+
         result = import_settings(path)
         if result["imported"]:
             msg = t("settings_import_done", count=len(result["imported"]))
             if result["skipped"]:
-                msg += "\n" + t("settings_import_skipped", count=len(result["skipped"]),
-                                files=", ".join(result["skipped"][:5]))
+                msg += "\n" + t(
+                    "settings_import_skipped", count=len(result["skipped"]), files=", ".join(result["skipped"][:5])
+                )
             messagebox.showinfo(
                 t("settings_title"),
                 msg,
@@ -375,7 +414,9 @@ class SettingsPanel(tk.Toplevel):
                 return
             idx = sel[0]
             path = exports[idx]
-            if not messagebox.askyesno(t("settings_title"), t("settings_delete_confirm", name=os.path.basename(path)), parent=dlg):
+            if not messagebox.askyesno(
+                t("settings_title"), t("settings_delete_confirm", name=os.path.basename(path)), parent=dlg
+            ):
                 return
             if delete_export(path):
                 exports.pop(idx)
@@ -390,11 +431,16 @@ class SettingsPanel(tk.Toplevel):
 
         btn_frame = tk.Frame(dlg, bg=_tk.BG)
         btn_frame.pack(pady=8)
-        tk.Button(btn_frame, text=t("settings_delete"), font=FONTS.BODY, width=10, command=_delete).pack(side="left", padx=4)
-        tk.Button(btn_frame, text=t("settings_close"), font=FONTS.BODY, width=10, command=dlg.destroy).pack(side="left", padx=4)
+        tk.Button(btn_frame, text=t("settings_delete"), font=FONTS.BODY, width=10, command=_delete).pack(
+            side="left", padx=4
+        )
+        tk.Button(btn_frame, text=t("settings_close"), font=FONTS.BODY, width=10, command=dlg.destroy).pack(
+            side="left", padx=4
+        )
 
     def _open_profiles(self):
         from profile_manager import open_profile_manager
+
         open_profile_manager(self)
 
     # ── UI 재구성 ──

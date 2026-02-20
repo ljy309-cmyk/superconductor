@@ -448,18 +448,23 @@ def run_simulation():
                     toast.toggle_history()
                 elif event.key == pygame.K_x and (pygame.key.get_mods() & pygame.KMOD_CTRL):
                     from session_io import export_session
-                    export_session("qubit_chain", {
-                        "total_qubits": len(nodes),
-                        "collapsed_count": sum(1 for n in nodes if n.collapsed),
-                        "alive_count": sum(1 for n in nodes if not n.collapsed),
-                        "noise_rate": noise_rate,
-                        "cascade_damage": cascade_damage,
-                        "shield_uses": gs.qec_uses,
-                        "max_stress": max((n.stress for n in nodes), default=0),
-                        "survival_time": round(gs.survival_time, 2),
-                    })
+
+                    export_session(
+                        "qubit_chain",
+                        {
+                            "total_qubits": len(nodes),
+                            "collapsed_count": sum(1 for n in nodes if n.collapsed),
+                            "alive_count": sum(1 for n in nodes if not n.collapsed),
+                            "noise_rate": noise_rate,
+                            "cascade_damage": cascade_damage,
+                            "shield_uses": gs.qec_uses,
+                            "max_stress": max((n.stress for n in nodes), default=0),
+                            "survival_time": round(gs.survival_time, 2),
+                        },
+                    )
                 elif event.key == pygame.K_i and (pygame.key.get_mods() & pygame.KMOD_CTRL):
                     from session_io import choose_import_file, load_session
+
                     _imp_path = choose_import_file(screen, info_font, "qubit_chain")
                     if _imp_path:
                         load_session(_imp_path)

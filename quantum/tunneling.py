@@ -4,7 +4,6 @@
 - 터널링: 입자가 장벽과 충돌할 때 10 % 확률로 장벽 반대편으로 이동
 """
 
-import os
 import time
 from collections import deque
 
@@ -45,17 +44,6 @@ from quantum.tunneling_physics import (
 
 # ── 렌더링 (분리 모듈) ──────────────────────────────
 from quantum.tunneling_render import (
-    BG,
-    BLOCH_CX,
-    BLOCH_CY,
-    BLOCH_R,
-    FPS,
-    HEIGHT,
-    REFLECT_CLR,
-    TEXT_CLR,
-    TUNNEL_FLASH,
-    WIDTH,
-    ACCENT,
     _CHART_H,
     _CHART_W,
     _CHART_X,
@@ -64,15 +52,18 @@ from quantum.tunneling_render import (
     _FORMULA_W,
     _FORMULA_X,
     _FORMULA_Y,
-    _BlochMeshCache,
-    _CIRCLE_STEPS,
-    _EQUATOR_PTS,
     _MAX_TRAILS,
-    _MERIDIAN_XZ,
-    _MERIDIAN_YZ,
-    _TextCache,
     _TRAIL_SAMPLE,
-    _TrailCache,
+    ACCENT,
+    BG,
+    BLOCH_CX,
+    BLOCH_CY,
+    BLOCH_R,
+    FPS,
+    HEIGHT,
+    TEXT_CLR,
+    TUNNEL_FLASH,
+    WIDTH,
     _draw_achievement_progress,
     _draw_bloch_sphere,
     _draw_energy_diagram,
@@ -85,10 +76,9 @@ from quantum.tunneling_render import (
     _draw_sweep_chart,
     _draw_trails,
     _draw_wavefunction,
-    _ease_out,
-    _flash_ease,
     _load_theme_colors,
     _tcache,
+    _TrailCache,
     _update_exp_fit_stats,
 )
 from quit_dialog import confirm_quit
@@ -660,7 +650,6 @@ from quantum.tunneling_data import (
     _export_session,
     _import_session,
 )
-
 
 # ── 렌더링 ───────────────────────────────────────────
 

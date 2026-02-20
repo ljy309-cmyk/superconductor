@@ -161,9 +161,7 @@ class LatticeSimulation:
             y = rng.uniform(bounds[1] + 20, bounds[3] - 20)
             angle = rng.uniform(0, 2 * math.pi)
             speed = ELECTRON_SPEED * rng.uniform(0.5, 1.0)
-            self.electrons.append(
-                Electron(x, y, speed * math.cos(angle), speed * math.sin(angle))
-            )
+            self.electrons.append(Electron(x, y, speed * math.cos(angle), speed * math.sin(angle)))
 
     def _bounds(self) -> tuple[float, float, float, float]:
         return (

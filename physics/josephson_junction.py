@@ -50,15 +50,15 @@ WHITE = _pg.WHITE
 del _get_pg_theme_init
 
 # 고유 색상
-SC_BLOCK_COLOR = (137, 180, 250)   # 초전도체 블록 (파랑)
-BARRIER_COLOR = (243, 139, 168)    # 장벽 (빨강)
-PAIR_COLOR = (166, 227, 161)       # 쿠퍼 쌍 (녹색)
-PHASE_COLOR = (250, 179, 135)      # 위상 곡선 (오렌지)
-IV_COLOR = (203, 166, 247)         # I-V 곡선 (보라)
+SC_BLOCK_COLOR = (137, 180, 250)  # 초전도체 블록 (파랑)
+BARRIER_COLOR = (243, 139, 168)  # 장벽 (빨강)
+PAIR_COLOR = (166, 227, 161)  # 쿠퍼 쌍 (녹색)
+PHASE_COLOR = (250, 179, 135)  # 위상 곡선 (오렌지)
+IV_COLOR = (203, 166, 247)  # I-V 곡선 (보라)
 WASHBOARD_COLOR = (148, 226, 213)  # 워시보드 (시안)
-ZERO_V_COLOR = (166, 227, 161)     # 제로 전압 표시 (녹색)
-FINITE_V_COLOR = (243, 139, 168)   # 유한 전압 표시 (빨강)
-BIAS_ARROW_COLOR = (250, 227, 135) # 바이어스 화살표 (노랑)
+ZERO_V_COLOR = (166, 227, 161)  # 제로 전압 표시 (녹색)
+FINITE_V_COLOR = (243, 139, 168)  # 유한 전압 표시 (빨강)
+BIAS_ARROW_COLOR = (250, 227, 135)  # 바이어스 화살표 (노랑)
 
 _COLOR_MAP = {
     "BG": "BG",
@@ -173,7 +173,7 @@ def run_simulation():
             _spawn_timer = 0.0
             if len(tunnel_pairs) < _MAX_TUNNEL_PAIRS:
                 import random
-                barrier_cx = DIAG_X + DIAG_W // 2
+
                 y = DIAG_Y + 30 + random.randint(0, DIAG_H - 60)
                 speed = 80 + abs(jj.voltage) * 40
                 tunnel_pairs.append(_TunnelPair(DIAG_X + 40, y, speed))
@@ -181,6 +181,7 @@ def run_simulation():
             _spawn_timer = 0.0
             if len(tunnel_pairs) < 4:
                 import random
+
                 y = DIAG_Y + 30 + random.randint(0, DIAG_H - 60)
                 tunnel_pairs.append(_TunnelPair(DIAG_X + 40, y, 30))
 
@@ -191,13 +192,15 @@ def run_simulation():
         tunnel_pairs = [tp for tp in tunnel_pairs if tp.alive]
 
         # 리플레이 기록
-        recorder.record_frame({
-            "bias": round(jj.bias_current, 3),
-            "phi": round(jj.phi, 3),
-            "voltage": round(jj.voltage, 3),
-            "supercurrent": round(jj.supercurrent, 3),
-            "zero_v": jj.is_zero_voltage,
-        })
+        recorder.record_frame(
+            {
+                "bias": round(jj.bias_current, 3),
+                "phi": round(jj.phi, 3),
+                "voltage": round(jj.voltage, 3),
+                "supercurrent": round(jj.supercurrent, 3),
+                "zero_v": jj.is_zero_voltage,
+            }
+        )
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -293,11 +296,15 @@ def _draw_junction_diagram(screen, font, small_font, jj, tunnel_pairs):
         end_x = x + w // 2 + arrow_dir * arrow_len
         pygame.draw.line(screen, BIAS_ARROW_COLOR, (start_x, arrow_y - 20), (end_x, arrow_y - 20), 2)
         # 화살표 머리
-        pygame.draw.polygon(screen, BIAS_ARROW_COLOR, [
-            (end_x, arrow_y - 20),
-            (end_x - arrow_dir * 6, arrow_y - 25),
-            (end_x - arrow_dir * 6, arrow_y - 15),
-        ])
+        pygame.draw.polygon(
+            screen,
+            BIAS_ARROW_COLOR,
+            [
+                (end_x, arrow_y - 20),
+                (end_x - arrow_dir * 6, arrow_y - 25),
+                (end_x - arrow_dir * 6, arrow_y - 15),
+            ],
+        )
 
 
 def _draw_phase_graph(screen, small_font, jj):
@@ -413,7 +420,7 @@ def _draw_washboard(screen, small_font, jj):
             pygame.draw.lines(screen, WASHBOARD_COLOR, False, points, 2)
 
     # 현재 위상 위치 (주기적으로 맵핑)
-    phi_norm = ((jj.phi + phi_range / 2) % phi_range)
+    phi_norm = (jj.phi + phi_range / 2) % phi_range
     marker_x = gx + int(phi_norm / phi_range * gw)
     marker_u = washboard_potential(jj.phi, jj.bias_current, jj.ic)
     if u_values:

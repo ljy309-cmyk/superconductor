@@ -10,9 +10,16 @@ import unittest
 from unittest.mock import MagicMock
 
 # GUI 의존성 mock
-for mod in ("pygame", "tkinter", "tkinter.messagebox", "tkinter.ttk",
-            "matplotlib", "matplotlib.backends", "matplotlib.backends.backend_tkagg",
-            "matplotlib.figure"):
+for mod in (
+    "pygame",
+    "tkinter",
+    "tkinter.messagebox",
+    "tkinter.ttk",
+    "matplotlib",
+    "matplotlib.backends",
+    "matplotlib.backends.backend_tkagg",
+    "matplotlib.figure",
+):
     sys.modules.setdefault(mod, MagicMock())
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,6 +30,7 @@ class TestE91Protocol(unittest.TestCase):
 
     def test_initial_state(self):
         from security.qkd_advanced_engine import E91State
+
         state = E91State()
         self.assertEqual(state.total_rounds, 0)
         self.assertEqual(len(state.raw_key_alice), 0)
@@ -30,6 +38,7 @@ class TestE91Protocol(unittest.TestCase):
 
     def test_single_round(self):
         from security.qkd_advanced_engine import E91State, e91_round
+
         state = E91State()
         rd = e91_round(state)
         self.assertEqual(state.total_rounds, 1)
@@ -41,6 +50,7 @@ class TestE91Protocol(unittest.TestCase):
     def test_batch_rounds_generate_keys(self):
         """200 라운드 후 키 비트가 생성되어야 함."""
         from security.qkd_advanced_engine import E91State, e91_round
+
         state = E91State()
         for _ in range(200):
             e91_round(state)
@@ -57,27 +67,28 @@ class TestE91Protocol(unittest.TestCase):
             compute_bell_S,
             e91_round,
         )
+
         state = E91State()
         for _ in range(1000):
             e91_round(state, eve_chance=0.0)
         S = compute_bell_S(state)
         # S ≈ 2√2 ≈ 2.828, 통계적 변동으로 2.0 이상이어야 함
-        self.assertGreater(abs(S), CHSH_CLASSICAL_BOUND * 0.9,
-                           f"S = {S} should exceed ~{CHSH_CLASSICAL_BOUND}")
+        self.assertGreater(abs(S), CHSH_CLASSICAL_BOUND * 0.9, f"S = {S} should exceed ~{CHSH_CLASSICAL_BOUND}")
 
     def test_bell_weakened_with_eve(self):
         """Eve 도청 시 벨 위반이 약해짐."""
         from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round
+
         state = E91State()
         for _ in range(1000):
             e91_round(state, eve_chance=0.8)
         S = compute_bell_S(state)
         # Eve 도청 → 상관관계 약화 → S < 2√2
-        self.assertLess(abs(S), 2.8,
-                        f"S = {S} should be weakened with Eve")
+        self.assertLess(abs(S), 2.8, f"S = {S} should be weakened with Eve")
 
     def test_eve_rounds_counted(self):
         from security.qkd_advanced_engine import E91State, e91_round
+
         state = E91State()
         for _ in range(100):
             e91_round(state, eve_chance=1.0)
@@ -85,6 +96,7 @@ class TestE91Protocol(unittest.TestCase):
 
     def test_rounds_history_bounded(self):
         from security.qkd_advanced_engine import E91State, e91_round
+
         state = E91State()
         for _ in range(300):
             e91_round(state)
@@ -93,6 +105,7 @@ class TestE91Protocol(unittest.TestCase):
     def test_bell_s_history_recorded(self):
         """compute_bell_S 호출 시 히스토리가 기록되어야 함."""
         from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round
+
         state = E91State()
         for _ in range(100):
             e91_round(state)
@@ -105,6 +118,7 @@ class TestE91Protocol(unittest.TestCase):
     def test_bell_s_history_bounded(self):
         """히스토리가 200개로 제한되어야 함."""
         from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round
+
         state = E91State()
         for i in range(250):
             e91_round(state)
@@ -115,6 +129,7 @@ class TestE91Protocol(unittest.TestCase):
     def test_bell_s_history_convergence(self):
         """충분한 라운드 후 S가 이론값에 수렴해야 함 (Eve 없음)."""
         from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round
+
         state = E91State()
         for i in range(500):
             e91_round(state, eve_chance=0.0)
@@ -127,6 +142,7 @@ class TestE91Protocol(unittest.TestCase):
 
     def test_reset_e91(self):
         from security.qkd_advanced_engine import E91State, e91_round, reset_e91
+
         state = E91State()
         for _ in range(50):
             e91_round(state)
@@ -142,6 +158,7 @@ class TestQBEREstimation(unittest.TestCase):
 
     def test_qber_no_data(self):
         from security.qkd_advanced_engine import E91State, estimate_qber
+
         state = E91State()
         result = estimate_qber(state)
         self.assertEqual(result, 0.0)
@@ -150,6 +167,7 @@ class TestQBEREstimation(unittest.TestCase):
     def test_qber_low_without_eve(self):
         """Eve 없으면 QBER이 낮아야 함."""
         from security.qkd_advanced_engine import E91State, e91_round, estimate_qber
+
         state = E91State()
         for _ in range(500):
             e91_round(state, eve_chance=0.0)
@@ -161,6 +179,7 @@ class TestQBEREstimation(unittest.TestCase):
     def test_qber_high_with_eve(self):
         """Eve 있으면 QBER이 상승해야 함."""
         from security.qkd_advanced_engine import E91State, e91_round, estimate_qber
+
         state = E91State()
         for _ in range(2000):
             e91_round(state, eve_chance=0.8)
@@ -170,6 +189,7 @@ class TestQBEREstimation(unittest.TestCase):
     def test_qber_discards_sample(self):
         """QBER 샘플은 sifted_key에서 제외되어야 함."""
         from security.qkd_advanced_engine import E91State, e91_round, estimate_qber
+
         state = E91State()
         for _ in range(200):
             e91_round(state, eve_chance=0.0)
@@ -184,6 +204,7 @@ class TestErrorCorrection(unittest.TestCase):
 
     def test_correction_no_data(self):
         from security.qkd_advanced_engine import E91State, error_correct
+
         state = E91State()
         state.qber_done = True
         result = error_correct(state)
@@ -198,6 +219,7 @@ class TestErrorCorrection(unittest.TestCase):
             error_correct,
             estimate_qber,
         )
+
         state = E91State()
         for _ in range(500):
             e91_round(state, eve_chance=0.3)
@@ -215,6 +237,7 @@ class TestErrorCorrection(unittest.TestCase):
             error_correct,
             estimate_qber,
         )
+
         state = E91State()
         for _ in range(500):
             e91_round(state, eve_chance=0.0)
@@ -229,6 +252,7 @@ class TestKeySifting(unittest.TestCase):
 
     def test_sift_no_data(self):
         from security.qkd_advanced_engine import E91State, key_sift
+
         state = E91State()
         result = key_sift(state)
         self.assertEqual(result, [])
@@ -237,6 +261,7 @@ class TestKeySifting(unittest.TestCase):
     def test_sift_runs_full_pipeline(self):
         """key_sift가 QBER 추정 + 에러 정정을 순차 실행."""
         from security.qkd_advanced_engine import E91State, e91_round, key_sift
+
         state = E91State()
         for _ in range(200):
             e91_round(state, eve_chance=0.0)
@@ -249,6 +274,7 @@ class TestKeySifting(unittest.TestCase):
     def test_sift_high_match_no_eve(self):
         """Eve 없으면 매칭률이 높아야 함."""
         from security.qkd_advanced_engine import E91State, e91_round, key_sift
+
         state = E91State()
         for _ in range(500):
             e91_round(state, eve_chance=0.0)
@@ -258,6 +284,7 @@ class TestKeySifting(unittest.TestCase):
     def test_sift_lower_match_with_eve(self):
         """Eve 있으면 에러율 상승."""
         from security.qkd_advanced_engine import E91State, e91_round, key_sift
+
         state = E91State()
         for _ in range(2000):
             e91_round(state, eve_chance=0.8)
@@ -271,6 +298,7 @@ class TestToeplitzHash(unittest.TestCase):
     def test_output_length(self):
         """출력 길이가 지정한 대로."""
         from security.qkd_advanced_engine import _toeplitz_hash
+
         key = [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]
         for m in [4, 8, 5]:
             out, seed = _toeplitz_hash(key, m)
@@ -279,6 +307,7 @@ class TestToeplitzHash(unittest.TestCase):
     def test_output_is_binary(self):
         """출력이 0/1 비트."""
         from security.qkd_advanced_engine import _toeplitz_hash
+
         key = [1, 0, 1, 1, 0, 0, 1, 0]
         out, seed = _toeplitz_hash(key, 4)
         for bit in out:
@@ -287,6 +316,7 @@ class TestToeplitzHash(unittest.TestCase):
     def test_deterministic_with_same_seed(self):
         """같은 시드 → 같은 출력."""
         from security.qkd_advanced_engine import _toeplitz_hash
+
         key = [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]
         out1, seed = _toeplitz_hash(key, 5)
         out2, _ = _toeplitz_hash(key, 5, seed=seed)
@@ -295,6 +325,7 @@ class TestToeplitzHash(unittest.TestCase):
     def test_different_keys_different_output(self):
         """다른 키 → 높은 확률로 다른 출력 (2-universal)."""
         from security.qkd_advanced_engine import _toeplitz_hash
+
         key1 = [1, 0, 1, 1, 0, 0, 1, 0]
         key2 = [0, 1, 0, 0, 1, 1, 0, 1]
         seed = [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1]  # m + n - 1 = 4 + 8 - 1 = 11
@@ -306,12 +337,14 @@ class TestToeplitzHash(unittest.TestCase):
 
     def test_empty_key(self):
         from security.qkd_advanced_engine import _toeplitz_hash
+
         out, seed = _toeplitz_hash([], 4)
         self.assertEqual(out, [])
 
     def test_seed_length(self):
         """시드 길이 = m + n - 1."""
         from security.qkd_advanced_engine import _toeplitz_hash
+
         key = [1, 0, 1, 0, 1]  # n=5
         out, seed = _toeplitz_hash(key, 3)  # m=3
         self.assertEqual(len(seed), 3 + 5 - 1)  # 7
@@ -322,6 +355,7 @@ class TestPrivacyAmplification(unittest.TestCase):
 
     def test_pa_empty_key(self):
         from security.qkd_advanced_engine import E91State, privacy_amplification
+
         state = E91State()
         result = privacy_amplification(state)
         self.assertEqual(result, "")
@@ -334,6 +368,7 @@ class TestPrivacyAmplification(unittest.TestCase):
             key_sift,
             privacy_amplification,
         )
+
         state = E91State()
         for _ in range(200):
             e91_round(state)
@@ -347,6 +382,7 @@ class TestPrivacyAmplification(unittest.TestCase):
     def test_pa_compressed(self):
         """PA 후 키는 입력보다 짧아야 함."""
         from security.qkd_advanced_engine import E91State, privacy_amplification
+
         state = E91State()
         state.sifted_key = [_random_bit() for _ in range(100)]
         final = privacy_amplification(state)
@@ -357,6 +393,7 @@ class TestPrivacyAmplification(unittest.TestCase):
     def test_pa_different_runs_differ(self):
         """Toeplitz 시드가 랜덤이므로 다른 실행마다 다른 키 (높은 확률)."""
         from security.qkd_advanced_engine import E91State, privacy_amplification
+
         results = set()
         for _ in range(5):
             state = E91State()
@@ -368,6 +405,7 @@ class TestPrivacyAmplification(unittest.TestCase):
 
 def _random_bit():
     import random
+
     return random.randint(0, 1)
 
 
@@ -376,6 +414,7 @@ class TestGHZProtocol(unittest.TestCase):
 
     def test_initial_state(self):
         from security.qkd_advanced_engine import GHZState
+
         state = GHZState()
         self.assertEqual(state.n_parties, 3)
         self.assertEqual(len(state.party_names), 3)
@@ -383,6 +422,7 @@ class TestGHZProtocol(unittest.TestCase):
 
     def test_single_round(self):
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         rd = ghz_round(state)
         self.assertEqual(state.total_rounds, 1)
@@ -396,6 +436,7 @@ class TestGHZProtocol(unittest.TestCase):
     def test_batch_generates_keys(self):
         """200 라운드 후 키 비트가 생성되어야 함."""
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         for _ in range(200):
             ghz_round(state)
@@ -405,6 +446,7 @@ class TestGHZProtocol(unittest.TestCase):
     def test_z_basis_correlation_no_eve(self):
         """Eve 없을 때 Z 기저 결과는 모두 같아야 함."""
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         all_same = 0
         key_count = 0
@@ -416,12 +458,12 @@ class TestGHZProtocol(unittest.TestCase):
                     all_same += 1
         if key_count > 0:
             rate = all_same / key_count
-            self.assertGreater(rate, 0.9,
-                               f"Z basis should give same results: {rate:.2f}")
+            self.assertGreater(rate, 0.9, f"Z basis should give same results: {rate:.2f}")
 
     def test_x_basis_parity_no_eve(self):
         """Eve 없을 때 X 기저 패리티는 짝수."""
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         for _ in range(500):
             ghz_round(state, eve_chance=0.0)
@@ -432,6 +474,7 @@ class TestGHZProtocol(unittest.TestCase):
     def test_eve_disrupts_consistency(self):
         """Eve 도청 시 일관성 검증 실패율 상승."""
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         for _ in range(500):
             ghz_round(state, eve_chance=0.8)
@@ -442,6 +485,7 @@ class TestGHZProtocol(unittest.TestCase):
 
     def test_ghz_key_sift(self):
         from security.qkd_advanced_engine import GHZState, ghz_key_sift, ghz_round
+
         state = GHZState()
         for _ in range(200):
             ghz_round(state, eve_chance=0.0)
@@ -456,6 +500,7 @@ class TestGHZProtocol(unittest.TestCase):
             ghz_privacy_amplification,
             ghz_round,
         )
+
         state = GHZState()
         for _ in range(200):
             ghz_round(state)
@@ -467,6 +512,7 @@ class TestGHZProtocol(unittest.TestCase):
 
     def test_rounds_history_bounded(self):
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         for _ in range(300):
             ghz_round(state)
@@ -474,6 +520,7 @@ class TestGHZProtocol(unittest.TestCase):
 
     def test_reset_ghz(self):
         from security.qkd_advanced_engine import GHZState, ghz_round, reset_ghz
+
         state = GHZState()
         for _ in range(50):
             ghz_round(state)
@@ -485,6 +532,7 @@ class TestGHZProtocol(unittest.TestCase):
     def test_resize_ghz_to_4(self):
         """4자간으로 리사이즈 후 정상 동작."""
         from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+
         state = GHZState()
         resize_ghz(state, 4)
         self.assertEqual(state.n_parties, 4)
@@ -497,6 +545,7 @@ class TestGHZProtocol(unittest.TestCase):
     def test_resize_ghz_to_5(self):
         """5자간으로 리사이즈 후 정상 동작."""
         from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+
         state = GHZState()
         resize_ghz(state, 5)
         self.assertEqual(state.n_parties, 5)
@@ -514,6 +563,7 @@ class TestGHZProtocol(unittest.TestCase):
             GHZState,
             resize_ghz,
         )
+
         state = GHZState()
         resize_ghz(state, 1)
         self.assertEqual(state.n_parties, GHZ_MIN_PARTIES)
@@ -523,6 +573,7 @@ class TestGHZProtocol(unittest.TestCase):
     def test_resize_ghz_resets_state(self):
         """리사이즈 시 상태가 리셋."""
         from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+
         state = GHZState()
         for _ in range(50):
             ghz_round(state)
@@ -534,6 +585,7 @@ class TestGHZProtocol(unittest.TestCase):
     def test_ghz_4party_z_correlation(self):
         """4자간 Z 기저 상관관계 (Eve 없음)."""
         from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+
         state = GHZState()
         resize_ghz(state, 4)
         all_same = 0
@@ -550,6 +602,7 @@ class TestGHZProtocol(unittest.TestCase):
     def test_ghz_5party_sift(self):
         """5자간 키 시프팅 정상 동작."""
         from security.qkd_advanced_engine import GHZState, ghz_key_sift, ghz_round, resize_ghz
+
         state = GHZState()
         resize_ghz(state, 5)
         for _ in range(300):
@@ -566,6 +619,7 @@ class TestOTPEncryption(unittest.TestCase):
     def test_encrypt_decrypt_roundtrip(self):
         """암호화 후 복호화하면 원문 복원."""
         from security.qkd_advanced_engine import xor_decrypt, xor_encrypt
+
         plaintext = "QUANTUM OK"
         key = "abcdef0123456789abcd"  # 10 bytes = 20 hex chars
         cipher = xor_encrypt(plaintext, key)
@@ -575,6 +629,7 @@ class TestOTPEncryption(unittest.TestCase):
 
     def test_encrypt_produces_hex(self):
         from security.qkd_advanced_engine import xor_encrypt
+
         cipher = xor_encrypt("Hello", "deadbeef00")
         # 유효한 hex 문자열
         int(cipher, 16)
@@ -583,21 +638,25 @@ class TestOTPEncryption(unittest.TestCase):
 
     def test_different_keys_different_cipher(self):
         from security.qkd_advanced_engine import xor_encrypt
+
         c1 = xor_encrypt("TEST", "aaaa0000")
         c2 = xor_encrypt("TEST", "bbbb1111")
         self.assertNotEqual(c1, c2)
 
     def test_empty_key_returns_empty(self):
         from security.qkd_advanced_engine import xor_encrypt
+
         self.assertEqual(xor_encrypt("msg", ""), "")
 
     def test_empty_cipher_returns_empty(self):
         from security.qkd_advanced_engine import xor_decrypt
+
         self.assertEqual(xor_decrypt("", "abcd"), "")
 
     def test_short_key_partial_encrypt(self):
         """키가 짧으면 가능한 만큼만 암호화."""
         from security.qkd_advanced_engine import xor_decrypt, xor_encrypt
+
         plaintext = "ABCDEFGH"  # 8 bytes
         key = "ff"  # 1 byte
         cipher = xor_encrypt(plaintext, key)
@@ -616,6 +675,7 @@ class TestOTPEncryption(unittest.TestCase):
             xor_decrypt,
             xor_encrypt,
         )
+
         state = E91State()
         for _ in range(300):
             e91_round(state, eve_chance=0.0)
@@ -632,6 +692,7 @@ class TestE91Constants(unittest.TestCase):
 
     def test_alice_bases(self):
         from security.qkd_advanced_engine import E91_ALICE_BASES
+
         self.assertEqual(len(E91_ALICE_BASES), 3)
         self.assertAlmostEqual(E91_ALICE_BASES[0], 0.0)
         self.assertAlmostEqual(E91_ALICE_BASES[1], math.pi / 8)
@@ -639,6 +700,7 @@ class TestE91Constants(unittest.TestCase):
 
     def test_bob_bases(self):
         from security.qkd_advanced_engine import E91_BOB_BASES
+
         self.assertEqual(len(E91_BOB_BASES), 3)
         self.assertAlmostEqual(E91_BOB_BASES[0], math.pi / 8)
         self.assertAlmostEqual(E91_BOB_BASES[1], math.pi / 4)
@@ -646,6 +708,7 @@ class TestE91Constants(unittest.TestCase):
 
     def test_chsh_bounds(self):
         from security.qkd_advanced_engine import CHSH_CLASSICAL_BOUND, CHSH_QUANTUM_BOUND
+
         self.assertAlmostEqual(CHSH_CLASSICAL_BOUND, 2.0)
         self.assertAlmostEqual(CHSH_QUANTUM_BOUND, 2 * math.sqrt(2), places=10)
 
@@ -656,10 +719,11 @@ class TestE91Constants(unittest.TestCase):
             E91_BOB_BASES,
             E91_KEY_PAIRS,
         )
+
         for a_idx, b_idx in E91_KEY_PAIRS:
             self.assertAlmostEqual(
-                E91_ALICE_BASES[a_idx], E91_BOB_BASES[b_idx],
-                msg=f"Key pair ({a_idx},{b_idx}) should be same angle")
+                E91_ALICE_BASES[a_idx], E91_BOB_BASES[b_idx], msg=f"Key pair ({a_idx},{b_idx}) should be same angle"
+            )
 
 
 class TestBB84Compare(unittest.TestCase):
@@ -667,6 +731,7 @@ class TestBB84Compare(unittest.TestCase):
 
     def test_initial_state(self):
         from security.qkd_advanced_engine import BB84State
+
         state = BB84State()
         self.assertEqual(state.total_rounds, 0)
         self.assertEqual(state.basis_match_rounds, 0)
@@ -676,6 +741,7 @@ class TestBB84Compare(unittest.TestCase):
 
     def test_single_round(self):
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         rd = bb84_round(state)
         self.assertEqual(state.total_rounds, 1)
@@ -686,6 +752,7 @@ class TestBB84Compare(unittest.TestCase):
     def test_batch_generates_key_bits(self):
         """200 라운드 후 기저 매칭된 키 비트가 생성되어야 함."""
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(200):
             bb84_round(state)
@@ -696,6 +763,7 @@ class TestBB84Compare(unittest.TestCase):
     def test_low_qber_without_eve(self):
         """Eve 없으면 QBER이 0에 가까워야 함."""
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(300):
             bb84_round(state, eve_chance=0.0)
@@ -705,6 +773,7 @@ class TestBB84Compare(unittest.TestCase):
     def test_high_qber_with_eve(self):
         """Eve 도청 시 QBER이 상승하고 탐지되어야 함."""
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(300):
             bb84_round(state, eve_chance=1.0)
@@ -713,6 +782,7 @@ class TestBB84Compare(unittest.TestCase):
 
     def test_eve_rounds_counted(self):
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(100):
             bb84_round(state, eve_chance=1.0)
@@ -721,6 +791,7 @@ class TestBB84Compare(unittest.TestCase):
     def test_sliding_window_bounded(self):
         """슬라이딩 윈도우가 50개로 제한."""
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(500):
             bb84_round(state)
@@ -729,6 +800,7 @@ class TestBB84Compare(unittest.TestCase):
 
     def test_reset_bb84(self):
         from security.qkd_advanced_engine import BB84State, bb84_round, reset_bb84
+
         state = BB84State()
         for _ in range(100):
             bb84_round(state, eve_chance=0.5)
@@ -750,6 +822,7 @@ class TestMeasureEntangled(unittest.TestCase):
     def test_same_angle_perfect_correlation(self):
         """같은 각도로 측정하면 항상 같은 결과."""
         from security.qkd_advanced_engine import _measure_entangled
+
         same = 0
         n = 200
         for _ in range(n):
@@ -761,6 +834,7 @@ class TestMeasureEntangled(unittest.TestCase):
     def test_orthogonal_angles_anticorrelation(self):
         """직교 편광(90°)으로 측정하면 반상관."""
         from security.qkd_advanced_engine import _measure_entangled
+
         diff = 0
         n = 200
         for _ in range(n):
@@ -771,6 +845,7 @@ class TestMeasureEntangled(unittest.TestCase):
 
     def test_results_are_pm1(self):
         from security.qkd_advanced_engine import _measure_entangled
+
         for _ in range(50):
             a, b = _measure_entangled(0.3, 0.5)
             self.assertIn(a, (+1, -1))
@@ -787,18 +862,18 @@ class TestBB84ErrorModel(unittest.TestCase):
         σ = sqrt(0.25*0.75/50) ≈ 0.061 → 넓은 허용 범위 사용.
         """
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(2000):
             bb84_round(state, eve_chance=1.0)
         # BB84 이론: QBER = 25% (sliding window 50 → 넓은 범위)
-        self.assertGreater(state.qber, 0.08,
-                           f"QBER = {state.qber:.3f}, expected ~0.25")
-        self.assertLess(state.qber, 0.50,
-                        f"QBER = {state.qber:.3f}, expected ~0.25")
+        self.assertGreater(state.qber, 0.08, f"QBER = {state.qber:.3f}, expected ~0.25")
+        self.assertLess(state.qber, 0.50, f"QBER = {state.qber:.3f}, expected ~0.25")
 
     def test_no_corruption_when_eve_absent(self):
         """Eve 없으면 corruption이 발생하지 않아야 함."""
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(500):
             bb84_round(state, eve_chance=0.0)
@@ -811,22 +886,26 @@ class TestXORErrorHandling(unittest.TestCase):
 
     def test_invalid_hex_key_encrypt(self):
         from security.qkd_advanced_engine import xor_encrypt
+
         result = xor_encrypt("Hello", "ZZZZ")
         self.assertEqual(result, "")
 
     def test_invalid_hex_cipher_decrypt(self):
         from security.qkd_advanced_engine import xor_decrypt
+
         result = xor_decrypt("ZZZZ", "abcd")
         self.assertEqual(result, "")
 
     def test_invalid_hex_key_decrypt(self):
         from security.qkd_advanced_engine import xor_decrypt
+
         result = xor_decrypt("abcd", "ZZZZ")
         self.assertEqual(result, "")
 
     def test_odd_length_hex_key(self):
         """홀수 길이 hex 키도 정상 동작."""
         from security.qkd_advanced_engine import xor_decrypt, xor_encrypt
+
         cipher = xor_encrypt("A", "abc")
         self.assertGreater(len(cipher), 0)
         decrypted = xor_decrypt(cipher, "abc")
@@ -838,18 +917,21 @@ class TestQRNGRandint(unittest.TestCase):
 
     def test_range_output(self):
         from security.qkd_advanced_engine import _qrng_randint
+
         for _ in range(100):
             val = _qrng_randint(0, 2)
             self.assertIn(val, (0, 1, 2))
 
     def test_single_value_range(self):
         from security.qkd_advanced_engine import _qrng_randint
+
         for _ in range(10):
             val = _qrng_randint(5, 5)
             self.assertEqual(val, 5)
 
     def test_binary_range(self):
         from security.qkd_advanced_engine import _qrng_randint
+
         seen = set()
         for _ in range(50):
             seen.add(_qrng_randint(0, 1))
@@ -863,6 +945,7 @@ class TestGHZMeasure(unittest.TestCase):
     def test_z_basis_all_same(self):
         """Z 기저 측정 시 모든 결과 동일 (Eve 없음)."""
         from security.qkd_advanced_engine import _ghz_measure
+
         all_same = 0
         n = 100
         for _ in range(n):
@@ -874,6 +957,7 @@ class TestGHZMeasure(unittest.TestCase):
     def test_x_basis_even_parity(self):
         """X 기저 측정 시 짝수 패리티 (Eve 없음)."""
         from security.qkd_advanced_engine import _ghz_measure
+
         for _ in range(100):
             results = _ghz_measure(["X", "X", "X"], eve_present=False)
             self.assertEqual(sum(results) % 2, 0)
@@ -881,6 +965,7 @@ class TestGHZMeasure(unittest.TestCase):
     def test_mixed_basis_random(self):
         """혼합 기저 → 무작위 결과."""
         from security.qkd_advanced_engine import _ghz_measure
+
         results = _ghz_measure(["X", "Z", "X"], eve_present=False)
         self.assertEqual(len(results), 3)
         for r in results:
@@ -889,6 +974,7 @@ class TestGHZMeasure(unittest.TestCase):
     def test_z_basis_eve_disrupts(self):
         """Eve 도청 시 Z 기저 상관관계 파괴."""
         from security.qkd_advanced_engine import _ghz_measure
+
         disrupted = 0
         n = 200
         for _ in range(n):
@@ -901,6 +987,7 @@ class TestGHZMeasure(unittest.TestCase):
     def test_n_party_z_basis(self):
         """N자간 Z 기저 측정."""
         from security.qkd_advanced_engine import _ghz_measure
+
         for n in (4, 5):
             results = _ghz_measure(["Z"] * n, eve_present=False)
             self.assertEqual(len(results), n)
@@ -912,6 +999,7 @@ class TestE91StateDuplicate(unittest.TestCase):
 
     def test_single_sifted_key_field(self):
         from security.qkd_advanced_engine import E91State
+
         state = E91State()
         state.sifted_key = [1, 0, 1]
         self.assertEqual(state.sifted_key, [1, 0, 1])
@@ -922,11 +1010,13 @@ class TestBobRemainingField(unittest.TestCase):
 
     def test_bob_remaining_exists(self):
         from security.qkd_advanced_engine import E91State
+
         state = E91State()
         self.assertEqual(state.bob_remaining, [])
 
     def test_bob_remaining_populated_after_qber(self):
         from security.qkd_advanced_engine import E91State, e91_round, estimate_qber
+
         state = E91State()
         for _ in range(200):
             e91_round(state, eve_chance=0.0)
@@ -940,6 +1030,7 @@ class TestBobRemainingField(unittest.TestCase):
 
     def test_reset_clears_bob_remaining(self):
         from security.qkd_advanced_engine import E91State, e91_round, estimate_qber, reset_e91
+
         state = E91State()
         for _ in range(200):
             e91_round(state)
@@ -961,6 +1052,7 @@ class TestCompareModeEngine(unittest.TestCase):
             compute_bell_S,
             e91_round,
         )
+
         bb84 = BB84State()
         e91 = E91State()
         eve_chance = 0.5
@@ -985,6 +1077,7 @@ class TestCompareModeEngine(unittest.TestCase):
             compute_bell_S,
             e91_round,
         )
+
         bb84 = BB84State()
         e91 = E91State()
         for _ in range(3000):
@@ -995,8 +1088,7 @@ class TestCompareModeEngine(unittest.TestCase):
         # BB84: QBER > 11%
         self.assertTrue(bb84.eve_detected)
         # E91: Eve 도청 시 Bell S가 양자 한계(2√2)보다 크게 약화
-        self.assertLess(abs(e91.bell_S), 2.8,
-                        f"S = {e91.bell_S:.3f} should be weakened with Eve")
+        self.assertLess(abs(e91.bell_S), 2.8, f"S = {e91.bell_S:.3f} should be weakened with Eve")
 
 
 class TestFullPipeline(unittest.TestCase):
@@ -1005,8 +1097,8 @@ class TestFullPipeline(unittest.TestCase):
     def test_e91_full_pipeline_no_eve(self):
         """E91 전체: 라운드→QBER→정정→PA→OTP 파이프라인."""
         from security.qkd_advanced_engine import (
-            E91State,
             _DEMO_PLAINTEXT,
+            E91State,
             compute_bell_S,
             e91_round,
             error_correct,
@@ -1015,6 +1107,7 @@ class TestFullPipeline(unittest.TestCase):
             xor_decrypt,
             xor_encrypt,
         )
+
         state = E91State()
         for _ in range(300):
             e91_round(state, eve_chance=0.0)
@@ -1039,11 +1132,12 @@ class TestFullPipeline(unittest.TestCase):
     def test_ghz_5party_with_eve(self):
         """GHZ 5자간 Eve 있을 때 에러율 상승."""
         from security.qkd_advanced_engine import GHZState, ghz_key_sift, ghz_round, resize_ghz
+
         state = GHZState()
         resize_ghz(state, 5)
         for _ in range(500):
             ghz_round(state, eve_chance=0.8)
-        sifted = ghz_key_sift(state)
+        ghz_key_sift(state)
         # Eve → 상관관계 파괴 → 에러율 상승
         self.assertGreater(state.error_rate, 0.0)
 
@@ -1061,6 +1155,7 @@ class TestGHZFullPipeline(unittest.TestCase):
             xor_decrypt,
             xor_encrypt,
         )
+
         state = GHZState()
         for _ in range(300):
             ghz_round(state, eve_chance=0.0)
@@ -1087,6 +1182,7 @@ class TestGHZFullPipeline(unittest.TestCase):
             ghz_round,
             resize_ghz,
         )
+
         state = GHZState()
         resize_ghz(state, 4)
         for _ in range(500):
@@ -1095,7 +1191,7 @@ class TestGHZFullPipeline(unittest.TestCase):
         self.assertTrue(state.sift_done)
         self.assertGreater(state.error_rate, 0.0)
 
-        final = ghz_privacy_amplification(state)
+        ghz_privacy_amplification(state)
         self.assertTrue(state.pa_done)
 
 
@@ -1111,6 +1207,7 @@ class TestCompareModePA(unittest.TestCase):
             key_sift,
             privacy_amplification,
         )
+
         e91_cmp = E91State()
         for _ in range(300):
             e91_round(e91_cmp, eve_chance=0.0)
@@ -1134,6 +1231,7 @@ class TestCompareModePA(unittest.TestCase):
             key_sift,
             privacy_amplification,
         )
+
         bb84 = BB84State()
         e91 = E91State()
         for _ in range(500):
@@ -1157,6 +1255,7 @@ class TestEveLevels(unittest.TestCase):
     def test_eve_levels_produce_different_qber(self):
         """다른 Eve 레벨이 다른 QBER을 생성."""
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         results = {}
         for eve in [0.0, 0.3, 1.0]:
             state = BB84State()
@@ -1172,8 +1271,7 @@ class TestEveLevels(unittest.TestCase):
         levels = [0.0, 0.1, 0.3, 0.5, 0.8, 1.0]
         # 각 레벨에서 다음 레벨로 순환
         for i, lvl in enumerate(levels):
-            cur = min(range(len(levels)),
-                      key=lambda j: abs(levels[j] - lvl))
+            cur = min(range(len(levels)), key=lambda j: abs(levels[j] - lvl))
             nxt = levels[(cur + 1) % len(levels)]
             expected = levels[(i + 1) % len(levels)]
             self.assertAlmostEqual(nxt, expected)
@@ -1184,6 +1282,7 @@ class TestLocaleKeysComplete(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1196,24 +1295,38 @@ class TestLocaleKeysComplete(unittest.TestCase):
         ko_keys = set(ko.keys())
         missing_in_ko = en_keys - ko_keys
         missing_in_en = ko_keys - en_keys
-        self.assertEqual(missing_in_ko, set(),
-                         f"Keys in en.json but not in ko.json: {missing_in_ko}")
-        self.assertEqual(missing_in_en, set(),
-                         f"Keys in ko.json but not in en.json: {missing_in_en}")
+        self.assertEqual(missing_in_ko, set(), f"Keys in en.json but not in ko.json: {missing_in_ko}")
+        self.assertEqual(missing_in_en, set(), f"Keys in ko.json but not in en.json: {missing_in_en}")
 
     def test_qa_keys_present(self):
         """QKD 관련 모든 키가 en.json에 존재."""
         base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         en = self._load_json(os.path.join(base, "locale", "en.json"))
         required_keys = [
-            "qa_e91_rounds", "qa_raw_key_len", "qa_bell_s_detail",
-            "qa_qber_display", "qa_sift_pipeline", "qa_sift_qber_stat",
-            "qa_ghz_rounds", "qa_ghz_consistency", "qa_ghz_sifted",
-            "qa_ghz_final_key", "qa_cmp_bb84_rounds", "qa_cmp_bb84_basis",
-            "qa_cmp_bb84_rawkey", "qa_cmp_bb84_eve", "qa_cmp_bb84_qber",
-            "qa_cmp_e91_rounds", "qa_cmp_e91_keypairs", "qa_cmp_e91_rawkey",
-            "qa_cmp_e91_eve", "qa_cmp_e91_bell", "qa_key_rate",
-            "qa_sift_bell_stat", "qa_qber_graph", "qa_qber_nodata",
+            "qa_e91_rounds",
+            "qa_raw_key_len",
+            "qa_bell_s_detail",
+            "qa_qber_display",
+            "qa_sift_pipeline",
+            "qa_sift_qber_stat",
+            "qa_ghz_rounds",
+            "qa_ghz_consistency",
+            "qa_ghz_sifted",
+            "qa_ghz_final_key",
+            "qa_cmp_bb84_rounds",
+            "qa_cmp_bb84_basis",
+            "qa_cmp_bb84_rawkey",
+            "qa_cmp_bb84_eve",
+            "qa_cmp_bb84_qber",
+            "qa_cmp_e91_rounds",
+            "qa_cmp_e91_keypairs",
+            "qa_cmp_e91_rawkey",
+            "qa_cmp_e91_eve",
+            "qa_cmp_e91_bell",
+            "qa_key_rate",
+            "qa_sift_bell_stat",
+            "qa_qber_graph",
+            "qa_qber_nodata",
             "tutorial_nav_hint",
         ]
         for key in required_keys:
@@ -1226,6 +1339,7 @@ class TestBB84QBERHistory(unittest.TestCase):
     def test_qber_history_recorded(self):
         """QBER 히스토리가 10 라운드마다 기록."""
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(100):
             bb84_round(state, eve_chance=0.5)
@@ -1239,6 +1353,7 @@ class TestBB84QBERHistory(unittest.TestCase):
     def test_qber_history_bounded(self):
         """히스토리가 200개로 제한."""
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(3000):
             bb84_round(state)
@@ -1247,6 +1362,7 @@ class TestBB84QBERHistory(unittest.TestCase):
     def test_qber_history_reset(self):
         """리셋 시 히스토리 초기화."""
         from security.qkd_advanced_engine import BB84State, bb84_round, reset_bb84
+
         state = BB84State()
         for _ in range(100):
             bb84_round(state)
@@ -1257,6 +1373,7 @@ class TestBB84QBERHistory(unittest.TestCase):
     def test_qber_history_convergence_with_eve(self):
         """Eve 있을 때 QBER 히스토리에 > 0 값 존재."""
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(200):
             bb84_round(state, eve_chance=1.0)
@@ -1279,6 +1396,7 @@ class TestCompareAutoSiftPA(unittest.TestCase):
             estimate_qber,
             privacy_amplification,
         )
+
         e91_cmp = E91State()
         for _ in range(300):
             e91_round(e91_cmp, eve_chance=0.0)
@@ -1301,6 +1419,7 @@ class TestGHZConsistencyHistory(unittest.TestCase):
     def test_consistency_history_recorded(self):
         """일관성 히스토리가 검증 10회마다 기록."""
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         for _ in range(1000):
             ghz_round(state, eve_chance=0.0)
@@ -1316,6 +1435,7 @@ class TestGHZConsistencyHistory(unittest.TestCase):
     def test_consistency_history_bounded(self):
         """히스토리가 200개로 제한."""
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         for _ in range(10000):
             ghz_round(state)
@@ -1324,6 +1444,7 @@ class TestGHZConsistencyHistory(unittest.TestCase):
     def test_consistency_history_reset(self):
         """리셋 시 히스토리 초기화."""
         from security.qkd_advanced_engine import GHZState, ghz_round, reset_ghz
+
         state = GHZState()
         for _ in range(500):
             ghz_round(state)
@@ -1333,6 +1454,7 @@ class TestGHZConsistencyHistory(unittest.TestCase):
     def test_consistency_high_without_eve(self):
         """Eve 없을 때 일관성 패스율이 높아야 함."""
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         for _ in range(1000):
             ghz_round(state, eve_chance=0.0)
@@ -1343,6 +1465,7 @@ class TestGHZConsistencyHistory(unittest.TestCase):
     def test_consistency_drops_with_eve(self):
         """Eve 도청 시 일관성 패스율 하락."""
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         for _ in range(1000):
             ghz_round(state, eve_chance=0.8)
@@ -1357,6 +1480,7 @@ class TestGHZSiftEmptyKey(unittest.TestCase):
     def test_sift_empty_sets_done(self):
         """빈 키로 시프팅 시 sift_done이 True여야 함."""
         from security.qkd_advanced_engine import GHZState, ghz_key_sift
+
         state = GHZState()
         result = ghz_key_sift(state)
         self.assertEqual(result, [])
@@ -1368,6 +1492,7 @@ class TestLocaleNewKeys(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1399,6 +1524,7 @@ class TestLocaleRound8Keys(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1426,10 +1552,8 @@ class TestLocaleRound8Keys(unittest.TestCase):
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         en_keys = set(en.keys())
         ko_keys = set(ko.keys())
-        self.assertEqual(en_keys - ko_keys, set(),
-                         f"Keys in en.json but not in ko.json: {en_keys - ko_keys}")
-        self.assertEqual(ko_keys - en_keys, set(),
-                         f"Keys in ko.json but not in en.json: {ko_keys - en_keys}")
+        self.assertEqual(en_keys - ko_keys, set(), f"Keys in en.json but not in ko.json: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(), f"Keys in ko.json but not in en.json: {ko_keys - en_keys}")
 
 
 class TestBellSBadgeLogic(unittest.TestCase):
@@ -1443,6 +1567,7 @@ class TestBellSBadgeLogic(unittest.TestCase):
             compute_bell_S,
             e91_round,
         )
+
         state = E91State()
         for _ in range(2000):
             e91_round(state, eve_chance=0.0)
@@ -1454,11 +1579,11 @@ class TestBellSBadgeLogic(unittest.TestCase):
     def test_danger_badge_with_full_eve(self):
         """100% Eve → S 약화 → DANGER 가능."""
         from security.qkd_advanced_engine import (
-            CHSH_CLASSICAL_BOUND,
             E91State,
             compute_bell_S,
             e91_round,
         )
+
         state = E91State()
         for _ in range(1000):
             e91_round(state, eve_chance=1.0)
@@ -1473,6 +1598,7 @@ class TestLocaleRound9Keys(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1502,6 +1628,7 @@ class TestGHZConsistencyHistoryResize(unittest.TestCase):
     def test_resize_clears_consistency_history(self):
         """리사이즈 시 consistency_history도 초기화."""
         from security.qkd_advanced_engine import GHZState, ghz_round, resize_ghz
+
         state = GHZState()
         for _ in range(500):
             ghz_round(state)
@@ -1515,8 +1642,8 @@ class TestNibbleConversionRemainder(unittest.TestCase):
 
     def test_pa_handles_non_multiple_of_4(self):
         """비트 수가 4의 배수가 아닌 경우에도 최종 키가 생성됨."""
-        from security.qkd_advanced_engine import E91State, e91_round, compute_bell_S, \
-            key_sift, privacy_amplification
+        from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round, key_sift, privacy_amplification
+
         state = E91State()
         for _ in range(200):
             e91_round(state, 0.0)
@@ -1529,8 +1656,8 @@ class TestNibbleConversionRemainder(unittest.TestCase):
 
     def test_ghz_pa_handles_non_multiple_of_4(self):
         """GHZ PA도 나머지 비트 패딩 처리."""
-        from security.qkd_advanced_engine import GHZState, ghz_round, \
-            ghz_key_sift, ghz_privacy_amplification
+        from security.qkd_advanced_engine import GHZState, ghz_key_sift, ghz_privacy_amplification, ghz_round
+
         state = GHZState()
         for _ in range(200):
             ghz_round(state, 0.0)
@@ -1546,6 +1673,7 @@ class TestLocaleRound10Keys(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1554,8 +1682,7 @@ class TestLocaleRound10Keys(unittest.TestCase):
         base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         en = self._load_json(os.path.join(base, "locale", "en.json"))
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
-        keys = ["qa_tag_mix", "qa_stage_rounds", "qa_stage_ec",
-                "qa_stage_pa", "qa_stage_done"]
+        keys = ["qa_tag_mix", "qa_stage_rounds", "qa_stage_ec", "qa_stage_pa", "qa_stage_done"]
         for key in keys:
             self.assertIn(key, en, f"Missing in en.json: {key}")
             self.assertIn(key, ko, f"Missing in ko.json: {key}")
@@ -1577,13 +1704,16 @@ class TestTextCacheRoundTrip(unittest.TestCase):
     def test_cache_returns_same_surface(self):
         """동일 키에 대해 동일 객체 반환."""
         import sys
+
         sys.modules.setdefault("pygame", type(sys)("pygame"))
         from security.qkd_advanced import _TextCache
+
         cache = _TextCache(max_size=4)
 
         class FakeFont:
             def render(self, text, aa, color):
                 return (text, color)
+
         f = FakeFont()
         s1 = cache.render(f, "hello", (1, 2, 3))
         s2 = cache.render(f, "hello", (1, 2, 3))
@@ -1592,13 +1722,16 @@ class TestTextCacheRoundTrip(unittest.TestCase):
     def test_cache_evicts_when_full(self):
         """캐시가 꽉 차면 가장 오래된 항목 제거."""
         import sys
+
         sys.modules.setdefault("pygame", type(sys)("pygame"))
         from security.qkd_advanced import _TextCache
+
         cache = _TextCache(max_size=2)
 
         class FakeFont:
             def render(self, text, aa, color):
                 return (text, color)
+
         f = FakeFont()
         cache.render(f, "a", (0,))
         cache.render(f, "b", (0,))
@@ -1611,6 +1744,7 @@ class TestLocaleRound11Keys(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1620,9 +1754,18 @@ class TestLocaleRound11Keys(unittest.TestCase):
         en = self._load_json(os.path.join(base, "locale", "en.json"))
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         keys = [
-            "qa_sc_title", "qa_sc_space", "qa_sc_sift", "qa_sc_auto",
-            "qa_sc_eve", "qa_sc_pause", "qa_sc_reset", "qa_sc_tab",
-            "qa_sc_locale", "qa_sc_updown", "qa_sc_help", "qa_sc_shortcuts",
+            "qa_sc_title",
+            "qa_sc_space",
+            "qa_sc_sift",
+            "qa_sc_auto",
+            "qa_sc_eve",
+            "qa_sc_pause",
+            "qa_sc_reset",
+            "qa_sc_tab",
+            "qa_sc_locale",
+            "qa_sc_updown",
+            "qa_sc_help",
+            "qa_sc_shortcuts",
             "qa_sc_exit",
         ]
         for key in keys:
@@ -1654,8 +1797,11 @@ class TestBB84Pipeline(unittest.TestCase):
 
     def test_bb84_estimate_qber(self):
         from security.qkd_advanced_engine import (
-            BB84State, bb84_round, bb84_estimate_qber,
+            BB84State,
+            bb84_estimate_qber,
+            bb84_round,
         )
+
         state = BB84State()
         for _ in range(200):
             bb84_round(state, eve_chance=0.0)
@@ -1667,9 +1813,13 @@ class TestBB84Pipeline(unittest.TestCase):
 
     def test_bb84_full_pipeline(self):
         from security.qkd_advanced_engine import (
-            BB84State, bb84_round, bb84_estimate_qber,
-            bb84_error_correct, bb84_privacy_amplification,
+            BB84State,
+            bb84_error_correct,
+            bb84_estimate_qber,
+            bb84_privacy_amplification,
+            bb84_round,
         )
+
         state = BB84State()
         for _ in range(500):
             bb84_round(state, eve_chance=0.0)
@@ -1683,9 +1833,13 @@ class TestBB84Pipeline(unittest.TestCase):
     def test_bb84_pipeline_idempotent(self):
         """이미 완료된 단계 재호출 시 상태 변경 없음."""
         from security.qkd_advanced_engine import (
-            BB84State, bb84_round, bb84_estimate_qber,
-            bb84_error_correct, bb84_privacy_amplification,
+            BB84State,
+            bb84_error_correct,
+            bb84_estimate_qber,
+            bb84_privacy_amplification,
+            bb84_round,
         )
+
         state = BB84State()
         for _ in range(300):
             bb84_round(state, eve_chance=0.0)
@@ -1701,9 +1855,14 @@ class TestBB84Pipeline(unittest.TestCase):
 
     def test_bb84_reset_clears_pipeline(self):
         from security.qkd_advanced_engine import (
-            BB84State, bb84_round, bb84_estimate_qber,
-            bb84_error_correct, bb84_privacy_amplification, reset_bb84,
+            BB84State,
+            bb84_error_correct,
+            bb84_estimate_qber,
+            bb84_privacy_amplification,
+            bb84_round,
+            reset_bb84,
         )
+
         state = BB84State()
         for _ in range(300):
             bb84_round(state, eve_chance=0.0)
@@ -1719,6 +1878,7 @@ class TestBB84Pipeline(unittest.TestCase):
 
     def test_bb84_raw_key_tracks_bits(self):
         from security.qkd_advanced_engine import BB84State, bb84_round
+
         state = BB84State()
         for _ in range(100):
             bb84_round(state, eve_chance=0.0)
@@ -1730,9 +1890,9 @@ class TestStatsExport(unittest.TestCase):
 
     def test_export_creates_file(self):
         import json
-        import tempfile
-        from security.qkd_advanced_engine import E91State, GHZState, BB84State
+
         from security.qkd_advanced import _export_stats
+        from security.qkd_advanced_engine import BB84State, E91State, GHZState
 
         e91 = E91State()
         ghz = GHZState()
@@ -1744,10 +1904,8 @@ class TestStatsExport(unittest.TestCase):
 
         # exports 디렉토리에 파일이 생겼는지 확인
         import os
-        export_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "exports", "sessions"
-        )
+
+        export_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "exports", "sessions")
         files = [f for f in os.listdir(export_dir) if f.startswith("qkd_stats_")]
         self.assertGreater(len(files), 0)
 
@@ -1765,6 +1923,7 @@ class TestLocaleExportKey(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1781,6 +1940,7 @@ class TestRound13Features(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1790,8 +1950,11 @@ class TestRound13Features(unittest.TestCase):
         en = self._load_json(os.path.join(base, "locale", "en.json"))
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         keys = [
-            "qa_paused_banner", "qa_auto_speed", "qa_fps_counter",
-            "qa_sc_speed", "qa_sc_fps",
+            "qa_paused_banner",
+            "qa_auto_speed",
+            "qa_fps_counter",
+            "qa_sc_speed",
+            "qa_sc_fps",
         ]
         for key in keys:
             self.assertIn(key, en, f"Missing in en.json: {key}")
@@ -1813,10 +1976,8 @@ class TestRound13Features(unittest.TestCase):
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         en_keys = set(en.keys())
         ko_keys = set(ko.keys())
-        self.assertEqual(en_keys - ko_keys, set(),
-                         f"en에만 있는 키: {en_keys - ko_keys}")
-        self.assertEqual(ko_keys - en_keys, set(),
-                         f"ko에만 있는 키: {ko_keys - en_keys}")
+        self.assertEqual(en_keys - ko_keys, set(), f"en에만 있는 키: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(), f"ko에만 있는 키: {ko_keys - en_keys}")
 
 
 class TestRound14Features(unittest.TestCase):
@@ -1824,6 +1985,7 @@ class TestRound14Features(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1840,6 +2002,7 @@ class TestRound14Features(unittest.TestCase):
     def test_key_match_rate_after_pa(self):
         """PA 완료 후 key_match_rate 설정 확인."""
         from security.qkd_advanced_engine import E91State, e91_round, key_sift
+
         state = E91State()
         for _ in range(500):
             e91_round(state, eve_chance=0.0)
@@ -1849,7 +2012,8 @@ class TestRound14Features(unittest.TestCase):
 
     def test_entanglement_fidelity_calc(self):
         """상관값 기반 충실도 — 벨 검증 상관 데이터 존재."""
-        from security.qkd_advanced_engine import E91State, e91_round, compute_bell_S
+        from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round
+
         state = E91State()
         for _ in range(3000):
             e91_round(state, eve_chance=0.0)
@@ -1860,11 +2024,11 @@ class TestRound14Features(unittest.TestCase):
     def test_ghz_x_basis_parity(self):
         """GHZ X-기저 라운드에서 패리티 검사 데이터 존재."""
         from security.qkd_advanced_engine import GHZState, ghz_round
+
         state = GHZState()
         for _ in range(200):
             ghz_round(state, eve_chance=0.0)
-        x_rounds = [rd for rd in state.rounds
-                     if rd.all_same_basis and rd.bases[0] == "X"]
+        x_rounds = [rd for rd in state.rounds if rd.all_same_basis and rd.bases[0] == "X"]
         self.assertGreater(len(x_rounds), 0)
         for rd in x_rounds:
             parity = sum(rd.results) % 2
@@ -1872,7 +2036,8 @@ class TestRound14Features(unittest.TestCase):
 
     def test_fidelity_degrades_with_eve(self):
         """Eve 있으면 상관값(충실도) 약화."""
-        from security.qkd_advanced_engine import E91State, e91_round, compute_bell_S
+        from security.qkd_advanced_engine import E91State, compute_bell_S, e91_round
+
         clean = E91State()
         noisy = E91State()
         for _ in range(2000):
@@ -1889,6 +2054,7 @@ class TestRound15Features(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1898,10 +2064,17 @@ class TestRound15Features(unittest.TestCase):
         en = self._load_json(os.path.join(base, "locale", "en.json"))
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         keys = [
-            "qa_toast_bell", "qa_toast_pa", "qa_toast_eve",
-            "qa_toast_winner_e91", "qa_toast_winner_tie",
-            "qa_summary_title", "qa_summary_rounds", "qa_summary_keybits",
-            "qa_summary_bells", "qa_summary_qber", "qa_summary_exit",
+            "qa_toast_bell",
+            "qa_toast_pa",
+            "qa_toast_eve",
+            "qa_toast_winner_e91",
+            "qa_toast_winner_tie",
+            "qa_summary_title",
+            "qa_summary_rounds",
+            "qa_summary_keybits",
+            "qa_summary_bells",
+            "qa_summary_qber",
+            "qa_summary_exit",
         ]
         for key in keys:
             self.assertIn(key, en, f"Missing in en.json: {key}")
@@ -1910,6 +2083,7 @@ class TestRound15Features(unittest.TestCase):
     def test_key_accumulation_history(self):
         """누적 키 생성 히스토리가 기록됨."""
         from security.qkd_advanced_engine import E91State, e91_round
+
         state = E91State()
         for _ in range(500):
             e91_round(state, eve_chance=0.0)
@@ -1922,6 +2096,7 @@ class TestRound15Features(unittest.TestCase):
     def test_key_accumulation_cleared_on_reset(self):
         """리셋 시 히스토리 클리어."""
         from security.qkd_advanced_engine import E91State, e91_round, reset_e91
+
         state = E91State()
         for _ in range(100):
             e91_round(state, eve_chance=0.0)
@@ -1936,10 +2111,8 @@ class TestRound15Features(unittest.TestCase):
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         en_keys = set(en.keys())
         ko_keys = set(ko.keys())
-        self.assertEqual(en_keys - ko_keys, set(),
-                         f"en에만: {en_keys - ko_keys}")
-        self.assertEqual(ko_keys - en_keys, set(),
-                         f"ko에만: {ko_keys - en_keys}")
+        self.assertEqual(en_keys - ko_keys, set(), f"en에만: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(), f"ko에만: {ko_keys - en_keys}")
 
 
 class TestRound16Features(unittest.TestCase):
@@ -1947,6 +2120,7 @@ class TestRound16Features(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -1956,8 +2130,10 @@ class TestRound16Features(unittest.TestCase):
         en = self._load_json(os.path.join(base, "locale", "en.json"))
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         keys = [
-            "qa_sc_theme", "qa_sc_noise",
-            "qa_noise_model", "qa_noise_label",
+            "qa_sc_theme",
+            "qa_sc_noise",
+            "qa_noise_model",
+            "qa_noise_label",
         ]
         for key in keys:
             self.assertIn(key, en, f"Missing in en.json: {key}")
@@ -1966,14 +2142,18 @@ class TestRound16Features(unittest.TestCase):
     def test_noise_model_default(self):
         """기본 노이즈 모델은 depolarizing."""
         from security.qkd_advanced_engine import get_noise_model, set_noise_model
+
         set_noise_model("depolarizing")  # ensure default
         self.assertEqual(get_noise_model(), "depolarizing")
 
     def test_noise_model_cycle(self):
         """노이즈 모델 순환."""
         from security.qkd_advanced_engine import (
-            NOISE_MODELS, cycle_noise_model, get_noise_model, set_noise_model,
+            cycle_noise_model,
+            get_noise_model,
+            set_noise_model,
         )
+
         set_noise_model("depolarizing")
         result = cycle_noise_model()
         self.assertEqual(result, "dephasing")
@@ -1986,6 +2166,7 @@ class TestRound16Features(unittest.TestCase):
     def test_noise_model_set_invalid(self):
         """잘못된 모델은 무시."""
         from security.qkd_advanced_engine import get_noise_model, set_noise_model
+
         set_noise_model("depolarizing")
         set_noise_model("nonexistent")
         self.assertEqual(get_noise_model(), "depolarizing")
@@ -1993,6 +2174,7 @@ class TestRound16Features(unittest.TestCase):
     def test_noise_models_list(self):
         """3개 노이즈 모델이 정의됨."""
         from security.qkd_advanced_engine import NOISE_MODELS
+
         self.assertEqual(len(NOISE_MODELS), 3)
         self.assertIn("depolarizing", NOISE_MODELS)
         self.assertIn("dephasing", NOISE_MODELS)
@@ -2001,8 +2183,12 @@ class TestRound16Features(unittest.TestCase):
     def test_depolarizing_noise_with_eve(self):
         """Depolarizing 노이즈에서 Eve 시 Bell S 감소."""
         from security.qkd_advanced_engine import (
-            E91State, compute_bell_S, e91_round, set_noise_model,
+            E91State,
+            compute_bell_S,
+            e91_round,
+            set_noise_model,
         )
+
         set_noise_model("depolarizing")
         state = E91State()
         for _ in range(3000):
@@ -2014,8 +2200,12 @@ class TestRound16Features(unittest.TestCase):
     def test_dephasing_noise_with_eve(self):
         """Dephasing 노이즈에서 Eve 시 상관관계 변화."""
         from security.qkd_advanced_engine import (
-            E91State, compute_bell_S, e91_round, set_noise_model,
+            E91State,
+            compute_bell_S,
+            e91_round,
+            set_noise_model,
         )
+
         set_noise_model("dephasing")
         state = E91State()
         for _ in range(3000):
@@ -2028,8 +2218,11 @@ class TestRound16Features(unittest.TestCase):
     def test_amplitude_damping_noise_with_eve(self):
         """Amplitude damping 노이즈에서 Eve 시 비대칭 효과."""
         from security.qkd_advanced_engine import (
-            E91State, e91_round, set_noise_model,
+            E91State,
+            e91_round,
+            set_noise_model,
         )
+
         set_noise_model("amplitude_damping")
         state = E91State()
         for _ in range(2000):
@@ -2041,8 +2234,11 @@ class TestRound16Features(unittest.TestCase):
     def test_ghz_noise_model_dephasing(self):
         """GHZ에서 dephasing 노이즈 모델 적용."""
         from security.qkd_advanced_engine import (
-            GHZState, ghz_round, set_noise_model,
+            GHZState,
+            ghz_round,
+            set_noise_model,
         )
+
         set_noise_model("dephasing")
         state = GHZState()
         for _ in range(500):
@@ -2053,8 +2249,11 @@ class TestRound16Features(unittest.TestCase):
     def test_ghz_noise_model_amplitude_damping(self):
         """GHZ에서 amplitude_damping 모델 적용."""
         from security.qkd_advanced_engine import (
-            GHZState, ghz_round, set_noise_model,
+            GHZState,
+            ghz_round,
+            set_noise_model,
         )
+
         set_noise_model("amplitude_damping")
         state = GHZState()
         for _ in range(500):
@@ -2069,10 +2268,8 @@ class TestRound16Features(unittest.TestCase):
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         en_keys = set(en.keys())
         ko_keys = set(ko.keys())
-        self.assertEqual(en_keys - ko_keys, set(),
-                         f"en에만: {en_keys - ko_keys}")
-        self.assertEqual(ko_keys - en_keys, set(),
-                         f"ko에만: {ko_keys - en_keys}")
+        self.assertEqual(en_keys - ko_keys, set(), f"en에만: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(), f"ko에만: {ko_keys - en_keys}")
 
 
 class TestRound17Features(unittest.TestCase):
@@ -2080,6 +2277,7 @@ class TestRound17Features(unittest.TestCase):
 
     def _load_json(self, path):
         import json
+
         with open(path) as f:
             return json.load(f)
 
@@ -2089,14 +2287,23 @@ class TestRound17Features(unittest.TestCase):
         en = self._load_json(os.path.join(base, "locale", "en.json"))
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         keys = [
-            "qa_witness_title", "qa_witness_entangled",
-            "qa_witness_border", "qa_witness_separable",
-            "qa_error_heatmap", "qa_error_legend",
-            "qa_screenshot", "qa_sc_screenshot",
-            "qa_sc_step", "qa_step_on", "qa_step_off",
+            "qa_witness_title",
+            "qa_witness_entangled",
+            "qa_witness_border",
+            "qa_witness_separable",
+            "qa_error_heatmap",
+            "qa_error_legend",
+            "qa_screenshot",
+            "qa_sc_screenshot",
+            "qa_sc_step",
+            "qa_step_on",
+            "qa_step_off",
             "qa_step_active",
-            "qa_step_first_key", "qa_step_bell_violated",
-            "qa_step_qber_done", "qa_step_ec_done", "qa_step_pa_done",
+            "qa_step_first_key",
+            "qa_step_bell_violated",
+            "qa_step_qber_done",
+            "qa_step_ec_done",
+            "qa_step_pa_done",
         ]
         for key in keys:
             self.assertIn(key, en, f"Missing in en.json: {key}")
@@ -2105,8 +2312,12 @@ class TestRound17Features(unittest.TestCase):
     def test_witness_computed_no_eve(self):
         """Eve 없을 때 witness > 0.5 (얽힘 확인)."""
         from security.qkd_advanced_engine import (
-            E91State, compute_bell_S, e91_round, set_noise_model,
+            E91State,
+            compute_bell_S,
+            e91_round,
+            set_noise_model,
         )
+
         set_noise_model("depolarizing")
         state = E91State()
         for _ in range(2000):
@@ -2118,8 +2329,12 @@ class TestRound17Features(unittest.TestCase):
     def test_witness_degrades_with_eve(self):
         """Eve가 강하면 witness 값 하락."""
         from security.qkd_advanced_engine import (
-            E91State, compute_bell_S, e91_round, set_noise_model,
+            E91State,
+            compute_bell_S,
+            e91_round,
+            set_noise_model,
         )
+
         set_noise_model("depolarizing")
         state = E91State()
         for _ in range(3000):
@@ -2131,8 +2346,12 @@ class TestRound17Features(unittest.TestCase):
     def test_witness_reset(self):
         """리셋 시 witness 클리어."""
         from security.qkd_advanced_engine import (
-            E91State, compute_bell_S, e91_round, reset_e91,
+            E91State,
+            compute_bell_S,
+            e91_round,
+            reset_e91,
         )
+
         state = E91State()
         for _ in range(200):
             e91_round(state, eve_chance=0.0)
@@ -2145,8 +2364,12 @@ class TestRound17Features(unittest.TestCase):
     def test_error_positions_tracked(self):
         """에러 정정에서 에러 위치가 기록됨."""
         from security.qkd_advanced_engine import (
-            E91State, e91_round, estimate_qber, error_correct,
+            E91State,
+            e91_round,
+            error_correct,
+            estimate_qber,
         )
+
         state = E91State()
         for _ in range(2000):
             e91_round(state, eve_chance=0.5)
@@ -2161,8 +2384,12 @@ class TestRound17Features(unittest.TestCase):
     def test_error_positions_empty_no_eve(self):
         """Eve 없이 에러 위치 빈 리스트 또는 매우 적음."""
         from security.qkd_advanced_engine import (
-            E91State, e91_round, estimate_qber, error_correct,
+            E91State,
+            e91_round,
+            error_correct,
+            estimate_qber,
         )
+
         state = E91State()
         for _ in range(1000):
             e91_round(state, eve_chance=0.0)
@@ -2174,8 +2401,13 @@ class TestRound17Features(unittest.TestCase):
     def test_error_positions_reset(self):
         """리셋 시 에러 위치 클리어."""
         from security.qkd_advanced_engine import (
-            E91State, e91_round, estimate_qber, error_correct, reset_e91,
+            E91State,
+            e91_round,
+            error_correct,
+            estimate_qber,
+            reset_e91,
         )
+
         state = E91State()
         for _ in range(500):
             e91_round(state, eve_chance=0.5)
@@ -2191,10 +2423,8 @@ class TestRound17Features(unittest.TestCase):
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         en_keys = set(en.keys())
         ko_keys = set(ko.keys())
-        self.assertEqual(en_keys - ko_keys, set(),
-                         f"en에만: {en_keys - ko_keys}")
-        self.assertEqual(ko_keys - en_keys, set(),
-                         f"ko에만: {ko_keys - en_keys}")
+        self.assertEqual(en_keys - ko_keys, set(), f"en에만: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(), f"ko에만: {ko_keys - en_keys}")
 
 
 class TestRound18Features(unittest.TestCase):
@@ -2203,6 +2433,7 @@ class TestRound18Features(unittest.TestCase):
     @staticmethod
     def _load_json(path):
         import json as _json
+
         with open(path, encoding="utf-8") as f:
             return _json.load(f)
 
@@ -2212,11 +2443,19 @@ class TestRound18Features(unittest.TestCase):
         en = self._load_json(os.path.join(base, "locale", "en.json"))
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         r18_keys = [
-            "qa_channel_cap", "qa_secure_rate", "qa_bloch_title",
-            "qa_entropy_title", "qa_entropy_raw", "qa_entropy_eve",
-            "qa_entropy_final", "qa_entropy_pending",
-            "qa_agreement_title", "qa_bench_title", "qa_bench_done",
-            "qa_bench_close", "qa_sc_bench",
+            "qa_channel_cap",
+            "qa_secure_rate",
+            "qa_bloch_title",
+            "qa_entropy_title",
+            "qa_entropy_raw",
+            "qa_entropy_eve",
+            "qa_entropy_final",
+            "qa_entropy_pending",
+            "qa_agreement_title",
+            "qa_bench_title",
+            "qa_bench_done",
+            "qa_bench_close",
+            "qa_sc_bench",
         ]
         for key in r18_keys:
             self.assertIn(key, en, f"en missing {key}")
@@ -2225,8 +2464,11 @@ class TestRound18Features(unittest.TestCase):
     def test_channel_capacity_no_eve(self):
         """Eve 없이 채널 용량 계산 — I(A;B) 높고, I(E;B) 낮아야."""
         from security.qkd_advanced_engine import (
-            E91State, e91_round, compute_bell_S,
+            E91State,
+            compute_bell_S,
+            e91_round,
         )
+
         state = E91State()
         for _ in range(500):
             e91_round(state, eve_chance=0.0)
@@ -2239,8 +2481,11 @@ class TestRound18Features(unittest.TestCase):
     def test_channel_capacity_with_eve(self):
         """Eve 있으면 채널 용량 감소."""
         from security.qkd_advanced_engine import (
-            E91State, e91_round, compute_bell_S,
+            E91State,
+            compute_bell_S,
+            e91_round,
         )
+
         state = E91State()
         for _ in range(500):
             e91_round(state, eve_chance=1.0)
@@ -2251,8 +2496,11 @@ class TestRound18Features(unittest.TestCase):
     def test_channel_history_recorded(self):
         """채널 히스토리가 20 라운드마다 기록."""
         from security.qkd_advanced_engine import (
-            E91State, e91_round, compute_bell_S,
+            E91State,
+            compute_bell_S,
+            e91_round,
         )
+
         state = E91State()
         for _ in range(100):
             e91_round(state, eve_chance=0.0)
@@ -2265,8 +2513,11 @@ class TestRound18Features(unittest.TestCase):
     def test_agreement_history_recorded(self):
         """키 합의율 히스토리가 기록."""
         from security.qkd_advanced_engine import (
-            E91State, e91_round, compute_bell_S,
+            E91State,
+            compute_bell_S,
+            e91_round,
         )
+
         state = E91State()
         for _ in range(200):
             e91_round(state, eve_chance=0.0)
@@ -2282,6 +2533,7 @@ class TestRound18Features(unittest.TestCase):
     def test_binary_entropy_function(self):
         """이진 엔트로피 함수 검증."""
         from security.qkd_advanced_engine import _binary_entropy
+
         # h(0) = 0, h(1) = 0
         self.assertAlmostEqual(_binary_entropy(0.0), 0.0)
         self.assertAlmostEqual(_binary_entropy(1.0), 0.0)
@@ -2295,8 +2547,12 @@ class TestRound18Features(unittest.TestCase):
     def test_channel_capacity_reset(self):
         """리셋 시 채널 용량 필드 클리어."""
         from security.qkd_advanced_engine import (
-            E91State, e91_round, compute_bell_S, reset_e91,
+            E91State,
+            compute_bell_S,
+            e91_round,
+            reset_e91,
         )
+
         state = E91State()
         for _ in range(100):
             e91_round(state, eve_chance=0.0)
@@ -2311,8 +2567,10 @@ class TestRound18Features(unittest.TestCase):
     def test_benchmark_runs(self):
         """벤치마크 함수가 올바른 결과 반환."""
         import sys
+
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         from security.qkd_advanced import _run_benchmark
+
         results = _run_benchmark()
         self.assertEqual(len(results), 4)  # 4 Eve levels
         for r in results:
@@ -2331,10 +2589,8 @@ class TestRound18Features(unittest.TestCase):
         ko = self._load_json(os.path.join(base, "locale", "ko.json"))
         en_keys = set(en.keys())
         ko_keys = set(ko.keys())
-        self.assertEqual(en_keys - ko_keys, set(),
-                         f"en에만: {en_keys - ko_keys}")
-        self.assertEqual(ko_keys - en_keys, set(),
-                         f"ko에만: {ko_keys - en_keys}")
+        self.assertEqual(en_keys - ko_keys, set(), f"en에만: {en_keys - ko_keys}")
+        self.assertEqual(ko_keys - en_keys, set(), f"ko에만: {ko_keys - en_keys}")
 
 
 if __name__ == "__main__":

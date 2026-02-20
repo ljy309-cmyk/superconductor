@@ -115,7 +115,7 @@ class TestIVCurve(unittest.TestCase):
     def test_formula(self):
         """V = Rn × √(I² - Ic²) 공식 확인."""
         bias, ic, rn = 2.0, 1.0, 1.0
-        expected = rn * math.sqrt(bias ** 2 - ic ** 2)
+        expected = rn * math.sqrt(bias**2 - ic**2)
         self.assertAlmostEqual(iv_curve_point(bias, ic, rn), expected)
 
     def test_symmetric(self):

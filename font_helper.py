@@ -14,18 +14,18 @@ import pygame
 
 # 한글을 지원하는 폰트 후보 목록 (우선순위순)
 _CANDIDATE_FONTS: list[str] = [
-    "NanumGothicCoding",       # 한글 코딩 전용 (Linux/Mac)
-    "NanumGothic",             # 나눔고딕 (Linux/Mac)
-    "Malgun Gothic",           # 맑은 고딕 (Windows)
+    "NanumGothicCoding",  # 한글 코딩 전용 (Linux/Mac)
+    "NanumGothic",  # 나눔고딕 (Linux/Mac)
+    "Malgun Gothic",  # 맑은 고딕 (Windows)
     "MalgunGothic",
-    "Noto Sans CJK KR",       # Noto CJK (Linux)
+    "Noto Sans CJK KR",  # Noto CJK (Linux)
     "Noto Sans KR",
     "WenQuanYi Zen Hei Mono",  # CJK 모노 (Linux 기본)
     "WenQuanYi Zen Hei",
-    "UnDotum",                 # 은돋움 (Linux)
-    "AppleGothic",             # macOS
-    "Apple SD Gothic Neo",     # macOS
-    "Gulim",                   # 굴림 (Windows)
+    "UnDotum",  # 은돋움 (Linux)
+    "AppleGothic",  # macOS
+    "Apple SD Gothic Neo",  # macOS
+    "Gulim",  # 굴림 (Windows)
 ]
 
 _resolved_family: str | None = None

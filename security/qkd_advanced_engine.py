@@ -36,6 +36,7 @@ except ImportError:
     def shared_key_available() -> int:  # noqa: E306
         return 0
 
+
 # ── E91 설정 ──────────────────────────────────────────
 E91_ALICE_BASES = [0.0, math.pi / 8, math.pi / 4]  # a1=0, a2=π/8, a3=π/4
 E91_BOB_BASES = [math.pi / 8, math.pi / 4, 3 * math.pi / 8]  # b1=π/8, b2=π/4, b3=3π/8
@@ -80,14 +81,15 @@ def _qrng_randint(lo: int, hi: int) -> int:
 @dataclass
 class E91Round:
     """E91 프로토콜 1 라운드 결과."""
+
     round_id: int
     alice_basis_idx: int
     bob_basis_idx: int
     alice_angle: float
     bob_angle: float
     alice_result: int  # +1 or -1
-    bob_result: int    # +1 or -1
-    same_basis: bool   # 키 생성에 사용
+    bob_result: int  # +1 or -1
+    same_basis: bool  # 키 생성에 사용
     eve_present: bool  # Eve 도청 여부
     key_bit: int | None = None  # 키 비트 (같은 기저일 때만)
 
@@ -95,6 +97,7 @@ class E91Round:
 @dataclass
 class E91State:
     """E91 프로토콜 전체 상태."""
+
     rounds: list[E91Round] = field(default_factory=list)
     raw_key_alice: list[int] = field(default_factory=list)
     raw_key_bob: list[int] = field(default_factory=list)
@@ -117,19 +120,19 @@ class E91State:
 
     # ── QKD 후처리 파이프라인 상태 ──
     # Stage 1: QBER 추정 (원시 키의 일부를 샘플링하여 에러율 추정)
-    qber_sample_size: int = 0        # 샘플링한 비트 수
-    qber_value: float = 0.0          # 추정된 QBER
+    qber_sample_size: int = 0  # 샘플링한 비트 수
+    qber_value: float = 0.0  # 추정된 QBER
     qber_done: bool = False
 
     # Stage 2: 에러 정정 (블록 패리티 기반)
     corrected_key: list[int] = field(default_factory=list)
     bob_remaining: list[int] = field(default_factory=list)  # Bob 측 남은 키 (에러 정정용)
     correction_done: bool = False
-    correction_flips: int = 0        # 정정된 비트 수
+    correction_flips: int = 0  # 정정된 비트 수
     error_positions: list[int] = field(default_factory=list)  # EC에서 플립된 비트 위치
 
     # Stage 3: 프라이버시 증폭
-    sifted_key: list[int] = field(default_factory=list)   # 최종 시프트 키 (호환용)
+    sifted_key: list[int] = field(default_factory=list)  # 최종 시프트 키 (호환용)
     sift_done: bool = False
     pa_done: bool = False
     error_rate: float = 0.0
@@ -171,8 +174,7 @@ def cycle_noise_model() -> str:
     return _noise_model
 
 
-def _measure_entangled(angle_a: float, angle_b: float,
-                       eve_present: bool = False) -> tuple[int, int]:
+def _measure_entangled(angle_a: float, angle_b: float, eve_present: bool = False) -> tuple[int, int]:
     """얽힘 쌍의 측정 시뮬레이션 (광자 편광 모델).
 
     |Φ+⟩ 상태에서 편광 각도 a, b로 측정 시:
@@ -297,6 +299,7 @@ def compute_bell_S(state: E91State) -> float:
     CHSH 쌍: (a1,b1)=(0,0), (a1,b3)=(0,2), (a3,b1)=(2,0), (a3,b3)=(2,2)
     양자 이론: S = 2√2 ≈ 2.828 (광자 편광 모델)
     """
+
     def _avg(pair):
         data = state.correlators.get(pair, [])
         if not data:
@@ -323,7 +326,7 @@ def compute_bell_S(state: E91State) -> float:
     # 얽힘 증인 (Entanglement Witness) 계산
     # W = (1 + max|E(a,b)|) / 2 — W > 0.5 → 얽힘 상태
     corr_avgs = []
-    for pair, vals in state.correlators.items():
+    for _pair, vals in state.correlators.items():
         if vals:
             corr_avgs.append(abs(sum(vals) / len(vals)))
     max_corr = max(corr_avgs) if corr_avgs else 0.0
@@ -361,8 +364,7 @@ def _compute_channel_capacity(state: E91State):
 
     # 히스토리 기록 (20 라운드마다)
     if state.total_rounds % 20 == 0 and state.total_rounds > 0:
-        state.channel_history.append(
-            (state.total_rounds, state.mutual_info, state.eve_info))
+        state.channel_history.append((state.total_rounds, state.mutual_info, state.eve_info))
         if len(state.channel_history) > 200:
             state.channel_history.pop(0)
 
@@ -422,10 +424,7 @@ def estimate_qber(state: E91State) -> float:
     remaining_indices = [i for i in range(n) if i not in sample_indices]
 
     # 샘플 비교 → QBER 추정
-    errors = sum(
-        1 for i in sample_indices
-        if state.raw_key_alice[i] != state.raw_key_bob[i]
-    )
+    errors = sum(1 for i in sample_indices if state.raw_key_alice[i] != state.raw_key_bob[i])
     state.qber_sample_size = sample_n
     state.qber_value = errors / sample_n if sample_n > 0 else 0.0
     state.qber_done = True
@@ -513,8 +512,7 @@ def key_sift(state: E91State) -> list[int]:
     return state.corrected_key
 
 
-def _toeplitz_hash(key_bits: list[int], output_len: int,
-                   seed: list[int] | None = None) -> tuple[list[int], list[int]]:
+def _toeplitz_hash(key_bits: list[int], output_len: int, seed: list[int] | None = None) -> tuple[list[int], list[int]]:
     """Toeplitz 범용 해시 (2-universal hash family).
 
     Toeplitz 행렬은 대각선이 일정한 행렬로, 첫 행과 첫 열만으로
@@ -588,8 +586,7 @@ def privacy_amplification(state: E91State) -> str:
     hex_chars = []
     padded = hashed_bits + [0] * ((4 - len(hashed_bits) % 4) % 4)
     for i in range(0, len(padded), 4):
-        nibble = (padded[i] << 3 | padded[i + 1] << 2 |
-                  padded[i + 2] << 1 | padded[i + 3])
+        nibble = padded[i] << 3 | padded[i + 1] << 2 | padded[i + 2] << 1 | padded[i + 3]
         hex_chars.append(f"{nibble:x}")
     final = "".join(hex_chars)
 
@@ -646,17 +643,19 @@ def xor_decrypt(ciphertext_hex: str, key_hex: str) -> str:
 @dataclass
 class GHZRound:
     """GHZ N자간 QKD 1 라운드."""
+
     round_id: int
-    bases: list[str]       # 각 파티의 기저 ("X" 또는 "Z")
-    results: list[int]     # 각 파티의 측정 결과 (0 or 1)
-    all_same_basis: bool   # 모든 파티가 같은 기저
-    key_bit: int | None    # 키 비트 (Z 기저 일치 시)
+    bases: list[str]  # 각 파티의 기저 ("X" 또는 "Z")
+    results: list[int]  # 각 파티의 측정 결과 (0 or 1)
+    all_same_basis: bool  # 모든 파티가 같은 기저
+    key_bit: int | None  # 키 비트 (Z 기저 일치 시)
     eve_present: bool
 
 
 @dataclass
 class GHZState:
     """GHZ 다자간 QKD 상태."""
+
     n_parties: int = GHZ_PARTIES
     party_names: list[str] = field(default_factory=lambda: list(_GHZ_PARTY_NAMES[:GHZ_PARTIES]))
     rounds: list[GHZRound] = field(default_factory=list)
@@ -829,8 +828,7 @@ def ghz_privacy_amplification(state: GHZState) -> str:
     hex_chars = []
     padded = hashed_bits + [0] * ((4 - len(hashed_bits) % 4) % 4)
     for i in range(0, len(padded), 4):
-        nibble = (padded[i] << 3 | padded[i + 1] << 2 |
-                  padded[i + 2] << 1 | padded[i + 3])
+        nibble = padded[i] << 3 | padded[i + 1] << 2 | padded[i + 2] << 1 | padded[i + 3]
         hex_chars.append(f"{nibble:x}")
     final = "".join(hex_chars)
 
@@ -851,6 +849,7 @@ BB84_BASES = ["+", "×"]
 @dataclass
 class BB84State:
     """BB84 프로토콜 상태 (비교 모드용)."""
+
     total_rounds: int = 0
     basis_match_rounds: int = 0
     error_count: int = 0
@@ -969,8 +968,7 @@ def bb84_privacy_amplification(state: BB84State):
     hex_chars = []
     padded = hashed_bits + [0] * ((4 - len(hashed_bits) % 4) % 4)
     for i in range(0, len(padded), 4):
-        nibble = (padded[i] << 3 | padded[i + 1] << 2 |
-                  padded[i + 2] << 1 | padded[i + 3])
+        nibble = padded[i] << 3 | padded[i + 1] << 2 | padded[i + 2] << 1 | padded[i + 3]
         hex_chars.append(f"{nibble:x}")
     state.final_key = "".join(hex_chars)
     state.pa_done = True

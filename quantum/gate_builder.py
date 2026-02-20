@@ -7,7 +7,6 @@
   - 측정 히스토그램
 """
 
-import math
 import time
 
 import pygame
@@ -22,12 +21,10 @@ from quantum.gate_builder_engine import (
     ALL_GATES,
     GATE_INFO,
     MAX_GATES,
-    SINGLE_GATES,
     QuantumCircuit,
 )
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
-from sim_speed import speed_label
 from sound_manager import get_sound_manager
 from theme import get_pg_theme as _get_pg_theme_init
 from theme import load_pg_colors, on_theme_change
@@ -62,8 +59,12 @@ BLOCH_XY = (137, 180, 250)
 MEASURE_COLOR = (243, 139, 168)
 
 _COLOR_MAP = {
-    "BG": "BG", "TEXT_CLR": "TEXT", "SUBTEXT_CLR": "SUBTEXT",
-    "SC_COLOR": "SC_COLOR", "SC_GLOW": "SC_GLOW", "WHITE": "WHITE",
+    "BG": "BG",
+    "TEXT_CLR": "TEXT",
+    "SUBTEXT_CLR": "SUBTEXT",
+    "SC_COLOR": "SC_COLOR",
+    "SC_GLOW": "SC_GLOW",
+    "WHITE": "WHITE",
 }
 
 
@@ -193,10 +194,12 @@ def run_simulation():
                 break
 
         # 리플레이 기록
-        recorder.record_frame({
-            "gates": len(qc.gates),
-            "probs": [round(p, 3) for p in qc.probabilities()],
-        })
+        recorder.record_frame(
+            {
+                "gates": len(qc.gates),
+                "probs": [round(p, 3) for p in qc.probabilities()],
+            }
+        )
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -271,9 +274,7 @@ def run_simulation():
             screen.blit(surf, (12, HEIGHT - 36 + i * 16))
 
         # 게이트 수 표시
-        count_text = small_font.render(
-            t("gb_gate_count", count=len(qc.gates), max=MAX_GATES), True, TEXT_CLR
-        )
+        count_text = small_font.render(t("gb_gate_count", count=len(qc.gates), max=MAX_GATES), True, TEXT_CLR)
         screen.blit(count_text, (CIRCUIT_X, CIRCUIT_Y + qc.num_qubits * WIRE_SPACING + 10))
 
         help_overlay.draw(screen, font)

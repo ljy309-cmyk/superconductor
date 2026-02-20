@@ -1,9 +1,8 @@
 """ranking_server 단위 테스트 — rate-limit 정리 로직 및 기본 동작."""
 
-import sys
 import os
+import sys
 import time
-from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "data_ai"))
@@ -13,7 +12,8 @@ class TestCheckRateLimit:
     """_check_rate_limit 함수 테스트."""
 
     def _import_module(self):
-        from data_ai.ranking_server import _check_rate_limit, _rate_limit_map, _rate_limit_lock
+        from data_ai.ranking_server import _check_rate_limit, _rate_limit_lock, _rate_limit_map
+
         return _check_rate_limit, _rate_limit_map, _rate_limit_lock
 
     def _clear_map(self):
@@ -91,14 +91,17 @@ class TestSanitizeStr:
 
     def test_normal_string(self):
         from data_ai.ranking_server import _sanitize_str
+
         assert _sanitize_str("hello") == "hello"
 
     def test_max_length(self):
         from data_ai.ranking_server import _sanitize_str
+
         result = _sanitize_str("a" * 100, max_len=10)
         assert len(result) == 10
 
     def test_control_chars_removed(self):
         from data_ai.ranking_server import _sanitize_str
+
         result = _sanitize_str("hello\x00world\x01")
         assert result == "helloworld"

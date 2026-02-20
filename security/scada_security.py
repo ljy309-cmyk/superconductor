@@ -101,8 +101,8 @@ STATS_X, STATS_Y = 40, 470
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
 
-def _draw_node(screen, pos, label, sublabel, color, font, big_font, radius=30,
-               glow_color=None, glow_radius=0):
+
+def _draw_node(screen, pos, label, sublabel, color, font, big_font, radius=30, glow_color=None, glow_radius=0):
     """네트워크 노드 그리기."""
     if glow_color and glow_radius > 0:
         glow = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
@@ -152,58 +152,60 @@ def _draw_network(screen, gs: ScadaSecurityState, anim_t, font, big_font):
         # 깜빡이는 효과
         link_color = RED if int(anim_t * 4) % 2 == 0 else YELLOW
 
-    _draw_network_link(screen, (SENSOR_POS[0] + 35, SENSOR_POS[1]),
-                       (CTRL_POS[0] - 35, CTRL_POS[1]), link_color)
-    _draw_network_link(screen, (CTRL_POS[0] + 35, CTRL_POS[1]),
-                       (HMI_POS[0] - 35, HMI_POS[1]),
-                       GREEN if gs.phase == PHASE_PROTECTED else OVERLAY)
+    _draw_network_link(screen, (SENSOR_POS[0] + 35, SENSOR_POS[1]), (CTRL_POS[0] - 35, CTRL_POS[1]), link_color)
+    _draw_network_link(
+        screen,
+        (CTRL_POS[0] + 35, CTRL_POS[1]),
+        (HMI_POS[0] - 35, HMI_POS[1]),
+        GREEN if gs.phase == PHASE_PROTECTED else OVERLAY,
+    )
 
     # QKD 인증 채널 (보호 모드)
     if gs.phase == PHASE_PROTECTED or gs.qkd.authenticated:
         wave_offset = math.sin(anim_t * 4) * 3
         mid_y = SENSOR_POS[1] + 45
-        _draw_network_link(screen,
-                           (SENSOR_POS[0] + 20, mid_y + wave_offset),
-                           (CTRL_POS[0] - 20, mid_y - wave_offset),
-                           MAUVE, 2)
+        _draw_network_link(
+            screen, (SENSOR_POS[0] + 20, mid_y + wave_offset), (CTRL_POS[0] - 20, mid_y - wave_offset), MAUVE, 2
+        )
         qlbl = font.render("QKD Auth", True, MAUVE)
-        screen.blit(qlbl, ((SENSOR_POS[0] + CTRL_POS[0]) // 2 - qlbl.get_width() // 2,
-                           mid_y + 8))
+        screen.blit(qlbl, ((SENSOR_POS[0] + CTRL_POS[0]) // 2 - qlbl.get_width() // 2, mid_y + 8))
 
     # Eve 연결선 (공격 시)
     if gs.attack_active:
         eve_alpha = min(255, int(gs.attack_intensity * 255))
         eve_color = (*RED[:3], eve_alpha) if eve_alpha < 255 else RED
         mid_x = (SENSOR_POS[0] + CTRL_POS[0]) // 2
-        _draw_network_link(screen, EVE_POS,
-                           (mid_x, SENSOR_POS[1] - 5),
-                           eve_color, 1, dashed=True)
+        _draw_network_link(screen, EVE_POS, (mid_x, SENSOR_POS[1] - 5), eve_color, 1, dashed=True)
 
     # 노드 그리기
     sensor_glow = RED if gs.attack_active and gs.attack_intensity > 0.5 else None
-    _draw_node(screen, SENSOR_POS, t("ss_sensor"), t("ss_temp_sensor"),
-               BLUE, font, big_font, glow_color=sensor_glow,
-               glow_radius=40 if sensor_glow else 0)
+    _draw_node(
+        screen,
+        SENSOR_POS,
+        t("ss_sensor"),
+        t("ss_temp_sensor"),
+        BLUE,
+        font,
+        big_font,
+        glow_color=sensor_glow,
+        glow_radius=40 if sensor_glow else 0,
+    )
 
     ctrl_color = GREEN if gs.phase == PHASE_PROTECTED else BLUE
-    _draw_node(screen, CTRL_POS, t("ss_controller"), "PLC/RTU",
-               ctrl_color, font, big_font)
+    _draw_node(screen, CTRL_POS, t("ss_controller"), "PLC/RTU", ctrl_color, font, big_font)
 
-    _draw_node(screen, HMI_POS, "HMI", t("ss_operator"),
-               BLUE, font, big_font)
+    _draw_node(screen, HMI_POS, "HMI", t("ss_operator"), BLUE, font, big_font)
 
     # Eve 노드
     if gs.attack_active or gs.attack_intensity > 0.01:
         eve_glow = int(40 + 20 * math.sin(anim_t * 8))
         glow_s = pygame.Surface((eve_glow * 2, eve_glow * 2), pygame.SRCALPHA)
-        pygame.draw.circle(glow_s, (*RED, int(100 * gs.attack_intensity)),
-                           (eve_glow, eve_glow), eve_glow)
+        pygame.draw.circle(glow_s, (*RED, int(100 * gs.attack_intensity)), (eve_glow, eve_glow), eve_glow)
         screen.blit(glow_s, (EVE_POS[0] - eve_glow, EVE_POS[1] - eve_glow))
 
     eve_alpha = 255 if gs.attack_active else max(40, int(gs.attack_intensity * 200))
     eve_r = 22
-    pygame.draw.circle(screen, (*RED[:3], eve_alpha) if eve_alpha < 255 else RED,
-                       EVE_POS, eve_r)
+    pygame.draw.circle(screen, (*RED[:3], eve_alpha) if eve_alpha < 255 else RED, EVE_POS, eve_r)
     pygame.draw.circle(screen, TEXT_CLR, EVE_POS, eve_r, 2)
     eve_lbl = big_font.render("Eve", True, RED)
     screen.blit(eve_lbl, (EVE_POS[0] - eve_lbl.get_width() // 2, EVE_POS[1] - eve_r - 16))
@@ -289,16 +291,14 @@ def _draw_temp_graph(screen, gs: ScadaSecurityState, font, big_font):
     # 임계 온도선
     crit_y = temp_to_y(CRITICAL_TEMP)
     if GRAPH_Y < crit_y < GRAPH_Y + GRAPH_H:
-        pygame.draw.line(screen, RED, (GRAPH_X, crit_y),
-                         (GRAPH_X + GRAPH_W, crit_y), 1)
+        pygame.draw.line(screen, RED, (GRAPH_X, crit_y), (GRAPH_X + GRAPH_W, crit_y), 1)
         crit_lbl = font.render(f"{CRITICAL_TEMP} C", True, RED)
         screen.blit(crit_lbl, (GRAPH_X + GRAPH_W - crit_lbl.get_width() - 2, crit_y - 12))
 
     # 목표 온도선
     tgt_y = temp_to_y(TARGET_TEMP)
     if GRAPH_Y < tgt_y < GRAPH_Y + GRAPH_H:
-        pygame.draw.line(screen, GREEN, (GRAPH_X, tgt_y),
-                         (GRAPH_X + GRAPH_W, tgt_y), 1)
+        pygame.draw.line(screen, GREEN, (GRAPH_X, tgt_y), (GRAPH_X + GRAPH_W, tgt_y), 1)
 
     # 표시 온도 (회색)
     disp_pts = []
@@ -354,16 +354,14 @@ def _draw_qber_meter(screen, gs: ScadaSecurityState, anim_t, font, big_font):
     fill_h = int(bar_h * qber_val / 0.5)
     if fill_h > 0:
         fill_color = RED if gs.qkd.qber > QBER_DETECT_THRESHOLD else GREEN
-        pygame.draw.rect(screen, fill_color,
-                         (bar_x, bar_y + bar_h - fill_h, bar_w, fill_h))
+        pygame.draw.rect(screen, fill_color, (bar_x, bar_y + bar_h - fill_h, bar_w, fill_h))
 
     pygame.draw.rect(screen, TEXT_CLR, (bar_x, bar_y, bar_w, bar_h), 1)
 
     # 임계선
     thresh_ratio = QBER_DETECT_THRESHOLD / 0.5
     thresh_y = int(bar_y + bar_h - bar_h * thresh_ratio)
-    pygame.draw.line(screen, YELLOW, (bar_x - 4, thresh_y),
-                     (bar_x + bar_w + 4, thresh_y), 2)
+    pygame.draw.line(screen, YELLOW, (bar_x - 4, thresh_y), (bar_x + bar_w + 4, thresh_y), 2)
     thresh_lbl = font.render(f"{QBER_DETECT_THRESHOLD * 100:.0f}%", True, YELLOW)
     screen.blit(thresh_lbl, (bar_x + bar_w + 6, thresh_y - 6))
 
@@ -396,9 +394,9 @@ def _draw_qber_meter(screen, gs: ScadaSecurityState, anim_t, font, big_font):
     # 키 교환 통계
     info_y = QBER_Y + QBER_H + 4
     keys_lbl = font.render(
-        t("ss_keys_info", exchanged=gs.qkd.keys_exchanged,
-          compromised=gs.qkd.keys_compromised),
-        True, TEXT_CLR,
+        t("ss_keys_info", exchanged=gs.qkd.keys_exchanged, compromised=gs.qkd.keys_compromised),
+        True,
+        TEXT_CLR,
     )
     screen.blit(keys_lbl, (QBER_X + 4, info_y))
 
@@ -427,16 +425,17 @@ def _draw_event_log(screen, gs: ScadaSecurityState, font, big_font):
 def _draw_stats(screen, gs: ScadaSecurityState, font, big_font):
     """통계 패널."""
     lines = [
-        (t("ss_stat_attacks", detected=gs.attacks_detected,
-           blocked=gs.attacks_blocked), ACCENT),
+        (t("ss_stat_attacks", detected=gs.attacks_detected, blocked=gs.attacks_blocked), ACCENT),
         (t("ss_stat_max_temp", temp=gs.max_real_temp), RED if gs.max_real_temp > CRITICAL_TEMP else TEXT_CLR),
         (t("ss_stat_attack_time", time=gs.time_under_attack), TEXT_CLR),
-        (t("ss_stat_qkd_state",
-           state="Authenticated" if gs.qkd.authenticated else "Monitoring"),
-         MAUVE if gs.qkd.authenticated else SUBTEXT_CLR),
-        (t("ss_stat_cooling",
-           state=t("emergency") if gs.emergency else (t("on") if gs.cooling_on else t("off"))),
-         RED if gs.emergency else GREEN),
+        (
+            t("ss_stat_qkd_state", state="Authenticated" if gs.qkd.authenticated else "Monitoring"),
+            MAUVE if gs.qkd.authenticated else SUBTEXT_CLR,
+        ),
+        (
+            t("ss_stat_cooling", state=t("emergency") if gs.emergency else (t("on") if gs.cooling_on else t("off"))),
+            RED if gs.emergency else GREEN,
+        ),
     ]
     for i, (text, color) in enumerate(lines):
         surf = font.render(text, True, color)
@@ -525,14 +524,16 @@ def run_simulation():
         if not paused:
             update_scenario(gs, dt)
 
-            recorder.record({
-                "phase": gs.phase,
-                "real_temp": gs.real_temp,
-                "displayed_temp": gs.displayed_temp,
-                "qber": gs.qkd.qber,
-                "attack_active": gs.attack_active,
-                "attack_intensity": gs.attack_intensity,
-            })
+            recorder.record(
+                {
+                    "phase": gs.phase,
+                    "real_temp": gs.real_temp,
+                    "displayed_temp": gs.displayed_temp,
+                    "qber": gs.qkd.qber,
+                    "attack_active": gs.attack_active,
+                    "attack_intensity": gs.attack_intensity,
+                }
+            )
 
         # ── 렌더링 ───────────────────────────────────
         # 배경 (공격 시 약간 붉은 빛)
@@ -541,9 +542,7 @@ def run_simulation():
             r = int(BG[0] + (60 - BG[0]) * flash * gs.attack_intensity)
             g = int(BG[1] * (1 - flash * 0.3 * gs.attack_intensity))
             b = int(BG[2] * (1 - flash * 0.3 * gs.attack_intensity))
-            screen.fill((max(0, min(255, r)),
-                         max(0, min(255, g)),
-                         max(0, min(255, b))))
+            screen.fill((max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))))
         else:
             screen.fill(BG)
 
@@ -578,9 +577,11 @@ def run_simulation():
 
         # 안내
         hints = [
-            t("ss_hint_line1",
-              auto=t("auto_on") if gs.auto_scenario else t("auto_off"),
-              pause=t("paused") if paused else t("running_state")),
+            t(
+                "ss_hint_line1",
+                auto=t("auto_on") if gs.auto_scenario else t("auto_off"),
+                pause=t("paused") if paused else t("running_state"),
+            ),
             t("ss_hint_line2"),
         ]
         for i, h in enumerate(hints):

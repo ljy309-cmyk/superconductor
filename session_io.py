@@ -141,7 +141,6 @@ def _export_as_csv(prefix, session_data, ts, now, trial_rows=None, trial_columns
     return path
 
 
-
 # ── 파일 목록 ─────────────────────────────────────────
 
 
@@ -316,7 +315,10 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
 
         screen.blit(
             hint_surf,
-            (W // 2 - hint_surf.get_width() // 2, py + panel_h - 22 if len(files) <= max_visible else py + panel_h - 10),
+            (
+                W // 2 - hint_surf.get_width() // 2,
+                py + panel_h - 22 if len(files) <= max_visible else py + panel_h - 10,
+            ),
         )
 
         pygame.display.flip()
@@ -420,5 +422,3 @@ def _auto_parse_csv_values(row: dict):
                 row[k] = float(v)
             except ValueError:
                 pass
-
-
