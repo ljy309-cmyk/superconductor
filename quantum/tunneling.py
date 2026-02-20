@@ -80,6 +80,10 @@ def _load_theme_colors():
 # ── 블로흐 구 레이아웃 ────────────────────────────────
 BLOCH_CX, BLOCH_CY = 730, 280
 BLOCH_R = 110
+_BLOCH_EL_DEFAULT = 0.25  # 기본 기울기 (rad) — 약 14°
+_BLOCH_EL_MIN, _BLOCH_EL_MAX = -1.0, 1.0
+_BLOCH_DRAG_SENSITIVITY = 0.008  # 마우스 픽셀 → 라디안
+_CIRCLE_STEPS = 48  # 대원 그리기 해상도
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
@@ -131,44 +135,94 @@ def _draw_particle(screen, p: QuantumParticle, font):
     screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
 
 
-def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font):
-    """블로흐 구 시각화."""
+def _project_bloch(x3, y3, z3, phi, el):
+    """3D 블로흐 좌표 → 2D 화면 좌표 + 깊이 (직교 투영).
+
+    Returns:
+        (screen_x, screen_y, depth) — depth > 0 이면 구 뒷면.
+    """
+    cp, sp = math.cos(phi), math.sin(phi)
+    ce, se = math.cos(el), math.sin(el)
+    # Z축 회전 (방위각)
+    x1 = x3 * cp - y3 * sp
+    y1 = x3 * sp + y3 * cp
+    # X축 회전 (기울기)
+    depth = y1 * ce + z3 * se
+    z2 = -y1 * se + z3 * ce
+    sx = BLOCH_CX + int(x1 * BLOCH_R)
+    sy = BLOCH_CY - int(z2 * BLOCH_R)
+    return sx, sy, depth
+
+
+def _draw_great_circle(screen, axis_fn, phi, el, color_front, color_back):
+    """대원 그리기 — 전면/후면 색상 분리.
+
+    Args:
+        axis_fn: angle → (x, y, z) 매핑 함수.
+    """
+    pts = []
+    for i in range(_CIRCLE_STEPS):
+        a = 2 * math.pi * i / _CIRCLE_STEPS
+        x3, y3, z3 = axis_fn(a)
+        sx, sy, d = _project_bloch(x3, y3, z3, phi, el)
+        pts.append((sx, sy, d))
+    for i in range(_CIRCLE_STEPS):
+        j = (i + 1) % _CIRCLE_STEPS
+        behind = pts[i][2] > 0 and pts[j][2] > 0
+        clr = color_back if behind else color_front
+        pygame.draw.line(screen, clr, pts[i][:2], pts[j][:2], 1)
+
+
+def _draw_bloch_sphere(screen, p: QuantumParticle, font, title_font, view_phi, view_el):
+    """블로흐 구 시각화 (3D 회전 가능)."""
     time_ms = pygame.time.get_ticks()
 
     # 타이틀
     label = title_font.render(t("tn_bloch"), True, ACCENT)
     screen.blit(label, (BLOCH_CX - label.get_width() // 2, BLOCH_CY - BLOCH_R - 40))
 
-    # 구 외곽 (원)
+    # 구 외곽 (실루엣)
     pygame.draw.circle(screen, BLOCH_RING, (BLOCH_CX, BLOCH_CY), BLOCH_R, 1)
 
-    # 적도 타원
-    pygame.draw.ellipse(
-        screen,
-        BLOCH_RING,
-        (BLOCH_CX - BLOCH_R, BLOCH_CY - BLOCH_R // 4, BLOCH_R * 2, BLOCH_R // 2),
-        1,
-    )
+    # 색상: 전면/후면
+    dim = tuple(max(c // 3, 0) for c in BLOCH_RING)
 
-    # 축
-    pygame.draw.line(screen, OVERLAY_CLR, (BLOCH_CX, BLOCH_CY - BLOCH_R - 8), (BLOCH_CX, BLOCH_CY + BLOCH_R + 8), 1)
+    # 적도 (XY 평면, z=0)
+    _draw_great_circle(screen, lambda a: (math.cos(a), math.sin(a), 0), view_phi, view_el, BLOCH_RING, dim)
+    # XZ 경선 (y=0) — 상태 벡터가 위치하는 평면
+    _draw_great_circle(screen, lambda a: (math.sin(a), 0, math.cos(a)), view_phi, view_el, BLOCH_RING, dim)
+    # YZ 경선 (x=0)
+    _draw_great_circle(screen, lambda a: (0, math.sin(a), math.cos(a)), view_phi, view_el, BLOCH_RING, dim)
+
+    # Z축
+    t0x, t0y, _ = _project_bloch(0, 0, 1.12, view_phi, view_el)
+    b0x, b0y, _ = _project_bloch(0, 0, -1.12, view_phi, view_el)
+    pygame.draw.line(screen, OVERLAY_CLR, (t0x, t0y), (b0x, b0y), 1)
 
     # |0⟩, |1⟩ 라벨
+    lx0, ly0, _ = _project_bloch(0, 0, 1.22, view_phi, view_el)
+    lx1, ly1, _ = _project_bloch(0, 0, -1.22, view_phi, view_el)
     z0 = font.render("|0⟩", True, TUNNEL_FLASH)
     z1 = font.render("|1⟩", True, REFLECT_CLR)
-    screen.blit(z0, (BLOCH_CX + 8, BLOCH_CY - BLOCH_R - 18))
-    screen.blit(z1, (BLOCH_CX + 8, BLOCH_CY + BLOCH_R + 4))
+    screen.blit(z0, (lx0 + 4, ly0 - 8))
+    screen.blit(z1, (lx1 + 4, ly1 - 4))
 
-    # 상태 벡터 (θ 기반)
+    # X축 라벨 (|+⟩)
+    lxx, lxy, _ = _project_bloch(1.18, 0, 0, view_phi, view_el)
+    xlab = font.render("|+⟩", True, OVERLAY_CLR)
+    screen.blit(xlab, (lxx - xlab.get_width() // 2, lxy - 14))
+
+    # 상태 벡터 (θ 기반, XZ 평면)
     theta = p.superposition_alpha(time_ms)
-    tip_x = BLOCH_CX + int(BLOCH_R * 0.4 * math.sin(theta))
-    tip_y = BLOCH_CY - int(BLOCH_R * math.cos(theta))
-
-    pygame.draw.line(screen, ACCENT, (BLOCH_CX, BLOCH_CY), (tip_x, tip_y), 2)
-    pygame.draw.circle(screen, ACCENT, (tip_x, tip_y), 6)
+    sv_x, sv_y, sv_z = math.sin(theta), 0.0, math.cos(theta)
+    tip_sx, tip_sy, _ = _project_bloch(sv_x, sv_y, sv_z, view_phi, view_el)
+    pygame.draw.line(screen, ACCENT, (BLOCH_CX, BLOCH_CY), (tip_sx, tip_sy), 2)
+    pygame.draw.circle(screen, ACCENT, (tip_sx, tip_sy), 6)
 
     # 현재 상태 텍스트
-    state_label = f"|{'0' if theta < math.pi / 2 else '1'}⟩  θ={math.degrees(theta):.0f}°"
+    state_label = (
+        f"|{'0' if theta < math.pi / 2 else '1'}⟩  θ={math.degrees(theta):.0f}°  φ={math.degrees(view_phi):.0f}°"
+    )
     sl = font.render(state_label, True, TEXT_CLR)
     screen.blit(sl, (BLOCH_CX - sl.get_width() // 2, BLOCH_CY + BLOCH_R + 26))
 
@@ -209,6 +263,12 @@ def run_simulation():
 
     particle = QuantumParticle()
     paused = False
+
+    # ── 블로흐 구 인터랙션 ──
+    bloch_phi = 0.0
+    bloch_el = _BLOCH_EL_DEFAULT
+    bloch_dragging = False
+    bloch_drag_prev = (0, 0)
 
     # ── 슬라이더 패널 ─────────────────────────────────
     panel = SliderPanel(WIDTH + 5, 40, PANEL_W - 10, "Parameters")
@@ -284,8 +344,24 @@ def run_simulation():
                 elif event.key == pygame.K_RIGHTBRACKET:
                     cycle_sim_speed(1)
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                # 클릭으로 입자 재발사
-                particle.reset()
+                mx, my = event.pos
+                dx_b, dy_b = mx - BLOCH_CX, my - BLOCH_CY
+                if dx_b * dx_b + dy_b * dy_b <= BLOCH_R * BLOCH_R:
+                    # 블로흐 구 드래그 시작
+                    bloch_dragging = True
+                    bloch_drag_prev = (mx, my)
+                else:
+                    # 다른 영역 클릭 → 입자 재발사
+                    particle.reset()
+            elif event.type == pygame.MOUSEMOTION and bloch_dragging:
+                mx, my = event.pos
+                dx_m = mx - bloch_drag_prev[0]
+                dy_m = my - bloch_drag_prev[1]
+                bloch_phi += dx_m * _BLOCH_DRAG_SENSITIVITY
+                bloch_el = max(_BLOCH_EL_MIN, min(_BLOCH_EL_MAX, bloch_el - dy_m * _BLOCH_DRAG_SENSITIVITY))
+                bloch_drag_prev = (mx, my)
+            elif event.type == pygame.MOUSEBUTTONUP:
+                bloch_dragging = False
 
         # ── 슬라이더 값 읽기 ─────────────────────────
         speed_mult = sl_speed.value
@@ -352,7 +428,7 @@ def run_simulation():
         _draw_particle(screen, particle, font)
 
         # 블로흐 구
-        _draw_bloch_sphere(screen, particle, font, title_font)
+        _draw_bloch_sphere(screen, particle, font, title_font, bloch_phi, bloch_el)
 
         # 통계
         _draw_stats(screen, particle, font, tunnel_prob)
