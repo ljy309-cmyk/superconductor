@@ -292,8 +292,8 @@
   "hint_reset": "R: Full Reset  |  ESC: Exit",
 
   "hint_speed_info": "Speed: x{speed:.1f}  |  Sim: {sim_speed}  |  Wall Thickness: {width}px  |  Probability: {prob:.1f}%  |  {pause_state}",
-  "hint_click_launch": "Click: Relaunch  |  Drag Barrier Edge: Width  |  Drag Bloch: Rotate  |  Arrows: Params",
-  "hint_pause_reset": "SPACE: Pause  |  R: Reset  |  ESC: Exit",
+  "hint_click_launch": "Click: Relaunch  |  Drag Barrier: Width  |  WASD: Bloch  |  Arrows: Params  |  F1: Help",
+  "hint_pause_reset": "SPACE: Pause  |  R: Reset  |  L: Lang  |  [/]: Sim Speed  |  ESC: Exit",
 
   "ctx_hint_barrier": "Drag edge to adjust barrier width (← → keys)",
   "ctx_hint_bloch": "Drag to rotate Bloch sphere 3D view",

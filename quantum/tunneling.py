@@ -24,7 +24,9 @@ from preset_hud import PresetHUD
 
 # ── 물리 엔진 (순수 로직) ────────────────────────────
 from quantum.tunneling_physics import (
+    _REFLECT_FLASH,
     _TUNNEL_DECAY,
+    _TUNNEL_FLASH,
     BARRIER_WIDTH_DEFAULT,
     BARRIER_WIDTH_MAX,
     BARRIER_WIDTH_MIN,
@@ -93,6 +95,7 @@ BLOCH_R = cfg("tunneling", "bloch_r", 110)
 _BLOCH_EL_DEFAULT = 0.25  # 기본 기울기 (rad) — 약 14°
 _BLOCH_EL_MIN, _BLOCH_EL_MAX = -1.0, 1.0
 _BLOCH_DRAG_SENSITIVITY = 0.008  # 마우스 픽셀 → 라디안
+_BLOCH_KEY_STEP = 0.08  # 키보드 한 번 누름 → 라디안 (#24)
 _CIRCLE_STEPS = cfg("tunneling", "circle_steps", 48)
 
 # ── 실시간 확률 차트 레이아웃 ─────────────────────────
@@ -103,6 +106,26 @@ _CHART_H = 52
 _CHART_PAD_L = 22  # y축 라벨
 _CHART_PAD_T = 3
 _CHART_PAD_B = 10  # x축 라벨
+
+# ── 플래시 이징 (#22) ─────────────────────────────────
+
+
+def _ease_out(t_norm: float) -> float:
+    """ease-out 커브: 1-(1-t)^2. t_norm 은 0→1 (시작→끝)."""
+    clamped = max(0.0, min(1.0, t_norm))
+    inv = 1.0 - clamped
+    return 1.0 - inv * inv
+
+
+def _flash_ease(flash_timer: float, flash_duration: float) -> float:
+    """flash_timer(남은 시간) → ease-out 적용된 0~1 세기 반환."""
+    if flash_duration <= 0.0:
+        return 0.0
+    # 진행률: 0(방금 시작) → 1(거의 끝)
+    progress = 1.0 - max(0.0, flash_timer) / flash_duration
+    # ease-out 적용 후 반전 → 시작에 밝고 끝에 빠르게 사라짐
+    return 1.0 - _ease_out(progress)
+
 
 # ── 장벽 드래그 ──────────────────────────────────────
 _BARRIER_EDGE_TOL = 8  # 장벽 가장자리 감지 허용 범위 (px)
@@ -327,12 +350,14 @@ def _draw_particle(screen, p: QuantumParticle, font):
     cx, cy = int(p.x), int(p.y)
     time_ms = pygame.time.get_ticks()
 
-    # 터널링/반사 플래시
+    # 터널링/반사 플래시 (ease-out 이징, #22)
     if p.flash_timer > 0:
-        flash_r = int(PARTICLE_RADIUS + 20 * p.flash_timer)
+        duration = _TUNNEL_FLASH if p.tunneled else _REFLECT_FLASH
+        eased = _flash_ease(p.flash_timer, duration)
+        flash_r = int(PARTICLE_RADIUS + 20 * eased)
         flash_clr = TUNNEL_FLASH if p.tunneled else REFLECT_CLR
         glow = pygame.Surface((flash_r * 2, flash_r * 2), pygame.SRCALPHA)
-        alpha = int(120 * p.flash_timer)
+        alpha = int(120 * eased)
         pygame.draw.circle(glow, (*flash_clr, alpha), (flash_r, flash_r), flash_r)
         screen.blit(glow, (cx - flash_r, cy - flash_r))
 
@@ -772,6 +797,7 @@ class _SimContext:
     """run_simulation 내부 상태를 하나로 묶는 컨테이너."""
 
     def __init__(self):
+        _log.info("터널링 시뮬레이션 시작")
         _load_theme_colors()
         on_theme_change(_load_theme_colors)
         pygame.init()
@@ -873,6 +899,7 @@ def _switch_difficulty_midgame(ctx: _SimContext):
     ctx.preset_hud._apply_preset(chosen)
     ctx.read_sliders()
     ctx.snd.play("preset_change")
+    _log.info("난이도 변경 → %s", chosen)
 
 
 # ── 이벤트 처리 ──────────────────────────────────────
@@ -912,6 +939,7 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
             return False
     elif key == pygame.K_SPACE:
         ctx.paused = not ctx.paused
+        _log.debug("일시정지 토글 → %s", "paused" if ctx.paused else "resumed")
     elif key == pygame.K_r:
         ctx.particle = QuantumParticle()
         ctx.panel.reset_all()
@@ -919,22 +947,41 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         ctx.current_trail.clear()
         ctx.trail_cache.clear()
         ctx.prev_tunneled_state = None
+        _log.info("시뮬레이션 리셋")
     elif key == pygame.K_UP:
         ctx.sl_speed.value = ctx.sl_speed.value + 0.5
         ctx.snd.play("speed_change")
+        _log.debug("속도 증가 → %.1f", ctx.sl_speed.value)
     elif key == pygame.K_DOWN:
         ctx.sl_speed.value = ctx.sl_speed.value - 0.5
         ctx.snd.play("speed_change")
+        _log.debug("속도 감소 → %.1f", ctx.sl_speed.value)
     elif key == pygame.K_RIGHT:
         ctx.sl_barrier.value = ctx.sl_barrier.value + 10
         ctx.snd.play("barrier_adjust")
+        _log.debug("장벽 두께 증가 → %.0f", ctx.sl_barrier.value)
     elif key == pygame.K_LEFT:
         ctx.sl_barrier.value = ctx.sl_barrier.value - 10
         ctx.snd.play("barrier_adjust")
+        _log.debug("장벽 두께 감소 → %.0f", ctx.sl_barrier.value)
+    # 블로흐 구 키보드 조작 (#24): WASD (Ctrl+D 는 난이도 변경)
+    elif key == pygame.K_a:
+        ctx.bloch_phi -= _BLOCH_KEY_STEP
+        _log.debug("블로흐 phi -= %.3f → %.3f", _BLOCH_KEY_STEP, ctx.bloch_phi)
+    elif key == pygame.K_d:
+        if pygame.key.get_mods() & pygame.KMOD_CTRL:
+            _switch_difficulty_midgame(ctx)
+        else:
+            ctx.bloch_phi += _BLOCH_KEY_STEP
+            _log.debug("블로흐 phi += %.3f → %.3f", _BLOCH_KEY_STEP, ctx.bloch_phi)
+    elif key == pygame.K_w:
+        ctx.bloch_el = min(_BLOCH_EL_MAX, ctx.bloch_el + _BLOCH_KEY_STEP)
+        _log.debug("블로흐 el += %.3f → %.3f", _BLOCH_KEY_STEP, ctx.bloch_el)
+    elif key == pygame.K_s:
+        ctx.bloch_el = max(_BLOCH_EL_MIN, ctx.bloch_el - _BLOCH_KEY_STEP)
+        _log.debug("블로흐 el -= %.3f → %.3f", _BLOCH_KEY_STEP, ctx.bloch_el)
     elif key == pygame.K_l:
         toggle_locale()
-    elif key == pygame.K_d:
-        _switch_difficulty_midgame(ctx)
     elif key == pygame.K_TAB:
         ctx.toast.toggle_history()
     elif key == pygame.K_LEFTBRACKET:
@@ -969,6 +1016,7 @@ def _handle_mouse_down(ctx: _SimContext, pos: tuple[int, int]):
             ctx.bloch_drag_prev = (mx, my)
         else:
             ctx.particle.reset()
+            _log.debug("입자 재발사 (클릭)")
 
 
 def _handle_mouse_motion(ctx: _SimContext, pos: tuple[int, int]):
@@ -1278,7 +1326,10 @@ def _choose_export_file(screen, font) -> str | None:
             screen.blit(info, (W // 2 - info.get_width() // 2, py + panel_h - 22))
 
         hint = font.render(t("import_hint"), True, pg.SUBTEXT)
-        screen.blit(hint, (W // 2 - hint.get_width() // 2, py + panel_h - 22 if len(files) <= max_visible else py + panel_h - 10))
+        screen.blit(
+            hint,
+            (W // 2 - hint.get_width() // 2, py + panel_h - 22 if len(files) <= max_visible else py + panel_h - 10),
+        )
 
         pygame.display.flip()
         clock.tick(30)
@@ -1393,7 +1444,8 @@ def _render_frame(ctx: _SimContext):
             pause_state=t("paused") if ctx.paused else t("running_state"),
         ),
         t("hint_click_launch"),
-        t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X/I: Export/Import  |  G: {t('glossary_title')}",
+        t("hint_pause_reset")
+        + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X/I: Export/Import  |  G: {t('glossary_title')}",
     ]
     for i, h in enumerate(hints):
         surf = _tcache.render(ctx.font, h, TEXT_CLR)

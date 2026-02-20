@@ -292,8 +292,8 @@
   "hint_reset": "R: 전체 리셋  |  ESC: 종료",
 
   "hint_speed_info": "속도: x{speed:.1f}  |  Sim: {sim_speed}  |  벽 두께: {width}px  |  확률: {prob:.1f}%  |  {pause_state}",
-  "hint_click_launch": "클릭: 재발사  |  장벽 가장자리 드래그: 두께  |  블로흐 드래그: 회전  |  ↑↓←→: 파라미터",
-  "hint_pause_reset": "SPACE: 일시정지  |  R: 리셋  |  ESC: 종료",
+  "hint_click_launch": "클릭: 재발사  |  장벽 드래그: 두께  |  WASD: 블로흐  |  ↑↓←→: 파라미터  |  F1: 도움말",
+  "hint_pause_reset": "SPACE: 일시정지  |  R: 리셋  |  L: 언어  |  [/]: 시뮬속도  |  ESC: 종료",
 
   "ctx_hint_barrier": "가장자리 드래그로 장벽 두께 조절 (←→ 키)",
   "ctx_hint_bloch": "드래그로 블로흐 구 3D 회전",

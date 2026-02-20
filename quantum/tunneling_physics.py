@@ -13,6 +13,9 @@ import math
 import random
 
 from config_loader import cfg
+from logger import get_module_logger
+
+_log = get_module_logger("tunneling_physics")
 
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 TUNNEL_PROB_BASE = cfg("tunneling", "tunnel_prob_base", 0.10)
@@ -183,6 +186,12 @@ class QuantumParticle:
                     self.tunneled = True
                     self.tunnel_count += 1
                     self.flash_timer = _TUNNEL_FLASH
+                    _log.debug(
+                        "터널링 성공 #%d prob=%.3f barrier=%.0f",
+                        self.tunnel_count,
+                        tunnel_prob,
+                        barrier_width,
+                    )
                 else:
                     # 반사
                     self.vx = -abs(self.vx) * REFLECT_DAMPING
@@ -190,6 +199,12 @@ class QuantumParticle:
                     self.tunneled = False
                     self.reflect_count += 1
                     self.flash_timer = _REFLECT_FLASH
+                    _log.debug(
+                        "반사 #%d prob=%.3f barrier=%.0f",
+                        self.reflect_count,
+                        tunnel_prob,
+                        barrier_width,
+                    )
 
         # 화면 밖으로 나가면 재발사
         if self.x < SIM_LEFT - 20 or self.x > SIM_LEFT + SIM_W + 20:

@@ -1981,5 +1981,152 @@ class TestTrailCache(unittest.TestCase):
         self.assertTrue(cache._dirty)
 
 
+class TestFlashEase(unittest.TestCase):
+    """#22 — ease-out 이징 커브 테스트."""
+
+    def setUp(self):
+        from quantum.tunneling import _ease_out, _flash_ease
+
+        self.ease_out = _ease_out
+        self.flash_ease = _flash_ease
+
+    # -- _ease_out --
+
+    def test_ease_out_boundaries(self):
+        """ease_out(0)=0, ease_out(1)=1."""
+        self.assertAlmostEqual(self.ease_out(0.0), 0.0)
+        self.assertAlmostEqual(self.ease_out(1.0), 1.0)
+
+    def test_ease_out_midpoint_above_linear(self):
+        """ease-out 곡선은 중간점에서 선형보다 큼 (빨리 올라감)."""
+        self.assertGreater(self.ease_out(0.5), 0.5)
+
+    def test_ease_out_clamped(self):
+        """범위 밖 입력은 클램핑."""
+        self.assertAlmostEqual(self.ease_out(-0.5), 0.0)
+        self.assertAlmostEqual(self.ease_out(1.5), 1.0)
+
+    def test_ease_out_monotonic(self):
+        """단조 증가 확인."""
+        prev = 0.0
+        for i in range(1, 11):
+            val = self.ease_out(i / 10.0)
+            self.assertGreaterEqual(val, prev)
+            prev = val
+
+    # -- _flash_ease --
+
+    def test_flash_ease_start_full(self):
+        """플래시 시작 시(timer==duration) 세기 ≈ 1."""
+        self.assertAlmostEqual(self.flash_ease(0.6, 0.6), 1.0)
+
+    def test_flash_ease_end_zero(self):
+        """플래시 끝(timer==0) 세기 = 0."""
+        self.assertAlmostEqual(self.flash_ease(0.0, 0.6), 0.0)
+
+    def test_flash_ease_mid_nonlinear(self):
+        """중간 지점에서 ease-out 비선형 확인."""
+        linear_mid = 0.5  # 선형이면 세기 = 0.5
+        eased_mid = self.flash_ease(0.3, 0.6)  # timer=0.3, duration=0.6 → 중간
+        self.assertNotAlmostEqual(eased_mid, linear_mid, places=2)
+
+    def test_flash_ease_zero_duration(self):
+        """duration=0이면 0 반환."""
+        self.assertAlmostEqual(self.flash_ease(0.5, 0.0), 0.0)
+
+    def test_flash_ease_negative_timer(self):
+        """음수 timer → 0 반환."""
+        self.assertAlmostEqual(self.flash_ease(-0.1, 0.6), 0.0)
+
+
+class TestBlochKeyboard(unittest.TestCase):
+    """#24 — 블로흐 구 키보드 조작 상수 테스트."""
+
+    def test_key_step_positive(self):
+        """_BLOCH_KEY_STEP은 양수."""
+        from quantum.tunneling import _BLOCH_KEY_STEP
+
+        self.assertGreater(_BLOCH_KEY_STEP, 0)
+
+    def test_key_step_reasonable(self):
+        """_BLOCH_KEY_STEP은 0.01~0.5 범위 내."""
+        from quantum.tunneling import _BLOCH_KEY_STEP
+
+        self.assertGreaterEqual(_BLOCH_KEY_STEP, 0.01)
+        self.assertLessEqual(_BLOCH_KEY_STEP, 0.5)
+
+
+class TestHelpOverlayShortcuts(unittest.TestCase):
+    """#23 — 도움말 오버레이에 단축키 포함 확인."""
+
+    def test_tunneling_help_has_wasd(self):
+        """터널링 도움말에 W/A/S/D 블로흐 조작 안내 포함."""
+        from help_overlay import _HELP_TEXTS
+
+        lines = _HELP_TEXTS.get("tunneling", [])
+        joined = " ".join(lines)
+        self.assertIn("W/A/S/D", joined)
+
+    def test_tunneling_help_has_f1(self):
+        """터널링 도움말에 F1 안내 포함."""
+        from help_overlay import _HELP_TEXTS
+
+        lines = _HELP_TEXTS.get("tunneling", [])
+        joined = " ".join(lines)
+        self.assertIn("F1", joined)
+
+    def test_tunneling_help_has_ctrl_x(self):
+        """터널링 도움말에 Ctrl+X 안내 포함."""
+        from help_overlay import _HELP_TEXTS
+
+        lines = _HELP_TEXTS.get("tunneling", [])
+        joined = " ".join(lines)
+        self.assertIn("Ctrl+X", joined)
+
+    def test_tunneling_help_has_space_pause(self):
+        """터널링 도움말에 SPACE 일시정지 안내 포함."""
+        from help_overlay import _HELP_TEXTS
+
+        lines = _HELP_TEXTS.get("tunneling", [])
+        joined = " ".join(lines)
+        self.assertIn("SPACE", joined)
+
+
+class TestPhysicsLogging(unittest.TestCase):
+    """#25 — 물리 엔진 로깅 테스트."""
+
+    def test_tunnel_event_logged(self):
+        """터널링 성공 시 debug 로그 출력."""
+        import logging
+
+        from quantum.tunneling_physics import QuantumParticle
+
+        p = QuantumParticle(seed=42)
+        logger = logging.getLogger("superconductor.tunneling_physics")
+        with self.assertLogs(logger, level="DEBUG") as cm:
+            # 확률 1.0 → 장벽 도달하면 반드시 터널링
+            for _ in range(500):
+                p.update(1 / 60.0, barrier_width=12, tunnel_prob=1.0)
+                if p.tunneled is True:
+                    break
+        self.assertTrue(any("터널링 성공" in msg for msg in cm.output))
+
+    def test_reflect_event_logged(self):
+        """반사 시 debug 로그 출력."""
+        import logging
+
+        from quantum.tunneling_physics import QuantumParticle
+
+        p = QuantumParticle(seed=42)
+        logger = logging.getLogger("superconductor.tunneling_physics")
+        with self.assertLogs(logger, level="DEBUG") as cm:
+            # 확률 0.0 → 장벽 도달하면 반드시 반사
+            for _ in range(500):
+                p.update(1 / 60.0, barrier_width=12, tunnel_prob=0.0)
+                if p.tunneled is False:
+                    break
+        self.assertTrue(any("반사" in msg for msg in cm.output))
+
+
 if __name__ == "__main__":
     unittest.main()
