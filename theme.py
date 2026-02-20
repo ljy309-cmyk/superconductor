@@ -572,9 +572,12 @@ def load_pg_colors(mapping: dict[str, str], target_globals: dict) -> None:
 
 
 def save_preferences():
-    """현재 테마/색맹 설정을 config.json에 저장."""
+    """현재 테마/색맹/폰트/언어 설정을 config.json에 저장."""
     import json
     import os
+
+    from font_helper import get_user_font
+    from i18n import get_locale
 
     cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     try:
@@ -585,6 +588,12 @@ def save_preferences():
     cfg["theme"] = _current_theme
     cfg["colorblind_mode"] = _colorblind
     cfg["font_scale"] = _font_scale
+    cfg["locale"] = get_locale()
+    user_font = get_user_font()
+    if user_font:
+        cfg["font_family"] = user_font
+    elif "font_family" in cfg:
+        del cfg["font_family"]
     try:
         with open(cfg_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2, ensure_ascii=False)
@@ -593,9 +602,12 @@ def save_preferences():
 
 
 def load_preferences():
-    """config.json에서 테마/색맹 설정을 로드 (알림 없이)."""
+    """config.json에서 테마/색맹/폰트/언어 설정을 로드 (알림 없이)."""
     import json
     import os
+
+    from font_helper import set_user_font
+    from i18n import set_locale
 
     global _current_theme, _colorblind, _font_scale
     cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -608,5 +620,10 @@ def load_preferences():
             _colorblind = cfg["colorblind_mode"]
         if isinstance(cfg.get("font_scale"), (int, float)):
             _font_scale = round(max(_FONT_SCALE_MIN, min(_FONT_SCALE_MAX, cfg["font_scale"])), 1)
+        if isinstance(cfg.get("locale"), str) and cfg["locale"] in ("ko", "en"):
+            set_locale(cfg["locale"])
+        if isinstance(cfg.get("font_family"), str) and cfg["font_family"]:
+            set_user_font(cfg["font_family"])
+            FONTS.FAMILY = cfg["font_family"]
     except (OSError, json.JSONDecodeError):
         pass

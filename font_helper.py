@@ -1,4 +1,4 @@
-"""Pygame 한글 폰트 헬퍼 — CJK 지원 폰트 자동 탐색.
+"""Pygame 한글 폰트 헬퍼 — CJK 지원 폰트 자동 탐색 및 사용자 선택.
 
 모든 Pygame 모듈에서 ``pygame.font.SysFont("Consolas", ...)`` 대신
 이 모듈의 ``get_font()`` 를 사용하면 한글이 올바르게 표시됩니다.
@@ -29,6 +29,7 @@ _CANDIDATE_FONTS: list[str] = [
 ]
 
 _resolved_family: str | None = None
+_user_family: str | None = None  # 사용자가 설정에서 선택한 폰트
 
 
 def _resolve_font() -> str:
@@ -56,12 +57,49 @@ def _resolve_font() -> str:
     return _resolved_family
 
 
+def set_user_font(family: str | None):
+    """사용자가 선택한 폰트를 설정. None이면 자동 탐색."""
+    global _user_family
+    _user_family = family
+
+
+def get_user_font() -> str | None:
+    """사용자가 선택한 폰트 이름 반환. 미설정이면 None."""
+    return _user_family
+
+
 def get_font(size: int, bold: bool = False) -> pygame.font.Font:
     """한글을 지원하는 Pygame 폰트를 반환."""
-    family = _resolve_font()
+    family = _user_family if _user_family else _resolve_font()
     return pygame.font.SysFont(family, size, bold=bold)
 
 
 def get_font_family() -> str:
-    """현재 선택된 폰트 패밀리 이름을 반환."""
+    """현재 사용 중인 폰트 패밀리 이름을 반환."""
+    if _user_family:
+        return _user_family
     return _resolve_font()
+
+
+def list_available_fonts() -> list[str]:
+    """시스템에서 한글을 지원하는 사용 가능한 폰트 목록 반환."""
+    if not pygame.font.get_init():
+        pygame.font.init()
+
+    available: list[str] = []
+    for name in _CANDIDATE_FONTS:
+        try:
+            f = pygame.font.SysFont(name, 14)
+            surf = f.render("가", True, (255, 255, 255))
+            if surf.get_width() > 0 and surf.get_width() != f.render("?", True, (255, 255, 255)).get_width():
+                available.append(name)
+        except Exception:
+            continue
+    return available
+
+
+def list_all_system_fonts() -> list[str]:
+    """시스템의 모든 폰트 목록 반환 (한글 미지원 포함)."""
+    if not pygame.font.get_init():
+        pygame.font.init()
+    return sorted(pygame.font.get_fonts())

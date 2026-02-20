@@ -292,5 +292,6 @@
   "colorblind_mode": false,
   "font_scale": 1.0,
   "sound_volume": 0.7,
-  "sound_enabled": true
+  "sound_enabled": true,
+  "locale": "ko"
 }
