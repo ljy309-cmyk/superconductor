@@ -66,7 +66,7 @@ def draw_page_dots(screen, x, cy, total_pages, current_page,
         return
 
     # 많은 페이지: [첫] ... [현재 주변] ... [끝] 축약
-    # 슬롯: first, ellipsis, window(5), ellipsis, last = 9
+    # 항상 정확히 MAX_PAGE_DOTS 슬롯을 유지하여 너비 점프 방지.
     window = MAX_PAGE_DOTS - 4  # 양쪽 끝점(2) + 줄임표(2) = 4 제외
     half = window // 2
 
@@ -84,6 +84,12 @@ def draw_page_dots(screen, x, cy, total_pages, current_page,
 
     show_left_ellipsis = win_start > 1
     show_right_ellipsis = win_end < total_pages - 2
+
+    # 줄임표가 생략된 쪽으로 윈도우를 1칸 확장하여 슬롯 수 보전
+    if not show_left_ellipsis and show_right_ellipsis:
+        win_end += 1
+    elif show_left_ellipsis and not show_right_ellipsis:
+        win_start -= 1
 
     # 표시할 인덱스 목록 구축
     slots: list[tuple[str, int]] = []  # ("dot"|"ellipsis", page_index)
@@ -108,6 +114,21 @@ def draw_page_dots(screen, x, cy, total_pages, current_page,
         else:
             pygame.draw.circle(screen, inactive_clr, (cx, cy), small_r)
             pygame.draw.circle(screen, border_clr, (cx, cy), small_r, 1)
+
+
+def page_dots_width(total_pages):
+    """도트 인디케이터의 렌더링 픽셀 너비를 반환.
+
+    draw_page_dots가 실제로 그리는 슬롯 수 기반으로 계산하므로
+    overflow 모드에서도 정확한 너비를 반환합니다.
+    """
+    if total_pages <= 1:
+        return 0
+    hc = is_high_contrast()
+    dot_r = 4 if hc else 3
+    gap = dot_r * 2 + 5
+    n = min(total_pages, MAX_PAGE_DOTS)
+    return (n - 1) * gap + 2 * dot_r
 
 
 # ── 색맹 보조 막대 패턴 ──────────────────────────────

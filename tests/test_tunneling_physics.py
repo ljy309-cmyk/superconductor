@@ -934,7 +934,7 @@ sys.modules.setdefault("pygame.font", _pg_mock.font)
 sys.modules.setdefault("pygame.draw", _pg_mock.draw)
 sys.modules.setdefault("pygame.display", _pg_mock.display)
 
-from quantum.ui_common import MAX_PAGE_DOTS, NOTIFY_CATEGORIES, NotifyToast, draw_page_dots
+from quantum.ui_common import MAX_PAGE_DOTS, NOTIFY_CATEGORIES, NotifyToast, draw_page_dots, page_dots_width
 
 
 class TestNotifyToast(unittest.TestCase):
@@ -1193,6 +1193,79 @@ class TestDrawPageDots(unittest.TestCase):
             if len(args) >= 4 and isinstance(args[3], int) and len(call[0]) == 4:
                 radii.append(args[3])
         self.assertIn(1, radii, "Ellipsis small dots (r=1) should be drawn")
+
+    def _count_rendered_slots(self, total_pages, current_page):
+        """overflow 모드에서 실제 렌더링된 고유 슬롯(열) 수 계산."""
+        dot_r = 3  # non-hc default
+        gap = dot_r * 2 + 5  # 11
+        x = 100
+        self.pg.draw.circle.reset_mock()
+        draw_page_dots(self.screen, x, 50, total_pages, current_page,
+                       self.active, self.inactive, self.border)
+        slot_indices = set()
+        for call in self.pg.draw.circle.call_args_list:
+            cx = call[0][2][0]  # position tuple → x
+            si = round((cx - x - dot_r) / gap)
+            slot_indices.add(si)
+        return len(slot_indices)
+
+    def test_overflow_slot_count_always_max(self):
+        """overflow 모드에서 모든 페이지 위치에서 슬롯 수 = MAX_PAGE_DOTS."""
+        total = 30
+        for page in range(total):
+            count = self._count_rendered_slots(total, page)
+            self.assertEqual(count, MAX_PAGE_DOTS,
+                             f"page {page}: expected {MAX_PAGE_DOTS}, got {count}")
+
+    def test_overflow_first_page_slots(self):
+        """첫 페이지에서 슬롯 수가 MAX_PAGE_DOTS여야 한다."""
+        self.assertEqual(self._count_rendered_slots(20, 0), MAX_PAGE_DOTS)
+
+    def test_overflow_last_page_slots(self):
+        """마지막 페이지에서 슬롯 수가 MAX_PAGE_DOTS여야 한다."""
+        self.assertEqual(self._count_rendered_slots(20, 19), MAX_PAGE_DOTS)
+
+
+# ── page_dots_width 테스트 ────────────────────────────
+
+
+class TestPageDotsWidth(unittest.TestCase):
+    """page_dots_width() 너비 계산 테스트."""
+
+    def test_single_page_zero(self):
+        """1페이지면 너비 0."""
+        self.assertEqual(page_dots_width(1), 0)
+
+    def test_zero_pages_zero(self):
+        """0페이지면 너비 0."""
+        self.assertEqual(page_dots_width(0), 0)
+
+    def test_two_pages_positive(self):
+        """2페이지면 양수 너비."""
+        self.assertGreater(page_dots_width(2), 0)
+
+    def test_width_increases_up_to_max(self):
+        """페이지 수 증가에 따라 너비도 MAX_PAGE_DOTS까지 증가."""
+        widths = [page_dots_width(n) for n in range(2, MAX_PAGE_DOTS + 1)]
+        for i in range(len(widths) - 1):
+            self.assertLess(widths[i], widths[i + 1])
+
+    def test_width_capped_at_max(self):
+        """MAX_PAGE_DOTS 초과 시 너비 동일."""
+        w_at_max = page_dots_width(MAX_PAGE_DOTS)
+        w_over = page_dots_width(MAX_PAGE_DOTS + 10)
+        self.assertEqual(w_at_max, w_over)
+
+    def test_width_matches_max_dots(self):
+        """50페이지와 MAX_PAGE_DOTS 페이지의 너비가 같다."""
+        self.assertEqual(page_dots_width(50), page_dots_width(MAX_PAGE_DOTS))
+
+    def test_exact_value_small(self):
+        """정확한 값 계산: 3페이지."""
+        # dot_r=3 (non-hc default), gap=11
+        # (3-1)*11 + 6 = 28
+        w = page_dots_width(3)
+        self.assertEqual(w, 28)
 
 
 if __name__ == "__main__":
