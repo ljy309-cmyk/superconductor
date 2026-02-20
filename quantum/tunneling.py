@@ -23,6 +23,7 @@ from preset_hud import PresetHUD
 
 # ── 물리 엔진 (순수 로직) ────────────────────────────
 from quantum.tunneling_physics import (
+    _TUNNEL_DECAY,
     BARRIER_WIDTH_DEFAULT,
     BARRIER_WIDTH_MAX,
     BARRIER_WIDTH_MIN,
@@ -339,12 +340,16 @@ def _draw_stats(screen, p: QuantumParticle, font, tunnel_prob: float = TUNNEL_PR
 _FORMULA_X = BLOCH_CX - BLOCH_R  # 블로흐 구 좌측 정렬
 _FORMULA_Y = 45
 _FORMULA_W = BLOCH_R * 2  # 블로흐 구 직경과 동일
-_FORMULA_H = 80
+_FORMULA_H = 140
 
 
-def _draw_formula_overlay(screen, font, barrier_width, tunnel_prob):
-    """핵심 터널링 수식 오버레이."""
+def _draw_formula_overlay(screen, font, ctx):
+    """핵심 터널링 수식 오버레이 — 슬라이더 값에 따른 실시간 계산 표시."""
     fx, fy, fw, fh = _FORMULA_X, _FORMULA_Y, _FORMULA_W, _FORMULA_H
+    bw = ctx.barrier_width
+    bp = ctx.base_prob
+    tp = ctx.tunnel_prob
+    p = ctx.particle
 
     # 반투명 배경
     bg_surf = pygame.Surface((fw, fh), pygame.SRCALPHA)
@@ -356,21 +361,47 @@ def _draw_formula_overlay(screen, font, barrier_width, tunnel_prob):
     title = font.render(t("tn_formula_title"), True, ACCENT)
     screen.blit(title, (fx + fw // 2 - title.get_width() // 2, fy + 3))
 
-    # ① 투과 계수: T ≈ e^(−2κL)
-    f1 = font.render("T ≈ e", True, BARRIER_CLR)
-    screen.blit(f1, (fx + 8, fy + 20))
-    # 지수 부분 (위 첨자 느낌으로 작은 오프셋)
-    exp_text = font.render("(−2κL)", True, TEXT_CLR)
-    screen.blit(exp_text, (fx + 8 + f1.get_width(), fy + 17))
+    y = fy + 18
 
-    # ② 감쇠 상수: κ = √(2m(V−E)) / ℏ
-    f2 = font.render("κ = √(2m(V−E)) / ℏ", True, BARRIER_CLR)
-    screen.blit(f2, (fx + 8, fy + 37))
+    # ① 수식: P = P₀ × e^(−κ(L−L₀))
+    f1 = font.render("P = P\u2080 \u00d7 e", True, BARRIER_CLR)
+    screen.blit(f1, (fx + 8, y))
+    exp_text = font.render("(\u2212\u03ba(L\u2212L\u2080))", True, TEXT_CLR)
+    screen.blit(exp_text, (fx + 8 + f1.get_width(), y - 3))
+    y += 16
 
-    # ③ 현재 시뮬레이션 값
-    val_text = f"L={barrier_width}px  →  P={tunnel_prob * 100:.1f}%"
-    val_surf = font.render(val_text, True, TUNNEL_FLASH)
-    screen.blit(val_surf, (fx + 8, fy + 57))
+    # ② 파라미터 값 (슬라이더에서 실시간 반영)
+    params = f"P\u2080={bp:.2f}  \u03ba={_TUNNEL_DECAY}  L={bw}  L\u2080={BARRIER_WIDTH_DEFAULT}"
+    p_surf = font.render(params, True, TEXT_CLR)
+    screen.blit(p_surf, (fx + 8, y))
+    y += 16
+
+    # ③ 지수 계산 과정
+    exponent = -_TUNNEL_DECAY * (bw - BARRIER_WIDTH_DEFAULT)
+    exp_val = math.exp(max(-500.0, min(500.0, exponent)))
+    calc = f"e^({exponent:+.2f}) = {exp_val:.4f}"
+    c_surf = font.render(calc, True, BARRIER_CLR)
+    screen.blit(c_surf, (fx + 8, y))
+    y += 16
+
+    # ④ 최종 결과
+    result = f"P = {bp:.2f} \u00d7 {exp_val:.4f} = {tp * 100:.1f}%"
+    r_surf = font.render(result, True, TUNNEL_FLASH)
+    screen.blit(r_surf, (fx + 8, y))
+    y += 18
+
+    # ⑤ 관측 성공률 vs 이론 확률 비교
+    if p.total_attempts > 0:
+        observed = p.tunnel_count / p.total_attempts
+        diff = observed - tp
+        diff_sign = "+" if diff >= 0 else ""
+        obs_clr = TUNNEL_FLASH if observed >= tp else REFLECT_CLR
+        obs_text = f"Obs {observed * 100:.1f}% vs Th {tp * 100:.1f}% ({diff_sign}{diff * 100:.1f}%)"
+        obs_surf = font.render(obs_text, True, obs_clr)
+        screen.blit(obs_surf, (fx + 8, y))
+    else:
+        no_data = font.render("(no trials yet)", True, OVERLAY_CLR)
+        screen.blit(no_data, (fx + 8, y))
 
 
 def _draw_rate_chart(screen, font, trial_history, tunnel_prob):
@@ -881,7 +912,7 @@ def _render_frame(ctx: _SimContext):
     _draw_sim_area(ctx.screen, ctx.font, ctx.barrier_width, ctx.barrier_hover, ctx.barrier_dragging)
     _draw_trails(ctx.screen, ctx.trails, ctx.current_trail, ctx.particle.tunneled)
     _draw_particle(ctx.screen, ctx.particle, ctx.font)
-    _draw_formula_overlay(ctx.screen, ctx.font, ctx.barrier_width, ctx.tunnel_prob)
+    _draw_formula_overlay(ctx.screen, ctx.font, ctx)
     _draw_bloch_sphere(ctx.screen, ctx.particle, ctx.font, ctx.title_font, ctx.bloch_phi, ctx.bloch_el)
     _draw_stats(ctx.screen, ctx.particle, ctx.font, ctx.tunnel_prob)
     _draw_rate_chart(ctx.screen, ctx.font, ctx.trial_history, ctx.tunnel_prob)

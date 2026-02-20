@@ -12,6 +12,7 @@
 #12 업적 진행도 데이터 검증
 #14 프리셋 중간 전환 (base_prob 파라미터)
 #15 사운드 이펙트 (배리어/업적/속도/프리셋)
+#16 수식 오버레이 동적 계산 검증
 """
 
 import math
@@ -1163,6 +1164,78 @@ class TestSoundEffects(unittest.TestCase):
         self.assertAlmostEqual(snd.volume, 0.6, places=2)
         snd.volume_down(0.2)
         self.assertAlmostEqual(snd.volume, 0.4, places=2)
+
+
+# ── #16 수식 오버레이 동적 계산 ──────────────────────
+
+
+class TestFormulaOverlayCalculations(unittest.TestCase):
+    """수식 오버레이에서 사용하는 계산의 정확성 검증."""
+
+    def test_exponent_at_default_width(self):
+        """기본 두께에서 지수 항은 0."""
+        exponent = -_TUNNEL_DECAY * (BARRIER_WIDTH_DEFAULT - BARRIER_WIDTH_DEFAULT)
+        self.assertAlmostEqual(exponent, 0.0)
+
+    def test_exponent_increases_with_width(self):
+        """두께 증가 → 지수 감소 (음수 방향)."""
+        exp_narrow = -_TUNNEL_DECAY * (10 - BARRIER_WIDTH_DEFAULT)
+        exp_wide = -_TUNNEL_DECAY * (100 - BARRIER_WIDTH_DEFAULT)
+        self.assertGreater(exp_narrow, exp_wide)
+
+    def test_exp_val_at_default_width(self):
+        """기본 두께에서 e^0 = 1."""
+        exponent = -_TUNNEL_DECAY * (BARRIER_WIDTH_DEFAULT - BARRIER_WIDTH_DEFAULT)
+        exp_val = math.exp(exponent)
+        self.assertAlmostEqual(exp_val, 1.0)
+
+    def test_final_prob_equals_calc_tunnel_prob(self):
+        """수식 오버레이 계산이 _calc_tunnel_prob과 일치."""
+        for bw, bp in [(12, 0.1), (50, 0.25), (100, 0.03), (4, 0.5)]:
+            exponent = -_TUNNEL_DECAY * (bw - BARRIER_WIDTH_DEFAULT)
+            exp_val = math.exp(max(-500.0, min(500.0, exponent)))
+            overlay_result = bp * exp_val
+            engine_result = _calc_tunnel_prob(bw, bp)
+            self.assertAlmostEqual(overlay_result, engine_result, places=10, msg=f"bw={bw}, bp={bp}")
+
+    def test_observed_vs_theoretical_sign(self):
+        """관측률 > 이론 → 양수 차이, 관측률 < 이론 → 음수 차이."""
+        observed = 0.15
+        theoretical = 0.10
+        diff = observed - theoretical
+        self.assertGreater(diff, 0.0)
+
+        observed2 = 0.05
+        diff2 = observed2 - theoretical
+        self.assertLess(diff2, 0.0)
+
+    def test_tunnel_decay_is_positive(self):
+        """감쇠 계수 κ는 양수."""
+        self.assertGreater(_TUNNEL_DECAY, 0.0)
+
+    def test_tunnel_decay_is_exported(self):
+        """_TUNNEL_DECAY가 tunneling_physics에서 접근 가능."""
+        from quantum.tunneling_physics import _TUNNEL_DECAY as decay
+
+        self.assertIsInstance(decay, float)
+
+    def test_formula_components_consistency(self):
+        """수식 요소별 계산 합산이 최종 확률과 일치 (다양한 입력)."""
+        test_cases = [
+            (BARRIER_WIDTH_DEFAULT, TUNNEL_PROB_BASE),
+            (BARRIER_WIDTH_MIN, 0.5),
+            (BARRIER_WIDTH_MAX, 0.01),
+            (50, 0.2),
+        ]
+        for bw, bp in test_cases:
+            # 수식 오버레이와 동일한 과정
+            bw_clamped = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, int(bw)))
+            exponent = -_TUNNEL_DECAY * (bw_clamped - BARRIER_WIDTH_DEFAULT)
+            exponent = max(-500.0, min(500.0, exponent))
+            exp_val = math.exp(exponent)
+            manual_result = bp * exp_val
+            engine_result = _calc_tunnel_prob(bw, bp)
+            self.assertAlmostEqual(manual_result, engine_result, places=10)
 
 
 if __name__ == "__main__":
