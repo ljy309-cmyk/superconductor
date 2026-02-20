@@ -785,6 +785,11 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         cycle_sim_speed(-1)
     elif key == pygame.K_RIGHTBRACKET:
         cycle_sim_speed(1)
+    elif key == pygame.K_x and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+        result = _export_session(ctx)
+        if result:
+            ctx.toast.show({"title": t("export_success"), "desc": result})
+            ctx.snd.play("achievement")
     return running
 
 
@@ -972,6 +977,47 @@ def _draw_contextual_hint(screen, font, hint: str, mx: int, my: int):
     screen.blit(surf, (tx + _HINT_PAD, ty + _HINT_PAD))
 
 
+# ── 데이터 내보내기 ──────────────────────────────────
+
+
+def _export_session(ctx) -> str | None:
+    """세션 통계를 JSON + CSV로 내보내기. 저장 경로 반환 (실패 시 None)."""
+    import csv
+    import json
+    import os
+    from datetime import datetime
+
+    export_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "exports")
+    os.makedirs(export_dir, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # ① JSON — 세션 요약
+    session = _build_session_data(ctx)
+    session.pop("trial_history", None)  # CSV에 별도 저장하므로 JSON에서 제거
+    session["timestamp"] = datetime.now().isoformat()
+    json_path = os.path.join(export_dir, f"tunneling_stats_{ts}.json")
+    try:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(session, f, indent=2, ensure_ascii=False)
+    except OSError:
+        _log.warning("JSON 내보내기 실패: %s", json_path)
+        return None
+
+    # ② CSV — 시행별 이력
+    csv_path = os.path.join(export_dir, f"tunneling_trials_{ts}.csv")
+    try:
+        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["trial", "time_s", "barrier_width", "tunnel_prob", "result"])
+            for i, tr in enumerate(ctx.trial_history, 1):
+                writer.writerow([i, tr["t"], tr["barrier"], tr["prob"], int(tr["result"])])
+    except OSError:
+        _log.warning("CSV 내보내기 실패: %s", csv_path)
+
+    _log.info("데이터 내보내기 완료: %s", export_dir)
+    return export_dir
+
+
 # ── 렌더링 ───────────────────────────────────────────
 
 
@@ -1004,7 +1050,7 @@ def _render_frame(ctx: _SimContext):
             pause_state=t("paused") if ctx.paused else t("running_state"),
         ),
         t("hint_click_launch"),
-        t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  G: {t('glossary_title')}",
+        t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})  |  D: Difficulty  |  Ctrl+X: Export  |  G: {t('glossary_title')}",
     ]
     for i, h in enumerate(hints):
         surf = ctx.font.render(h, True, TEXT_CLR)

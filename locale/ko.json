@@ -303,6 +303,8 @@
   "ctx_hint_sim": "클릭: 입자 재발사",
   "ctx_hint_stats": "터널링/반사 통계 및 현재 확률",
 
+  "export_success": "데이터 내보내기 완료",
+
   "hint_reduction_info": "감쇠: x{red:.1f}  |  {shield_state}  |  {pause_state}",
   "hint_qec_controls": "S: 방어막  |  H: 힐링  |  ←→: 감쇠  |  우측 패널: 슬라이더",
 

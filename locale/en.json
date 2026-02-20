@@ -303,6 +303,8 @@
   "ctx_hint_sim": "Click: Relaunch particle",
   "ctx_hint_stats": "Tunneling/reflection stats and probability",
 
+  "export_success": "Data exported successfully",
+
   "hint_reduction_info": "Reduction: x{red:.1f}  |  {shield_state}  |  {pause_state}",
   "hint_qec_controls": "S: Shield  |  H: Healing  |  Left/Right: Reduction  |  Right Panel: Sliders",
 
