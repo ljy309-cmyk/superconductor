@@ -291,7 +291,7 @@
   "hint_params": "↑↓/←→: 파라미터 조절  |  우측 패널: 슬라이더  |  SPACE: 일시정지",
   "hint_reset": "R: 전체 리셋  |  ESC: 종료",
 
-  "hint_speed_info": "속도: x{speed:.1f}  |  벽 두께: {width}px  |  확률: {prob:.1f}%  |  {pause_state}",
+  "hint_speed_info": "속도: x{speed:.1f}  |  Sim: {sim_speed}  |  벽 두께: {width}px  |  확률: {prob:.1f}%  |  {pause_state}",
   "hint_click_launch": "클릭: 재발사  |  ↑↓/←→: 파라미터  |  우측 패널: 슬라이더",
   "hint_pause_reset": "SPACE: 일시정지  |  R: 리셋  |  ESC: 종료",
 

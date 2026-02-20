@@ -291,7 +291,7 @@
   "hint_params": "Up/Down/Left/Right: Adjust Parameters  |  Right Panel: Sliders  |  SPACE: Pause",
   "hint_reset": "R: Full Reset  |  ESC: Exit",
 
-  "hint_speed_info": "Speed: x{speed:.1f}  |  Wall Thickness: {width}px  |  Probability: {prob:.1f}%  |  {pause_state}",
+  "hint_speed_info": "Speed: x{speed:.1f}  |  Sim: {sim_speed}  |  Wall Thickness: {width}px  |  Probability: {prob:.1f}%  |  {pause_state}",
   "hint_click_launch": "Click: Relaunch  |  Up/Down/Left/Right: Parameters  |  Right Panel: Sliders",
   "hint_pause_reset": "SPACE: Pause  |  R: Reset  |  ESC: Exit",
 

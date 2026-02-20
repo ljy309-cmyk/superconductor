@@ -34,6 +34,7 @@ from quantum.tunneling_physics import (
 )
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
+from sim_speed import apply_speed, cycle_sim_speed, speed_label
 from sound_manager import get_sound_manager
 from theme import load_pg_colors, on_theme_change
 from ui.slider import PANEL_W, SliderPanel
@@ -248,7 +249,8 @@ def run_simulation():
 
     running = True
     while running:
-        dt = clock.tick(FPS) / 1000.0
+        raw_dt = clock.tick(FPS) / 1000.0
+        dt = apply_speed(raw_dt)
 
         # ── 이벤트 ───────────────────────────────────
         for event in pygame.event.get():
@@ -277,6 +279,10 @@ def run_simulation():
                     sl_barrier.value = sl_barrier.value - 10
                 elif event.key == pygame.K_l:
                     toggle_locale()
+                elif event.key == pygame.K_LEFTBRACKET:
+                    cycle_sim_speed(-1)
+                elif event.key == pygame.K_RIGHTBRACKET:
+                    cycle_sim_speed(1)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 # 클릭으로 입자 재발사
                 particle.reset()
@@ -359,12 +365,13 @@ def run_simulation():
             t(
                 "hint_speed_info",
                 speed=speed_mult,
+                sim_speed=speed_label(),
                 width=barrier_width,
                 prob=tunnel_prob * 100,
                 pause_state=t("paused") if paused else t("running_state"),
             ),
             t("hint_click_launch"),
-            t("hint_pause_reset"),
+            t("hint_pause_reset") + f"  |  [/]: Sim Speed ({speed_label()})",
         ]
         for i, h in enumerate(hints):
             surf = font.render(h, True, TEXT_CLR)
