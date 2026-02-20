@@ -133,6 +133,8 @@ class SoundManager:
             # 공용
             "preset_change": _sine_wave(660, 50, 0.15),
             "achievement": _dual_tone(523, 1046, 250),
+            "barrier_adjust": _sine_wave(1000, 25, 0.10),
+            "speed_change": _sine_wave(880, 35, 0.12),
         }
 
     def play(self, name: str):

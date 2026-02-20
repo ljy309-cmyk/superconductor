@@ -469,13 +469,14 @@ def _build_progress_snapshot(ctx) -> dict:
 
 
 def _check_realtime_achievements(ctx):
-    """시행 발생 시 업적 확인 → 토스트 표시."""
+    """시행 발생 시 업적 확인 → 토스트 표시 + 효과음."""
     snap = _build_progress_snapshot(ctx)
     new_ach = check_achievements("tunneling", snap)
     for ach in new_ach:
         if ach["id"] not in ctx.unlocked_ids:
             ctx.unlocked_ids.add(ach["id"])
             ctx.toast.show(ach)
+            ctx.snd.play("achievement")
 
 
 def _draw_achievement_progress(screen, font, ctx):
@@ -685,6 +686,7 @@ def _switch_difficulty_midgame(ctx: _SimContext):
         return  # ESC → 취소, 기존 유지
     ctx.preset_hud._apply_preset(chosen)
     ctx.read_sliders()
+    ctx.snd.play("preset_change")
 
 
 # ── 이벤트 처리 ──────────────────────────────────────
@@ -732,12 +734,16 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         ctx.prev_tunneled_state = None
     elif key == pygame.K_UP:
         ctx.sl_speed.value = ctx.sl_speed.value + 0.5
+        ctx.snd.play("speed_change")
     elif key == pygame.K_DOWN:
         ctx.sl_speed.value = ctx.sl_speed.value - 0.5
+        ctx.snd.play("speed_change")
     elif key == pygame.K_RIGHT:
         ctx.sl_barrier.value = ctx.sl_barrier.value + 10
+        ctx.snd.play("barrier_adjust")
     elif key == pygame.K_LEFT:
         ctx.sl_barrier.value = ctx.sl_barrier.value - 10
+        ctx.snd.play("barrier_adjust")
     elif key == pygame.K_l:
         toggle_locale()
     elif key == pygame.K_d:
@@ -774,7 +780,10 @@ def _handle_mouse_motion(ctx: _SimContext, pos: tuple[int, int]):
     mx, my = pos
     if ctx.barrier_dragging:
         half_w = abs(mx - BARRIER_X)
+        old_bw = int(ctx.sl_barrier.value)
         ctx.sl_barrier.value = max(BARRIER_WIDTH_MIN, min(BARRIER_WIDTH_MAX, half_w * 2))
+        if int(ctx.sl_barrier.value) != old_bw:
+            ctx.snd.play("barrier_adjust")
     elif ctx.bloch_dragging:
         dx_m = mx - ctx.bloch_drag_prev[0]
         dy_m = my - ctx.bloch_drag_prev[1]

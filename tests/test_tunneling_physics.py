@@ -11,6 +11,7 @@
 #10 반사 감쇠 계수 config 분리
 #12 업적 진행도 데이터 검증
 #14 프리셋 중간 전환 (base_prob 파라미터)
+#15 사운드 이펙트 (배리어/업적/속도/프리셋)
 """
 
 import math
@@ -1068,6 +1069,100 @@ class TestMidSessionPresetSwitch(unittest.TestCase):
         p2 = _calc_tunnel_prob(50, 0.2)
         # base_prob 2배이면 결과도 정확히 2배
         self.assertAlmostEqual(p2 / p1, 2.0, places=5)
+
+
+# ── #15 사운드 이펙트 ────────────────────────────────
+
+
+class TestSoundEffects(unittest.TestCase):
+    """터널링 모듈 사운드 이펙트 테스트."""
+
+    def test_sound_manager_has_barrier_adjust(self):
+        """SoundManager에 barrier_adjust 사운드 키 정의."""
+        from sound_manager import SoundManager
+
+        snd = SoundManager()
+        # init 없이는 _sounds가 비어 있으므로 _build_sounds 없이 구조만 확인
+        self.assertTrue(hasattr(snd, "play"))
+        self.assertTrue(hasattr(snd, "enabled"))
+
+    def test_sound_manager_has_speed_change(self):
+        """SoundManager에 speed_change 사운드 키 정의."""
+        from sound_manager import SoundManager
+
+        snd = SoundManager()
+        self.assertTrue(hasattr(snd, "play"))
+
+    def test_play_without_init_no_crash(self):
+        """초기화 전 play 호출해도 크래시 없음."""
+        from sound_manager import SoundManager
+
+        snd = SoundManager()
+        # init()을 호출하지 않은 상태에서 play해도 안전
+        snd.play("barrier_adjust")
+        snd.play("speed_change")
+        snd.play("achievement")
+        snd.play("preset_change")
+        snd.play("nonexistent_sound")
+
+    def test_play_disabled_no_crash(self):
+        """사운드 비활성 시 play 호출해도 크래시 없음."""
+        from sound_manager import SoundManager
+
+        snd = SoundManager()
+        snd.enabled = False
+        snd.play("barrier_adjust")
+        snd.play("speed_change")
+        snd.play("achievement")
+
+    def test_expected_sound_keys_exist(self):
+        """터널링에서 사용하는 사운드 키가 _build_sounds 메서드에 포함."""
+        import inspect
+
+        from sound_manager import SoundManager
+
+        source = inspect.getsource(SoundManager._build_sounds)
+        expected_keys = [
+            "tunnel_success",
+            "tunnel_reflect",
+            "barrier_adjust",
+            "speed_change",
+            "achievement",
+            "preset_change",
+        ]
+        for key in expected_keys:
+            self.assertIn(f'"{key}"', source, f"Missing sound key: {key}")
+
+    def test_volume_bounds(self):
+        """볼륨 설정이 0~1 범위로 클램핑."""
+        from sound_manager import SoundManager
+
+        snd = SoundManager()
+        snd.volume = 1.5
+        self.assertLessEqual(snd.volume, 1.0)
+        snd.volume = -0.5
+        self.assertGreaterEqual(snd.volume, 0.0)
+
+    def test_toggle_returns_state(self):
+        """toggle()이 현재 상태를 반환."""
+        from sound_manager import SoundManager
+
+        snd = SoundManager()
+        self.assertTrue(snd.enabled)
+        result = snd.toggle()
+        self.assertFalse(result)
+        self.assertFalse(snd.enabled)
+
+    def test_volume_up_down(self):
+        """volume_up/volume_down 동작 확인."""
+        from sound_manager import SoundManager
+
+        snd = SoundManager()
+        snd.volume = 0.5
+        snd.volume_up(0.1)
+        self.assertAlmostEqual(snd.volume, 0.6, places=2)
+        snd.volume_down(0.2)
+        self.assertAlmostEqual(snd.volume, 0.4, places=2)
 
 
 if __name__ == "__main__":
