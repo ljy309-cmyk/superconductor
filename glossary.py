@@ -213,6 +213,8 @@ class GlossaryOverlay:
             return
 
         w, h = screen.get_size()
+        if w <= 0 or h <= 0:
+            return
 
         # 반투명 배경
         overlay = pygame.Surface((w, h), pygame.SRCALPHA)
