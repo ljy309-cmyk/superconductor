@@ -366,6 +366,25 @@ def run_simulation():
                     game.auto_block_enabled = not game.auto_block_enabled
                 elif event.key == pygame.K_l:
                     toggle_locale()
+                elif event.key == pygame.K_x and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    from session_io import export_session_json
+                    export_session_json("bb84_defense", {
+                        "score": game.score,
+                        "total_sent": game.total_sent,
+                        "total_errors": game.total_errors,
+                        "total_safe": game.total_safe,
+                        "eve_intercepts": game.eve_intercept_count,
+                        "auto_blocks": game.auto_blocks,
+                        "manual_blocks": game.manual_blocks,
+                        "decoy_sent": game.decoy_sent,
+                        "decoy_trapped": game.decoy_trapped,
+                        "qrng_bits_used": game.qrng_bits_used,
+                    })
+                elif event.key == pygame.K_i and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    from session_io import choose_import_file, load_session_json
+                    _imp_path = choose_import_file(screen, font, "bb84_defense")
+                    if _imp_path:
+                        load_session_json(_imp_path)
 
         # ── 업데이트 ─────────────────────────────────
         preset_hud.update(dt)

@@ -160,6 +160,7 @@
   "qa_sc_shortcuts": "이 패널 전환",
   "qa_sc_exit": "메뉴로 돌아가기",
   "qa_sc_export": "통계 내보내기 (JSON)",
+  "qa_sc_import": "통계 가져오기",
   "qa_paused_banner": "일시정지 — P 키로 재개",
   "qa_auto_speed": "속도: {speed}x",
   "qa_fps_counter": "FPS: {fps}",

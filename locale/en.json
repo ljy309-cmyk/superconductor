@@ -160,6 +160,7 @@
   "qa_sc_shortcuts": "Toggle this panel",
   "qa_sc_exit": "Exit to menu",
   "qa_sc_export": "Export stats (JSON)",
+  "qa_sc_import": "Import stats",
   "qa_paused_banner": "PAUSED — press P to resume",
   "qa_auto_speed": "Speed: {speed}x",
   "qa_fps_counter": "FPS: {fps}",

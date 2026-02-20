@@ -1780,12 +1780,9 @@ def _draw_benchmark_overlay(screen, results: list[dict], font, big_font):
 
 def _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp):
     """현재 시뮬레이션 통계를 JSON 파일로 내보내기."""
-    import json
-    import os
-    from datetime import datetime
+    from session_io import export_session_json
 
     data = {
-        "timestamp": datetime.now().isoformat(),
         "mode": ["E91", "Sift", "GHZ", "Compare"][mode],
         "e91": {
             "total_rounds": e91.total_rounds,
@@ -1819,12 +1816,17 @@ def _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp):
             "pa_done": e91_cmp.pa_done,
         },
     }
-    export_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "exports")
-    os.makedirs(export_dir, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(export_dir, f"qkd_stats_{ts}.json")
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    return export_session_json("qkd", data)
+
+
+def _import_qkd_stats(screen, font) -> dict | None:
+    """이전 QKD 세션 데이터 가져오기. 세션 딕셔너리 반환, 취소 시 None."""
+    from session_io import choose_import_file, load_session_json
+
+    json_path = choose_import_file(screen, font, "qkd")
+    if json_path is None:
+        return None
+    return load_session_json(json_path)
 
 
 def _show_session_summary(screen, font, big_font, mode, e91, ghz, bb84_cmp, e91_cmp):
@@ -2069,6 +2071,8 @@ def run_simulation():
                     show_shortcuts = not show_shortcuts
                 elif event.key == pygame.K_x and (pygame.key.get_mods() & pygame.KMOD_CTRL):
                     _export_stats(mode, e91, ghz, bb84_cmp, e91_cmp)
+                elif event.key == pygame.K_i and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    _import_qkd_stats(screen, font)
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 # 모드 탭 클릭 처리
                 mx, my = event.pos
@@ -2429,6 +2433,7 @@ def run_simulation():
                 f"F12     {t('qa_sc_screenshot')}",
                 f"?       {t('qa_sc_shortcuts')}",
                 f"Ctrl+X  {t('qa_sc_export')}",
+                f"Ctrl+I  {t('qa_sc_import')}",
                 f"ESC     {t('qa_sc_exit')}",
             ]
             sc_w, sc_h = 280, len(_sc_lines) * 15 + 16
