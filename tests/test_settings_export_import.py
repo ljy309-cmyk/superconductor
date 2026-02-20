@@ -2493,5 +2493,126 @@ class TestBackupOverwriteWarning(unittest.TestCase):
             shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+# ═══════════════════════════════════════════════════════════
+# 41. list_export_files() 예외 처리 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestListExportFilesExceptionHandling(unittest.TestCase):
+    """list_export_files() os.listdir 실패 시 빈 리스트 반환."""
+
+    def test_oserror_returns_empty(self):
+        import session_io
+        orig = session_io.EXPORT_DIR
+        tmpdir = tempfile.mkdtemp()
+        try:
+            session_io.EXPORT_DIR = tmpdir
+            with unittest.mock.patch("os.listdir", side_effect=PermissionError("denied")):
+                result = session_io.list_export_files("test")
+                self.assertEqual(result, [])
+        finally:
+            session_io.EXPORT_DIR = orig
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ═══════════════════════════════════════════════════════════
+# 42. 파일명/내용 타임스탬프 일관성 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestTimestampConsistency(unittest.TestCase):
+    """export_session의 파일명 ts와 내용 timestamp가 동일 시점."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        import session_io
+        self._orig = session_io.EXPORT_DIR
+        session_io.EXPORT_DIR = self.tmpdir
+
+    def tearDown(self):
+        import session_io
+        session_io.EXPORT_DIR = self._orig
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_json_timestamp_matches_filename(self):
+        from session_io import export_session
+
+        path = export_session("tsc", {"val": 1})
+        self.assertIsNotNone(path)
+
+        # 파일명에서 ts 추출
+        fname = os.path.basename(path)
+        ts_part = fname.replace("tsc_stats_", "").replace(".json", "")
+
+        # 내용에서 timestamp 추출
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        iso_ts = data["timestamp"]  # e.g. 2026-02-20T12:00:00.123456
+
+        # 파일명 ts에서 날짜/시간 추출하여 ISO 타임스탬프와 비교
+        # ts_part: 20260220_120000_123456
+        # iso_ts:  2026-02-20T12:00:00.123456
+        ts_date = ts_part[:8]  # 20260220
+        iso_date = iso_ts[:10].replace("-", "")  # 20260220
+        self.assertEqual(ts_date, iso_date)
+
+        ts_time = ts_part[9:15]  # 120000
+        iso_time = iso_ts[11:19].replace(":", "")  # 120000
+        self.assertEqual(ts_time, iso_time)
+
+    def test_csv_timestamp_matches_filename(self):
+        from session_io import export_session
+
+        path = export_session("tsc", {"val": 1}, fmt="csv")
+        self.assertIsNotNone(path)
+
+        fname = os.path.basename(path)
+        ts_part = fname.replace("tsc_stats_", "").replace(".csv", "")
+
+        with open(path, encoding="utf-8") as f:
+            import csv as csv_mod
+            reader = csv_mod.DictReader(f)
+            row = next(reader)
+        iso_ts = row["timestamp"]
+
+        ts_date = ts_part[:8]
+        iso_date = iso_ts[:10].replace("-", "")
+        self.assertEqual(ts_date, iso_date)
+
+        ts_time = ts_part[9:15]
+        iso_time = iso_ts[11:19].replace(":", "")
+        self.assertEqual(ts_time, iso_time)
+
+
+# ═══════════════════════════════════════════════════════════
+# 43. 빈 ZIP 삭제 실패 시 안전 처리 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestEmptyZipRemoveSafe(unittest.TestCase):
+    """빈 ZIP 삭제 실패해도 None 반환, 크래시 없음."""
+
+    def test_remove_failure_still_returns_none(self):
+        import settings_io
+        orig_base = settings_io._BASE
+        orig_files = settings_io._EXPORT_FILES
+        orig_dirs = settings_io._EXPORT_DIRS
+        tmpdir = tempfile.mkdtemp()
+        try:
+            settings_io._BASE = tmpdir
+            settings_io._EXPORT_FILES = ["nonexistent.json"]
+            settings_io._EXPORT_DIRS = []
+            out_dir = os.path.join(tmpdir, "out")
+
+            with unittest.mock.patch("os.remove", side_effect=OSError("busy")):
+                result = settings_io.export_settings(output_dir=out_dir)
+                self.assertIsNone(result)
+        finally:
+            settings_io._BASE = orig_base
+            settings_io._EXPORT_FILES = orig_files
+            settings_io._EXPORT_DIRS = orig_dirs
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()

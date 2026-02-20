@@ -83,7 +83,10 @@ def export_settings(output_dir: str | None = None) -> str | None:
 
         if file_count == 0:
             _log.warning("내보낼 설정 파일이 없음 — 빈 ZIP 삭제")
-            os.remove(zip_path)
+            try:
+                os.remove(zip_path)
+            except OSError:
+                pass
             return None
 
         _log.info("설정 내보내기 완료: %s (%d개 파일)", zip_path, file_count)

@@ -69,21 +69,22 @@ def export_session(
         저장된 파일 경로. 실패 시 ``None``.
     """
     os.makedirs(EXPORT_DIR, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    now = datetime.now()
+    ts = now.strftime("%Y%m%d_%H%M%S_%f")
 
     if fmt not in ("json", "csv"):
         _log.warning("지원하지 않는 포맷: %s (json으로 대체)", fmt)
         fmt = "json"
 
     if fmt == "csv":
-        return _export_as_csv(prefix, session_data, ts, trial_rows, trial_columns, trial_row_fn)
-    return _export_as_json(prefix, session_data, ts, trial_rows)
+        return _export_as_csv(prefix, session_data, ts, now, trial_rows, trial_columns, trial_row_fn)
+    return _export_as_json(prefix, session_data, ts, now, trial_rows)
 
 
-def _export_as_json(prefix, session_data, ts, trial_rows=None):
+def _export_as_json(prefix, session_data, ts, now, trial_rows=None):
     """JSON 포맷으로 내보내기 (내부)."""
     data = dict(session_data)
-    data["timestamp"] = datetime.now().isoformat()
+    data["timestamp"] = now.isoformat()
     if trial_rows:
         data["trial_history"] = trial_rows
     path = os.path.join(EXPORT_DIR, f"{prefix}_stats_{ts}.json")
@@ -97,7 +98,7 @@ def _export_as_json(prefix, session_data, ts, trial_rows=None):
     return path
 
 
-def _export_as_csv(prefix, session_data, ts, trial_rows=None, trial_columns=None, trial_row_fn=None):
+def _export_as_csv(prefix, session_data, ts, now, trial_rows=None, trial_columns=None, trial_row_fn=None):
     """CSV 포맷으로 내보내기 (내부)."""
     path = os.path.join(EXPORT_DIR, f"{prefix}_stats_{ts}.csv")
     try:
@@ -116,7 +117,7 @@ def _export_as_csv(prefix, session_data, ts, trial_rows=None, trial_columns=None
             else:
                 # 세션 요약만 flat CSV로
                 data = dict(session_data)
-                data["timestamp"] = datetime.now().isoformat()
+                data["timestamp"] = now.isoformat()
                 headers = list(data.keys())
                 values = []
                 for k in headers:
@@ -150,8 +151,13 @@ def list_export_files(prefix: str) -> list[tuple[str, str]]:
     stats_prefix = f"{prefix}_stats_"
     if not os.path.isdir(EXPORT_DIR):
         return []
+    try:
+        entries = sorted(os.listdir(EXPORT_DIR), reverse=True)
+    except OSError as e:
+        _log.warning("내보내기 목록 조회 실패: %s", e)
+        return []
     files = []
-    for f in sorted(os.listdir(EXPORT_DIR), reverse=True):
+    for f in entries:
         if not f.startswith(stats_prefix):
             continue
         if f.endswith(".json"):
@@ -291,7 +297,6 @@ def choose_import_file(screen, font, prefix: str) -> str | None:
             btn = _import_btn_rect(W, H, vi)
             is_sel = idx == selected
             bg_alpha = 80 if is_sel else 30
-            btn_surf.fill((0, 0, 0, 0))
             btn_surf.fill((*pg.ACCENT_BLUE[:3], bg_alpha))
             screen.blit(btn_surf, btn.topleft)
             border_w = 2 if is_sel else 1

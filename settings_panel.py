@@ -15,7 +15,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 from logger import get_module_logger
-from font_helper import get_font_family, get_user_font, list_available_fonts, set_user_font
+from font_helper import get_font_family, get_user_font, set_user_font
 from i18n import get_locale, set_locale, t
 from sound_manager import get_sound_manager
 from theme import (
@@ -248,7 +248,7 @@ class SettingsPanel(tk.Toplevel):
             cjk = [f for f in families if any(kw in f.lower() for kw in cjk_keywords)]
             others = [f for f in families if f not in cjk]
             return cjk + others if cjk else families
-        except Exception:
+        except (OSError, subprocess.TimeoutExpired, ValueError):
             return [get_font_family()]
 
     def _change_font(self, family):
@@ -364,7 +364,6 @@ class SettingsPanel(tk.Toplevel):
         scrollbar.pack(side="right", fill="y")
         lb.pack(side="left", fill="both", expand=True)
 
-        import os
         for path in exports:
             lb.insert("end", os.path.basename(path))
         if exports:
