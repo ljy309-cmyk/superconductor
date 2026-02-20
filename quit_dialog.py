@@ -2,6 +2,7 @@
 
 import pygame
 
+from font_helper import get_font
 from i18n import t
 from theme import get_pg_theme
 
@@ -15,8 +16,8 @@ def confirm_quit(screen, font=None) -> bool:
     W, H = screen.get_size()
 
     if font is None:
-        font = pygame.font.SysFont("Consolas", 14)
-    bold_font = pygame.font.SysFont("Consolas", 16, bold=True)
+        font = get_font(14)
+    bold_font = get_font(16, bold=True)
 
     # 반투명 오버레이
     overlay = pygame.Surface((W, H), pygame.SRCALPHA)

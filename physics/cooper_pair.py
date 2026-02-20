@@ -13,6 +13,7 @@ import time
 import pygame
 
 from config_loader import cfg
+from font_helper import get_font
 from game_base import finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
@@ -91,9 +92,9 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption(t("game_title_cooper_pair"))
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 13)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
-    small_font = pygame.font.SysFont("Consolas", 11)
+    font = get_font(13)
+    title_font = get_font(18, bold=True)
+    small_font = get_font(11)
 
     help_overlay = HelpOverlay("cooper_pair")
     snd = get_sound_manager()

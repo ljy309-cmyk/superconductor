@@ -506,7 +506,7 @@ class TestTheme(unittest.TestCase):
     def test_fonts_defined(self):
         from theme import FONTS
 
-        self.assertEqual(FONTS.FAMILY, "Consolas")
+        self.assertEqual(FONTS.FAMILY, "WenQuanYi Zen Hei Mono")
         self.assertIsInstance(FONTS.TITLE, tuple)
 
 

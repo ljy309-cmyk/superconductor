@@ -14,6 +14,7 @@ quit_dialog.py와 같은 패턴으로, 각 모듈의 run_simulation()에서 호�
 
 import pygame
 
+from font_helper import get_font
 from i18n import t
 from theme import get_pg_theme
 
@@ -35,9 +36,9 @@ def choose_difficulty(screen: pygame.Surface, font: pygame.font.Font | None = No
     W, H = screen.get_size()
 
     if font is None:
-        font = pygame.font.SysFont("Consolas", 14)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
-    key_font = pygame.font.SysFont("Consolas", 14, bold=True)
+        font = get_font(14)
+    title_font = get_font(18, bold=True)
+    key_font = get_font(14, bold=True)
 
     # 색상 매핑
     diff_colors = {

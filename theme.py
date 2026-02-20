@@ -116,7 +116,7 @@ class FONTS:
     font_scale 변경 시 프로퍼티처럼 동적으로 반환합니다.
     """
 
-    FAMILY = "Consolas"
+    FAMILY = "WenQuanYi Zen Hei Mono"
 
     @staticmethod
     def _f(size, bold=False):

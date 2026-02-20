@@ -2,6 +2,7 @@
 
 import pygame
 
+from font_helper import get_font
 from i18n import t
 from theme import get_pg_theme
 
@@ -25,9 +26,9 @@ def draw_game_summary(screen, title: str, stats: list[tuple[str, str]], font=Non
     screen.blit(overlay, (0, 0))
 
     if font is None:
-        font = pygame.font.SysFont("Consolas", 13)
+        font = get_font(13)
     if title_font is None:
-        title_font = pygame.font.SysFont("Consolas", 20, bold=True)
+        title_font = get_font(20, bold=True)
 
     # 패널 크기 계산
     line_h = 22

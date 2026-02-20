@@ -15,6 +15,7 @@ import pygame
 
 from achievement_toast import AchievementToast
 from config_loader import cfg
+from font_helper import get_font
 from game_base import finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
@@ -616,9 +617,9 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption(t("game_title_entanglement"))
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 13)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
-    info_font = pygame.font.SysFont("Consolas", 11)
+    font = get_font(13)
+    title_font = get_font(18, bold=True)
+    info_font = get_font(11)
 
     gs = EntanglementState()
     gs.reset_teleport()  # 초기 랜덤 상태

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 import pygame
 
 from config_loader import cfg
+from font_helper import get_font
 from game_base import choose_difficulty_or_quit, finalize_session
 from help_overlay import HelpOverlay
 from logger import get_module_logger
@@ -261,9 +262,9 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption("SQUID Minesweeper — Magnetic Flux Sensor")
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 12)
-    big_font = pygame.font.SysFont("Consolas", 16, bold=True)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
+    font = get_font(12)
+    big_font = get_font(16, bold=True)
+    title_font = get_font(18, bold=True)
 
     game = SQUIDGame()
     gs = SQUIDMinesState()

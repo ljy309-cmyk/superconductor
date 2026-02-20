@@ -15,6 +15,7 @@ import pygame
 from achievement_toast import AchievementToast
 from achievements import check_achievements
 from config_loader import cfg
+from font_helper import get_font
 from game_base import choose_difficulty_or_quit, finalize_session
 from game_summary import draw_game_summary
 from help_overlay import HelpOverlay
@@ -318,9 +319,9 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption(t("game_title_qubit_chain"))
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 12)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
-    info_font = pygame.font.SysFont("Consolas", 11)
+    font = get_font(12)
+    title_font = get_font(18, bold=True)
+    info_font = get_font(11)
 
     nodes = _build_network()
     gs = QubitChainState()

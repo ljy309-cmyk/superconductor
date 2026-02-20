@@ -15,6 +15,7 @@ from achievement_toast import AchievementToast
 from achievements import check_achievements
 from config_loader import cfg
 from difficulty_dialog import choose_difficulty
+from font_helper import get_font
 from game_base import choose_difficulty_or_quit, finalize_session
 from glossary import GlossaryOverlay
 from help_overlay import HelpOverlay
@@ -377,7 +378,7 @@ def _draw_wavefunction(screen, barrier_width: int, tunnel_prob: float, time_ms: 
     pygame.draw.line(surf, (*TEXT_CLR[:3], 30), (0, base_y), (SIM_W, base_y), 1)
 
     # ψ(x) 라벨
-    lbl = _tcache.render(pygame.font.SysFont("Consolas", 10), "\u03c8(x)", (*ACCENT[:3],))
+    lbl = _tcache.render(get_font(10), "\u03c8(x)", (*ACCENT[:3],))
     surf.blit(lbl, (4, base_y - 14))
 
     screen.blit(surf, (SIM_LEFT, SIM_TOP))
@@ -1234,9 +1235,9 @@ class _SimContext:
         self.screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
         pygame.display.set_caption(t("game_title_tunneling"))
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("Consolas", 12)
-        self.title_font = pygame.font.SysFont("Consolas", 16, bold=True)
-        self.big_font = pygame.font.SysFont("Consolas", 18, bold=True)
+        self.font = get_font(12)
+        self.title_font = get_font(16, bold=True)
+        self.big_font = get_font(18, bold=True)
 
         self.particle = QuantumParticle()
         self.paused = False
