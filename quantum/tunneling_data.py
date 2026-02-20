@@ -13,17 +13,12 @@ from quantum.tunneling_physics import (
     BARRIER_WIDTH_MIN,
 )
 from session_io import (
-    EXPORT_DIR,
     choose_import_file,
     export_session_json,
-    list_export_files,
     load_session_with_trials,
 )
 
 _log = get_module_logger("tunneling")
-
-# 하위 호환용 — 기존 코드가 tunneling_data._EXPORT_DIR 을 참조
-_EXPORT_DIR = EXPORT_DIR
 
 _PREFIX = "tunneling"
 
@@ -83,22 +78,6 @@ def _export_session(ctx) -> str | None:
 # ── 데이터 가져오기 ──────────────────────────────────
 
 
-def _list_export_files() -> list[tuple[str, str]]:
-    """tunneling 내보내기 파일 목록. [(표시명, JSON경로), ...] 최신순."""
-    return list_export_files(_PREFIX)
-
-
-def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int):
-    """하위 호환 — session_io._import_btn_rect 위임."""
-    from session_io import _import_btn_rect
-    return _import_btn_rect(screen_w, screen_h, vis_index)
-
-
-def _choose_export_file(screen, font) -> str | None:
-    """내보내기 파일 선택 대화상자. JSON 경로 반환, 취소 시 None."""
-    return choose_import_file(screen, font, _PREFIX)
-
-
 def _load_import_data(json_path: str) -> tuple[dict | None, list[dict]]:
     """JSON 세션 + CSV 시행 이력 로드."""
     return load_session_with_trials(
@@ -115,7 +94,7 @@ def _load_import_data(json_path: str) -> tuple[dict | None, list[dict]]:
 
 def _import_session(ctx) -> bool:
     """내보내기 파일을 선택하고 파라미터 적용 + 비교 데이터 로드."""
-    json_path = _choose_export_file(ctx.screen, ctx.font)
+    json_path = choose_import_file(ctx.screen, ctx.font, _PREFIX)
     if json_path is None:
         return False
 

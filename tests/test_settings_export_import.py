@@ -935,46 +935,6 @@ class TestTunnelingDataImport(unittest.TestCase):
         self.assertEqual(trials, [])
 
 
-# ═══════════════════════════════════════════════════════════
-# 10. tunneling_data — _list_export_files / EXPORT_DIR
-# ═══════════════════════════════════════════════════════════
-
-
-class TestTunnelingDataExportFiles(unittest.TestCase):
-    """tunneling_data._list_export_files 및 하위 호환성."""
-
-    def setUp(self):
-        self.tmpdir = tempfile.mkdtemp()
-        import session_io
-
-        self._orig_export_dir = session_io.EXPORT_DIR
-        session_io.EXPORT_DIR = self.tmpdir
-
-        # tunneling_data도 EXPORT_DIR을 참조하므로 동기화
-        import quantum.tunneling_data as td
-
-        td._EXPORT_DIR = self.tmpdir
-
-    def tearDown(self):
-        import session_io
-
-        session_io.EXPORT_DIR = self._orig_export_dir
-        shutil.rmtree(self.tmpdir, ignore_errors=True)
-
-    def test_list_export_files(self):
-        from quantum.tunneling_data import _list_export_files
-
-        for name in [
-            "tunneling_stats_20260101.json",
-            "tunneling_stats_20260201.json",
-            "other_stats_20260101.json",
-        ]:
-            with open(os.path.join(self.tmpdir, name), "w") as f:
-                f.write("{}")
-
-        result = _list_export_files()
-        self.assertEqual(len(result), 2)
-
 
 # ═══════════════════════════════════════════════════════════
 # 11. settings_io — ZIP 구조 무결성 검증

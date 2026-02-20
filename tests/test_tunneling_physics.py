@@ -1604,7 +1604,7 @@ class TestImportSession(unittest.TestCase):
 
     def test_load_import_json(self):
         """JSON 파일에서 세션 데이터 로드."""
-        from quantum.tunneling import _load_import_data
+        from quantum.tunneling_data import _load_import_data
 
         session, _ = _load_import_data(self.json_path)
         self.assertIsNotNone(session)
@@ -1614,7 +1614,7 @@ class TestImportSession(unittest.TestCase):
 
     def test_load_import_csv(self):
         """매칭 CSV 파일에서 시행 이력 로드."""
-        from quantum.tunneling import _load_import_data
+        from quantum.tunneling_data import _load_import_data
 
         _, trials = _load_import_data(self.json_path)
         self.assertEqual(len(trials), 4)
@@ -1623,7 +1623,7 @@ class TestImportSession(unittest.TestCase):
 
     def test_load_import_csv_fields(self):
         """가져온 시행 데이터의 필드 구조."""
-        from quantum.tunneling import _load_import_data
+        from quantum.tunneling_data import _load_import_data
 
         _, trials = _load_import_data(self.json_path)
         tr = trials[0]
@@ -1642,7 +1642,7 @@ class TestImportSession(unittest.TestCase):
         with open(json_only, "w", encoding="utf-8") as f:
             json.dump({"total_attempts": 5}, f)
 
-        from quantum.tunneling import _load_import_data
+        from quantum.tunneling_data import _load_import_data
 
         session, trials = _load_import_data(json_only)
         self.assertIsNotNone(session)
@@ -1654,7 +1654,7 @@ class TestImportSession(unittest.TestCase):
         with open(bad_path, "w") as f:
             f.write("{invalid json}")
 
-        from quantum.tunneling import _load_import_data
+        from quantum.tunneling_data import _load_import_data
 
         session, trials = _load_import_data(bad_path)
         self.assertIsNone(session)
@@ -1662,7 +1662,7 @@ class TestImportSession(unittest.TestCase):
 
     def test_load_import_missing_file(self):
         """존재하지 않는 파일 → None 반환."""
-        from quantum.tunneling import _load_import_data
+        from quantum.tunneling_data import _load_import_data
 
         session, trials = _load_import_data("/nonexistent/path.json")
         self.assertIsNone(session)
@@ -1670,10 +1670,10 @@ class TestImportSession(unittest.TestCase):
 
     def test_list_export_files(self):
         """내보내기 파일 목록 함수 존재 및 호출 가능."""
-        from quantum.tunneling import _list_export_files
+        from session_io import list_export_files
 
-        self.assertTrue(callable(_list_export_files))
-        result = _list_export_files()
+        self.assertTrue(callable(list_export_files))
+        result = list_export_files("tunneling")
         self.assertIsInstance(result, list)
 
     def test_import_function_exists(self):
@@ -1684,7 +1684,7 @@ class TestImportSession(unittest.TestCase):
 
     def test_imported_overlay_rates(self):
         """가져온 시행 이력에서 누적 확률 계산 검증."""
-        from quantum.tunneling import _load_import_data
+        from quantum.tunneling_data import _load_import_data
 
         _, trials = _load_import_data(self.json_path)
         # 수동 누적 확률 계산: [1,0,1,1] → [1/1, 1/2, 2/3, 3/4]

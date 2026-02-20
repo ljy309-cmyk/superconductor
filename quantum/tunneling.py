@@ -656,14 +656,9 @@ def _draw_contextual_hint(screen, font, hint: str, mx: int, my: int):
 
 # ── 데이터 I/O (분리 모듈) ─────────────────────────────
 from quantum.tunneling_data import (
-    _EXPORT_DIR,
     _build_session_data,
-    _choose_export_file,
     _export_session,
-    _import_btn_rect,
     _import_session,
-    _list_export_files,
-    _load_import_data,
 )
 
 
