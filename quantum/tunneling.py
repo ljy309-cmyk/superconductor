@@ -44,9 +44,16 @@ from quantum.tunneling_physics import (
     SIM_W,
     TUNNEL_PROB_BASE,
     TUNNEL_SPEED_BOOST,
+    SHAPE_DOUBLE,
+    SHAPE_NAMES,
+    SHAPE_RECT,
+    SHAPE_TRAPEZOID,
+    SHAPE_TRIANGLE,
+    _NUM_SHAPES,
     DensityAccumulator,
     QuantumParticle,
     _calc_tunnel_prob,
+    barrier_potential,
     compute_potential_profile,
     compute_wavefunction,
 )
@@ -66,6 +73,9 @@ MODE_COMPARE = 2
 MODE_QC = 3  # 양자 vs 고전 비교 분석
 _NUM_MODES = 4
 _MODE_TAB_KEYS = ["tn_tab_step", "tn_tab_auto", "tn_tab_compare", "tn_tab_qc"]
+
+# 장벽 형태 상태
+_barrier_shape = SHAPE_RECT
 COMPARE_TARGET = 50  # 비교 모드: 각 장벽당 총 시행 횟수
 QC_TARGET = 100  # QC 분석: 각 모델당 시행 횟수
 
@@ -233,19 +243,70 @@ def _rebuild_layout(w: int, h: int):
 def _draw_sim_area(screen, font, barrier_width: int = BARRIER_WIDTH_DEFAULT):
     """시뮬레이션 영역 배경."""
     hc = is_high_contrast()
+    shape = _barrier_shape
     pygame.draw.rect(screen, SURFACE_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H))
     border_w = 2 if hc else 1
     pygame.draw.rect(screen, OVERLAY_CLR, (SIM_LEFT, SIM_TOP, SIM_W, SIM_H), border_w)
 
-    # 장벽
+    # 장벽 — 형태별 렌더링
     bx = BARRIER_X - barrier_width // 2
-    pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, barrier_width, SIM_H))
-    _draw_bar_pattern(screen, (bx, SIM_TOP, barrier_width, SIM_H), BARRIER_CLR, "mid")
-    if hc:
-        pygame.draw.rect(screen, TEXT_CLR, (bx, SIM_TOP, barrier_width, SIM_H), 1)
+    half_w = barrier_width / 2.0
+
+    if shape == SHAPE_RECT:
+        pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, barrier_width, SIM_H))
+        _draw_bar_pattern(screen, (bx, SIM_TOP, barrier_width, SIM_H), BARRIER_CLR, "mid")
+        if hc:
+            pygame.draw.rect(screen, TEXT_CLR, (bx, SIM_TOP, barrier_width, SIM_H), 1)
+
+    elif shape == SHAPE_TRIANGLE:
+        # 삼각형: 중앙 꼭짓점, 양 끝 바닥
+        mid_x = BARRIER_X
+        pts = [
+            (bx, SIM_TOP + SIM_H),
+            (mid_x, SIM_TOP),
+            (bx + barrier_width, SIM_TOP + SIM_H),
+        ]
+        pygame.draw.polygon(screen, BARRIER_CLR, pts)
+        outline_w = 2 if hc else 1
+        pygame.draw.polygon(screen, TEXT_CLR if hc else BARRIER_CLR, pts, outline_w)
+
+    elif shape == SHAPE_TRAPEZOID:
+        # 사다리꼴: 양쪽 경사 + 중앙 평탄
+        ramp_w = int(barrier_width * 0.3)
+        pts = [
+            (bx, SIM_TOP + SIM_H),
+            (bx + ramp_w, SIM_TOP),
+            (bx + barrier_width - ramp_w, SIM_TOP),
+            (bx + barrier_width, SIM_TOP + SIM_H),
+        ]
+        pygame.draw.polygon(screen, BARRIER_CLR, pts)
+        outline_w = 2 if hc else 1
+        pygame.draw.polygon(screen, TEXT_CLR if hc else BARRIER_CLR, pts, outline_w)
+
+    elif shape == SHAPE_DOUBLE:
+        # 이중장벽: 두 벽 + 사이 빈 공간
+        wall_w = max(int(barrier_width * 0.3), 2)
+        gap_start = bx + wall_w
+        gap_end = bx + barrier_width - wall_w
+        # 왼쪽 벽
+        pygame.draw.rect(screen, BARRIER_CLR, (bx, SIM_TOP, wall_w, SIM_H))
+        _draw_bar_pattern(screen, (bx, SIM_TOP, wall_w, SIM_H), BARRIER_CLR, "mid")
+        # 오른쪽 벽
+        pygame.draw.rect(screen, BARRIER_CLR, (gap_end, SIM_TOP, wall_w, SIM_H))
+        _draw_bar_pattern(screen, (gap_end, SIM_TOP, wall_w, SIM_H), BARRIER_CLR, "mid")
+        # 우물 영역 표시 (연한 배경)
+        well_w = max(gap_end - gap_start, 1)
+        well_surf = pygame.Surface((well_w, SIM_H), pygame.SRCALPHA)
+        well_surf.fill((*TUNNEL_FLASH[:3], 25))
+        screen.blit(well_surf, (gap_start, SIM_TOP))
+        if hc:
+            pygame.draw.rect(screen, TEXT_CLR, (bx, SIM_TOP, wall_w, SIM_H), 1)
+            pygame.draw.rect(screen, TEXT_CLR, (gap_end, SIM_TOP, wall_w, SIM_H), 1)
 
     # 장벽 라벨
-    label = font.render(t("tn_barrier"), True, BG)
+    shape_key = f"tn_shape_{SHAPE_NAMES[shape]}"
+    label_text = t("tn_barrier") + f" ({t(shape_key)})"
+    label = font.render(label_text, True, BG)
     label_rot = pygame.transform.rotate(label, 90)
     screen.blit(label_rot, (bx - 2, SIM_TOP + SIM_H // 2 - label_rot.get_height() // 2))
 
@@ -410,7 +471,7 @@ def _draw_wavefunction(screen, font, barrier_width: int, time_ms: float):
     else:
         phase = time_ms / 1000.0 * _WF_ANIM_SPEED
 
-    xs, amps, regions = compute_wavefunction(barrier_width, _WF_N_POINTS, phase)
+    xs, amps, regions = compute_wavefunction(barrier_width, _WF_N_POINTS, phase, shape=_barrier_shape)
 
     # 그래프 영역 배경 (반투명)
     graph_rect = (SIM_LEFT, L.wf_y, SIM_W, L.wf_h)
@@ -518,7 +579,7 @@ def _draw_potential_energy(screen, font, barrier_width: int):
     hc = is_high_contrast()
 
     xs, potentials, energy = compute_potential_profile(
-        barrier_width, _PE_N_POINTS
+        barrier_width, _PE_N_POINTS, shape=_barrier_shape
     )
 
     # 그래프 영역 배경 (반투명)
@@ -539,32 +600,32 @@ def _draw_potential_energy(screen, font, barrier_width: int):
     pygame.draw.line(screen, BLOCH_RING, (SIM_LEFT, base_y),
                      (SIM_LEFT + SIM_W, base_y), 1)
 
-    # V(x) 장벽 채움 — 사각형 포텐셜 장벽
+    # V(x) 장벽 좌표 계산
     half_w = barrier_width / 2.0
     bx_left = int(BARRIER_X - half_w)
     bx_right = int(BARRIER_X + half_w)
     bw_px = max(bx_right - bx_left, 1)
 
-    # 장벽 영역 채움 (반투명 노란색)
-    fill_surf = pygame.Surface((bw_px, usable_h), pygame.SRCALPHA)
-    fill_surf.fill((*BARRIER_CLR[:3], 60))
-    screen.blit(fill_surf, (bx_left, top_y))
-
-    # V(x) 윤곽선 — 계단 형태
+    # V(x) 윤곽선 — 형태에 따른 곡선
     v_line_w = 2 if hc else 2
-    # 바닥 → 장벽 좌측 상승
-    pygame.draw.line(screen, BARRIER_CLR, (SIM_LEFT, base_y),
-                     (bx_left, base_y), v_line_w)
-    pygame.draw.line(screen, BARRIER_CLR, (bx_left, base_y),
-                     (bx_left, top_y), v_line_w)
-    # 장벽 상단
-    pygame.draw.line(screen, BARRIER_CLR, (bx_left, top_y),
-                     (bx_right, top_y), v_line_w)
-    # 장벽 우측 하강 → 바닥
-    pygame.draw.line(screen, BARRIER_CLR, (bx_right, top_y),
-                     (bx_right, base_y), v_line_w)
-    pygame.draw.line(screen, BARRIER_CLR, (bx_right, base_y),
-                     (SIM_LEFT + SIM_W, base_y), v_line_w)
+    v_points = []
+    for i in range(len(xs)):
+        px = int(xs[i])
+        py = int(base_y - potentials[i] * usable_h)
+        v_points.append((px, py))
+
+    # 채움 영역 (반투명)
+    if len(v_points) >= 2:
+        fill_pts = list(v_points) + [(v_points[-1][0], base_y), (v_points[0][0], base_y)]
+        fill_surf = pygame.Surface((SIM_W, L.pe_h), pygame.SRCALPHA)
+        shifted = [(p[0] - SIM_LEFT, p[1] - L.pe_y) for p in fill_pts]
+        if len(shifted) >= 3:
+            pygame.draw.polygon(fill_surf, (*BARRIER_CLR[:3], 60), shifted)
+            screen.blit(fill_surf, (SIM_LEFT, L.pe_y))
+
+    # V(x) 윤곽선
+    if len(v_points) > 1:
+        pygame.draw.lines(screen, BARRIER_CLR, False, v_points, v_line_w)
 
     # E (입자 에너지) 수평 점선 — 파란색
     e_y = int(base_y - energy * usable_h)
@@ -1221,6 +1282,12 @@ def run_simulation():
                     _density_visible = not _density_visible
                     key = "tn_dm_on" if _density_visible else "tn_dm_off"
                     _notify(t(key), "info", 1.0)
+                    snd.play("click")
+                elif event.key == pygame.K_b:
+                    global _barrier_shape
+                    _barrier_shape = (_barrier_shape + 1) % _NUM_SHAPES
+                    shape_key = f"tn_shape_{SHAPE_NAMES[_barrier_shape]}"
+                    _notify(t("tn_shape_changed", shape=t(shape_key)), "info", 1.5)
                     snd.play("click")
                 elif event.key == pygame.K_l:
                     toggle_locale()

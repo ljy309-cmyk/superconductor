@@ -15,6 +15,11 @@ from quantum.tunneling_physics import (
     BARRIER_X,
     PARTICLE_RADIUS,
     PARTICLE_SPEED,
+    SHAPE_DOUBLE,
+    SHAPE_NAMES,
+    SHAPE_RECT,
+    SHAPE_TRAPEZOID,
+    SHAPE_TRIANGLE,
     SIM_H,
     SIM_LEFT,
     SIM_TOP,
@@ -22,6 +27,7 @@ from quantum.tunneling_physics import (
     SUPERPOSITION_HZ,
     TUNNEL_PROB_BASE,
     TUNNEL_SPEED_BOOST,
+    _NUM_SHAPES,
     QuantumParticle,
     _REFLECT_FLASH,
     _TUNNEL_DECAY,
@@ -29,6 +35,7 @@ from quantum.tunneling_physics import (
     _VY_RANGE,
     DensityAccumulator,
     _calc_tunnel_prob,
+    barrier_potential,
     compute_potential_profile,
     compute_wavefunction,
 )
@@ -1860,6 +1867,149 @@ class TestDensityAccumulator(unittest.TestCase):
         for d in acc.get_density():
             self.assertGreaterEqual(d, 0.0)
             self.assertLessEqual(d, 1.0)
+
+
+# ══════════════════════════════════════════════════════
+# 장벽 형태별 포텐셜 함수
+# ══════════════════════════════════════════════════════
+
+
+class TestBarrierPotential(unittest.TestCase):
+    """barrier_potential() 함수 — 형태별 포텐셜 V(x) 단위 테스트."""
+
+    # ── 사각형 (SHAPE_RECT) ──
+
+    def test_rect_inside_is_one(self):
+        """사각형: 장벽 내부 V=1.0."""
+        v = barrier_potential(BARRIER_X, BARRIER_WIDTH_DEFAULT, SHAPE_RECT)
+        self.assertAlmostEqual(v, 1.0)
+
+    def test_rect_outside_is_zero(self):
+        """사각형: 장벽 외부 V=0.0."""
+        v = barrier_potential(SIM_LEFT, BARRIER_WIDTH_DEFAULT, SHAPE_RECT)
+        self.assertAlmostEqual(v, 0.0)
+
+    # ── 삼각형 (SHAPE_TRIANGLE) ──
+
+    def test_triangle_center_is_one(self):
+        """삼각형: 중앙 V=1.0."""
+        v = barrier_potential(BARRIER_X, BARRIER_WIDTH_DEFAULT, SHAPE_TRIANGLE)
+        self.assertAlmostEqual(v, 1.0)
+
+    def test_triangle_edges_near_zero(self):
+        """삼각형: 가장자리 V≈0."""
+        half_w = BARRIER_WIDTH_DEFAULT / 2.0
+        bl = BARRIER_X - half_w
+        v = barrier_potential(bl + 0.1, BARRIER_WIDTH_DEFAULT, SHAPE_TRIANGLE)
+        self.assertLess(v, 0.1)
+
+    def test_triangle_outside_is_zero(self):
+        """삼각형: 외부 V=0.0."""
+        v = barrier_potential(SIM_LEFT, BARRIER_WIDTH_DEFAULT, SHAPE_TRIANGLE)
+        self.assertAlmostEqual(v, 0.0)
+
+    # ── 사다리꼴 (SHAPE_TRAPEZOID) ──
+
+    def test_trapezoid_center_is_one(self):
+        """사다리꼴: 중앙 평탄부 V=1.0."""
+        v = barrier_potential(BARRIER_X, BARRIER_WIDTH_DEFAULT, SHAPE_TRAPEZOID)
+        self.assertAlmostEqual(v, 1.0)
+
+    def test_trapezoid_ramp_intermediate(self):
+        """사다리꼴: 경사구간 V는 0~1 사이."""
+        half_w = BARRIER_WIDTH_DEFAULT / 2.0
+        bl = BARRIER_X - half_w
+        ramp = (1.0 - 0.4) / 2.0  # _TRAP_TOP_RATIO = 0.4
+        ramp_mid_x = bl + BARRIER_WIDTH_DEFAULT * ramp / 2.0
+        v = barrier_potential(ramp_mid_x, BARRIER_WIDTH_DEFAULT, SHAPE_TRAPEZOID)
+        self.assertGreater(v, 0.0)
+        self.assertLess(v, 1.0)
+
+    def test_trapezoid_outside_is_zero(self):
+        """사다리꼴: 외부 V=0.0."""
+        v = barrier_potential(SIM_LEFT, BARRIER_WIDTH_DEFAULT, SHAPE_TRAPEZOID)
+        self.assertAlmostEqual(v, 0.0)
+
+    # ── 이중장벽 (SHAPE_DOUBLE) ──
+
+    def test_double_wall_is_one(self):
+        """이중장벽: 벽 영역 V=1.0."""
+        half_w = BARRIER_WIDTH_DEFAULT / 2.0
+        bl = BARRIER_X - half_w
+        wall_mid = bl + BARRIER_WIDTH_DEFAULT * 0.15
+        v = barrier_potential(wall_mid, BARRIER_WIDTH_DEFAULT, SHAPE_DOUBLE)
+        self.assertAlmostEqual(v, 1.0)
+
+    def test_double_gap_is_zero(self):
+        """이중장벽: 우물(gap) 영역 V=0.0."""
+        v = barrier_potential(BARRIER_X, BARRIER_WIDTH_DEFAULT, SHAPE_DOUBLE)
+        self.assertAlmostEqual(v, 0.0)
+
+    def test_double_outside_is_zero(self):
+        """이중장벽: 외부 V=0.0."""
+        v = barrier_potential(SIM_LEFT, BARRIER_WIDTH_DEFAULT, SHAPE_DOUBLE)
+        self.assertAlmostEqual(v, 0.0)
+
+    # ── 공통 속성 ──
+
+    def test_all_shapes_outside_zero(self):
+        """모든 형태: 장벽 외부에서 V=0.0."""
+        for shape in range(_NUM_SHAPES):
+            v = barrier_potential(SIM_LEFT, BARRIER_WIDTH_DEFAULT, shape)
+            self.assertAlmostEqual(v, 0.0, msg=f"shape={SHAPE_NAMES[shape]}")
+
+    def test_all_shapes_range_zero_one(self):
+        """모든 형태: V(x)는 0.0~1.0 범위."""
+        for shape in range(_NUM_SHAPES):
+            for i in range(200):
+                x = SIM_LEFT + i * SIM_W / 199
+                v = barrier_potential(x, BARRIER_WIDTH_DEFAULT, shape)
+                self.assertGreaterEqual(v, 0.0, msg=f"shape={SHAPE_NAMES[shape]}, x={x}")
+                self.assertLessEqual(v, 1.0, msg=f"shape={SHAPE_NAMES[shape]}, x={x}")
+
+    def test_wavefunction_with_shape(self):
+        """compute_wavefunction이 shape 파라미터를 올바르게 전달."""
+        for shape in range(_NUM_SHAPES):
+            xs, amps, regions = compute_wavefunction(BARRIER_WIDTH_DEFAULT, 50, 0.0, shape)
+            self.assertEqual(len(xs), 50)
+            self.assertEqual(len(amps), 50)
+            self.assertEqual(len(regions), 50)
+
+    def test_potential_profile_with_shape(self):
+        """compute_potential_profile이 shape 파라미터를 올바르게 전달."""
+        for shape in range(_NUM_SHAPES):
+            xs, pots, energy = compute_potential_profile(BARRIER_WIDTH_DEFAULT, 50, shape=shape)
+            self.assertEqual(len(xs), 50)
+            self.assertEqual(len(pots), 50)
+            if shape in (SHAPE_TRIANGLE, SHAPE_TRAPEZOID):
+                has_intermediate = any(0.01 < p < 0.99 for p in pots)
+                self.assertTrue(has_intermediate, msg=f"shape={SHAPE_NAMES[shape]} should have intermediate values")
+
+    def test_shape_names_length(self):
+        """SHAPE_NAMES 개수가 _NUM_SHAPES와 일치."""
+        self.assertEqual(len(SHAPE_NAMES), _NUM_SHAPES)
+
+    def test_double_barrier_symmetry(self):
+        """이중장벽: 좌우 대칭."""
+        half_w = BARRIER_WIDTH_DEFAULT / 2.0
+        bl = BARRIER_X - half_w
+        br = BARRIER_X + half_w
+        for d in [1, 2, 3]:
+            v_left = barrier_potential(bl + d, BARRIER_WIDTH_DEFAULT, SHAPE_DOUBLE)
+            v_right = barrier_potential(br - d, BARRIER_WIDTH_DEFAULT, SHAPE_DOUBLE)
+            self.assertAlmostEqual(v_left, v_right, places=5,
+                                   msg=f"d={d}: left={v_left}, right={v_right}")
+
+    def test_triangle_symmetry(self):
+        """삼각형: 좌우 대칭."""
+        half_w = BARRIER_WIDTH_DEFAULT / 2.0
+        bl = BARRIER_X - half_w
+        br = BARRIER_X + half_w
+        for d in [1, 2, 3]:
+            v_left = barrier_potential(bl + d, BARRIER_WIDTH_DEFAULT, SHAPE_TRIANGLE)
+            v_right = barrier_potential(br - d, BARRIER_WIDTH_DEFAULT, SHAPE_TRIANGLE)
+            self.assertAlmostEqual(v_left, v_right, places=5,
+                                   msg=f"d={d}: left={v_left}, right={v_right}")
 
 
 if __name__ == "__main__":

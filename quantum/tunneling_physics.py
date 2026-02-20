@@ -41,6 +41,78 @@ SIM_W, SIM_H = 520, 420
 BARRIER_X = SIM_LEFT + SIM_W // 2
 
 
+# ── 장벽 형태 ────────────────────────────────────────
+SHAPE_RECT = 0       # 사각형 (기본)
+SHAPE_TRIANGLE = 1   # 삼각형
+SHAPE_TRAPEZOID = 2  # 사다리꼴
+SHAPE_DOUBLE = 3     # 이중장벽 (공진 터널링)
+_NUM_SHAPES = 4
+SHAPE_NAMES = ["rect", "triangle", "trapezoid", "double"]
+
+# 이중장벽 파라미터
+_DOUBLE_GAP_RATIO = 0.4  # 장벽 사이 빈 공간 비율 (전체 폭 대비)
+_DOUBLE_WALL_RATIO = 0.3  # 각 벽 폭 비율 (전체 폭 대비)
+
+# 사다리꼴 파라미터
+_TRAP_TOP_RATIO = 0.4  # 상단 평탄부 비율 (전체 폭 대비)
+
+
+def barrier_potential(
+    x: float,
+    barrier_width: int = BARRIER_WIDTH_DEFAULT,
+    shape: int = SHAPE_RECT,
+) -> float:
+    """장벽 형태에 따른 포텐셜 V(x) 반환 (0.0~1.0).
+
+    Args:
+        x: x 좌표 (시뮬레이션 좌표계).
+        barrier_width: 장벽 전체 폭.
+        shape: 장벽 형태 상수 (SHAPE_RECT 등).
+
+    Returns:
+        포텐셜 값 0.0 (자유영역) ~ 1.0 (장벽 최대 높이).
+    """
+    half_w = barrier_width / 2.0
+    bl = BARRIER_X - half_w
+    br = BARRIER_X + half_w
+
+    if x < bl or x > br:
+        return 0.0
+
+    frac = (x - bl) / max(barrier_width, 1)  # 0~1 (장벽 내 상대 위치)
+
+    if shape == SHAPE_RECT:
+        return 1.0
+
+    elif shape == SHAPE_TRIANGLE:
+        # 삼각형: 중앙에서 최대, 양 끝에서 0
+        return 1.0 - 2.0 * abs(frac - 0.5)
+
+    elif shape == SHAPE_TRAPEZOID:
+        # 사다리꼴: 양쪽 경사 + 중앙 평탄
+        ramp = (1.0 - _TRAP_TOP_RATIO) / 2.0
+        if frac < ramp:
+            return frac / ramp
+        elif frac > 1.0 - ramp:
+            return (1.0 - frac) / ramp
+        else:
+            return 1.0
+
+    elif shape == SHAPE_DOUBLE:
+        # 이중장벽: 두 벽 사이에 빈 공간 (양자 우물)
+        wall = _DOUBLE_WALL_RATIO
+        gap_start = wall
+        gap_end = 1.0 - wall
+        if frac < wall:
+            return 1.0
+        elif frac > 1.0 - wall:
+            return 1.0
+        else:
+            return 0.0  # 우물 내부
+
+    return 0.0
+
+
 def _calc_tunnel_prob(barrier_width: int) -> float:
     """벽 두께에 따른 터널링 확률 — 두꺼울수록 확률 감소.
 
@@ -71,6 +143,7 @@ def compute_wavefunction(
     barrier_width: int = BARRIER_WIDTH_DEFAULT,
     n_points: int = 200,
     time_phase: float = 0.0,
+    shape: int = SHAPE_RECT,
 ) -> tuple[list[float], list[float], list[int]]:
     """1D 포텐셜 장벽에 대한 파동함수 |ψ(x)|² 를 계산.
 
@@ -78,6 +151,7 @@ def compute_wavefunction(
         barrier_width: 장벽 두께 (px 단위, 시뮬레이션 좌표계).
         n_points: 계산할 x 좌표 개수.
         time_phase: 시간 위상 (라디안). 실시간 파동 진행 애니메이션용.
+        shape: 장벽 형태 상수 (SHAPE_RECT 등).
 
     Returns:
         (xs, amplitudes, regions) 튜플:
@@ -110,25 +184,22 @@ def compute_wavefunction(
         xs.append(x)
 
         if x < barrier_left:
-            # 영역 I: 입사파 + 반사파 → 정재파 패턴
             rel = x - barrier_left
-            # ψ = e^{ikx} + R·e^{-ikx} → |ψ|² = 1 + R² + 2R·cos(2kx + φ)
             psi_sq = 1.0 + r_coeff ** 2 + 2.0 * r_coeff * math.cos(
                 2.0 * k * rel + time_phase
             )
             regions.append(0)
         elif x > barrier_right:
-            # 영역 III: 투과파 → |ψ|² = T²
             rel = x - barrier_right
             psi_sq = t_coeff ** 2 * (
                 1.0 + 0.3 * math.cos(2.0 * k * rel + time_phase)
             )
             regions.append(2)
         else:
-            # 영역 II: 장벽 내부 → 지수감쇠
+            # 장벽 내부: 형태에 따른 국소 포텐셜로 감쇠율 조절
+            v_local = barrier_potential(x, barrier_width, shape)
             frac = (x - barrier_left) / max(barrier_width, 1)
-            # 왼쪽 경계에서 오른쪽으로 지수감쇠
-            psi_sq = math.exp(-2.0 * kappa * frac)
+            psi_sq = math.exp(-2.0 * kappa * frac * v_local)
             regions.append(1)
 
         amplitudes.append(psi_sq)
@@ -155,6 +226,7 @@ def compute_potential_profile(
     barrier_width: int = BARRIER_WIDTH_DEFAULT,
     n_points: int = 200,
     energy_ratio: float = _PE_ENERGY_RATIO,
+    shape: int = SHAPE_RECT,
 ) -> tuple[list[float], list[float], float]:
     """1D 포텐셜 에너지 V(x) 프로필과 입자 에너지 E를 계산.
 
@@ -162,17 +234,14 @@ def compute_potential_profile(
         barrier_width: 장벽 두께 (px 단위, 시뮬레이션 좌표계).
         n_points: 계산할 x 좌표 개수.
         energy_ratio: 입자 에너지 / 장벽 높이 비율 (0.0~1.0).
+        shape: 장벽 형태 상수 (SHAPE_RECT 등).
 
     Returns:
         (xs, potentials, energy) 튜플:
         - xs: x 좌표 리스트 (SIM_LEFT ~ SIM_LEFT+SIM_W)
-        - potentials: V(x) 값 (0.0 또는 1.0, 정규화됨)
+        - potentials: V(x) 값 (0.0~1.0)
         - energy: 입자 에너지 E (0.0~1.0, 정규화됨)
     """
-    half_w = barrier_width / 2.0
-    barrier_left = BARRIER_X - half_w
-    barrier_right = BARRIER_X + half_w
-
     xs: list[float] = []
     potentials: list[float] = []
 
@@ -181,10 +250,7 @@ def compute_potential_profile(
     for i in range(n_points):
         x = SIM_LEFT + i * dx
         xs.append(x)
-        if barrier_left <= x <= barrier_right:
-            potentials.append(1.0)
-        else:
-            potentials.append(0.0)
+        potentials.append(barrier_potential(x, barrier_width, shape))
 
     energy = max(0.0, min(1.0, energy_ratio))
     return xs, potentials, energy
