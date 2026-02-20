@@ -17,7 +17,7 @@ from config_loader import cfg
 # ── 물리 파라미터 (config.json에서 로드) ──────────────
 TUNNEL_PROB_BASE = cfg("tunneling", "tunnel_prob_base", 0.10)
 PARTICLE_SPEED = cfg("tunneling", "particle_speed", 200.0)
-PARTICLE_RADIUS = 10
+PARTICLE_RADIUS = cfg("tunneling", "particle_radius", 10)
 BARRIER_WIDTH_DEFAULT = cfg("tunneling", "barrier_width_default", 12)
 BARRIER_WIDTH_MIN = cfg("tunneling", "barrier_width_min", 4)
 BARRIER_WIDTH_MAX = cfg("tunneling", "barrier_width_max", 200)
@@ -27,13 +27,16 @@ _TUNNEL_DECAY = cfg("tunneling", "tunnel_decay_rate", 0.02)
 _VY_RANGE = cfg("tunneling", "particle_vy_range", 60.0)
 _TUNNEL_FLASH = cfg("tunneling", "tunnel_flash_sec", 0.6)
 _REFLECT_FLASH = cfg("tunneling", "reflect_flash_sec", 0.4)
+REFLECT_DAMPING = cfg("tunneling", "reflect_damping", 0.8)
 BLOCH_LERP_SPEED = cfg("tunneling", "bloch_lerp_speed", 8.0)
 TRIAL_HISTORY_MAX = cfg("tunneling", "trial_history_max", 5000)
 
-# ── 영역 레이아웃 ────────────────────────────────────
+# ── 영역 레이아웃 (config.json에서 로드) ───────────────
 # 왼쪽: 터널링 시뮬레이션 | 오른쪽: 블로흐 구
-SIM_LEFT, SIM_TOP = 30, 70
-SIM_W, SIM_H = 520, 420
+SIM_LEFT = cfg("tunneling", "sim_left", 30)
+SIM_TOP = cfg("tunneling", "sim_top", 70)
+SIM_W = cfg("tunneling", "sim_width", 520)
+SIM_H = cfg("tunneling", "sim_height", 420)
 
 # 장벽 위치 (시뮬레이션 영역 중앙)
 BARRIER_X = SIM_LEFT + SIM_W // 2
@@ -176,7 +179,7 @@ class QuantumParticle:
                     self.flash_timer = _TUNNEL_FLASH
                 else:
                     # 반사
-                    self.vx = -abs(self.vx) * 0.8
+                    self.vx = -abs(self.vx) * REFLECT_DAMPING
                     self.x = BARRIER_X - barrier_width / 2 - PARTICLE_RADIUS - 2
                     self.tunneled = False
                     self.reflect_count += 1

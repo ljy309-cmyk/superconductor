@@ -7,6 +7,8 @@
 #5  reset() 카운터 보존 테스트
 #6  시드 기반 재현성
 #7  trial_history 크기 제한
+#9  config 기반 레이아웃 상수
+#10 반사 감쇠 계수 config 분리
 """
 
 import math
@@ -26,10 +28,15 @@ from quantum.tunneling_physics import (
     BARRIER_WIDTH_DEFAULT,
     BARRIER_WIDTH_MAX,
     BARRIER_WIDTH_MIN,
+    BARRIER_X,
+    BLOCH_LERP_SPEED,
+    PARTICLE_RADIUS,
     PARTICLE_SPEED,
+    REFLECT_DAMPING,
     SIM_H,
     SIM_LEFT,
     SIM_TOP,
+    SIM_W,
     SUPERPOSITION_HZ,
     TRIAL_HISTORY_MAX,
     TUNNEL_PROB_BASE,
@@ -680,6 +687,121 @@ class TestTrialHistoryBounded(unittest.TestCase):
         avg = sum(r["barrier"] for r in history) / len(history)
         expected = sum(range(15, 25)) / 10  # 10+5=15 ~ 10+14=24
         self.assertAlmostEqual(avg, expected)
+
+
+# ═══════════════════════════════════════════════════════════
+# #9  config 기반 레이아웃 상수 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestConfigLayoutConstants(unittest.TestCase):
+    """레이아웃 상수가 config에서 정상 로드되고 올바른 기본값을 갖는지 검증."""
+
+    def test_sim_left_default(self):
+        self.assertEqual(SIM_LEFT, 30)
+
+    def test_sim_top_default(self):
+        self.assertEqual(SIM_TOP, 70)
+
+    def test_sim_w_default(self):
+        self.assertEqual(SIM_W, 520)
+
+    def test_sim_h_default(self):
+        self.assertEqual(SIM_H, 420)
+
+    def test_particle_radius_default(self):
+        self.assertEqual(PARTICLE_RADIUS, 10)
+
+    def test_particle_radius_positive(self):
+        self.assertGreater(PARTICLE_RADIUS, 0)
+
+    def test_barrier_x_derived(self):
+        """BARRIER_X = SIM_LEFT + SIM_W // 2."""
+        self.assertEqual(BARRIER_X, SIM_LEFT + SIM_W // 2)
+
+    def test_bloch_lerp_speed_default(self):
+        self.assertAlmostEqual(BLOCH_LERP_SPEED, 8.0)
+
+    def test_bloch_lerp_speed_positive(self):
+        self.assertGreater(BLOCH_LERP_SPEED, 0)
+
+    def test_trial_history_max_default(self):
+        self.assertEqual(TRIAL_HISTORY_MAX, 5000)
+
+    def test_sim_area_positive_dimensions(self):
+        """시뮬레이션 영역의 너비·높이가 양수."""
+        self.assertGreater(SIM_W, 0)
+        self.assertGreater(SIM_H, 0)
+
+    def test_all_constants_are_numeric(self):
+        """모든 레이아웃 상수가 숫자."""
+        for name, val in [
+            ("SIM_LEFT", SIM_LEFT),
+            ("SIM_TOP", SIM_TOP),
+            ("SIM_W", SIM_W),
+            ("SIM_H", SIM_H),
+            ("PARTICLE_RADIUS", PARTICLE_RADIUS),
+            ("BARRIER_X", BARRIER_X),
+        ]:
+            self.assertIsInstance(val, (int, float), f"{name} is not numeric")
+
+
+# ═══════════════════════════════════════════════════════════
+# #10 반사 감쇠 계수 config 분리 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestReflectDamping(unittest.TestCase):
+    """REFLECT_DAMPING — 반사 시 속도 감쇠 계수."""
+
+    def test_default_value(self):
+        """기본값 0.8."""
+        self.assertAlmostEqual(REFLECT_DAMPING, 0.8)
+
+    def test_range_zero_to_one(self):
+        """감쇠 계수는 [0, 1] 범위."""
+        self.assertGreaterEqual(REFLECT_DAMPING, 0.0)
+        self.assertLessEqual(REFLECT_DAMPING, 1.0)
+
+    def test_reflect_applies_damping(self):
+        """반사 시 속도가 REFLECT_DAMPING 비율로 감소."""
+        p = QuantumParticle(seed=0)
+        original_speed = PARTICLE_SPEED
+
+        # 장벽에 정면 충돌하도록 위치 조정 (tunnel_prob=0 → 무조건 반사)
+        p.x = BARRIER_X - BARRIER_WIDTH_DEFAULT / 2 - PARTICLE_RADIUS + 1
+        p.vx = PARTICLE_SPEED
+        p.tunneled = None
+        p.update(1 / 60, barrier_width=BARRIER_WIDTH_DEFAULT, tunnel_prob=0.0)
+
+        if p.tunneled is False:
+            # 반사됨 → 속도가 -original_speed * REFLECT_DAMPING
+            expected_vx = -abs(original_speed) * REFLECT_DAMPING
+            self.assertAlmostEqual(p.vx, expected_vx, places=2)
+
+    def test_reflect_reverses_direction(self):
+        """반사 시 속도 방향이 반전 (음수)."""
+        p = QuantumParticle(seed=1)
+        p.x = BARRIER_X - BARRIER_WIDTH_DEFAULT / 2 - PARTICLE_RADIUS + 1
+        p.vx = PARTICLE_SPEED
+        p.tunneled = None
+        p.update(1 / 60, barrier_width=BARRIER_WIDTH_DEFAULT, tunnel_prob=0.0)
+
+        if p.tunneled is False:
+            self.assertLess(p.vx, 0)
+
+    def test_damping_reduces_speed(self):
+        """감쇠 후 |vx| < 원래 |vx| (REFLECT_DAMPING < 1 가정)."""
+        if REFLECT_DAMPING >= 1.0:
+            self.skipTest("REFLECT_DAMPING >= 1.0")
+        p = QuantumParticle(seed=2)
+        p.x = BARRIER_X - BARRIER_WIDTH_DEFAULT / 2 - PARTICLE_RADIUS + 1
+        p.vx = PARTICLE_SPEED
+        p.tunneled = None
+        p.update(1 / 60, barrier_width=BARRIER_WIDTH_DEFAULT, tunnel_prob=0.0)
+
+        if p.tunneled is False:
+            self.assertLess(abs(p.vx), PARTICLE_SPEED)
 
 
 if __name__ == "__main__":

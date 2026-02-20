@@ -81,13 +81,14 @@ def _load_theme_colors():
     load_pg_colors(_COLOR_MAP, globals())
 
 
-# ── 블로흐 구 레이아웃 ────────────────────────────────
-BLOCH_CX, BLOCH_CY = 730, 280
-BLOCH_R = 110
+# ── 블로흐 구 레이아웃 (config.json에서 로드) ──────────
+BLOCH_CX = cfg("tunneling", "bloch_cx", 730)
+BLOCH_CY = cfg("tunneling", "bloch_cy", 280)
+BLOCH_R = cfg("tunneling", "bloch_r", 110)
 _BLOCH_EL_DEFAULT = 0.25  # 기본 기울기 (rad) — 약 14°
 _BLOCH_EL_MIN, _BLOCH_EL_MAX = -1.0, 1.0
 _BLOCH_DRAG_SENSITIVITY = 0.008  # 마우스 픽셀 → 라디안
-_CIRCLE_STEPS = 48  # 대원 그리기 해상도
+_CIRCLE_STEPS = cfg("tunneling", "circle_steps", 48)
 
 # ── 실시간 확률 차트 레이아웃 ─────────────────────────
 _CHART_X = SIM_LEFT
@@ -101,10 +102,10 @@ _CHART_PAD_B = 10  # x축 라벨
 # ── 장벽 드래그 ──────────────────────────────────────
 _BARRIER_EDGE_TOL = 8  # 장벽 가장자리 감지 허용 범위 (px)
 
-# ── 입자 궤적 잔상 ──────────────────────────────────
-_MAX_TRAILS = 30  # 보존할 최대 궤적 수
-_TRAIL_SAMPLE = 3  # 매 N프레임마다 위치 기록
-_TRAIL_DOT_R = 2  # 잔상 점 반지름
+# ── 입자 궤적 잔상 (config.json에서 로드) ──────────────
+_MAX_TRAILS = cfg("tunneling", "max_trails", 30)
+_TRAIL_SAMPLE = cfg("tunneling", "trail_sample", 3)
+_TRAIL_DOT_R = cfg("tunneling", "trail_dot_radius", 2)
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────

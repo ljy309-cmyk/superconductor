@@ -41,11 +41,13 @@ from quantum.tunneling_physics import (
 )
 
 
-def _run_trials(n: int, barrier_width: int, tunnel_prob: float | None = None) -> QuantumParticle:
+def _run_trials(
+    n: int, barrier_width: int, tunnel_prob: float | None = None, seed: int | None = None
+) -> QuantumParticle:
     """지정 장벽으로 n회 시행을 실행하고 입자를 반환."""
     if tunnel_prob is None:
         tunnel_prob = _calc_tunnel_prob(barrier_width)
-    p = QuantumParticle()
+    p = QuantumParticle(seed=seed)
     for _ in range(n):
         p.reset()
         for _ in range(600):
@@ -619,8 +621,8 @@ class TestCompareScenarios(unittest.TestCase):
         best_width = None
         best_rate = -1.0
 
-        for bw in widths:
-            p = _run_trials(200, barrier_width=bw)
+        for i, bw in enumerate(widths):
+            p = _run_trials(200, barrier_width=bw, seed=42 + i)
             rate = p.tunnel_count / max(p.total_attempts, 1)
             if rate > best_rate:
                 best_rate = rate

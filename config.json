@@ -49,6 +49,7 @@
   "tunneling": {
     "tunnel_prob_base": 0.1,
     "particle_speed": 200.0,
+    "particle_radius": 10,
     "barrier_width_default": 12,
     "barrier_width_min": 4,
     "barrier_width_max": 200,
@@ -57,7 +58,21 @@
     "tunnel_decay_rate": 0.02,
     "particle_vy_range": 60.0,
     "tunnel_flash_sec": 0.6,
-    "reflect_flash_sec": 0.4
+    "reflect_flash_sec": 0.4,
+    "reflect_damping": 0.8,
+    "bloch_lerp_speed": 8.0,
+    "trial_history_max": 5000,
+    "sim_left": 30,
+    "sim_top": 70,
+    "sim_width": 520,
+    "sim_height": 420,
+    "bloch_cx": 730,
+    "bloch_cy": 280,
+    "bloch_r": 110,
+    "circle_steps": 48,
+    "max_trails": 30,
+    "trail_sample": 3,
+    "trail_dot_radius": 2
   },
   "qec_shield": {
     "noise_rate": 5.0,
