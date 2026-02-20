@@ -25,6 +25,12 @@ _T = {
     "tn_tunnel_streak": cfg("achievements", "tn_tunnel_streak", 10),
     "tn_rate_threshold": cfg("achievements", "tn_rate_threshold", 0.5),
     "tn_rate_min_attempts": cfg("achievements", "tn_rate_min_attempts", 10),
+    "tn_rate_high": cfg("achievements", "tn_rate_high", 0.75),
+    "tn_speed_run_count": cfg("achievements", "tn_speed_run_count", 20),
+    "tn_speed_run_time": cfg("achievements", "tn_speed_run_time", 30),
+    "tn_qa_min_attempts": cfg("achievements", "tn_qa_min_attempts", 20),
+    "tn_compare_configs": cfg("achievements", "tn_compare_configs", 3),
+    "tn_barrier_master_width": cfg("achievements", "tn_barrier_master_width", 100),
     "qec_survive_time": cfg("achievements", "qec_survive_time", 60),
     "qec_efficient_max": cfg("achievements", "qec_efficient_max_uses", 3),
     "qec_efficient_time": cfg("achievements", "qec_efficient_time", 60),
@@ -109,6 +115,54 @@ ACHIEVEMENTS = [
             d.get("tunnel_rate", 0) >= _T["tn_rate_threshold"]
             and d.get("total_attempts", 0) >= _T["tn_rate_min_attempts"]
         ),
+    },
+    {
+        "id": "tn_rate_75",
+        "module": "tunneling",
+        "title": "Quantum Ace",
+        "desc": "터널링 성공률 75% 이상 달성!",
+        "icon": "A",
+        "condition": lambda d: (
+            d.get("tunnel_rate", 0) >= _T["tn_rate_high"] and d.get("total_attempts", 0) >= _T["tn_rate_min_attempts"]
+        ),
+    },
+    {
+        "id": "tn_speed_run",
+        "module": "tunneling",
+        "title": "Speed Runner",
+        "desc": "30초 이내 20회 터널링 성공!",
+        "icon": "R",
+        "condition": lambda d: (
+            d.get("tunnel_count", 0) >= _T["tn_speed_run_count"]
+            and d.get("elapsed_time", float("inf")) <= _T["tn_speed_run_time"]
+        ),
+    },
+    {
+        "id": "tn_quantum_advantage",
+        "module": "tunneling",
+        "title": "Quantum Advantage",
+        "desc": "관측 성공률이 이론적 확률을 초과 — 양자 우위 시연!",
+        "icon": "Q",
+        "condition": lambda d: (
+            d.get("tunnel_rate", 0) > d.get("tunnel_prob", 1.0)
+            and d.get("total_attempts", 0) >= _T["tn_qa_min_attempts"]
+        ),
+    },
+    {
+        "id": "tn_compare_master",
+        "module": "tunneling",
+        "title": "Compare Master",
+        "desc": "3가지 이상 장벽 설정을 비교 완료!",
+        "icon": "C",
+        "condition": lambda d: d.get("barrier_configs_tried", 0) >= _T["tn_compare_configs"],
+    },
+    {
+        "id": "tn_barrier_master",
+        "module": "tunneling",
+        "title": "Barrier Breaker",
+        "desc": "장벽 두께 100 이상에서 터널링 성공!",
+        "icon": "X",
+        "condition": lambda d: d.get("max_tunnel_barrier", 0) >= _T["tn_barrier_master_width"],
     },
     # QEC 방어막
     {

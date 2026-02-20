@@ -5,6 +5,7 @@
 """
 
 import math
+import time
 
 import pygame
 
@@ -233,6 +234,11 @@ def run_simulation():
     barrier_width = BARRIER_WIDTH_DEFAULT
     tunnel_prob = _calc_tunnel_prob(barrier_width)
 
+    # ── 업적 추적 ──
+    start_time = time.monotonic()
+    max_tunnel_barrier = 0
+    barrier_configs_tried: set[int] = set()
+
     # ── 시작 시 난이도 선택 ──
     if not choose_difficulty_or_quit(screen, font, preset_hud, _load_theme_colors):
         return
@@ -276,6 +282,7 @@ def run_simulation():
         speed_mult = sl_speed.value
         barrier_width = int(sl_barrier.value)
         tunnel_prob = _calc_tunnel_prob(barrier_width)
+        barrier_configs_tried.add(barrier_width)
 
         # ── 물리 업데이트 ────────────────────────────
         if not paused:
@@ -283,6 +290,11 @@ def run_simulation():
             particle.vx = orig_vx * speed_mult if orig_vx > 0 else orig_vx
             particle.update(dt, barrier_width, tunnel_prob, sl_boost.value)
             particle.vx = orig_vx  # 속도 배율은 화면용, 내부 상태 보존
+
+            # ── 업적: 터널링 성공 시 장벽 두께 기록 ──
+            if particle.tunneled is True and particle.flash_timer > 0.5:
+                if barrier_width > max_tunnel_barrier:
+                    max_tunnel_barrier = barrier_width
 
             # ── 사운드 ──
             if particle.tunneled is True and particle.flash_timer > 0.5:
@@ -345,6 +357,7 @@ def run_simulation():
         pygame.display.flip()
 
     rate = particle.tunnel_count / max(particle.total_attempts, 1)
+    elapsed_time = time.monotonic() - start_time
     finalize_session(
         "tunneling",
         {
@@ -354,6 +367,9 @@ def run_simulation():
             "tunnel_rate": round(rate, 3),
             "barrier_width": barrier_width,
             "tunnel_prob": round(tunnel_prob, 3),
+            "elapsed_time": round(elapsed_time, 2),
+            "max_tunnel_barrier": max_tunnel_barrier,
+            "barrier_configs_tried": len(barrier_configs_tried),
         },
         recorder=recorder,
         snd=snd,
