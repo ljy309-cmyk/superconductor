@@ -9,6 +9,7 @@
 #7  trial_history 크기 제한
 #9  config 기반 레이아웃 상수
 #10 반사 감쇠 계수 config 분리
+#12 업적 진행도 데이터 검증
 """
 
 import math
@@ -802,6 +803,135 @@ class TestReflectDamping(unittest.TestCase):
 
         if p.tunneled is False:
             self.assertLess(abs(p.vx), PARTICLE_SPEED)
+
+
+# ═══════════════════════════════════════════════════════════
+# #12 업적 진행도 데이터 검증
+# ═══════════════════════════════════════════════════════════
+
+
+class TestAchievementProgressData(unittest.TestCase):
+    """업적 진행도 표시에 필요한 입자 데이터가 올바른지 검증."""
+
+    def test_tunnel_count_increments(self):
+        """터널링 성공 시 tunnel_count 증가."""
+        p = QuantumParticle(seed=42)
+        initial = p.tunnel_count
+        # tunnel_prob=1.0 → 무조건 터널링
+        for _ in range(100):
+            p.reset()
+            for _ in range(600):
+                p.update(1 / 60, tunnel_prob=1.0)
+                if p.tunneled is not None:
+                    break
+        self.assertGreater(p.tunnel_count, initial)
+
+    def test_total_attempts_tracks_all_trials(self):
+        """total_attempts = tunnel_count + reflect_count."""
+        p = QuantumParticle(seed=99)
+        for _ in range(30):
+            p.reset()
+            for _ in range(600):
+                p.update(1 / 60, tunnel_prob=0.5)
+                if p.tunneled is not None:
+                    break
+        self.assertEqual(p.total_attempts, p.tunnel_count + p.reflect_count)
+
+    def test_tunnel_rate_calculation(self):
+        """터널링 비율 = tunnel_count / total_attempts."""
+        p = QuantumParticle(seed=77)
+        for _ in range(50):
+            p.reset()
+            for _ in range(600):
+                p.update(1 / 60, tunnel_prob=0.3)
+                if p.tunneled is not None:
+                    break
+        if p.total_attempts > 0:
+            rate = p.tunnel_count / p.total_attempts
+            self.assertGreaterEqual(rate, 0.0)
+            self.assertLessEqual(rate, 1.0)
+
+    def test_progress_data_consistency(self):
+        """진행도 데이터의 일관성 검증."""
+        p = QuantumParticle(seed=10)
+        for _ in range(20):
+            p.reset()
+            for _ in range(600):
+                p.update(1 / 60, tunnel_prob=0.5)
+                if p.tunneled is not None:
+                    break
+        # 기본 불변식
+        self.assertGreaterEqual(p.tunnel_count, 0)
+        self.assertGreaterEqual(p.reflect_count, 0)
+        self.assertEqual(p.total_attempts, p.tunnel_count + p.reflect_count)
+
+    def test_achievement_threshold_constants_loaded(self):
+        """업적 임계값이 config에서 올바르게 로드."""
+        from config_loader import cfg
+
+        streak = cfg("achievements", "tn_tunnel_streak", 10)
+        self.assertIsInstance(streak, int)
+        self.assertGreater(streak, 0)
+
+        rate_thr = cfg("achievements", "tn_rate_threshold", 0.5)
+        self.assertIsInstance(rate_thr, float)
+        self.assertGreater(rate_thr, 0.0)
+        self.assertLessEqual(rate_thr, 1.0)
+
+    def test_check_achievements_returns_list(self):
+        """check_achievements()는 리스트를 반환."""
+        from achievements import check_achievements
+
+        data = {
+            "tunnel_count": 0,
+            "total_attempts": 0,
+            "tunnel_rate": 0.0,
+            "tunnel_prob": 0.1,
+            "elapsed_time": 0.0,
+            "max_tunnel_barrier": 0,
+            "barrier_configs_tried": 0,
+        }
+        result = check_achievements("tunneling", data)
+        self.assertIsInstance(result, list)
+
+    def test_achievement_ids_are_strings(self):
+        """모든 터널링 업적 ID가 tn_ 접두사 문자열."""
+        from achievements import ACHIEVEMENTS
+
+        tn_achs = [a for a in ACHIEVEMENTS if a["module"] == "tunneling"]
+        self.assertGreater(len(tn_achs), 0)
+        for ach in tn_achs:
+            self.assertIsInstance(ach["id"], str)
+            self.assertTrue(ach["id"].startswith("tn_"), f"{ach['id']} missing tn_ prefix")
+
+    def test_all_tunneling_achievements_have_icon(self):
+        """모든 터널링 업적에 아이콘이 있음."""
+        from achievements import ACHIEVEMENTS
+
+        tn_achs = [a for a in ACHIEVEMENTS if a["module"] == "tunneling"]
+        for ach in tn_achs:
+            self.assertIn("icon", ach)
+            self.assertIsInstance(ach["icon"], str)
+            self.assertEqual(len(ach["icon"]), 1)
+
+    def test_tunneling_achievement_count(self):
+        """터널링 업적은 8개."""
+        from achievements import ACHIEVEMENTS
+
+        tn_achs = [a for a in ACHIEVEMENTS if a["module"] == "tunneling"]
+        self.assertEqual(len(tn_achs), 8)
+
+    def test_speed_run_needs_both_conditions(self):
+        """스피드런 업적은 터널 횟수 + 시간 제한 둘 다 필요."""
+        from achievements import ACHIEVEMENTS
+
+        speed_ach = next(a for a in ACHIEVEMENTS if a["id"] == "tn_speed_run")
+        # 시간 초과면 실패
+        self.assertFalse(speed_ach["condition"]({"tunnel_count": 100, "elapsed_time": 999}))
+        # 시간 내 충분한 터널 → 성공
+        self.assertTrue(speed_ach["condition"]({"tunnel_count": 20, "elapsed_time": 25}))
+        # 시간 내 부족한 터널 → 실패
+        self.assertFalse(speed_ach["condition"]({"tunnel_count": 5, "elapsed_time": 10}))
 
 
 if __name__ == "__main__":

@@ -10,6 +10,8 @@ from collections import deque
 
 import pygame
 
+from achievement_toast import AchievementToast
+from achievements import check_achievements
 from config_loader import cfg
 from game_base import choose_difficulty_or_quit, finalize_session
 from glossary import GlossaryOverlay
@@ -106,6 +108,22 @@ _BARRIER_EDGE_TOL = 8  # 장벽 가장자리 감지 허용 범위 (px)
 _MAX_TRAILS = cfg("tunneling", "max_trails", 30)
 _TRAIL_SAMPLE = cfg("tunneling", "trail_sample", 3)
 _TRAIL_DOT_R = cfg("tunneling", "trail_dot_radius", 2)
+
+# ── 업적 진행도 레이아웃 ──────────────────────────────
+_ACH_X = WIDTH + 10
+_ACH_Y = 210  # 슬라이더 패널 아래
+_ACH_LINE_H = 16
+
+# ── 업적 임계값 (config에서 로드) ─────────────────────
+_ACH_STREAK = cfg("achievements", "tn_tunnel_streak", 10)
+_ACH_RATE_THR = cfg("achievements", "tn_rate_threshold", 0.5)
+_ACH_RATE_MIN = cfg("achievements", "tn_rate_min_attempts", 10)
+_ACH_RATE_HIGH = cfg("achievements", "tn_rate_high", 0.75)
+_ACH_SPEED_COUNT = cfg("achievements", "tn_speed_run_count", 20)
+_ACH_SPEED_TIME = cfg("achievements", "tn_speed_run_time", 30)
+_ACH_QA_MIN = cfg("achievements", "tn_qa_min_attempts", 20)
+_ACH_COMPARE = cfg("achievements", "tn_compare_configs", 3)
+_ACH_BARRIER_W = cfg("achievements", "tn_barrier_master_width", 100)
 
 
 # ── 그리기 헬퍼 ──────────────────────────────────────
@@ -431,6 +449,139 @@ def _draw_rate_chart(screen, font, trial_history, tunnel_prob):
     screen.blit(n_surf, (cx + cw - n_surf.get_width(), cy + ch + 1))
 
 
+# ── 업적 진행도 ──────────────────────────────────────
+
+
+def _build_progress_snapshot(ctx) -> dict:
+    """실시간 업적 평가용 세션 데이터 스냅샷."""
+    p = ctx.particle
+    elapsed = time.monotonic() - ctx.start_time
+    return {
+        "tunnel_count": p.tunnel_count,
+        "total_attempts": p.total_attempts,
+        "tunnel_rate": p.tunnel_count / max(p.total_attempts, 1),
+        "tunnel_prob": ctx.tunnel_prob,
+        "elapsed_time": elapsed,
+        "max_tunnel_barrier": ctx.max_tunnel_barrier,
+        "barrier_configs_tried": len(ctx.barrier_configs_tried),
+    }
+
+
+def _check_realtime_achievements(ctx):
+    """시행 발생 시 업적 확인 → 토스트 표시."""
+    snap = _build_progress_snapshot(ctx)
+    new_ach = check_achievements("tunneling", snap)
+    for ach in new_ach:
+        if ach["id"] not in ctx.unlocked_ids:
+            ctx.unlocked_ids.add(ach["id"])
+            ctx.toast.show(ach)
+
+
+def _draw_achievement_progress(screen, font, ctx):
+    """업적 진행도 패널 (슬라이더 패널 아래)."""
+    p = ctx.particle
+    elapsed = time.monotonic() - ctx.start_time
+    rate = p.tunnel_count / max(p.total_attempts, 1)
+
+    # 타이틀
+    title_surf = font.render("Achievements", True, ACCENT)
+    screen.blit(title_surf, (_ACH_X, _ACH_Y))
+
+    # 구분선
+    pygame.draw.line(screen, OVERLAY_CLR, (_ACH_X, _ACH_Y + 14), (_ACH_X + PANEL_W - 20, _ACH_Y + 14), 1)
+
+    # 업적별 진행도 데이터: (id, icon, label, progress_text, fraction)
+    items = [
+        (
+            "tn_first_tunnel",
+            "W",
+            "First Tunnel",
+            f"{min(p.tunnel_count, 1)}/1",
+            min(p.tunnel_count, 1) / 1,
+        ),
+        (
+            "tn_lucky_10",
+            "L",
+            "Lucky Streak",
+            f"{min(p.tunnel_count, _ACH_STREAK)}/{_ACH_STREAK}",
+            min(p.tunnel_count / _ACH_STREAK, 1.0),
+        ),
+        (
+            "tn_rate_50",
+            "B",
+            "Prob. Bender",
+            f"{rate * 100:.0f}%/{_ACH_RATE_THR * 100:.0f}% ({p.total_attempts}/{_ACH_RATE_MIN})",
+            min(rate / _ACH_RATE_THR, 1.0) if p.total_attempts >= _ACH_RATE_MIN else 0.0,
+        ),
+        (
+            "tn_rate_75",
+            "A",
+            "Quantum Ace",
+            f"{rate * 100:.0f}%/{_ACH_RATE_HIGH * 100:.0f}% ({p.total_attempts}/{_ACH_RATE_MIN})",
+            min(rate / _ACH_RATE_HIGH, 1.0) if p.total_attempts >= _ACH_RATE_MIN else 0.0,
+        ),
+        (
+            "tn_speed_run",
+            "R",
+            "Speed Runner",
+            f"{min(p.tunnel_count, _ACH_SPEED_COUNT)}/{_ACH_SPEED_COUNT} ({max(0, _ACH_SPEED_TIME - elapsed):.0f}s)",
+            min(p.tunnel_count / _ACH_SPEED_COUNT, 1.0) if elapsed <= _ACH_SPEED_TIME else 0.0,
+        ),
+        (
+            "tn_quantum_advantage",
+            "Q",
+            "Q. Advantage",
+            f"rate {rate * 100:.0f}% vs prob {ctx.tunnel_prob * 100:.0f}% ({p.total_attempts}/{_ACH_QA_MIN})",
+            1.0 if (rate > ctx.tunnel_prob and p.total_attempts >= _ACH_QA_MIN) else 0.0,
+        ),
+        (
+            "tn_compare_master",
+            "C",
+            "Compare",
+            f"{min(len(ctx.barrier_configs_tried), _ACH_COMPARE)}/{_ACH_COMPARE}",
+            min(len(ctx.barrier_configs_tried) / _ACH_COMPARE, 1.0),
+        ),
+        (
+            "tn_barrier_master",
+            "X",
+            "Barrier Break",
+            f"max {ctx.max_tunnel_barrier}/{_ACH_BARRIER_W}px",
+            min(ctx.max_tunnel_barrier / _ACH_BARRIER_W, 1.0),
+        ),
+    ]
+
+    y = _ACH_Y + 18
+    bar_w = PANEL_W - 24
+    bar_h = 4
+
+    for ach_id, icon, label, progress_text, frac in items:
+        completed = ach_id in ctx.unlocked_ids or frac >= 1.0
+        clr = TUNNEL_FLASH if completed else TEXT_CLR
+        prefix = "[V]" if completed else "[ ]"
+
+        # 아이콘 + 라벨
+        lbl_surf = font.render(f"{prefix}[{icon}] {label}", True, clr)
+        screen.blit(lbl_surf, (_ACH_X, y))
+
+        # 진행 텍스트
+        prog_surf = font.render(progress_text, True, OVERLAY_CLR if not completed else TUNNEL_FLASH)
+        screen.blit(prog_surf, (_ACH_X, y + _ACH_LINE_H))
+
+        # 진행 바
+        bar_y = y + _ACH_LINE_H * 2 - 2
+        pygame.draw.rect(screen, OVERLAY_CLR, (_ACH_X, bar_y, bar_w, bar_h))
+        fill_w = int(bar_w * min(frac, 1.0))
+        if fill_w > 0:
+            bar_clr = TUNNEL_FLASH if completed else ACCENT
+            pygame.draw.rect(screen, bar_clr, (_ACH_X, bar_y, fill_w, bar_h))
+
+        y += _ACH_LINE_H * 2 + 6
+
+        # 화면 하단 초과 시 중단
+        if y > HEIGHT - 10:
+            break
+
+
 # ── 시뮬레이션 상태 번들 ──────────────────────────────
 
 
@@ -505,6 +656,10 @@ class _SimContext:
         self.peak_rate = 0.0
         self.prev_attempts = 0
 
+        # 업적 토스트 + 실시간 추적
+        self.toast = AchievementToast()
+        self.unlocked_ids: set[str] = set()
+
     def read_sliders(self):
         """슬라이더 값 → 물리 파라미터 동기화."""
         self.speed_mult = self.sl_speed.value
@@ -566,6 +721,8 @@ def _handle_key(ctx: _SimContext, key: int, running: bool) -> bool:
         ctx.sl_barrier.value = ctx.sl_barrier.value - 10
     elif key == pygame.K_l:
         toggle_locale()
+    elif key == pygame.K_TAB:
+        ctx.toast.toggle_history()
     elif key == pygame.K_LEFTBRACKET:
         cycle_sim_speed(-1)
     elif key == pygame.K_RIGHTBRACKET:
@@ -644,6 +801,9 @@ def _step_physics(ctx: _SimContext, dt: float):
         if tunneled and ctx.barrier_width > ctx.max_tunnel_barrier:
             ctx.max_tunnel_barrier = ctx.barrier_width
 
+        # 실시간 업적 확인
+        _check_realtime_achievements(ctx)
+
     # 사운드
     if p.tunneled is True and p.flash_timer > 0.5:
         ctx.snd.play("tunnel_success")
@@ -696,6 +856,7 @@ def _render_frame(ctx: _SimContext):
     _draw_stats(ctx.screen, ctx.particle, ctx.font, ctx.tunnel_prob)
     _draw_rate_chart(ctx.screen, ctx.font, ctx.trial_history, ctx.tunnel_prob)
     ctx.panel.draw(ctx.screen, ctx.font)
+    _draw_achievement_progress(ctx.screen, ctx.font, ctx)
 
     # 안내 텍스트
     hints = [
@@ -718,6 +879,8 @@ def _render_frame(ctx: _SimContext):
     ctx.help_overlay.draw(ctx.screen, ctx.font)
     ctx.glossary.draw(ctx.screen, ctx.font)
     ctx.tutorial.draw(ctx.screen, ctx.font)
+    ctx.toast.draw(ctx.screen, ctx.font)
+    ctx.toast.draw_history(ctx.screen, ctx.font)
 
 
 # ── 세션 데이터 빌드 ────────────────────────────────
@@ -774,6 +937,7 @@ def run_simulation():
         if not ctx.paused:
             _step_physics(ctx, dt)
 
+        ctx.toast.update(raw_dt)
         _render_frame(ctx)
         pygame.display.flip()
 
