@@ -25,10 +25,8 @@ from physics.flux_pinning import (
     LEVITATION_AMP,
     LEVITATION_FREQ,
     PIN_LOCK_RADIUS,
-    PIN_SPRING_K,
     SPRING_K,
     TC_KELVIN,
-    TEMP_MAX,
     TEMP_MIN,
     FluxPinningState,
     PinningSite,
@@ -466,8 +464,11 @@ class TestTemperaturePhysicsIntegration(unittest.TestCase):
 
         # 저온 (강한 스프링) — 초기 10스텝에서 더 빠르게 이동
         gs_low = FluxPinningState(
-            magnet_x=450.0, magnet_y=300.0,
-            sc_x=450.0, sc_y=100.0, temperature=4.0,
+            magnet_x=450.0,
+            magnet_y=300.0,
+            sc_x=450.0,
+            sc_y=100.0,
+            temperature=4.0,
         )
         for _ in range(10):
             step_with_temperature(gs_low, dt)
@@ -475,8 +476,11 @@ class TestTemperaturePhysicsIntegration(unittest.TestCase):
 
         # 고온 근처 (약한 스프링) — 초기 10스텝에서 더 느리게 이동
         gs_high = FluxPinningState(
-            magnet_x=450.0, magnet_y=300.0,
-            sc_x=450.0, sc_y=100.0, temperature=TC_KELVIN * 0.9,
+            magnet_x=450.0,
+            magnet_y=300.0,
+            sc_x=450.0,
+            sc_y=100.0,
+            temperature=TC_KELVIN * 0.9,
         )
         for _ in range(10):
             step_with_temperature(gs_high, dt)
@@ -495,9 +499,12 @@ class TestPinningLockPhysics(unittest.TestCase):
 
         # 핀닝 없이
         gs_free = FluxPinningState(
-            magnet_x=450.0, magnet_y=300.0,
-            sc_x=450.0, sc_y=300.0 - EQUILIBRIUM_GAP,
-            temperature=4.0, pinned=False,
+            magnet_x=450.0,
+            magnet_y=300.0,
+            sc_x=450.0,
+            sc_y=300.0 - EQUILIBRIUM_GAP,
+            temperature=4.0,
+            pinned=False,
         )
         gs_free.magnet_x = 550.0  # 자석 수평 이동
         for _ in range(60):
@@ -505,10 +512,14 @@ class TestPinningLockPhysics(unittest.TestCase):
 
         # 핀닝 잠금
         gs_pin = FluxPinningState(
-            magnet_x=450.0, magnet_y=300.0,
-            sc_x=450.0, sc_y=300.0 - EQUILIBRIUM_GAP,
-            temperature=4.0, pinned=True,
-            pin_anchor_x=450.0, pin_anchor_y=300.0 - EQUILIBRIUM_GAP,
+            magnet_x=450.0,
+            magnet_y=300.0,
+            sc_x=450.0,
+            sc_y=300.0 - EQUILIBRIUM_GAP,
+            temperature=4.0,
+            pinned=True,
+            pin_anchor_x=450.0,
+            pin_anchor_y=300.0 - EQUILIBRIUM_GAP,
         )
         gs_pin.magnet_x = 550.0
         for _ in range(60):
@@ -525,10 +536,14 @@ class TestPinningLockPhysics(unittest.TestCase):
 
         # 저온 핀닝 — 강한 스프링 + 강한 핀
         gs_cold = FluxPinningState(
-            magnet_x=500.0, magnet_y=300.0,
-            sc_x=450.0, sc_y=300.0 - EQUILIBRIUM_GAP,
-            temperature=4.0, pinned=True,
-            pin_anchor_x=450.0, pin_anchor_y=300.0 - EQUILIBRIUM_GAP,
+            magnet_x=500.0,
+            magnet_y=300.0,
+            sc_x=450.0,
+            sc_y=300.0 - EQUILIBRIUM_GAP,
+            temperature=4.0,
+            pinned=True,
+            pin_anchor_x=450.0,
+            pin_anchor_y=300.0 - EQUILIBRIUM_GAP,
         )
         for _ in range(10):
             step_with_temperature(gs_cold, dt)
@@ -536,10 +551,14 @@ class TestPinningLockPhysics(unittest.TestCase):
 
         # 고온 핀닝 — 약한 스프링 + 약한 핀 (전반적 둔화)
         gs_hot = FluxPinningState(
-            magnet_x=500.0, magnet_y=300.0,
-            sc_x=450.0, sc_y=300.0 - EQUILIBRIUM_GAP,
-            temperature=TC_KELVIN * 0.95, pinned=True,
-            pin_anchor_x=450.0, pin_anchor_y=300.0 - EQUILIBRIUM_GAP,
+            magnet_x=500.0,
+            magnet_y=300.0,
+            sc_x=450.0,
+            sc_y=300.0 - EQUILIBRIUM_GAP,
+            temperature=TC_KELVIN * 0.95,
+            pinned=True,
+            pin_anchor_x=450.0,
+            pin_anchor_y=300.0 - EQUILIBRIUM_GAP,
         )
         for _ in range(10):
             step_with_temperature(gs_hot, dt)

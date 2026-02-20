@@ -10,9 +10,8 @@ from quantum.qec_physics import (
     CASCADE_DAMAGE,
     GRID_COLS,
     GRID_ROWS,
-    NOISE_RATE,
-    QECQubit,
     STRESS_THRESHOLD,
+    QECQubit,
     build_grid,
 )
 from quantum.qubit_physics import QubitState

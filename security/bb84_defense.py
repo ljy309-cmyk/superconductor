@@ -11,6 +11,7 @@ import math
 import pygame
 
 from config_loader import cfg
+from font_helper import get_font
 from game_base import choose_difficulty_or_quit, finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
@@ -301,9 +302,9 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption(t("game_title_bb84"))
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 11)
-    big_font = pygame.font.SysFont("Consolas", 14, bold=True)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
+    font = get_font(11)
+    big_font = get_font(14, bold=True)
+    title_font = get_font(18, bold=True)
 
     game = BB84Game()
     anim_t = 0.0
@@ -365,6 +366,30 @@ def run_simulation():
                     game.auto_block_enabled = not game.auto_block_enabled
                 elif event.key == pygame.K_l:
                     toggle_locale()
+                elif event.key == pygame.K_x and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    from session_io import export_session
+
+                    export_session(
+                        "bb84_defense",
+                        {
+                            "score": game.score,
+                            "total_sent": game.total_sent,
+                            "total_errors": game.total_errors,
+                            "total_safe": game.total_safe,
+                            "eve_intercepts": game.eve_intercept_count,
+                            "auto_blocks": game.auto_blocks,
+                            "manual_blocks": game.manual_blocks,
+                            "decoy_sent": game.decoy_sent,
+                            "decoy_trapped": game.decoy_trapped,
+                            "qrng_bits_used": game.qrng_bits_used,
+                        },
+                    )
+                elif event.key == pygame.K_i and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    from session_io import choose_import_file, load_session
+
+                    _imp_path = choose_import_file(screen, font, "bb84_defense")
+                    if _imp_path:
+                        load_session(_imp_path)
 
         # ── 업데이트 ─────────────────────────────────
         preset_hud.update(dt)

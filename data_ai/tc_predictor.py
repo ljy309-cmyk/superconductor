@@ -86,7 +86,10 @@ def train_and_evaluate(df, model_name, seed=42, n_est=100, test_size=0.2):
     y = df[TARGET].values
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=seed,
+        X,
+        y,
+        test_size=test_size,
+        random_state=seed,
     )
 
     # SVR은 스케일링 필요
@@ -134,6 +137,7 @@ def _get_feature_importances(model, X_test, y_test, model_name):
     # SVR: permutation importance (sklearn 내장)
     try:
         from sklearn.inspection import permutation_importance
+
         result = permutation_importance(model, X_test, y_test, n_repeats=10, random_state=42)
         return result.importances_mean
     except (ImportError, AttributeError):
@@ -146,6 +150,7 @@ class TcPredictorApp(tk.Toplevel):
 
     def __init__(self, master=None):
         import matplotlib
+
         matplotlib.use("TkAgg")
 
         super().__init__(master)
@@ -166,11 +171,13 @@ class TcPredictorApp(tk.Toplevel):
     def _load_data(self):
         """데이터 모드에 따라 데이터 로드."""
         import pandas as pd
+
         from data_ai.generate_sample_data import (
-            CSV_PATH,
             SUPERCON_PATH,
-            generate as generate_data,
             generate_supercon,
+        )
+        from data_ai.generate_sample_data import (
+            generate as generate_data,
         )
 
         if self.data_mode == "supercon":
@@ -200,7 +207,11 @@ class TcPredictorApp(tk.Toplevel):
 
         for name in MODEL_CONFIGS:
             self.results[name] = train_and_evaluate(
-                self.df, name, seed=_seed, n_est=_n_est, test_size=_test_size,
+                self.df,
+                name,
+                seed=_seed,
+                n_est=_n_est,
+                test_size=_test_size,
             )
 
     # ── UI 구성 ──────────────────────────────────────
@@ -214,23 +225,32 @@ class TcPredictorApp(tk.Toplevel):
         self.dataset_var = tk.StringVar(value=self.data_mode)
         for mode, label in [("synthetic", "Synthetic (212)"), ("supercon", "SuperCon (330+)")]:
             rb = tk.Radiobutton(
-                top_bar, text=label, variable=self.dataset_var, value=mode,
-                command=self._on_dataset_change, font=("Consolas", 9),
-                bg=BG, fg=FG, selectcolor="#313244", activebackground=BG,
+                top_bar,
+                text=label,
+                variable=self.dataset_var,
+                value=mode,
+                command=self._on_dataset_change,
+                font=("Consolas", 9),
+                bg=BG,
+                fg=FG,
+                selectcolor="#313244",
+                activebackground=BG,
             )
             rb.pack(side=tk.LEFT, padx=6)
 
         self.data_info_var = tk.StringVar(value=f"  |  {len(self.df)} rows")
         tk.Label(top_bar, textvariable=self.data_info_var, font=("Consolas", 9), bg=BG, fg="#6c7086").pack(
-            side=tk.LEFT, padx=8,
+            side=tk.LEFT,
+            padx=8,
         )
 
         # 탭 노트북
         style = ttk.Style()
         style.theme_use("default")
         style.configure("Dark.TNotebook", background=BG, borderwidth=0)
-        style.configure("Dark.TNotebook.Tab", background="#313244", foreground=FG,
-                        padding=[12, 4], font=("Consolas", 9))
+        style.configure(
+            "Dark.TNotebook.Tab", background="#313244", foreground=FG, padding=[12, 4], font=("Consolas", 9)
+        )
         style.map("Dark.TNotebook.Tab", background=[("selected", "#45475a")])
 
         self.notebook = ttk.Notebook(self, style="Dark.TNotebook")
@@ -304,7 +324,8 @@ class TcPredictorApp(tk.Toplevel):
         mode_label = "SuperCon" if self.data_mode == "supercon" else "Synthetic"
         self.scatter_fig.suptitle(
             f"Feature vs Critical Temperature — {mode_label} ({len(self.df)} samples)",
-            color="#cdd6f4", fontsize=11,
+            color="#cdd6f4",
+            fontsize=11,
         )
         self.scatter_fig.tight_layout(rect=[0, 0, 1, 0.93])
         self.scatter_canvas.draw()
@@ -328,7 +349,7 @@ class TcPredictorApp(tk.Toplevel):
 
         names = list(MODEL_CONFIGS.keys())
         colors = [MODEL_CONFIGS[n]["color"] for n in names]
-        labels = [MODEL_CONFIGS[n]["label"] for n in names]
+        _ = [MODEL_CONFIGS[n]["label"] for n in names]  # noqa: F841
 
         # 좌측: 성능 지표 비교 바 차트
         ax1 = self.compare_fig.add_subplot(1, 3, 1)
@@ -345,8 +366,14 @@ class TcPredictorApp(tk.Toplevel):
         for spine in ax1.spines.values():
             spine.set_color("#45475a")
         for bar, val in zip(bars, r2_vals):
-            ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.02,
-                     f"{val:.3f}", ha="center", fontsize=8, color="#cdd6f4")
+            ax1.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.02,
+                f"{val:.3f}",
+                ha="center",
+                fontsize=8,
+                color="#cdd6f4",
+            )
 
         # 중앙: MAE + RMSE 비교
         ax2 = self.compare_fig.add_subplot(1, 3, 2)
@@ -370,15 +397,14 @@ class TcPredictorApp(tk.Toplevel):
         res = self.results[best_name]
         ax3 = self.compare_fig.add_subplot(1, 3, 3)
         ax3.set_facecolor("#181825")
-        ax3.scatter(res["y_test"], res["y_pred"], c=MODEL_CONFIGS[best_name]["color"],
-                    s=15, alpha=0.6, edgecolors="none")
-        lims = [min(res["y_test"].min(), res["y_pred"].min()) - 5,
-                max(res["y_test"].max(), res["y_pred"].max()) + 5]
+        ax3.scatter(
+            res["y_test"], res["y_pred"], c=MODEL_CONFIGS[best_name]["color"], s=15, alpha=0.6, edgecolors="none"
+        )
+        lims = [min(res["y_test"].min(), res["y_pred"].min()) - 5, max(res["y_test"].max(), res["y_pred"].max()) + 5]
         ax3.plot(lims, lims, "--", color="#f9e2af", linewidth=1, alpha=0.6)
         ax3.set_xlabel("Actual Tc (K)", fontsize=9, color="#cdd6f4")
         ax3.set_ylabel("Predicted Tc (K)", fontsize=9, color="#cdd6f4")
-        ax3.set_title(f"Actual vs Predicted ({MODEL_CONFIGS[best_name]['short']})",
-                      fontsize=10, color="#cdd6f4")
+        ax3.set_title(f"Actual vs Predicted ({MODEL_CONFIGS[best_name]['short']})", fontsize=10, color="#cdd6f4")
         ax3.tick_params(colors="#6c7086", labelsize=7)
         for spine in ax3.spines.values():
             spine.set_color("#45475a")
@@ -420,14 +446,13 @@ class TcPredictorApp(tk.Toplevel):
             ax.set_yticklabels(sorted_features, fontsize=8, color="#cdd6f4")
             ax.set_xlabel("Importance", fontsize=8, color="#cdd6f4")
             imp_type = "Permutation" if name == "SVR" else "Gini / Split"
-            ax.set_title(f"{MODEL_CONFIGS[name]['short']} ({imp_type})",
-                         fontsize=10, color="#cdd6f4")
+            ax.set_title(f"{MODEL_CONFIGS[name]['short']} ({imp_type})", fontsize=10, color="#cdd6f4")
             ax.tick_params(colors="#6c7086", labelsize=7)
             for spine in ax.spines.values():
                 spine.set_color("#45475a")
 
             # 값 레이블
-            for i, (val, feat) in enumerate(zip(sorted_importances, sorted_features)):
+            for i, (val, _feat) in enumerate(zip(sorted_importances, sorted_features)):
                 ax.text(val + 0.005, i, f"{val:.3f}", va="center", fontsize=7, color="#cdd6f4")
 
         self.importance_fig.suptitle("Feature Importance by Model", color="#cdd6f4", fontsize=11)
@@ -439,15 +464,24 @@ class TcPredictorApp(tk.Toplevel):
     def _build_input_panel(self, parent):
         """성분비 입력 패널."""
         input_frame = tk.LabelFrame(
-            parent, text="  New Material — Predict Tc  ",
-            font=("Consolas", 11, "bold"), bg=BG, fg=ACCENT, padx=12, pady=8,
+            parent,
+            text="  New Material — Predict Tc  ",
+            font=("Consolas", 11, "bold"),
+            bg=BG,
+            fg=ACCENT,
+            padx=12,
+            pady=8,
         )
         input_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
 
         self.entries: dict[str, tk.Entry] = {}
         defaults = {
-            "density": "6.5", "atomic_mass": "90.0", "electron_affinity": "80.0",
-            "thermal_conductivity": "50.0", "valence": "3", "electronegativity": "1.8",
+            "density": "6.5",
+            "atomic_mass": "90.0",
+            "electron_affinity": "80.0",
+            "thermal_conductivity": "50.0",
+            "valence": "3",
+            "electronegativity": "1.8",
         }
 
         for feat in FEATURES:
@@ -471,20 +505,32 @@ class TcPredictorApp(tk.Toplevel):
         model_menu.pack(side=tk.LEFT, padx=4)
 
         tk.Button(
-            btn_frame, text="Predict Tc", command=self._predict,
-            font=("Consolas", 10, "bold"), width=12,
+            btn_frame,
+            text="Predict Tc",
+            command=self._predict,
+            font=("Consolas", 10, "bold"),
+            width=12,
         ).pack(side=tk.LEFT, padx=4)
 
         self.result_var = tk.StringVar(value="—")
         tk.Label(
-            btn_frame, textvariable=self.result_var, font=("Consolas", 12, "bold"), bg=BG, fg=ACCENT,
+            btn_frame,
+            textvariable=self.result_var,
+            font=("Consolas", 12, "bold"),
+            bg=BG,
+            fg=ACCENT,
         ).pack(side=tk.LEFT, padx=8)
 
     def _build_info_panel(self, parent):
         """모델 성능 정보."""
         self.info_frame = tk.LabelFrame(
-            parent, text="  Model Performance  ",
-            font=("Consolas", 11, "bold"), bg=BG, fg="#89b4fa", padx=12, pady=8,
+            parent,
+            text="  Model Performance  ",
+            font=("Consolas", 11, "bold"),
+            bg=BG,
+            fg="#89b4fa",
+            padx=12,
+            pady=8,
         )
         self.info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self._populate_info()
@@ -500,7 +546,8 @@ class TcPredictorApp(tk.Toplevel):
             conf = MODEL_CONFIGS[name]
             line = f"{conf['short']:4s}  R²={res['r2']:.4f}  MAE={res['mae']:.2f}K  RMSE={res['rmse']:.2f}K"
             tk.Label(self.info_frame, text=line, font=("Consolas", 9), bg=BG, fg=conf["color"], anchor="w").pack(
-                fill=tk.X, pady=1,
+                fill=tk.X,
+                pady=1,
             )
 
         tk.Label(self.info_frame, text="", bg=BG).pack()
@@ -513,7 +560,8 @@ class TcPredictorApp(tk.Toplevel):
         ]
         for line in info_lines:
             tk.Label(self.info_frame, text=line, font=("Consolas", 8), bg=BG, fg="#6c7086", anchor="w").pack(
-                fill=tk.X, pady=1,
+                fill=tk.X,
+                pady=1,
             )
 
         # 최고 모델의 Feature Importance (텍스트)
@@ -523,7 +571,10 @@ class TcPredictorApp(tk.Toplevel):
         tk.Label(
             self.info_frame,
             text=f"Top Features ({MODEL_CONFIGS[best_name]['short']}):",
-            font=("Consolas", 9, "bold"), bg=BG, fg="#f9e2af", anchor="w",
+            font=("Consolas", 9, "bold"),
+            bg=BG,
+            fg="#f9e2af",
+            anchor="w",
         ).pack(fill=tk.X)
         for feat, imp in sorted(zip(FEATURES, importances), key=lambda x: -x[1]):
             bar_len = int(imp * 30)
@@ -531,7 +582,10 @@ class TcPredictorApp(tk.Toplevel):
             tk.Label(
                 self.info_frame,
                 text=f"  {feat:24s} {bar} {imp:.3f}",
-                font=("Consolas", 8), bg=BG, fg=FG, anchor="w",
+                font=("Consolas", 8),
+                bg=BG,
+                fg=FG,
+                anchor="w",
             ).pack(fill=tk.X)
 
     def _update_info_panel(self):
@@ -555,7 +609,9 @@ class TcPredictorApp(tk.Toplevel):
                 return
             if val < 0:
                 messagebox.showwarning(
-                    "범위 경고", f"{feat} 값이 음수입니다. 결과가 부정확할 수 있습니다.", parent=self,
+                    "범위 경고",
+                    f"{feat} 값이 음수입니다. 결과가 부정확할 수 있습니다.",
+                    parent=self,
                 )
                 break
 

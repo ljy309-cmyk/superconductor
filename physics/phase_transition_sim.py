@@ -20,6 +20,7 @@ import time
 import pygame
 
 from config_loader import cfg
+from font_helper import get_font
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
 from logger import get_module_logger
@@ -113,9 +114,9 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption(t("game_title_phase_transition_sim"))
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 12)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
-    big_font = pygame.font.SysFont("Consolas", 28, bold=True)
+    font = get_font(12)
+    title_font = get_font(18, bold=True)
+    big_font = get_font(28, bold=True)
 
     help_overlay = HelpOverlay("phase_transition_sim")
     snd = get_sound_manager()

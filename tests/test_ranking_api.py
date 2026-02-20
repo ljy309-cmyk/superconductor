@@ -5,21 +5,21 @@ import os
 import sys
 import tempfile
 import threading
-import time
 import unittest
 from http.server import HTTPServer
 from unittest.mock import patch
-from urllib.request import Request, urlopen
 from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "data_ai"))
 
-from data_ai.ranking_server import RankingHandler, _rate_limit_map, _rate_limit_lock
+from data_ai.ranking_server import RankingHandler, _rate_limit_lock, _rate_limit_map
 
 
 def _find_free_port():
     import socket
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]

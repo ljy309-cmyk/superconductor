@@ -12,7 +12,6 @@ import cmath
 import math
 import random
 from dataclasses import dataclass, field
-from typing import Tuple
 
 SQRT2_INV = 1.0 / math.sqrt(2)
 
@@ -44,7 +43,7 @@ def bell_probabilities(state: list[complex]) -> list[float]:
     return [abs(a) ** 2 for a in state]
 
 
-def measure_bell(state: list[complex]) -> Tuple[int, int]:
+def measure_bell(state: list[complex]) -> tuple[int, int]:
     """벨 상태 측정 → (qubit_A, qubit_B) 각각 0 또는 1.
 
     상태 벡터가 확률에 따라 붕괴됩니다.
@@ -65,6 +64,7 @@ def measure_bell(state: list[complex]) -> Tuple[int, int]:
 
 # ── 측정 기저 (CHSH용) ────────────────────────────────
 
+
 def _rotation_matrix(angle: float) -> list[list[complex]]:
     """Z-Y 평면 회전 측정 기저 행렬."""
     c = math.cos(angle / 2)
@@ -80,8 +80,7 @@ def _apply_2x2(mat: list[list[complex]], vec: list[complex]) -> list[complex]:
     ]
 
 
-def measure_in_basis(state: list[complex], angle_a: float,
-                     angle_b: float) -> Tuple[int, int]:
+def measure_in_basis(state: list[complex], angle_a: float, angle_b: float) -> tuple[int, int]:
     """두 큐비트를 각각 다른 기저(각도)로 측정.
 
     Alice는 angle_a, Bob은 angle_b 회전 기저로 측정.
@@ -99,8 +98,7 @@ def measure_in_basis(state: list[complex], angle_a: float,
                 for l in range(2):
                     src_idx = k * 2 + l
                     dst_idx = i * 2 + j
-                    rotated[dst_idx] += (rot_a[i][k] * rot_b[j][l]
-                                         * state[src_idx])
+                    rotated[dst_idx] += rot_a[i][k] * rot_b[j][l] * state[src_idx]
 
     probs = [abs(a) ** 2 for a in rotated]
     r = random.random()
@@ -129,8 +127,7 @@ CHSH_ANGLES_ALICE = [0.0, math.pi / 4]
 CHSH_ANGLES_BOB = [math.pi / 8, 3 * math.pi / 8]
 
 
-def chsh_correlator(state: list[complex], angle_a: float,
-                    angle_b: float, n_shots: int = 100) -> float:
+def chsh_correlator(state: list[complex], angle_a: float, angle_b: float, n_shots: int = 100) -> float:
     """상관 함수 E(a,b) = ⟨A⊗B⟩ 측정 (n_shots 번 반복)."""
     total = 0.0
     for _ in range(n_shots):
@@ -139,8 +136,7 @@ def chsh_correlator(state: list[complex], angle_a: float,
     return total / n_shots
 
 
-def run_chsh_experiment(state: list[complex],
-                        n_shots: int = 200) -> dict:
+def run_chsh_experiment(state: list[complex], n_shots: int = 200) -> dict:
     """CHSH 실험 전체 수행.
 
     Returns:
@@ -152,8 +148,7 @@ def run_chsh_experiment(state: list[complex],
             e_matrix[i][j] = chsh_correlator(state, aa, ab, n_shots)
 
     # S = E(a1,b1) - E(a1,b2) + E(a2,b1) + E(a2,b2)
-    s_value = (e_matrix[0][0] - e_matrix[0][1]
-               + e_matrix[1][0] + e_matrix[1][1])
+    s_value = e_matrix[0][0] - e_matrix[0][1] + e_matrix[1][0] + e_matrix[1][1]
 
     return {
         "E": e_matrix,
@@ -164,6 +159,7 @@ def run_chsh_experiment(state: list[complex],
 
 # ── 양자 텔레포테이션 ─────────────────────────────────
 
+
 @dataclass
 class TeleportationState:
     """양자 텔레포테이션 프로토콜 상태."""
@@ -173,20 +169,22 @@ class TeleportationState:
     beta: complex = complex(0, 0)
 
     step: int = 0  # 0~5 단계
-    step_names: list[str] = field(default_factory=lambda: [
-        "prepare",       # 0: 전송할 상태 준비
-        "bell_pair",     # 1: Alice-Bob 벨 쌍 공유
-        "entangle",      # 2: Alice의 큐비트와 전송할 큐비트 얽힘
-        "measure",       # 3: Alice 측정 (벨 측정)
-        "classical",     # 4: 고전 채널로 결과 전송
-        "correct",       # 5: Bob 보정 → 상태 복원
-    ])
+    step_names: list[str] = field(
+        default_factory=lambda: [
+            "prepare",  # 0: 전송할 상태 준비
+            "bell_pair",  # 1: Alice-Bob 벨 쌍 공유
+            "entangle",  # 2: Alice의 큐비트와 전송할 큐비트 얽힘
+            "measure",  # 3: Alice 측정 (벨 측정)
+            "classical",  # 4: 고전 채널로 결과 전송
+            "correct",  # 5: Bob 보정 → 상태 복원
+        ]
+    )
 
     # 3-큐비트 상태벡터 [|000⟩ .. |111⟩]
     state_vector: list[complex] = field(default_factory=lambda: [complex(0)] * 8)
 
     # Alice의 측정 결과
-    measurement_result: Tuple[int, int] = (0, 0)
+    measurement_result: tuple[int, int] = (0, 0)
 
     # Bob의 최종 상태
     bob_alpha: complex = complex(0, 0)
@@ -289,7 +287,7 @@ def teleport_step(ts: TeleportationState) -> str:
         # Step 3: Alice 측정 (qubit 0, 1)
         probs = [0.0] * 4
         for i in range(8):
-            q01 = (i >> 1)  # upper 2 bits
+            q01 = i >> 1  # upper 2 bits
             probs[q01] += abs(ts.state_vector[i]) ** 2
 
         r = random.random()
@@ -309,7 +307,7 @@ def teleport_step(ts: TeleportationState) -> str:
         collapsed = [complex(0)] * 8
         norm_sq = 0.0
         for i in range(8):
-            q01 = (i >> 1)
+            q01 = i >> 1
             if q01 == result:
                 collapsed[i] = ts.state_vector[i]
                 norm_sq += abs(collapsed[i]) ** 2
@@ -371,7 +369,7 @@ def teleport_step(ts: TeleportationState) -> str:
         return f"Bob applies correction ({corr_str}) → Fidelity: {ts.fidelity:.4f}"
 
 
-def create_random_state() -> Tuple[complex, complex]:
+def create_random_state() -> tuple[complex, complex]:
     """블로흐 구 위의 랜덤 순수 상태 생성."""
     theta = random.uniform(0, math.pi)
     phi = random.uniform(0, 2 * math.pi)
@@ -380,7 +378,7 @@ def create_random_state() -> Tuple[complex, complex]:
     return (alpha, beta)
 
 
-def bloch_angles(alpha: complex, beta: complex) -> Tuple[float, float]:
+def bloch_angles(alpha: complex, beta: complex) -> tuple[float, float]:
     """상태 벡터에서 블로흐 구 각도 (theta, phi) 추출."""
     if abs(alpha) > 1e-10:
         phase = cmath.phase(alpha)
@@ -392,7 +390,7 @@ def bloch_angles(alpha: complex, beta: complex) -> Tuple[float, float]:
     return (theta, phi)
 
 
-def bloch_xyz(alpha: complex, beta: complex) -> Tuple[float, float, float]:
+def bloch_xyz(alpha: complex, beta: complex) -> tuple[float, float, float]:
     """상태 벡터에서 블로흐 구 (x, y, z) 좌표."""
     theta, phi = bloch_angles(alpha, beta)
     x = math.sin(theta) * math.cos(phi)

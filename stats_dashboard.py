@@ -22,7 +22,7 @@ class StatsDashboard(tk.Toplevel):
         super().__init__(master)
         self.title(t("stats_title"))
         self.configure(bg=TK.BG)
-        self.geometry("900x650")
+        self.geometry("900x800")
         self.resizable(False, False)
 
         self._build_ui()
@@ -85,7 +85,7 @@ class StatsDashboard(tk.Toplevel):
             from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
             from matplotlib.figure import Figure
 
-            self._fig = Figure(figsize=(5, 5), dpi=90, facecolor="#1e1e2e")
+            self._fig = Figure(figsize=(5, 7), dpi=90, facecolor="#1e1e2e")
             self._canvas = FigureCanvasTkAgg(self._fig, master=right)
             self._canvas.get_tk_widget().pack(fill="both", expand=True)
             self._has_matplotlib = True
@@ -233,7 +233,7 @@ class StatsDashboard(tk.Toplevel):
         self._fig.clear()
 
         # 상단: 모듈별 플레이 횟수 바 차트
-        ax1 = self._fig.add_subplot(211)
+        ax1 = self._fig.add_subplot(311)
         ax1.set_facecolor("#181825")
         for spine in ax1.spines.values():
             spine.set_color("#585b70")
@@ -249,8 +249,8 @@ class StatsDashboard(tk.Toplevel):
         for i, v in enumerate(counts):
             ax1.text(v + 0.1, i, str(v), va="center", color="#cdd6f4", fontsize=8)
 
-        # 하단: 생존 시간 추이 (qubit_chain 또는 qec_shield)
-        ax2 = self._fig.add_subplot(212)
+        # 중단: 생존 시간 추이 (qubit_chain 또는 qec_shield)
+        ax2 = self._fig.add_subplot(312)
         ax2.set_facecolor("#181825")
         for spine in ax2.spines.values():
             spine.set_color("#585b70")
@@ -288,6 +288,106 @@ class StatsDashboard(tk.Toplevel):
                 0.5,
                 t("stats_no_survival_data"),
                 transform=ax2.transAxes,
+                ha="center",
+                va="center",
+                color="#585b70",
+                fontsize=11,
+            )
+
+        # 하단: 터널링 성공률 추이
+        ax3 = self._fig.add_subplot(313)
+        ax3.set_facecolor("#181825")
+        for spine in ax3.spines.values():
+            spine.set_color("#585b70")
+        ax3.tick_params(colors="#cdd6f4", labelsize=7)
+        ax3.set_title(t("stats_tunnel_trend"), color="#f9e2af", fontsize=10, fontweight="bold")
+
+        try:
+            import pandas as pd
+
+            from data_ai.play_logger import get_logger
+
+            records = get_logger().records
+            df = pd.DataFrame(records)
+            tn_df = df[df["module"] == "tunneling"]
+
+            has_data = False
+            if not tn_df.empty and "tunnel_rate" in tn_df.columns:
+                rates = pd.to_numeric(tn_df["tunnel_rate"], errors="coerce").dropna()
+                if not rates.empty:
+                    rate_pct = (rates * 100).tolist()
+                    ax3.plot(
+                        range(len(rate_pct)),
+                        rate_pct,
+                        color="#a6e3a1",
+                        linewidth=1.5,
+                        label=t("stats_tn_rate"),
+                        marker="o",
+                        markersize=3,
+                    )
+                    has_data = True
+
+                if "peak_rate" in tn_df.columns:
+                    peaks = pd.to_numeric(tn_df["peak_rate"], errors="coerce").dropna()
+                    if not peaks.empty:
+                        peak_pct = (peaks * 100).tolist()
+                        ax3.plot(
+                            range(len(peak_pct)),
+                            peak_pct,
+                            color="#cba6f7",
+                            linewidth=1.0,
+                            linestyle="--",
+                            label=t("stats_tn_peak"),
+                            marker="^",
+                            markersize=3,
+                        )
+
+                if "avg_barrier_width" in tn_df.columns:
+                    bws = pd.to_numeric(tn_df["avg_barrier_width"], errors="coerce").dropna()
+                    if not bws.empty:
+                        ax3_bw = ax3.twinx()
+                        ax3_bw.plot(
+                            range(len(bws)),
+                            bws.tolist(),
+                            color="#f9e2af",
+                            linewidth=1.0,
+                            linestyle=":",
+                            label=t("stats_tn_barrier"),
+                            marker="s",
+                            markersize=2,
+                        )
+                        ax3_bw.set_ylabel(t("stats_tn_barrier_axis"), color="#f9e2af", fontsize=8)
+                        ax3_bw.tick_params(colors="#f9e2af", labelsize=7)
+                        ax3_bw.legend(
+                            fontsize=6,
+                            facecolor="#2a2a3d",
+                            edgecolor="#585b70",
+                            labelcolor="#cdd6f4",
+                            loc="lower right",
+                        )
+
+            if has_data:
+                ax3.legend(fontsize=7, facecolor="#2a2a3d", edgecolor="#585b70", labelcolor="#cdd6f4", loc="upper left")
+                ax3.set_xlabel(t("stats_session_num"), color="#cdd6f4", fontsize=8)
+                ax3.set_ylabel(t("stats_rate_pct"), color="#cdd6f4", fontsize=8)
+            else:
+                ax3.text(
+                    0.5,
+                    0.5,
+                    t("stats_no_tunnel_data"),
+                    transform=ax3.transAxes,
+                    ha="center",
+                    va="center",
+                    color="#585b70",
+                    fontsize=11,
+                )
+        except (KeyError, ValueError, TypeError, AttributeError) as e:
+            _log.warning("터널링 추이 차트 렌더링 실패: %s", e)
+            ax3.text(
+                0.5,
+                0.5,
+                t("stats_no_tunnel_data"),
+                transform=ax3.transAxes,
                 ha="center",
                 va="center",
                 color="#585b70",

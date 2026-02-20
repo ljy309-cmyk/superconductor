@@ -65,13 +65,43 @@ _TUTORIAL_STEPS: dict[str, list[dict]] = {
     ],
     "tunneling": [
         {
-            "title": "Quantum Tunneling",
-            "text": "입자가 에너지 장벽을 확률적으로 통과합니다.\n고전 물리에서는 불가능하지만 양자역학에서는 가능!",
+            "title": "1. Quantum Tunneling",
+            "text": "입자가 에너지 장벽을 확률적으로 통과하는 현상입니다.\n고전 물리학: 에너지 부족 → 장벽 통과 불가능\n양자역학: 일정 확률로 장벽을 '터널링' 가능!\n이 시뮬레이션에서 직접 관찰해 봅시다.",
             "highlight": "center",
         },
         {
-            "title": "Controls",
-            "text": "클릭: 입자 재발사\nUp/Down: 속도 조절\nLeft/Right: 장벽 두께",
+            "title": "2. Classical vs Quantum",
+            "text": "고전 입자는 공처럼 벽에 튕겨 나갑니다.\n양자 입자는 '파동'으로 행동합니다.\n파동은 장벽에서 완전히 사라지지 않고,\n장벽 너머로 '스며들' 수 있습니다.",
+            "highlight": "none",
+        },
+        {
+            "title": "3. Wave Function ψ(x)",
+            "text": "파동함수 ψ(x)는 입자의 존재 확률 진폭입니다.\n장벽 앞: 진행파 + 반사파 (진동)\n장벽 안: 지수 감쇠  ψ ~ e^(−κx)\n장벽 뒤: 투과파 (진폭 감소, 그러나 0이 아님!)",
+            "highlight": "none",
+        },
+        {
+            "title": "4. Tunneling Probability",
+            "text": "터널링 확률 공식: P ≈ exp(−2κd)\nκ = 감쇠 상수 (장벽 높이에 비례)\nd = 장벽 두께\n→ 장벽이 두꺼울수록 확률이 지수적으로 감소!\n←/→ 키 또는 장벽 가장자리 드래그로 확인하세요.",
+            "highlight": "none",
+        },
+        {
+            "title": "5. Superposition & Bloch Sphere",
+            "text": "큐비트는 |0⟩과 |1⟩ 상태를 동시에 가집니다 (중첩).\n오른쪽 블로흐 구의 벡터가 이를 시각화합니다.\nθ: |0⟩ vs |1⟩ 비율  |  φ: 위상\n마우스로 블로흐 구를 드래그하여 회전해 보세요!",
+            "highlight": "none",
+        },
+        {
+            "title": "6. Probability Interpretation",
+            "text": "|ψ|² = 입자를 발견할 확률\n시행 횟수가 늘면 실측 확률 → 이론값으로 수렴합니다.\n하단 그래프에서 녹색 선이 수렴하는 과정을 관찰하세요.\n노란 점선 = 이론 확률  |  녹색 실선 = 실측 누적률",
+            "highlight": "none",
+        },
+        {
+            "title": "7. Experiment Guide",
+            "text": "① 장벽 두께를 좁게 설정 → 터널링 빈번\n② 장벽을 넓히면 → 터널링 희소\n③ 시행 반복 → 누적률이 이론값으로 수렴 (대수의 법칙)\n④ 블로흐 구에서 중첩 상태 변화를 관찰\n이것이 양자역학의 확률 해석입니다!",
+            "highlight": "none",
+        },
+        {
+            "title": "8. Controls",
+            "text": "클릭: 입자 재발사  |  장벽 드래그: 두께 조절\n↑↓: 속도  |  ←→: 장벽 두께  |  [/]: Sim Speed\n블로흐 구 드래그: 회전  |  1/2/3: 난이도 프리셋\nR: 리셋  |  SPACE: 일시정지  |  T: 튜토리얼 재시작",
             "highlight": "none",
         },
     ],

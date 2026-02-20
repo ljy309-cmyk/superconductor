@@ -7,12 +7,12 @@ BCS 이론의 핵심 개념을 인터랙티브하게 시각화합니다:
   - 초전도 상전이 (Tc 기준)
 """
 
-import math
 import time
 
 import pygame
 
 from config_loader import cfg
+from font_helper import get_font
 from game_base import finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
@@ -23,9 +23,7 @@ from physics.cooper_pair_physics import (
     TEMP_MAX,
     TEMP_MIN,
     LatticeSimulation,
-    cooper_pair_density,
     energy_gap,
-    resistance_factor,
 )
 from quit_dialog import confirm_quit
 from replay import ReplayRecorder
@@ -52,13 +50,13 @@ WHITE = _pg.WHITE
 del _get_pg_theme_init
 
 # 고유 색상
-ION_COLOR = (116, 199, 236)     # 격자 이온 (파랑)
+ION_COLOR = (116, 199, 236)  # 격자 이온 (파랑)
 ELECTRON_COLOR = (250, 179, 135)  # 자유 전자 (오렌지)
-PAIR_COLOR = (166, 227, 161)      # 쿠퍼 쌍 전자 (녹색)
+PAIR_COLOR = (166, 227, 161)  # 쿠퍼 쌍 전자 (녹색)
 PAIR_LINK_COLOR = (166, 227, 161, 100)  # 쌍 연결선
-PHONON_COLOR = (203, 166, 247)    # 포논 파동 (보라)
-GAP_COLOR = (137, 180, 250)       # 에너지 갭 (파랑)
-RESIST_COLOR = (243, 139, 168)    # 저항 (빨강)
+PHONON_COLOR = (203, 166, 247)  # 포논 파동 (보라)
+GAP_COLOR = (137, 180, 250)  # 에너지 갭 (파랑)
+RESIST_COLOR = (243, 139, 168)  # 저항 (빨강)
 TEMP_MARKER_SC = (166, 227, 161)  # 초전도 마커 (녹색)
 TEMP_MARKER_NORM = (243, 139, 168)  # 정상 상태 마커 (빨강)
 
@@ -91,9 +89,9 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption(t("game_title_cooper_pair"))
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 13)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
-    small_font = pygame.font.SysFont("Consolas", 11)
+    font = get_font(13)
+    title_font = get_font(18, bold=True)
+    small_font = get_font(11)
 
     help_overlay = HelpOverlay("cooper_pair")
     snd = get_sound_manager()
@@ -101,9 +99,12 @@ def run_simulation():
     recorder = ReplayRecorder("cooper_pair")
 
     sim = LatticeSimulation(
-        cols=10, rows=6,
-        width=500, height=300,
-        offset_x=80, offset_y=120,
+        cols=10,
+        rows=6,
+        width=500,
+        height=300,
+        offset_x=80,
+        offset_y=120,
     )
 
     dragging_slider = False
@@ -153,12 +154,14 @@ def run_simulation():
         sim.update(dt)
 
         # 리플레이 기록
-        recorder.record_frame({
-            "temp": round(sim.temperature, 1),
-            "gap": round(sim.gap, 3),
-            "pairs": sim.pair_count,
-            "sc": sim.is_superconducting,
-        })
+        recorder.record_frame(
+            {
+                "temp": round(sim.temperature, 1),
+                "gap": round(sim.gap, 3),
+                "pairs": sim.pair_count,
+                "sc": sim.is_superconducting,
+            }
+        )
 
         # ── 렌더링 ───────────────────────────────────
         screen.fill(BG)
@@ -182,7 +185,8 @@ def run_simulation():
                 drawn_pairs.add(id(e))
                 drawn_pairs.add(id(e.partner))
                 pygame.draw.line(
-                    screen, PAIR_COLOR,
+                    screen,
+                    PAIR_COLOR,
                     (int(e.x), int(e.y)),
                     (int(e.partner.x), int(e.partner.y)),
                     2,
@@ -335,7 +339,7 @@ def _draw_gap_graph(screen, small_font, current_temp):
     screen.blit(title, (gx + gw // 2 - title.get_width() // 2, gy - 14))
     x_label = small_font.render(f"T (K): {TEMP_MIN:.0f} — {TEMP_MAX:.0f}", True, SUBTEXT_CLR)
     screen.blit(x_label, (gx, gy + gh + 4))
-    tc_text = small_font.render(f"Tc", True, RESIST_COLOR)
+    tc_text = small_font.render("Tc", True, RESIST_COLOR)
     screen.blit(tc_text, (tc_x - 6, gy + gh + 4))
 
 

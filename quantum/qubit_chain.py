@@ -15,6 +15,7 @@ import pygame
 from achievement_toast import AchievementToast
 from achievements import check_achievements
 from config_loader import cfg
+from font_helper import get_font
 from game_base import choose_difficulty_or_quit, finalize_session
 from game_summary import draw_game_summary
 from help_overlay import HelpOverlay
@@ -318,9 +319,9 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH + PANEL_W, HEIGHT))
     pygame.display.set_caption(t("game_title_qubit_chain"))
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 12)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
-    info_font = pygame.font.SysFont("Consolas", 11)
+    font = get_font(12)
+    title_font = get_font(18, bold=True)
+    info_font = get_font(11)
 
     nodes = _build_network()
     gs = QubitChainState()
@@ -445,6 +446,28 @@ def run_simulation():
                     toggle_locale()
                 elif event.key == pygame.K_g:
                     toast.toggle_history()
+                elif event.key == pygame.K_x and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    from session_io import export_session
+
+                    export_session(
+                        "qubit_chain",
+                        {
+                            "total_qubits": len(nodes),
+                            "collapsed_count": sum(1 for n in nodes if n.collapsed),
+                            "alive_count": sum(1 for n in nodes if not n.collapsed),
+                            "noise_rate": noise_rate,
+                            "cascade_damage": cascade_damage,
+                            "shield_uses": gs.qec_uses,
+                            "max_stress": max((n.stress for n in nodes), default=0),
+                            "survival_time": round(gs.survival_time, 2),
+                        },
+                    )
+                elif event.key == pygame.K_i and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    from session_io import choose_import_file, load_session
+
+                    _imp_path = choose_import_file(screen, info_font, "qubit_chain")
+                    if _imp_path:
+                        load_session(_imp_path)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 for n in nodes:

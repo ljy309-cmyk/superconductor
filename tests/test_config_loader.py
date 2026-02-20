@@ -344,6 +344,110 @@ class TestConfigLoaderEdgeCases(unittest.TestCase):
             os.unlink(path)
 
 
+# ═══════════════════════════════════════════════════════════
+# #11 tunneling 섹션 스키마 완전성 테스트
+# ═══════════════════════════════════════════════════════════
+
+
+class TestTunnelingSchemaCompleteness(unittest.TestCase):
+    """tunneling 섹션에서 cfg()로 사용하는 모든 키가 스키마에 등록되어 있는지 검증."""
+
+    def setUp(self):
+        from config_loader import _SCHEMA
+
+        self.schema = _SCHEMA.get("tunneling", {})
+
+    def test_bloch_lerp_speed_in_schema(self):
+        self.assertIn("bloch_lerp_speed", self.schema)
+
+    def test_trial_history_max_in_schema(self):
+        self.assertIn("trial_history_max", self.schema)
+
+    def test_reflect_damping_in_schema(self):
+        self.assertIn("reflect_damping", self.schema)
+
+    def test_particle_radius_in_schema(self):
+        self.assertIn("particle_radius", self.schema)
+
+    def test_sim_left_in_schema(self):
+        self.assertIn("sim_left", self.schema)
+
+    def test_sim_top_in_schema(self):
+        self.assertIn("sim_top", self.schema)
+
+    def test_sim_width_in_schema(self):
+        self.assertIn("sim_width", self.schema)
+
+    def test_sim_height_in_schema(self):
+        self.assertIn("sim_height", self.schema)
+
+    def test_bloch_cx_in_schema(self):
+        self.assertIn("bloch_cx", self.schema)
+
+    def test_bloch_cy_in_schema(self):
+        self.assertIn("bloch_cy", self.schema)
+
+    def test_bloch_r_in_schema(self):
+        self.assertIn("bloch_r", self.schema)
+
+    def test_circle_steps_in_schema(self):
+        self.assertIn("circle_steps", self.schema)
+
+    def test_max_trails_in_schema(self):
+        self.assertIn("max_trails", self.schema)
+
+    def test_trail_sample_in_schema(self):
+        self.assertIn("trail_sample", self.schema)
+
+    def test_trail_dot_radius_in_schema(self):
+        self.assertIn("trail_dot_radius", self.schema)
+
+    def test_all_schema_entries_have_valid_types(self):
+        """모든 스키마 엔트리가 (type, min, max) 튜플."""
+        for key, spec in self.schema.items():
+            self.assertIsInstance(spec, tuple, f"key={key}")
+            self.assertEqual(len(spec), 3, f"key={key}")
+            self.assertIn(spec[0], (int, float, bool, str), f"key={key}")
+
+    def test_schema_covers_all_config_json_keys(self):
+        """config.json의 tunneling 키가 모두 스키마에 포함."""
+        import json
+
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+        with open(config_path) as f:
+            data = json.load(f)
+        tunneling_keys = set(data.get("tunneling", {}).keys())
+        schema_keys = set(self.schema.keys())
+        missing = tunneling_keys - schema_keys
+        self.assertEqual(missing, set(), f"config.json에 있지만 스키마에 없는 키: {missing}")
+
+    def test_bloch_lerp_speed_range(self):
+        """bloch_lerp_speed 범위 검증."""
+        from config_loader import _validate
+
+        self.assertEqual(_validate("tunneling", "bloch_lerp_speed", 8.0), 8.0)
+        self.assertIsNone(_validate("tunneling", "bloch_lerp_speed", 0.0))
+        self.assertIsNone(_validate("tunneling", "bloch_lerp_speed", 101.0))
+
+    def test_trial_history_max_range(self):
+        """trial_history_max 범위 검증."""
+        from config_loader import _validate
+
+        self.assertEqual(_validate("tunneling", "trial_history_max", 5000), 5000)
+        self.assertIsNone(_validate("tunneling", "trial_history_max", 50))
+        self.assertIsNone(_validate("tunneling", "trial_history_max", 100001))
+
+    def test_reflect_damping_range(self):
+        """reflect_damping 범위 검증."""
+        from config_loader import _validate
+
+        self.assertEqual(_validate("tunneling", "reflect_damping", 0.8), 0.8)
+        self.assertEqual(_validate("tunneling", "reflect_damping", 0.0), 0.0)
+        self.assertEqual(_validate("tunneling", "reflect_damping", 1.0), 1.0)
+        self.assertIsNone(_validate("tunneling", "reflect_damping", -0.1))
+        self.assertIsNone(_validate("tunneling", "reflect_damping", 1.1))
+
+
 class TestI18n(unittest.TestCase):
     def test_set_locale_ko(self):
         from i18n import set_locale, t
@@ -402,7 +506,7 @@ class TestTheme(unittest.TestCase):
     def test_fonts_defined(self):
         from theme import FONTS
 
-        self.assertEqual(FONTS.FAMILY, "Consolas")
+        self.assertEqual(FONTS.FAMILY, "WenQuanYi Zen Hei Mono")
         self.assertIsInstance(FONTS.TITLE, tuple)
 
 

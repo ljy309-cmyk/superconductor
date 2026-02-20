@@ -13,13 +13,13 @@ from matplotlib.figure import Figure
 # ── 물질별 임계 온도 (°C) ────────────────────────────────
 # 대표적 초전도 물질 — 원소 금속, 합금, 산화물 고온 초전도체
 MATERIALS = {
-    "Mercury / Hg (Tc≈4.2K)": -268.95,       # 4.15 K — 최초 발견 (1911, Onnes)
-    "Aluminium / Al (Tc≈1.2K)": -271.97,      # 1.18 K
-    "Niobium / Nb (Tc≈9.3K)": -263.90,        # 9.25 K — 원소 최고
-    "Lead / Pb (Tc≈7.2K)": -265.96,           # 7.19 K
-    "Nb₃Sn (Tc≈18K)": -255.15,               # 18.0 K — A15 합금
-    "MgB₂ (Tc≈39K)": -234.15,                 # 39.0 K — 이원소 최고
-    "YBCO / YBa₂Cu₃O₇ (Tc≈92K)": -181.15,   # 92.0 K — 액체 질소 냉각 가능
+    "Mercury / Hg (Tc≈4.2K)": -268.95,  # 4.15 K — 최초 발견 (1911, Onnes)
+    "Aluminium / Al (Tc≈1.2K)": -271.97,  # 1.18 K
+    "Niobium / Nb (Tc≈9.3K)": -263.90,  # 9.25 K — 원소 최고
+    "Lead / Pb (Tc≈7.2K)": -265.96,  # 7.19 K
+    "Nb₃Sn (Tc≈18K)": -255.15,  # 18.0 K — A15 합금
+    "MgB₂ (Tc≈39K)": -234.15,  # 39.0 K — 이원소 최고
+    "YBCO / YBa₂Cu₃O₇ (Tc≈92K)": -181.15,  # 92.0 K — 액체 질소 냉각 가능
     "BSCCO / Bi₂Sr₂Ca₂Cu₃O₁₀ (Tc≈110K)": -163.15,  # 110 K — 고온 초전도체
 }
 DEFAULT_MATERIAL = "YBCO / YBa₂Cu₃O₇ (Tc≈92K)"

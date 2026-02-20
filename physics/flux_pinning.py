@@ -10,11 +10,11 @@ import math
 import random
 import time
 from dataclasses import dataclass, field
-from typing import List, Tuple
 
 import pygame
 
 from config_loader import cfg
+from font_helper import get_font
 from game_base import finalize_session
 from help_overlay import HelpOverlay
 from i18n import t, toggle_locale
@@ -110,7 +110,7 @@ class PinningSite:
     lock_strength: float = 1.0
 
 
-def _generate_pinning_sites(n: int) -> List[PinningSite]:
+def _generate_pinning_sites(n: int) -> list[PinningSite]:
     """초전도체 내에 무작위 핀닝 사이트 생성."""
     sites = []
     for _ in range(n):
@@ -151,7 +151,7 @@ def pin_force(
     pin_anchor_y: float,
     lock_radius: float = PIN_LOCK_RADIUS,
     k: float = PIN_SPRING_K,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """핀닝 사이트가 초전도체에 가하는 잠금력.
 
     초전도체가 핀닝 앵커에서 lock_radius 이내일 때
@@ -193,7 +193,7 @@ class FluxPinningState:
     # ── 온도 시스템 ──
     temperature: float = 4.0  # 현재 온도 (K)
     # ── 2D 핀닝 ──
-    pinning_sites: List[PinningSite] = field(default_factory=list)
+    pinning_sites: list[PinningSite] = field(default_factory=list)
     pin_anchor_x: float = 0.0  # 핀닝 잠금 시 기준 좌표
     pin_anchor_y: float = 0.0
     pinned: bool = False  # 핀닝 잠금 활성 여부
@@ -207,8 +207,8 @@ def run_simulation():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption(t("game_title_flux_pinning"))
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Consolas", 13)
-    title_font = pygame.font.SysFont("Consolas", 18, bold=True)
+    font = get_font(13)
+    title_font = get_font(18, bold=True)
 
     # ── 도움말 & 사운드 & 리플레이 ──
     help_overlay = HelpOverlay("flux_pinning")

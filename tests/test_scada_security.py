@@ -9,9 +9,16 @@ import unittest
 from unittest.mock import MagicMock
 
 # GUI 의존성 mock
-for mod in ("pygame", "tkinter", "tkinter.messagebox", "tkinter.ttk",
-            "matplotlib", "matplotlib.backends", "matplotlib.backends.backend_tkagg",
-            "matplotlib.figure"):
+for mod in (
+    "pygame",
+    "tkinter",
+    "tkinter.messagebox",
+    "tkinter.ttk",
+    "matplotlib",
+    "matplotlib.backends",
+    "matplotlib.backends.backend_tkagg",
+    "matplotlib.figure",
+):
     sys.modules.setdefault(mod, MagicMock())
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,6 +29,7 @@ class TestQKDChannel(unittest.TestCase):
 
     def test_initial_state(self):
         from security.scada_security_engine import QKDChannel
+
         qkd = QKDChannel()
         self.assertEqual(qkd.qber, 0.0)
         self.assertEqual(qkd.keys_exchanged, 0)
@@ -32,6 +40,7 @@ class TestQKDChannel(unittest.TestCase):
     def test_normal_qber_stays_low(self):
         """공격 없을 때 QBER은 낮게 유지."""
         from security.scada_security_engine import QBER_DETECT_THRESHOLD, QKDChannel
+
         qkd = QKDChannel()
         # 20번 키 교환 (공격 없음)
         for _ in range(20):
@@ -42,6 +51,7 @@ class TestQKDChannel(unittest.TestCase):
     def test_attack_raises_qber(self):
         """공격 시 QBER이 상승."""
         from security.scada_security_engine import QBER_DETECT_THRESHOLD, QKDChannel
+
         qkd = QKDChannel()
         # 20번 키 교환 (공격 중)
         for _ in range(20):
@@ -51,6 +61,7 @@ class TestQKDChannel(unittest.TestCase):
     def test_detection_triggers_under_attack(self):
         """공격 시 탐지 플래그가 활성화."""
         from security.scada_security_engine import QKDChannel
+
         qkd = QKDChannel()
         for _ in range(30):
             qkd.update(1.0, under_attack=True)
@@ -59,6 +70,7 @@ class TestQKDChannel(unittest.TestCase):
     def test_keys_compromised_count(self):
         """공격 시 keys_compromised 증가."""
         from security.scada_security_engine import QKDChannel
+
         qkd = QKDChannel()
         for _ in range(10):
             qkd.update(1.0, under_attack=True)
@@ -68,6 +80,7 @@ class TestQKDChannel(unittest.TestCase):
     def test_reset(self):
         """reset() 호출 시 초기 상태 복원."""
         from security.scada_security_engine import QKDChannel
+
         qkd = QKDChannel()
         for _ in range(10):
             qkd.update(1.0, under_attack=True)
@@ -81,6 +94,7 @@ class TestQKDChannel(unittest.TestCase):
     def test_qber_clamped(self):
         """QBER은 [0, 1] 범위."""
         from security.scada_security_engine import QKDChannel
+
         qkd = QKDChannel()
         for _ in range(50):
             qkd.update(1.0, under_attack=True)
@@ -90,6 +104,7 @@ class TestQKDChannel(unittest.TestCase):
     def test_qber_history_bounded(self):
         """QBER 히스토리는 최대 20개."""
         from security.scada_security_engine import QKDChannel
+
         qkd = QKDChannel()
         for _ in range(50):
             qkd.update(1.0, under_attack=False)
@@ -102,6 +117,7 @@ class TestSensorRead(unittest.TestCase):
     def test_normal_read(self):
         """공격 없을 때 displayed_temp ≈ real_temp."""
         from security.scada_security_engine import sensor_read
+
         reading = sensor_read(-196.0, under_attack=False, attack_intensity=0.0)
         self.assertFalse(reading.spoofed)
         # 노이즈 포함이지만 실제 온도에 가까워야 함
@@ -110,6 +126,7 @@ class TestSensorRead(unittest.TestCase):
     def test_attack_spoofs_display(self):
         """공격 시 displayed_temp은 목표 온도에 가까움 (스푸핑)."""
         from security.scada_security_engine import TARGET_TEMP, sensor_read
+
         reading = sensor_read(-185.0, under_attack=True, attack_intensity=1.0)
         self.assertTrue(reading.spoofed)
         # 스푸핑된 값은 목표 온도에 가까움
@@ -118,12 +135,14 @@ class TestSensorRead(unittest.TestCase):
     def test_low_intensity_no_spoof(self):
         """공격 강도가 매우 낮으면 스푸핑하지 않음."""
         from security.scada_security_engine import sensor_read
+
         reading = sensor_read(-196.0, under_attack=True, attack_intensity=0.001)
         self.assertFalse(reading.spoofed)
 
     def test_real_temp_preserved(self):
         """real_temp은 항상 입력값 그대로."""
         from security.scada_security_engine import sensor_read
+
         reading = sensor_read(-190.0, under_attack=True, attack_intensity=0.8)
         self.assertEqual(reading.real_temp, -190.0)
 
@@ -137,6 +156,7 @@ class TestScadaSecurityState(unittest.TestCase):
             ScadaSecurityState,
             reset_scenario,
         )
+
         gs = ScadaSecurityState()
         reset_scenario(gs)
         self.assertEqual(gs.phase, PHASE_NORMAL)
@@ -151,6 +171,7 @@ class TestScadaSecurityState(unittest.TestCase):
             reset_scenario,
             trigger_attack,
         )
+
         gs = ScadaSecurityState()
         reset_scenario(gs)
         self.assertEqual(gs.phase, PHASE_NORMAL)
@@ -166,6 +187,7 @@ class TestScadaSecurityState(unittest.TestCase):
             reset_scenario,
             trigger_attack,
         )
+
         gs = ScadaSecurityState()
         reset_scenario(gs)
         trigger_attack(gs)
@@ -182,6 +204,7 @@ class TestScadaSecurityState(unittest.TestCase):
             trigger_attack,
             trigger_defense,
         )
+
         gs = ScadaSecurityState()
         reset_scenario(gs)
         trigger_attack(gs)
@@ -197,6 +220,7 @@ class TestScadaSecurityState(unittest.TestCase):
             trigger_attack,
             trigger_defense,
         )
+
         gs = ScadaSecurityState()
         reset_scenario(gs)
         trigger_attack(gs)
@@ -211,6 +235,7 @@ class TestScadaSecurityState(unittest.TestCase):
             reset_scenario,
             trigger_attack,
         )
+
         gs = ScadaSecurityState()
         trigger_attack(gs)
         gs.attacks_detected = 5
@@ -223,6 +248,7 @@ class TestScadaSecurityState(unittest.TestCase):
 
     def test_event_log(self):
         from security.scada_security_engine import ScadaSecurityState
+
         gs = ScadaSecurityState()
         gs.log("test message")
         self.assertEqual(len(gs.event_log), 1)
@@ -230,6 +256,7 @@ class TestScadaSecurityState(unittest.TestCase):
 
     def test_event_log_max_size(self):
         from security.scada_security_engine import ScadaSecurityState
+
         gs = ScadaSecurityState()
         for i in range(20):
             gs.log(f"msg {i}")
@@ -247,6 +274,7 @@ class TestUpdateScenario(unittest.TestCase):
             reset_scenario,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = False
         reset_scenario(gs)
@@ -265,6 +293,7 @@ class TestUpdateScenario(unittest.TestCase):
             trigger_attack,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = False
         reset_scenario(gs)
@@ -283,6 +312,7 @@ class TestUpdateScenario(unittest.TestCase):
             trigger_attack,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = False
         reset_scenario(gs)
@@ -300,6 +330,7 @@ class TestUpdateScenario(unittest.TestCase):
             trigger_defense,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = False
         reset_scenario(gs)
@@ -319,6 +350,7 @@ class TestUpdateScenario(unittest.TestCase):
             reset_scenario,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = False
         reset_scenario(gs)
@@ -333,6 +365,7 @@ class TestUpdateScenario(unittest.TestCase):
             reset_scenario,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = False
         reset_scenario(gs)
@@ -346,6 +379,7 @@ class TestUpdateScenario(unittest.TestCase):
             reset_scenario,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = False
         reset_scenario(gs)
@@ -361,6 +395,7 @@ class TestUpdateScenario(unittest.TestCase):
             reset_scenario,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = False
         reset_scenario(gs)
@@ -385,6 +420,7 @@ class TestAutoScenario(unittest.TestCase):
             reset_scenario,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = True
         gs._next_attack_time = 1.0  # 1초 후 공격
@@ -395,18 +431,16 @@ class TestAutoScenario(unittest.TestCase):
             update_scenario(gs, 0.05)
 
         # 5초 후에는 공격이 발생했을 것
-        self.assertNotEqual(gs.phase, PHASE_NORMAL,
-                            "Auto scenario should trigger attack")
+        self.assertNotEqual(gs.phase, PHASE_NORMAL, "Auto scenario should trigger attack")
 
     def test_full_cycle_auto(self):
         """자동 모드에서 전체 사이클 (NORMAL→ATTACK→DETECTED→PROTECTED→NORMAL)."""
         from security.scada_security_engine import (
-            PHASE_NORMAL,
-            PHASE_PROTECTED,
             ScadaSecurityState,
             reset_scenario,
             update_scenario,
         )
+
         gs = ScadaSecurityState()
         gs.auto_scenario = True
         gs._next_attack_time = 0.5  # 빠른 공격
@@ -421,8 +455,7 @@ class TestAutoScenario(unittest.TestCase):
                 break
 
         # 적어도 NORMAL, ATTACK, 그리고 하나 이상의 다른 위상을 봐야 함
-        self.assertGreaterEqual(len(phases_seen), 2,
-                                f"Only saw phases: {phases_seen}")
+        self.assertGreaterEqual(len(phases_seen), 2, f"Only saw phases: {phases_seen}")
 
 
 class TestPhaseConstants(unittest.TestCase):
@@ -436,6 +469,7 @@ class TestPhaseConstants(unittest.TestCase):
             PHASE_NORMAL,
             PHASE_PROTECTED,
         )
+
         self.assertEqual(PHASE_NORMAL, 0)
         self.assertEqual(PHASE_ATTACK, 1)
         self.assertEqual(PHASE_DETECTED, 2)
@@ -444,6 +478,7 @@ class TestPhaseConstants(unittest.TestCase):
 
     def test_phase_names(self):
         from security.scada_security_engine import PHASE_NAMES
+
         self.assertEqual(PHASE_NAMES[0], "NORMAL")
         self.assertEqual(PHASE_NAMES[1], "ATTACK")
         self.assertEqual(PHASE_NAMES[2], "DETECTED")

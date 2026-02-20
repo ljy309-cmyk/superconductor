@@ -236,6 +236,7 @@ def generate_supercon():
 def load_from_csv(path: str):
     """외부 CSV 파일에서 데이터 로드."""
     import pandas as pd
+
     return pd.read_csv(path)
 
 
