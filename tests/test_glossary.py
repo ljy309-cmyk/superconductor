@@ -8,7 +8,8 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# pygame mock
+# pygame mock — 다른 테스트에서 이미 설정된 mock이 있을 수 있으므로
+# setdefault 후 실제 사용되는 mock에 필요한 속성을 설정한다.
 _pg_mock = MagicMock()
 _pg_mock.KEYDOWN = 2
 _pg_mock.K_g = 103
@@ -26,14 +27,26 @@ _pg_mock.K_SPACE = 32
 sys.modules.setdefault("pygame", _pg_mock)
 sys.modules.setdefault("pygame.time", MagicMock())
 
+# 실제로 glossary.py가 사용하는 pygame mock에 키 상수 보장
+_actual_pg = sys.modules["pygame"]
+for attr in ("KEYDOWN", "K_g", "K_ESCAPE", "K_SLASH", "K_LEFT", "K_RIGHT",
+             "K_UP", "K_DOWN", "K_PAGEUP", "K_PAGEDOWN", "K_RETURN",
+             "K_BACKSPACE", "K_SPACE"):
+    if not isinstance(getattr(_actual_pg, attr, None), int):
+        setattr(_actual_pg, attr, getattr(_pg_mock, attr))
+
 import i18n
 from glossary import (
     TERMS_PER_PAGE,
     GlossaryOverlay,
     _CATEGORY_KEYS,
     _TERMS,
-    _wrap_text,
 )
+from quantum.ui_common import wrap_text
+
+# glossary 모듈이 참조하는 실제 pygame 을 _pg_mock 으로 재설정
+import glossary as _glossary_mod
+_pg_mock = _glossary_mod.pygame  # glossary가 실제 참조하는 mock 사용
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -665,26 +678,26 @@ class TestGlossaryI18n(unittest.TestCase):
 class TestWrapText(unittest.TestCase):
 
     def test_short_text_no_wrap(self):
-        lines = _wrap_text("hello world", 50)
+        lines = wrap_text("hello world", 50)
         self.assertEqual(lines, ["hello world"])
 
     def test_long_text_wraps(self):
         text = "a " * 50
-        lines = _wrap_text(text.strip(), 20)
+        lines = wrap_text(text.strip(), 20)
         self.assertGreater(len(lines), 1)
         for line in lines:
             self.assertLessEqual(len(line), 21)  # word boundary 허용
 
     def test_empty_text(self):
-        lines = _wrap_text("", 50)
+        lines = wrap_text("", 50)
         self.assertEqual(lines, [])
 
     def test_single_long_word(self):
-        lines = _wrap_text("supercalifragilisticexpialidocious", 10)
+        lines = wrap_text("supercalifragilisticexpialidocious", 10)
         self.assertEqual(len(lines), 1)  # 한 단어는 자르지 않음
 
     def test_exact_fit(self):
-        lines = _wrap_text("12345 67890", 11)
+        lines = wrap_text("12345 67890", 11)
         self.assertEqual(lines, ["12345 67890"])
 
 

@@ -20,6 +20,8 @@ except ImportError:
     pygame = None  # type: ignore[assignment]
 
 from i18n import t
+from quantum.ui_common import wrap_text
+from theme import get_pg_theme, is_high_contrast, is_reduced_motion
 
 # ── 용어 정의 ────────────────────────────────────────────
 # (term_id, category_key)  →  locale keys: gl_{id}, gl_{id}_def, gl_{id}_formula
@@ -196,10 +198,16 @@ class GlossaryOverlay:
 
     def draw(self, screen, font):
         """오버레이 렌더링."""
+        if pygame is None:
+            return
+        pg = get_pg_theme()
+        hc = is_high_contrast()
+        reduced = is_reduced_motion()
+
         if not self.visible:
             # G키 힌트 작게 표시 (F1 힌트 왼쪽에)
-            hint = font.render(t("glossary_hint"), True, (88, 91, 112))
-            f1_hint = font.render(t("help_f1_hint"), True, (88, 91, 112))
+            hint = font.render(t("glossary_hint"), True, pg.SUBTEXT)
+            f1_hint = font.render(t("help_f1_hint"), True, pg.SUBTEXT)
             x = screen.get_width() - f1_hint.get_width() - hint.get_width() - 20
             screen.blit(hint, (x, 4))
             return
@@ -217,15 +225,17 @@ class GlossaryOverlay:
         box_x = (w - box_w) // 2
         box_y = (h - box_h) // 2
 
-        pygame.draw.rect(screen, (30, 30, 46),
+        border_w = 2 if hc else 1
+        pygame.draw.rect(screen, pg.BG,
                          (box_x, box_y, box_w, box_h), border_radius=10)
-        pygame.draw.rect(screen, (137, 180, 250),
-                         (box_x, box_y, box_w, box_h), 2, border_radius=10)
+        pygame.draw.rect(screen, pg.ACCENT_BLUE,
+                         (box_x, box_y, box_w, box_h), border_w + 1,
+                         border_radius=10)
 
         ty = box_y + 14
 
         # ── 제목 ──
-        title_surf = font.render(t("glossary_title"), True, (137, 180, 250))
+        title_surf = font.render(t("glossary_title"), True, pg.ACCENT_BLUE)
         screen.blit(title_surf, (box_x + box_w // 2 - title_surf.get_width() // 2, ty))
         ty += 24
 
@@ -234,15 +244,15 @@ class GlossaryOverlay:
         for i, ck in enumerate(_CATEGORY_KEYS):
             label = t(ck)
             if i == self._cat_idx:
-                color = (30, 30, 46)
-                bg = (137, 180, 250)
+                color = pg.BG
+                tab_bg = pg.ACCENT_BLUE
             else:
-                color = (166, 173, 200)
-                bg = (49, 50, 68)
+                color = pg.TEXT
+                tab_bg = pg.PANEL_BG
             ts = font.render(f" {label} ", True, color)
             tw, th = ts.get_size()
             pad = 4
-            pygame.draw.rect(screen, bg,
+            pygame.draw.rect(screen, tab_bg,
                              (tab_x - pad, ty, tw + pad * 2, th + 2),
                              border_radius=4)
             screen.blit(ts, (tab_x, ty))
@@ -252,29 +262,29 @@ class GlossaryOverlay:
         # ── 검색 바 ──
         search_bar_y = ty
         if self._search_active:
-            bar_color = (137, 180, 250)
+            bar_color = pg.ACCENT_BLUE
             prompt = t("glossary_search_placeholder")
             display_text = self._search_text if self._search_text else prompt
-            text_color = (205, 214, 244) if self._search_text else (88, 91, 112)
+            text_color = pg.TEXT if self._search_text else pg.SUBTEXT
         else:
-            bar_color = (69, 71, 90)
+            bar_color = pg.OVERLAY
             display_text = f"/ {self._search_text}" if self._search_text else "/"
-            text_color = (166, 173, 200) if self._search_text else (88, 91, 112)
+            text_color = pg.TEXT if self._search_text else pg.SUBTEXT
 
-        pygame.draw.rect(screen, (49, 50, 68),
+        pygame.draw.rect(screen, pg.PANEL_BG,
                          (box_x + 16, search_bar_y, box_w - 32, 20),
                          border_radius=4)
         pygame.draw.rect(screen, bar_color,
                          (box_x + 16, search_bar_y, box_w - 32, 20),
-                         1, border_radius=4)
+                         border_w, border_radius=4)
         st = font.render(display_text, True, text_color)
         screen.blit(st, (box_x + 24, search_bar_y + 3))
 
-        # 커서 깜박임
+        # 커서 깜박임 (감소 모션 시 항상 표시)
         if self._search_active:
             cursor_x = box_x + 24 + font.size(self._search_text)[0]
-            if pygame.time.get_ticks() % 1000 < 500:
-                pygame.draw.line(screen, (137, 180, 250),
+            if reduced or pygame.time.get_ticks() % 1000 < 500:
+                pygame.draw.line(screen, pg.ACCENT_BLUE,
                                  (cursor_x, search_bar_y + 3),
                                  (cursor_x, search_bar_y + 17))
         ty = search_bar_y + 26
@@ -282,7 +292,7 @@ class GlossaryOverlay:
         # ── 용어 목록 ──
         items = self._page_items()
         if not items and not self._filtered:
-            no_result = font.render(t("glossary_no_results"), True, (166, 173, 200))
+            no_result = font.render(t("glossary_no_results"), True, pg.TEXT)
             screen.blit(no_result, (box_x + box_w // 2 - no_result.get_width() // 2, ty + 20))
         else:
             content_bottom = box_y + box_h - 50
@@ -296,24 +306,24 @@ class GlossaryOverlay:
                 has_formula = formula != formula_key  # key 자체가 반환되면 없는 것
 
                 # 용어 이름
-                name_surf = font.render(f"  {name}", True, (249, 226, 175))
+                name_surf = font.render(f"  {name}", True, pg.ACCENT_YELLOW)
                 screen.blit(name_surf, (box_x + 16, ty))
                 ty += 18
 
                 # 정의 (줄바꿈)
                 max_chars = max(20, (box_w - 60) // (font.size("A")[0] or 8))
-                def_lines = _wrap_text(defn, max_chars)
+                def_lines = wrap_text(defn, max_chars)
                 for line in def_lines:
                     if ty > content_bottom:
                         break
-                    ls = font.render(f"    {line}", True, (205, 214, 244))
+                    ls = font.render(f"    {line}", True, pg.TEXT)
                     screen.blit(ls, (box_x + 16, ty))
                     ty += 16
 
                 # 수식
                 if has_formula:
                     if ty <= content_bottom:
-                        fs = font.render(f"    {formula}", True, (203, 166, 247))
+                        fs = font.render(f"    {formula}", True, pg.ACCENT_PURPLE)
                         screen.blit(fs, (box_x + 16, ty))
                         ty += 16
 
@@ -322,31 +332,14 @@ class GlossaryOverlay:
         # ── 하단 네비게이션 ──
         bottom_y = box_y + box_h - 42
         page_text = t("glossary_page", page=self._page + 1, total=self._total_pages())
-        page_surf = font.render(page_text, True, (166, 173, 200))
+        page_surf = font.render(page_text, True, pg.TEXT)
         screen.blit(page_surf, (box_x + box_w // 2 - page_surf.get_width() // 2, bottom_y))
 
         nav_text = t("glossary_nav")
-        nav_surf = font.render(nav_text, True, (88, 91, 112))
+        nav_surf = font.render(nav_text, True, pg.SUBTEXT)
         screen.blit(nav_surf, (box_x + box_w // 2 - nav_surf.get_width() // 2, bottom_y + 16))
 
         # 닫기 안내
-        close_surf = font.render(t("glossary_close"), True, (88, 91, 112))
+        close_surf = font.render(t("glossary_close"), True, pg.SUBTEXT)
         screen.blit(close_surf,
                      (box_x + box_w - close_surf.get_width() - 16, bottom_y + 16))
-
-
-def _wrap_text(text: str, max_chars: int) -> list[str]:
-    """텍스트를 max_chars 기준으로 줄바꿈."""
-    words = text.split()
-    lines: list[str] = []
-    current = ""
-    for word in words:
-        if len(current) + len(word) + 1 > max_chars:
-            if current:
-                lines.append(current)
-            current = word
-        else:
-            current = f"{current} {word}" if current else word
-    if current:
-        lines.append(current)
-    return lines
