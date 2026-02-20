@@ -236,8 +236,7 @@ class TestLoadSession(unittest.TestCase):
         from session_io import load_session
 
         path = os.path.join(self.tmpdir, "empty.json")
-        with open(path, "w"):
-            pass
+        open(path, "w").close()
 
         result = load_session(path)
         self.assertIsNone(result)
