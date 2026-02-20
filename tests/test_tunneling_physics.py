@@ -1226,6 +1226,225 @@ class TestDrawPageDots(unittest.TestCase):
         self.assertEqual(self._count_rendered_slots(20, 19), MAX_PAGE_DOTS)
 
 
+# ── 페이지 인디케이터 집중 테스트 ─────────────────────
+
+
+class TestPageDotsCore(unittest.TestCase):
+    """페이지 인디케이터 핵심 동작 집중 테스트.
+
+    도트 크기·색상·위치·모드 전환 경계·활성 가시성을 검증합니다.
+    """
+
+    def setUp(self):
+        self.screen = _MagicMock()
+        self.pg = sys.modules["pygame"]
+        self.pg.draw.circle.reset_mock()
+        self.active = (100, 200, 255)
+        self.inactive = (50, 50, 50)
+        self.border = (80, 80, 80)
+        self.dot_r = 3   # non-hc
+        self.small_r = 2
+        self.gap = self.dot_r * 2 + 5  # 11
+
+    def _draw(self, total, page, x=100, cy=50):
+        self.pg.draw.circle.reset_mock()
+        draw_page_dots(self.screen, x, cy, total, page,
+                       self.active, self.inactive, self.border)
+
+    def _filled(self):
+        """filled circle 호출 (outline 제외)."""
+        return [c for c in self.pg.draw.circle.call_args_list
+                if len(c[0]) == 4]
+
+    def _outlines(self):
+        """outline circle 호출."""
+        return [c for c in self.pg.draw.circle.call_args_list
+                if len(c[0]) >= 5]
+
+    def _slot_x(self, si, x=100):
+        return x + si * self.gap + self.dot_r
+
+    # ── 활성 도트 반지름 ──────────────────────────────
+
+    def test_active_radius_non_overflow(self):
+        """비-overflow: 활성 도트 반지름 = dot_r."""
+        self._draw(5, 2)
+        active = [c for c in self._filled() if c[0][1] == self.active]
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0][0][3], self.dot_r)
+
+    def test_active_radius_overflow(self):
+        """overflow: 활성 도트 반지름 = dot_r."""
+        self._draw(20, 10)
+        active = [c for c in self._filled() if c[0][1] == self.active]
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0][0][3], self.dot_r)
+
+    # ── 비활성 도트 반지름 ────────────────────────────
+
+    def test_inactive_radius_non_overflow(self):
+        """비-overflow: 비활성 도트 반지름 = small_r."""
+        self._draw(5, 0)
+        inactive = [c for c in self._filled() if c[0][1] == self.inactive]
+        for c in inactive:
+            self.assertEqual(c[0][3], self.small_r)
+
+    def test_inactive_radius_overflow(self):
+        """overflow: 비활성 도트 반지름 = small_r."""
+        self._draw(20, 10)
+        inactive = [c for c in self._filled() if c[0][1] == self.inactive]
+        for c in inactive:
+            self.assertEqual(c[0][3], self.small_r)
+
+    def test_inactive_size_same_at_threshold(self):
+        """overflow 전환점(9→10페이지)에서 비활성 도트 크기 동일."""
+        self._draw(MAX_PAGE_DOTS, 0)
+        pre = [c[0][3] for c in self._filled() if c[0][1] == self.inactive]
+        self._draw(MAX_PAGE_DOTS + 1, 0)
+        post = [c[0][3] for c in self._filled() if c[0][1] == self.inactive]
+        self.assertTrue(all(r == self.small_r for r in pre))
+        self.assertTrue(all(r == self.small_r for r in post))
+
+    # ── 색상 정확성 ───────────────────────────────────
+
+    def test_active_dot_uses_active_color(self):
+        """활성 도트는 active_clr 색상 사용."""
+        self._draw(5, 2)
+        active = [c for c in self._filled() if c[0][1] == self.active]
+        self.assertEqual(len(active), 1)
+
+    def test_inactive_fill_and_border_colors(self):
+        """비활성 도트: fill(inactive_clr) + border(border_clr)."""
+        self._draw(3, 0)
+        fills = [c for c in self._filled() if c[0][1] == self.inactive]
+        borders = [c for c in self._outlines() if c[0][1] == self.border]
+        self.assertEqual(len(fills), 2)    # 비활성 2개
+        self.assertEqual(len(borders), 2)  # border 2개
+
+    def test_second_page_active_colors(self):
+        """2페이지 중 두 번째 활성 → 정확한 색상 배치."""
+        self._draw(2, 1)
+        filled = self._filled()
+        slot0 = [c for c in filled if c[0][2][0] == self._slot_x(0)
+                 and c[0][3] != 1]
+        slot1 = [c for c in filled if c[0][2][0] == self._slot_x(1)
+                 and c[0][3] != 1]
+        self.assertEqual(slot0[0][0][1], self.inactive)
+        self.assertEqual(slot1[0][0][1], self.active)
+
+    # ── 모드 전환 경계 ────────────────────────────────
+
+    def test_threshold_max_pages_no_ellipsis(self):
+        """MAX_PAGE_DOTS 페이지: ellipsis(r=1) 없어야 한다."""
+        self._draw(MAX_PAGE_DOTS, 4)
+        tiny = [c for c in self._filled() if c[0][3] == 1]
+        self.assertEqual(len(tiny), 0)
+
+    def test_threshold_max_plus_one_has_ellipsis(self):
+        """MAX_PAGE_DOTS+1 페이지: ellipsis(r=1) 존재해야 한다."""
+        self._draw(MAX_PAGE_DOTS + 1, 5)
+        tiny = [c for c in self._filled() if c[0][3] == 1]
+        self.assertGreater(len(tiny), 0)
+
+    def test_threshold_slot_count_continuity(self):
+        """전환점 양쪽에서 렌더링 슬롯 수 차이가 1 이하."""
+        # MAX_PAGE_DOTS 페이지: 정확히 MAX_PAGE_DOTS 슬롯
+        self._draw(MAX_PAGE_DOTS, 0)
+        xs_pre = {c[0][2][0] for c in self._filled() if c[0][3] != 1}
+        # MAX_PAGE_DOTS + 1: overflow → MAX_PAGE_DOTS 슬롯
+        self._draw(MAX_PAGE_DOTS + 1, 0)
+        all_xs = [c[0][2][0] for c in self.pg.draw.circle.call_args_list]
+        slots_post = set()
+        for cx_val in all_xs:
+            si = round((cx_val - 100 - self.dot_r) / self.gap)
+            slots_post.add(si)
+        self.assertLessEqual(abs(len(xs_pre) - len(slots_post)), 1)
+
+    # ── 활성 페이지 가시성 ────────────────────────────
+
+    def test_exactly_one_active_non_overflow(self):
+        """비-overflow: 모든 페이지에서 정확히 1개 활성 도트."""
+        for page in range(6):
+            self._draw(6, page)
+            active = [c for c in self._filled() if c[0][1] == self.active]
+            self.assertEqual(len(active), 1,
+                             f"page {page}: {len(active)} active")
+
+    def test_exactly_one_active_overflow(self):
+        """overflow: 모든 페이지에서 정확히 1개 활성 도트."""
+        for page in range(20):
+            self._draw(20, page)
+            active = [c for c in self._filled() if c[0][1] == self.active]
+            self.assertEqual(len(active), 1,
+                             f"page {page}: {len(active)} active")
+
+    # ── Overflow 첫/끝 도트 존재 ──────────────────────
+
+    def test_overflow_first_slot_always_dot(self):
+        """overflow: 첫 슬롯(slot 0)에 항상 도트 존재."""
+        for page in range(20):
+            self._draw(20, page)
+            first_x = self._slot_x(0)
+            dots = [c for c in self._filled()
+                    if c[0][2][0] == first_x and c[0][3] != 1]
+            self.assertGreater(len(dots), 0,
+                               f"page {page}: first slot empty")
+
+    def test_overflow_last_slot_always_dot(self):
+        """overflow: 마지막 슬롯(slot MAX-1)에 항상 도트 존재."""
+        for page in range(20):
+            self._draw(20, page)
+            last_x = self._slot_x(MAX_PAGE_DOTS - 1)
+            dots = [c for c in self._filled()
+                    if c[0][2][0] == last_x and c[0][3] != 1]
+            self.assertGreater(len(dots), 0,
+                               f"page {page}: last slot empty")
+
+    # ── X-span 일정성 ────────────────────────────────
+
+    def test_overflow_x_span_constant(self):
+        """overflow: 모든 페이지에서 슬롯 중심 간 최대 간격 동일."""
+        total = 25
+        expected = (MAX_PAGE_DOTS - 1) * self.gap
+        for page in range(total):
+            self._draw(total, page)
+            all_xs = [c[0][2][0]
+                      for c in self.pg.draw.circle.call_args_list]
+            slot_xs = set()
+            for cx_val in all_xs:
+                si = round((cx_val - 100 - self.dot_r) / self.gap)
+                slot_xs.add(100 + si * self.gap + self.dot_r)
+            span = max(slot_xs) - min(slot_xs)
+            self.assertEqual(span, expected,
+                             f"page {page}: span {span} != {expected}")
+
+    # ── 비-overflow 완전성 ────────────────────────────
+
+    def test_non_overflow_all_pages_rendered(self):
+        """비-overflow: 정확히 total_pages개 도트 위치 사용."""
+        n = 7
+        self._draw(n, 3)
+        dot_xs = {c[0][2][0] for c in self._filled() if c[0][3] != 1}
+        self.assertEqual(len(dot_xs), n)
+
+    def test_non_overflow_exact_positions(self):
+        """비-overflow: 도트 위치가 gap 간격으로 정확히 배치."""
+        n = 5
+        x = 100
+        self._draw(n, 2, x=x)
+        expected = {x + i * self.gap + self.dot_r for i in range(n)}
+        actual = {c[0][2][0] for c in self._filled() if c[0][3] != 1}
+        self.assertEqual(actual, expected)
+
+    def test_non_overflow_active_position_matches_page(self):
+        """비-overflow: 활성 도트 X 위치가 current_page 슬롯과 일치."""
+        for page in range(5):
+            self._draw(5, page)
+            active = [c for c in self._filled()
+                      if c[0][1] == self.active]
+            self.assertEqual(active[0][0][2][0], self._slot_x(page))
+
+
 # ── page_dots_width 테스트 ────────────────────────────
 
 
