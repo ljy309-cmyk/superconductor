@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment / Secrets
+.env
+config/credentials.json
+config/token.json
+config/service_account.json
+
+# Output
+output/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
