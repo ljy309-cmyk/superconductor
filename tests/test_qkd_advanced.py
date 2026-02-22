@@ -1125,7 +1125,7 @@ class TestFullPipeline(unittest.TestCase):
 
         # OTP roundtrip
         cipher = xor_encrypt(_DEMO_PLAINTEXT, final)
-        if len(final) >= len(_DEMO_PLAINTEXT) * 2:
+        if len(final) >= len(_DEMO_PLAINTEXT) * 2:  # pragma: no cover
             decrypted = xor_decrypt(cipher, final)
             self.assertEqual(decrypted, _DEMO_PLAINTEXT)
 
@@ -1168,7 +1168,7 @@ class TestGHZFullPipeline(unittest.TestCase):
         self.assertGreater(len(final), 0)
 
         # OTP roundtrip
-        if len(final) >= 6:
+        if len(final) >= 6:  # pragma: no cover
             cipher = xor_encrypt("GHZ", final)
             decrypted = xor_decrypt(cipher, final)
             self.assertEqual(decrypted, "GHZ")

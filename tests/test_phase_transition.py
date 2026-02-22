@@ -29,8 +29,11 @@ _mock_modules = {
 }
 # matplotlib은 이미 로드된 경우 건드리지 않음 (다른 테스트에 영향)
 for _m in (
-    "matplotlib", "matplotlib.backends", "matplotlib.backends.backend_tkagg",
-    "matplotlib.backends._backend_tk", "matplotlib.figure",
+    "matplotlib",
+    "matplotlib.backends",
+    "matplotlib.backends.backend_tkagg",
+    "matplotlib.backends._backend_tk",
+    "matplotlib.figure",
 ):
     if _m not in sys.modules:
         _mock_modules[_m] = _mpl_mock
@@ -38,7 +41,6 @@ for _m in (
 with patch.dict(sys.modules, _mock_modules):
     from physics.phase_transition import (  # noqa: E402
         MATERIALS,
-        R_NORMAL,
         _celsius_to_kelvin,
         _kelvin_to_celsius,
         resistance,

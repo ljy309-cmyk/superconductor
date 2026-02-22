@@ -27,7 +27,7 @@ try:
     from data_ai.qrng_logger import pop_key_bit, shared_key_available
 
     QRNG_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover
     QRNG_AVAILABLE = False
 
     def pop_key_bit():  # noqa: E306

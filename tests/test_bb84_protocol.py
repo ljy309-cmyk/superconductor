@@ -115,6 +115,17 @@ class TestBB84GameRounds(unittest.TestCase):
         self.assertTrue(game.packets[0].intercepted)
         self.assertEqual(game.eve_intercept_count, 1)
 
+    def test_eve_corrupts_on_different_basis(self):
+        """Eve가 다른 기저로 측정 시 pkt.corrupted=True (line 178)."""
+        game = BB84Game()
+        # Eve가 항상 다른 기저를 선택하도록 패치
+        with patch("security.bb84_protocol.random") as mock_rng:
+            mock_rng.random.side_effect = [0.0, 0.0]  # eve_present=True, EVE_ERROR_INJECT 체크
+            mock_rng.choice.side_effect = ["0", "+", "x"]  # alice_bit, alice_basis, eve_basis (다른 기저)
+            game.new_round(eve_chance=1.0, decoy_chance=0.0)
+        pkt = game.packets[0]
+        self.assertTrue(pkt.corrupted)
+
     def test_no_eve(self):
         game = BB84Game()
         game.new_round(eve_chance=0.0, decoy_chance=0.0)

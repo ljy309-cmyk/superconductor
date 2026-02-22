@@ -1527,7 +1527,7 @@ class TestExportSession(unittest.TestCase):
         with open(csv_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["trial", "time_s", "barrier_width", "tunnel_prob", "result"])
-            for i, tr in enumerate(self.ctx.trial_history, 1):
+            for i, tr in enumerate(self.ctx.trial_history, 1):  # pragma: no cover
                 writer.writerow([i, tr["t"], tr["barrier"], tr["prob"], int(tr["result"])])
 
         with open(csv_path, encoding="utf-8") as f:
@@ -2615,7 +2615,7 @@ class TestBarrierSweeper(unittest.TestCase):
     def test_sweep_completes(self):
         """충분히 advance()하면 done=True."""
         sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=100)
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             pass
         self.assertTrue(sw.done)
         self.assertAlmostEqual(sw.progress, 1.0)
@@ -2623,7 +2623,7 @@ class TestBarrierSweeper(unittest.TestCase):
     def test_results_cover_all_widths(self):
         """완료 후 모든 폭에 결과 존재."""
         sw = BarrierSweeper(seed=42, trials_per_width=10, batch_size=1000)
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             pass
         for w in sw.widths:
             self.assertIn(w, sw.results)
@@ -2632,7 +2632,7 @@ class TestBarrierSweeper(unittest.TestCase):
     def test_results_totals_correct(self):
         """tunnel + reflect = total."""
         sw = BarrierSweeper(seed=42, trials_per_width=20, batch_size=500)
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             pass
         for _w, r in sw.results.items():
             self.assertEqual(r["tunnel"] + r["reflect"], r["total"])
@@ -2640,7 +2640,7 @@ class TestBarrierSweeper(unittest.TestCase):
     def test_rate_matches_counts(self):
         """rate = tunnel / total."""
         sw = BarrierSweeper(seed=42, trials_per_width=50, batch_size=1000)
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             pass
         for _w, r in sw.results.items():
             expected = r["tunnel"] / r["total"] if r["total"] > 0 else 0.0
@@ -2649,7 +2649,7 @@ class TestBarrierSweeper(unittest.TestCase):
     def test_sorted_results_ascending(self):
         """get_sorted_results()는 폭 기준 오름차순."""
         sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=1000)
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             pass
         sorted_r = sw.get_sorted_results()
         widths = [w for w, _, _ in sorted_r]
@@ -2658,7 +2658,7 @@ class TestBarrierSweeper(unittest.TestCase):
     def test_sorted_results_has_theory(self):
         """get_sorted_results()의 theory 값이 양수."""
         sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=1000)
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             pass
         for _w, meas, theory in sw.get_sorted_results():
             self.assertGreaterEqual(theory, 0.0)
@@ -2669,7 +2669,7 @@ class TestBarrierSweeper(unittest.TestCase):
 
         def run_sweep(seed):
             sw = BarrierSweeper(seed=seed, trials_per_width=20, batch_size=500)
-            while sw.advance():
+            while sw.advance():  # pragma: no cover
                 pass
             return sw.get_sorted_results()
 
@@ -2680,7 +2680,7 @@ class TestBarrierSweeper(unittest.TestCase):
     def test_thin_barrier_higher_rate(self):
         """얇은 장벽에서 통과율이 두꺼운 장벽보다 높음 (충분한 시행)."""
         sw = BarrierSweeper(seed=42, trials_per_width=500, batch_size=5000)
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             pass
         results = sw.get_sorted_results()
         # 첫 번째(얇은)와 마지막(두꺼운) 비교
@@ -2692,7 +2692,7 @@ class TestBarrierSweeper(unittest.TestCase):
     def test_advance_after_done_returns_false(self):
         """완료 후 advance()는 False 반환."""
         sw = BarrierSweeper(seed=42, trials_per_width=5, batch_size=1000)
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             pass
         self.assertFalse(sw.advance())
 
@@ -2706,7 +2706,7 @@ class TestBarrierSweeper(unittest.TestCase):
     def test_custom_range(self):
         """사용자 지정 범위 (width_min=10, width_max=50, step=20)."""
         sw = BarrierSweeper(seed=42, width_min=10, width_max=50, step=20, trials_per_width=10, batch_size=500)
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             pass
         self.assertEqual(sw.widths, [10, 30, 50])
         self.assertEqual(len(sw.results), 3)

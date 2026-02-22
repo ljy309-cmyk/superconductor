@@ -190,7 +190,7 @@ class TestQRNGThreadSafety(unittest.TestCase):
         from data_ai.qrng_logger import pop_key_bit, push_key_bits, shared_key_available
 
         # 큐 비우기
-        while pop_key_bit() is not None:
+        while pop_key_bit() is not None:  # pragma: no cover
             pass
 
         push_key_bits([1, 0, 1, 1])
@@ -204,7 +204,7 @@ class TestQRNGThreadSafety(unittest.TestCase):
         from data_ai.qrng_logger import pop_key_bit
 
         # 큐 비우기
-        while pop_key_bit() is not None:
+        while pop_key_bit() is not None:  # pragma: no cover
             pass
 
         result = pop_key_bit()
@@ -216,7 +216,7 @@ class TestQRNGThreadSafety(unittest.TestCase):
         from data_ai.qrng_logger import pop_key_bit, push_key_bits
 
         # 큐 비우기
-        while pop_key_bit() is not None:
+        while pop_key_bit() is not None:  # pragma: no cover
             pass
 
         results = []

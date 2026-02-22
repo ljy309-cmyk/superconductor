@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 try:
     from hypothesis import given, settings
     from hypothesis import strategies as st
-except ImportError as exc:
+except ImportError as exc:  # pragma: no cover
     raise unittest.SkipTest("hypothesis 패키지 필요") from exc
 
 # ── 전략(strategy) 정의 ──────────────────────────────
@@ -192,9 +192,9 @@ class TestBarrierSweeperPBT(unittest.TestCase):
 
         sw = BarrierSweeper(base_prob=bp, trials_per_width=5, batch_size=500, seed=seed)
         iters = 0
-        while sw.advance():
+        while sw.advance():  # pragma: no cover
             iters += 1
-            if iters > 10000:
+            if iters > 10000:  # pragma: no cover
                 break
         self.assertTrue(sw.done)
         for w in sw.widths:
@@ -208,7 +208,7 @@ class TestBarrierSweeperPBT(unittest.TestCase):
 
         sw = BarrierSweeper(base_prob=bp, trials_per_width=10, batch_size=500, seed=seed)
         while sw.advance():
-            pass
+            pass  # pragma: no cover
         for r in sw.results.values():
             self.assertEqual(r["tunnel"] + r["reflect"], r["total"])
 

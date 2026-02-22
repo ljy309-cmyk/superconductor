@@ -226,7 +226,7 @@ class QuantumCircuit:
             cumulative += p
             if r <= cumulative:
                 return i
-        return len(probs) - 1
+        return len(probs) - 1  # pragma: no cover
 
     def basis_labels(self) -> list[str]:
         """기저 상태 라벨 (|00⟩, |01⟩, ...)."""

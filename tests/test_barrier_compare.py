@@ -218,7 +218,7 @@ class TestBarrierCollisionDynamics(unittest.TestCase):
         p.update(1 / 60, barrier_width=bw, tunnel_prob=0.0)
         # 아직 도달 안 했으면 계속 전진
         while p.tunneled is None:
-            p.update(1 / 60, barrier_width=bw, tunnel_prob=0.0)
+            p.update(1 / 60, barrier_width=bw, tunnel_prob=0.0)  # pragma: no cover
         # 반사됨 → 장벽 왼쪽 가장자리 바로 앞
         self.assertLess(p.x, BARRIER_X, "Reflected: before barrier center")
 

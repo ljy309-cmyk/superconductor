@@ -77,8 +77,8 @@ def _validate_profile_name(name: str) -> bool:
     """프로파일 이름 유효성 검사 (경로 순회 방지)."""
     if not name or not _SAFE_NAME_RE.match(name):
         return False
-    # 경로 구분자 포함 방지
-    if os.sep in name or "/" in name or ".." in name:
+    # 경로 구분자 포함 방지 (방어적 2차 검증 — regex에서 이미 차단됨)
+    if os.sep in name or "/" in name or ".." in name:  # pragma: no cover
         return False
     return True
 

@@ -92,7 +92,7 @@ class TestThemeListeners(unittest.TestCase):
     def test_off_theme_change_removes_listener(self):
         calls = []
 
-        def fn():
+        def fn():  # pragma: no cover
             calls.append(1)
 
         theme.on_theme_change(fn)
@@ -140,7 +140,7 @@ class TestThemeListeners(unittest.TestCase):
         calls = []
 
         class Obj:
-            def on_change(self):
+            def on_change(self):  # pragma: no cover
                 calls.append(1)
 
         obj = Obj()

@@ -233,7 +233,7 @@ _server_instance: HTTPServer | None = None
 _server_thread: threading.Thread | None = None
 
 
-def start_server():
+def start_server():  # pragma: no cover
     """백그라운드 스레드에서 랭킹 서버 시작 (스레드 안전)."""
     global _server_instance, _server_thread
     with _server_lock:

@@ -185,8 +185,8 @@ class TestLocaleListeners(unittest.TestCase):
     def test_off_locale_change_removes_listener(self):
         calls = []
 
-        def fn():
-            return calls.append(1)
+        def fn():  # pragma: no cover
+            calls.append(1)
 
         i18n.on_locale_change(fn)
         i18n.off_locale_change(fn)
@@ -201,7 +201,7 @@ class TestLocaleListeners(unittest.TestCase):
         calls = []
 
         def fn():
-            return calls.append(1)
+            calls.append(1)
 
         i18n.on_locale_change(fn)
         i18n.on_locale_change(fn)  # 중복

@@ -715,6 +715,18 @@ class TestSoundManagerVolume(unittest.TestCase):
         sm.volume_down(0.2)
         self.assertAlmostEqual(sm._volume, 0.0, places=2)
 
+    def test_volume_setter_applies_to_existing_sounds(self):
+        """volume setter: _sounds에 사운드가 있으면 set_volume 호출 (line 80)."""
+        import sound_manager
+
+        sm = sound_manager.SoundManager()
+        mock_snd1 = MagicMock()
+        mock_snd2 = MagicMock()
+        sm._sounds = {"collapse": mock_snd1, "heal": mock_snd2}
+        sm.volume = 0.5
+        mock_snd1.set_volume.assert_called_once_with(0.5)
+        mock_snd2.set_volume.assert_called_once_with(0.5)
+
 
 class TestSoundManagerHandleKey(unittest.TestCase):
     """handle_key() 테스트 (lines 158-169)."""
@@ -1327,14 +1339,14 @@ class TestThemeSaveLoadWithFontFamily(unittest.TestCase):
                 mode = ""
                 if args:
                     mode = args[0]
-                elif "mode" in kwargs:
+                elif "mode" in kwargs:  # pragma: no cover
                     mode = kwargs["mode"]
                 if "w" in mode:
                     m = MagicMock()
                     m.__enter__ = MagicMock(return_value=m)
                     m.__exit__ = MagicMock(return_value=False)
 
-                    def capture_dump(data, f, **kw):
+                    def capture_dump(data, f, **kw):  # pragma: no cover
                         written_data.update(data)
 
                     return m
