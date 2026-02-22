@@ -62,6 +62,7 @@ testpaths = ["tests"]
 filterwarnings = [
     "error",                       # 모든 Python 워닝을 에러로 처리
     "ignore::DeprecationWarning",  # 외부 라이브러리 DeprecationWarning만 허용
+    "ignore::UserWarning:matplotlib",  # matplotlib 백엔드 전환 워닝 허용
 ]
 addopts = "--strict-markers --strict-config -x --tb=short"
 
