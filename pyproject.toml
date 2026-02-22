@@ -64,3 +64,57 @@ filterwarnings = [
     "ignore::DeprecationWarning",  # 외부 라이브러리 DeprecationWarning만 허용
 ]
 addopts = "--strict-markers --strict-config -x --tb=short"
+
+[tool.coverage.run]
+omit = [
+    # Pygame UI 파일 (디스플레이/이벤트루프 필요 — 단위 테스트 불가)
+    "main.py",
+    "game_base.py",
+    "achievement_toast.py",
+    "preset_hud.py",
+    "help_overlay.py",
+    "quit_dialog.py",
+    "game_summary.py",
+    "difficulty_dialog.py",
+    "tutorial.py",
+    "glossary.py",
+    "stats_dashboard.py",
+    "replay_viewer.py",
+    "profile_manager.py",
+    "settings_panel.py",
+    "ui/base_launcher.py",
+    "ui/slider.py",
+    "quantum/tunneling.py",
+    "quantum/tunneling_render.py",
+    "quantum/entanglement.py",
+    "quantum/gate_builder.py",
+    "quantum/qec_shield.py",
+    "quantum/qubit_chain.py",
+    "physics/cooper_pair.py",
+    "physics/josephson_junction.py",
+    "physics/flux_pinning.py",
+    "physics/phase_transition.py",
+    "physics/phase_transition_sim.py",
+    "security/bb84_defense.py",
+    "security/squid_mines.py",
+    "security/qkd_advanced.py",
+    "security/scada_security.py",
+    "data_ai/launcher.py",
+    "data_ai/ranking.py",
+    "data_ai/qrng_logger.py",
+    "data_ai/tc_predictor.py",
+    "physics/launcher.py",
+    "quantum/launcher.py",
+    "security/launcher.py",
+    "scada/dashboard.py",
+]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
+]

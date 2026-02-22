@@ -101,7 +101,7 @@ class PerfMonitor:
             s["uptime"],
         )
 
-    def draw_overlay(self, screen, font, x: int = 4, y: int = 4):
+    def draw_overlay(self, screen, font, x: int = 4, y: int = 4):  # pragma: no cover
         """성능 HUD 오버레이 (Pygame)."""
         try:
             import pygame

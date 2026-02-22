@@ -79,7 +79,7 @@ def _load_import_data(path: str) -> tuple[dict | None, list[dict]]:
     return data, trials
 
 
-def _import_session(ctx) -> bool:
+def _import_session(ctx) -> bool:  # pragma: no cover
     """내보내기 파일을 선택하고 파라미터 적용 + 비교 데이터 로드."""
     path = choose_import_file(ctx.screen, ctx.font, _PREFIX)
     if path is None:

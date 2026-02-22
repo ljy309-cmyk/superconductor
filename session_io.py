@@ -198,7 +198,7 @@ def _import_btn_rect(screen_w: int, screen_h: int, vis_index: int, num_files: in
     return pygame.Rect(bx, by, btn_w, btn_h)
 
 
-def choose_import_file(screen, font, prefix: str) -> str | None:
+def choose_import_file(screen, font, prefix: str) -> str | None:  # pragma: no cover
     """내보내기 파일 선택 대화상자 (Pygame). 선택한 파일 경로 반환, 취소 시 ``None``."""
     import pygame
 
