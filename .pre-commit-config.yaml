@@ -7,8 +7,8 @@ repos:
   - repo: local
     hooks:
       - id: pytest
-        name: pytest
-        entry: python -m pytest tests/ -x -q
+        name: pytest (all tests must pass + coverage >= 40%)
+        entry: python -m pytest tests/ --cov=. --cov-fail-under=40 --cov-report=term-missing:skip-covered
         language: system
         pass_filenames: false
         always_run: true

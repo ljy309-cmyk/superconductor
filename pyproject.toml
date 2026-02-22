@@ -59,4 +59,8 @@ quote-style = "double"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-filterwarnings = ["ignore::DeprecationWarning"]
+filterwarnings = [
+    "error",                       # 모든 Python 워닝을 에러로 처리
+    "ignore::DeprecationWarning",  # 외부 라이브러리 DeprecationWarning만 허용
+]
+addopts = "--strict-markers --strict-config -x --tb=short"
