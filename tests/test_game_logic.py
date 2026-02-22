@@ -206,7 +206,7 @@ class TestAchievementConditions(unittest.TestCase):
         for ach in ACHIEVEMENTS:
             try:
                 ach["condition"]({})  # 빈 dict로 호출 시 에러 없어야 함
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 self.fail(f"Achievement {ach['id']} 조건에서 예외: {e}")
 
 

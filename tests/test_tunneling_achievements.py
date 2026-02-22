@@ -563,7 +563,7 @@ class TestAchievementEdgeCases(unittest.TestCase):
             try:
                 result = ach["condition"]({})
                 self.assertIsInstance(result, bool)
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 self.fail(f"{ach['id']} raised {e} on empty dict")
 
     def test_corrupted_save_file(self):

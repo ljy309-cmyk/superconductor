@@ -10,7 +10,7 @@ try:
     import numpy as np
 
     HAS_NUMPY = True
-except ImportError:
+except ImportError:  # pragma: no cover
     HAS_NUMPY = False
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

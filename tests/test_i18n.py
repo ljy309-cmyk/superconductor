@@ -113,7 +113,7 @@ class TestTranslationLookup(unittest.TestCase):
             en_data = json.load(f)
         # ko에만 있는 키 찾기
         ko_only_keys = set(ko_data.keys()) - set(en_data.keys())
-        if ko_only_keys:
+        if ko_only_keys:  # pragma: no cover
             key = next(iter(ko_only_keys))
             result = i18n.t(key)
             self.assertEqual(result, ko_data[key])

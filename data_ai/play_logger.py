@@ -18,7 +18,7 @@ from datetime import datetime
 
 try:
     import pandas as pd
-except ImportError:
+except ImportError:  # pragma: no cover
     pd = None  # pandas 없어도 JSON/CSV 기록은 가능
 
 from logger import get_module_logger

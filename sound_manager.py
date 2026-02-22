@@ -12,7 +12,7 @@ import math
 
 try:
     import pygame
-except ImportError:
+except ImportError:  # pragma: no cover
     pygame = None  # type: ignore[assignment]
 
 from logger import get_module_logger

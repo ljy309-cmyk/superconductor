@@ -39,7 +39,7 @@ def _resolve_font() -> str:
         return _resolved_family
 
     if not pygame.font.get_init():
-        pygame.font.init()
+        pygame.font.init()  # pragma: no cover
 
     for name in _CANDIDATE_FONTS:
         try:
@@ -49,7 +49,7 @@ def _resolve_font() -> str:
             if surf.get_width() > 0 and surf.get_width() != f.render("?", True, (255, 255, 255)).get_width():
                 _resolved_family = name
                 return name
-        except Exception:
+        except Exception:  # pragma: no cover
             continue
 
     # 최후의 대안: pygame 기본 폰트 (한글 미지원일 수 있음)
@@ -93,7 +93,7 @@ def list_available_fonts() -> list[str]:
             surf = f.render("가", True, (255, 255, 255))
             if surf.get_width() > 0 and surf.get_width() != f.render("?", True, (255, 255, 255)).get_width():
                 available.append(name)
-        except Exception:
+        except Exception:  # pragma: no cover
             continue
     return available
 

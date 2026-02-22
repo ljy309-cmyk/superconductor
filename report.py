@@ -42,7 +42,7 @@ def generate_report(module_name: str, data: dict, output_dir: str | None = None)
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-    except ImportError:
+    except ImportError:  # pragma: no cover
         _log.warning("matplotlib 없음 — 텍스트 보고서만 생성")
         return _generate_text_report(module_name, data, output_dir)
 

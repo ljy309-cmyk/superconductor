@@ -124,11 +124,11 @@ class TestBuildModel(unittest.TestCase):
             import sklearn  # noqa: F401
 
             self.sklearn_available = True
-        except ImportError:
+        except ImportError:  # pragma: no cover
             self.sklearn_available = False
 
     def test_random_forest(self):
-        if not self.sklearn_available:
+        if not self.sklearn_available:  # pragma: no cover
             self.skipTest("sklearn not installed")
         from data_ai.tc_predictor import _build_model
 
@@ -136,7 +136,7 @@ class TestBuildModel(unittest.TestCase):
         self.assertEqual(model.n_estimators, 50)
 
     def test_gradient_boosting(self):
-        if not self.sklearn_available:
+        if not self.sklearn_available:  # pragma: no cover
             self.skipTest("sklearn not installed")
         from data_ai.tc_predictor import _build_model
 
@@ -144,7 +144,7 @@ class TestBuildModel(unittest.TestCase):
         self.assertEqual(model.n_estimators, 50)
 
     def test_svr(self):
-        if not self.sklearn_available:
+        if not self.sklearn_available:  # pragma: no cover
             self.skipTest("sklearn not installed")
         from data_ai.tc_predictor import _build_model
 
@@ -152,7 +152,7 @@ class TestBuildModel(unittest.TestCase):
         self.assertEqual(model.kernel, "rbf")
 
     def test_unknown_raises(self):
-        if not self.sklearn_available:
+        if not self.sklearn_available:  # pragma: no cover
             self.skipTest("sklearn not installed")
         from data_ai.tc_predictor import _build_model
 
@@ -170,7 +170,7 @@ class TestTrainAndEvaluate(unittest.TestCase):
             import sklearn  # noqa: F401
 
             self.deps_available = True
-        except ImportError:
+        except ImportError:  # pragma: no cover
             self.deps_available = False
 
     def _make_df(self):
@@ -192,7 +192,7 @@ class TestTrainAndEvaluate(unittest.TestCase):
         )
 
     def test_rf_returns_metrics(self):
-        if not self.deps_available:
+        if not self.deps_available:  # pragma: no cover
             self.skipTest("sklearn/pandas not installed")
         from data_ai.tc_predictor import train_and_evaluate
 
@@ -205,7 +205,7 @@ class TestTrainAndEvaluate(unittest.TestCase):
         self.assertEqual(len(result["importances"]), 6)
 
     def test_gbr_returns_metrics(self):
-        if not self.deps_available:
+        if not self.deps_available:  # pragma: no cover
             self.skipTest("sklearn/pandas not installed")
         from data_ai.tc_predictor import train_and_evaluate
 
@@ -215,7 +215,7 @@ class TestTrainAndEvaluate(unittest.TestCase):
         self.assertIsNotNone(result["model"])
 
     def test_svr_has_scaler(self):
-        if not self.deps_available:
+        if not self.deps_available:  # pragma: no cover
             self.skipTest("sklearn/pandas not installed")
         from data_ai.tc_predictor import train_and_evaluate
 
@@ -224,7 +224,7 @@ class TestTrainAndEvaluate(unittest.TestCase):
         self.assertIsNotNone(result["scaler"], "SVR should use StandardScaler")
 
     def test_rf_no_scaler(self):
-        if not self.deps_available:
+        if not self.deps_available:  # pragma: no cover
             self.skipTest("sklearn/pandas not installed")
         from data_ai.tc_predictor import train_and_evaluate
 
@@ -242,11 +242,11 @@ class TestGenerateSupercon(unittest.TestCase):
             import pandas  # noqa: F401
 
             self.deps_available = True
-        except ImportError:
+        except ImportError:  # pragma: no cover
             self.deps_available = False
 
     def test_generates_csv(self):
-        if not self.deps_available:
+        if not self.deps_available:  # pragma: no cover
             self.skipTest("numpy/pandas not installed")
         import pandas as pd
 
@@ -273,7 +273,7 @@ class TestGenerateSupercon(unittest.TestCase):
 
     def test_tc_range(self):
         """SuperCon 데이터의 Tc 범위가 넓어야 한다 (0~260K)."""
-        if not self.deps_available:
+        if not self.deps_available:  # pragma: no cover
             self.skipTest("numpy/pandas not installed")
         import pandas as pd
 

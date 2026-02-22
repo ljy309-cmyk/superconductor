@@ -185,7 +185,7 @@ class TestTunnelingParticlePosition(unittest.TestCase):
             if p.tunneled is True:
                 self.assertGreater(p.x, BARRIER_X, "Tunneled particle should be past barrier")
                 return
-        self.fail("No tunneling event occurred")
+        self.fail("No tunneling event occurred")  # pragma: no cover
 
     def test_reflected_particle_stays_before_barrier(self):
         """반사 시 입자가 장벽 왼쪽에 위치."""
@@ -201,7 +201,7 @@ class TestTunnelingParticlePosition(unittest.TestCase):
             if p.tunneled is False:
                 self.assertLess(p.x, BARRIER_X, "Reflected particle should be before barrier")
                 return
-        self.fail("No reflection event occurred")
+        self.fail("No reflection event occurred")  # pragma: no cover
 
     def test_reflected_particle_reverses_direction(self):
         """반사 시 입자의 수평 속도가 반전된다 (왼쪽으로)."""
@@ -217,7 +217,7 @@ class TestTunnelingParticlePosition(unittest.TestCase):
             if p.tunneled is False:
                 self.assertLess(p.vx, 0, "Reflected particle should move left")
                 return
-        self.fail("No reflection event occurred")
+        self.fail("No reflection event occurred")  # pragma: no cover
 
     def test_tunneled_particle_speed_boosted(self):
         """터널링 성공 시 속도 부스트 적용."""
@@ -235,7 +235,7 @@ class TestTunnelingParticlePosition(unittest.TestCase):
                 expected_vx = PARTICLE_SPEED * boost
                 self.assertAlmostEqual(p.vx, expected_vx, delta=1.0)
                 return
-        self.fail("No tunneling event occurred")
+        self.fail("No tunneling event occurred")  # pragma: no cover
 
 
 # ═══════════════════════════════════════════════════════
@@ -662,7 +662,7 @@ class TestQuantumAdvantageScenarios(unittest.TestCase):
         all_correlated = True
         for _ in range(n):
             a, b = measure_bell(BELL_STATES["Φ+"])
-            if a != b:
+            if a != b:  # pragma: no cover
                 all_correlated = False
                 break
 

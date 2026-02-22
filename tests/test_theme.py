@@ -93,7 +93,7 @@ class TestThemeListeners(unittest.TestCase):
         calls = []
 
         def fn():
-            return calls.append(1)
+            calls.append(1)
 
         theme.on_theme_change(fn)
         theme.off_theme_change(fn)
@@ -108,7 +108,7 @@ class TestThemeListeners(unittest.TestCase):
         calls = []
 
         def fn():
-            return calls.append(1)
+            calls.append(1)
 
         theme.on_theme_change(fn)
         theme.on_theme_change(fn)  # 중복 등록 시도

@@ -584,7 +584,7 @@ try:
     import tkinter
 
     _HAS_TK = True
-except ImportError:
+except ImportError:  # pragma: no cover
     _HAS_TK = False
 
 

@@ -63,7 +63,7 @@ class TestExportSettings(unittest.TestCase):
         from settings_io import _BASE, export_settings
 
         config_path = os.path.join(_BASE, "config.json")
-        if not os.path.exists(config_path):
+        if not os.path.exists(config_path):  # pragma: no cover
             self.skipTest("config.json not found")
 
         with open(config_path, encoding="utf-8") as f:

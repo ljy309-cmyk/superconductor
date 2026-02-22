@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # pandas가 없는 환경용 모킹
-if "pandas" not in sys.modules:
+if "pandas" not in sys.modules:  # pragma: no cover
     _pd_mock = MagicMock()
     _pd_mock.DataFrame.return_value = MagicMock(
         to_dict=MagicMock(return_value=[]),
@@ -112,7 +112,7 @@ class TestPlayLogger(unittest.TestCase):
             try:
                 l = PlayLogger()
                 instances.append(id(l))
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 errors.append(e)
 
         threads = [threading.Thread(target=create) for _ in range(10)]
@@ -180,7 +180,7 @@ try:
     import tkinter
 
     _HAS_TKINTER = True
-except ImportError:
+except ImportError:  # pragma: no cover
     _HAS_TKINTER = False
 
 
@@ -225,7 +225,7 @@ class TestQRNGThreadSafety(unittest.TestCase):
         def producer():
             try:
                 push_key_bits([1] * 100)
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 errors.append(e)
 
         def consumer():
@@ -236,7 +236,7 @@ class TestQRNGThreadSafety(unittest.TestCase):
                     if b is not None:
                         count += 1
                 results.append(count)
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 errors.append(e)
 
         threads = []

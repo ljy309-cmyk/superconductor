@@ -802,7 +802,7 @@ class TestReflectDamping(unittest.TestCase):
 
     def test_damping_reduces_speed(self):
         """감쇠 후 |vx| < 원래 |vx| (REFLECT_DAMPING < 1 가정)."""
-        if REFLECT_DAMPING >= 1.0:
+        if REFLECT_DAMPING >= 1.0:  # pragma: no cover
             self.skipTest("REFLECT_DAMPING >= 1.0")
         p = QuantumParticle(seed=2)
         p.x = BARRIER_X - BARRIER_WIDTH_DEFAULT / 2 - PARTICLE_RADIUS + 1
