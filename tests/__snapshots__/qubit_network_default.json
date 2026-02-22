@@ -1,0 +1,40 @@
+{
+  "nodes": [
+    {
+      "collapsed": false,
+      "qid": 0,
+      "stress": 0.0
+    },
+    {
+      "collapsed": false,
+      "qid": 1,
+      "stress": 0.0
+    },
+    {
+      "collapsed": false,
+      "qid": 2,
+      "stress": 0.0
+    },
+    {
+      "collapsed": false,
+      "qid": 3,
+      "stress": 0.0
+    },
+    {
+      "collapsed": false,
+      "qid": 4,
+      "stress": 0.0
+    },
+    {
+      "collapsed": false,
+      "qid": 5,
+      "stress": 0.0
+    },
+    {
+      "collapsed": false,
+      "qid": 6,
+      "stress": 0.0
+    }
+  ],
+  "num_qubits": 7
+}

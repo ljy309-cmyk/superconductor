@@ -1,0 +1,137 @@
+[
+  {
+    "icon": "Q",
+    "id": "qc_first_play",
+    "title": "First Cascade"
+  },
+  {
+    "icon": "T",
+    "id": "qc_survivor_30",
+    "title": "30s Survivor"
+  },
+  {
+    "icon": "S",
+    "id": "qc_survivor_60",
+    "title": "1min Survivor"
+  },
+  {
+    "icon": "D",
+    "id": "qc_shield_master",
+    "title": "Shield Master"
+  },
+  {
+    "icon": "P",
+    "id": "qc_no_collapse",
+    "title": "Perfect Defense"
+  },
+  {
+    "icon": "W",
+    "id": "tn_first_tunnel",
+    "title": "First Tunnel"
+  },
+  {
+    "icon": "L",
+    "id": "tn_lucky_10",
+    "title": "Lucky Streak"
+  },
+  {
+    "icon": "B",
+    "id": "tn_rate_50",
+    "title": "Probability Bender"
+  },
+  {
+    "icon": "A",
+    "id": "tn_rate_75",
+    "title": "Quantum Ace"
+  },
+  {
+    "icon": "R",
+    "id": "tn_speed_run",
+    "title": "Speed Runner"
+  },
+  {
+    "icon": "Q",
+    "id": "tn_quantum_advantage",
+    "title": "Quantum Advantage"
+  },
+  {
+    "icon": "C",
+    "id": "tn_compare_master",
+    "title": "Compare Master"
+  },
+  {
+    "icon": "X",
+    "id": "tn_barrier_master",
+    "title": "Barrier Breaker"
+  },
+  {
+    "icon": "M",
+    "id": "qec_survivor_60",
+    "title": "QEC Master"
+  },
+  {
+    "icon": "E",
+    "id": "qec_efficient",
+    "title": "Efficient Shielding"
+  },
+  {
+    "icon": "K",
+    "id": "bb84_first_play",
+    "title": "Protocol Initiator"
+  },
+  {
+    "icon": "H",
+    "id": "bb84_score_500",
+    "title": "Score 500"
+  },
+  {
+    "icon": "F",
+    "id": "bb84_manual_5",
+    "title": "Quick Hands"
+  },
+  {
+    "icon": "X",
+    "id": "bb84_trap_3",
+    "title": "Decoy Expert"
+  },
+  {
+    "icon": "G",
+    "id": "sq_first_win",
+    "title": "Mine Sweeper"
+  },
+  {
+    "icon": "V",
+    "id": "sq_perfect",
+    "title": "Perfect Scan"
+  },
+  {
+    "icon": "E",
+    "id": "qa_first_play",
+    "title": "Entangled Keys"
+  },
+  {
+    "icon": "B",
+    "id": "qa_bell_violation",
+    "title": "Bell Breaker"
+  },
+  {
+    "icon": "R",
+    "id": "qa_e91_200",
+    "title": "E91 Veteran"
+  },
+  {
+    "icon": "G",
+    "id": "qa_ghz_consistent",
+    "title": "GHZ Harmony"
+  },
+  {
+    "icon": "U",
+    "id": "fp_first_play",
+    "title": "Levitation!"
+  },
+  {
+    "icon": "A",
+    "id": "all_modules",
+    "title": "Explorer"
+  }
+]

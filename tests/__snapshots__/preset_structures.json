@@ -1,0 +1,23 @@
+{
+  "easy": [
+    "bb84",
+    "qec_shield",
+    "qubit_chain",
+    "squid_mines",
+    "tunneling"
+  ],
+  "hard": [
+    "bb84",
+    "qec_shield",
+    "qubit_chain",
+    "squid_mines",
+    "tunneling"
+  ],
+  "normal": [
+    "bb84",
+    "qec_shield",
+    "qubit_chain",
+    "squid_mines",
+    "tunneling"
+  ]
+}

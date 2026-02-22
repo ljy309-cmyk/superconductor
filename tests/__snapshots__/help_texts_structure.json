@@ -1,0 +1,32 @@
+{
+  "line_counts": {
+    "bb84_defense": 20,
+    "cooper_pair": 21,
+    "entanglement": 27,
+    "flux_pinning": 16,
+    "gate_builder": 20,
+    "josephson_junction": 25,
+    "phase_transition_sim": 19,
+    "qec_shield": 16,
+    "qkd_advanced": 39,
+    "qubit_chain": 20,
+    "scada_security": 29,
+    "squid_mines": 23,
+    "tunneling": 26
+  },
+  "modules": [
+    "bb84_defense",
+    "cooper_pair",
+    "entanglement",
+    "flux_pinning",
+    "gate_builder",
+    "josephson_junction",
+    "phase_transition_sim",
+    "qec_shield",
+    "qkd_advanced",
+    "qubit_chain",
+    "scada_security",
+    "squid_mines",
+    "tunneling"
+  ]
+}

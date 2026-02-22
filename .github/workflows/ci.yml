@@ -80,3 +80,43 @@ jobs:
           name: coverage-report
           path: coverage.xml
           retention-days: 30
+
+  a11y:
+    name: Accessibility Lint
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install numpy
+
+      - name: Run a11y lint
+        run: python scripts/a11y_lint.py --verbose
+
+  e2e:
+    name: E2E Tests (Playwright)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy matplotlib requests flask
+          pip install pytest playwright
+          playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        run: python -m pytest tests/test_e2e_playwright.py -v --tb=short

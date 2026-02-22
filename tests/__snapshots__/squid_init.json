@@ -1,0 +1,8 @@
+{
+  "actual_mines": 8,
+  "grid_cols": 10,
+  "grid_rows": 8,
+  "num_mines_config": 8,
+  "revealed": false,
+  "won": false
+}
