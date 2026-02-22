@@ -534,7 +534,6 @@ class TestPresets(unittest.TestCase):
         self.assertIn("eve_chance", normal["bb84"])
 
     def test_save_load_profile(self):
-
         from presets import list_profiles, load_profile, save_profile
 
         test_data = {"noise_rate": 5.0, "sensitivity": 3.0}
